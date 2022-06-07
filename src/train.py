@@ -1,7 +1,7 @@
 import os
-from .conversion import make_env
 from stable_baselines3.common.callbacks import CallbackList, CheckpointCallback, EvalCallback, EveryNTimesteps, BaseCallback
-from .callbacks import TqdmCallback, PlottingCallback, PlottingCallbackStartStop, LoggingCallback
+from utils.callbacks import TqdmCallback, LoggingCallback
+from utils.conversion import make_env
 import logging
 
 def train_model(name, train_env, eval_envs, eval_params,
@@ -21,10 +21,6 @@ def train_model(name, train_env, eval_envs, eval_params,
         os.mkdir(savePath)
 
     recordEvery = int(total_timesteps/evals) if evals > 0 else 1000
-    policy_kwargs = dict(
-        # change model hyperparams if cnn
-        features_extractor_kwargs=dict(features_dim=extractor_features ),
-        ) if policy[0]=='C' else {}
     
     train_env = make_env(train_env[0], player_config, train_env[1], memory=memory, threads=threads,
                          reduce_color=reduce_color, size=size, reward_decay=reward_decay,
@@ -42,18 +38,13 @@ def train_model(name, train_env, eval_envs, eval_params,
                              log_path=os.path.join(savePath,'/logs/'), eval_freq=recordEvery,
                              n_eval_episodes=eval_eps,
                              deterministic=True, render=False, verbose=0) for eval_env in eval_envs]
-    plot_cb = EveryNTimesteps(n_steps=recordEvery, callback=
-                PlottingCallback(savePath=savePath, name=name, envs=eval_envs, 
-                    names=eval_params, eval_cbs=eval_cbs, verbose=0))
-    plot_cb_extra = PlottingCallbackStartStop(savePath=savePath, name=name,
-                envs=eval_envs, names=eval_params, eval_cbs=eval_cbs, verbose=0,
-                params=str(locals()))
+
     tqdm_cb = EveryNTimesteps(n_steps=batch_size, callback=
                 TqdmCallback(threads=threads, record_every=batch_size))
 
     model.learn(total_timesteps=total_timesteps, 
                 tb_log_name=name, reset_num_timesteps=True, callback=
-                [eval_cbs, plot_cb, plot_cb_extra, tqdm_cb]
+                [eval_cbs, tqdm_cb]
                 )
 
     if saveModel:
