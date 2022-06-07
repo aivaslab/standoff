@@ -1,6 +1,6 @@
 # The Standoff Environment
 
-Gridworld environment for competitive-feeding-like theory of mind experiments, based on [marlgrid](https://github.com/kandouss/marlgrid), a fork of [MiniGrid](https://github.com/Farama-Foundation/gym-minigrid).
+Gridworld environment for competitive-feeding-like theory of mind experiments, based on [MarlGrid](https://github.com/kandouss/marlgrid), a fork of [MiniGrid](https://github.com/Farama-Foundation/gym-minigrid).
 
 [image]()
 
