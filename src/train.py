@@ -1,6 +1,4 @@
 import os
-from stable_baselines3.common.callbacks import CallbackList, CheckpointCallback, EvalCallback, EveryNTimesteps, BaseCallback
-from utils.callbacks import TqdmCallback, LoggingCallback
 from utils.conversion import make_env
 import logging
 
@@ -34,17 +32,8 @@ def train_model(name, train_env, eval_envs, eval_params,
     model = framework(policy, train_env, learning_rate=learning_rate, 
                       n_steps=batch_size, tensorboard_log="logs", policy_kwargs=policy_kwargs)
 
-    eval_cbs = [EvalCallback(eval_env, best_model_save_path=os.path.join(savePath,'/logs/best_model'),
-                             log_path=os.path.join(savePath,'/logs/'), eval_freq=recordEvery,
-                             n_eval_episodes=eval_eps,
-                             deterministic=True, render=False, verbose=0) for eval_env in eval_envs]
-
-    tqdm_cb = EveryNTimesteps(n_steps=batch_size, callback=
-                TqdmCallback(threads=threads, record_every=batch_size))
-
     model.learn(total_timesteps=total_timesteps, 
-                tb_log_name=name, reset_num_timesteps=True, callback=
-                [eval_cbs, tqdm_cb]
+                tb_log_name=name, reset_num_timesteps=True
                 )
 
     if saveModel:
