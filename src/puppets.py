@@ -1,16 +1,18 @@
 from operator import sub
 
-def pathfind(board, start, goal, startDir):
-    #returns dict describing directions at tiles along path
+
+def pathfind(board, start, goal):
+    # returns dict describing directions at tiles along path
     path = astar(board, start, goal)
     pathDict = {}
     for i, pos in enumerate(path):
-        if i < len(path)-1:
-            pathDict[str(pos)] = [(1, 0), (0, 1), (-1, 0), (0, -1)].index(tuple(map(sub,path[i+1],pos)))
+        if i < len(path) - 1:
+            pathDict[str(pos)] = [(1, 0), (0, 1), (-1, 0), (0, -1)].index(tuple(map(sub, path[i + 1], pos)))
     return pathDict
 
-#below from https://medium.com/@nicholas.w.swift/easy-a-star-pathfinding-7e6689c7f7b2
-class Node():
+
+# below from https://medium.com/@nicholas.w.swift/easy-a-star-pathfinding-7e6689c7f7b2
+class Node:
     """A node class for A* Pathfinding"""
 
     def __init__(self, parent=None, position=None, solid=False):
@@ -64,17 +66,18 @@ def astar(maze, start, end):
             while current is not None:
                 path.append(current.position)
                 current = current.parent
-            return path[::-1] # Return reversed path
+            return path[::-1]  # Return reversed path
 
         # Generate children
         children = []
-        for new_position in [(0, -1), (0, 1), (-1, 0), (1, 0)]: # Adjacent squares
+        for new_position in [(0, -1), (0, 1), (-1, 0), (1, 0)]:  # Adjacent squares
 
             # Get node position
             node_position = (current_node.position[0] + new_position[0], current_node.position[1] + new_position[1])
 
             # Make sure within range
-            if node_position[0] > (len(maze) - 1) or node_position[0] < 0 or node_position[1] > (len(maze[len(maze)-1]) -1) or node_position[1] < 0:
+            if node_position[0] > (len(maze) - 1) or node_position[0] < 0 or node_position[1] > (
+                    len(maze[len(maze) - 1]) - 1) or node_position[1] < 0:
                 continue
 
             # Make sure walkable terrain
@@ -93,7 +96,8 @@ def astar(maze, start, end):
 
                 # Create the f, g, and h values
                 child.g = current_node.g + 1 + child.solid
-                #child.h = ((child.position[0] - end_node.position[0]) ** 2) + ((child.position[1] - end_node.position[1]) ** 2)
+                # child.h = ((child.position[0] - end_node.position[0]) ** 2) + ((child.position[1] -
+                # end_node.position[1]) ** 2)
                 child.h = (child.position[0] - end_node.position[0]) + (child.position[1] - end_node.position[1])
                 child.f = child.g + child.h
 
