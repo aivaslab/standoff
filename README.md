@@ -1,8 +1,8 @@
 # The Standoff Environment
 
 
-![[https://github.com/aivaslab/standoff/blob/main/images/compfeed2.png?raw=true | width=100px]] 
-![[https://github.com/aivaslab/standoff/blob/main/images/compfeed.png?raw=true | width=100px]]
+[[https://github.com/aivaslab/standoff/blob/main/images/compfeed2.png?raw=true | width=100px]] 
+[[https://github.com/aivaslab/standoff/blob/main/images/compfeed.png?raw=true | width=100px]]
 
 Gridworld environment for competitive-feeding-like theory of mind experiments, based on [MarlGrid](https://github.com/kandouss/marlgrid), a fork of [MiniGrid](https://github.com/Farama-Foundation/gym-minigrid).
 
