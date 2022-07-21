@@ -1,5 +1,5 @@
-from ..base_AEC import *
-from ..objects import *
+from ..base_AEC import para_MultiGridEnv, MultiGrid
+from ..objects import Wall, Goal, Curtain, Block, GlassBlock, Box
 import random
 from ..puppets import pathfind
 import copy
@@ -48,8 +48,10 @@ class StandoffEnv(para_MultiGridEnv):
             "sharedRewards": [False],
             "firstBig": [True],
             "boxes": [5],  # [2,3,4,5],
+            "sub_valence": [1],
+            "dom_valence": [1],
             "puppets": [1],
-            "followDistance": [0],  # 0 = d first, 1=sub first
+            "followDistance": [1], # subordinate has delayed release. for subordinate first, use negative
             "lavaHeight": [2],
             "baits": [1],
             "baitSize": [2],
@@ -87,8 +89,10 @@ class StandoffEnv(para_MultiGridEnv):
                   rational=True,
                   sharedRewards=False,
                   boxes=5,
+                  sub_valence=1,
+                  dom_valence=1,
                   puppets=1,
-                  followDistance=0,
+                  followDistance=1,
                   lavaHeight=2,
                   baits=1,
                   baitSize=2,
@@ -108,8 +112,7 @@ class StandoffEnv(para_MultiGridEnv):
         self.box_reward = 1
         self.food_locs = list(range(boxes))
         random.shuffle(self.food_locs)
-        self.release1 = []
-        self.release2 = []
+        self.release = []
         releaseGap = boxes * 2 + atrium
         self.width = boxes * 2 + 3
         self.height = lavaHeight + startRoom * 2 + atrium * 2 + 2
@@ -125,6 +128,7 @@ class StandoffEnv(para_MultiGridEnv):
             self.agent_spawn_pos[agent] = (xx, h, d)
             self.agent_box_pos[agent] = (xx, h + (1 if agent == "player_0" else -1))
             a = self.instance_from_name[agent]
+            a.valence = sub_valence if agent == "player_0" else dom_valence
             if k > puppets:
                 a.spawn_delay = 1000
                 a.active = False
@@ -146,17 +150,17 @@ class StandoffEnv(para_MultiGridEnv):
 
         for box in range(boxes + 1):
             if box < boxes:
-                self.put_obj(Block(init_state=0, color="blue"), box * 2 + 2, startRoom)
-                self.release1 += [(box * 2 + 2, startRoom)]
-                self.put_obj(Block(init_state=0, color="blue"), box * 2 + 2, startRoom + atrium)
-                self.release2 += [(box * 2 + 2, startRoom + atrium)]
                 self.put_obj(Wall(), box * 2 + 1, startRoom - 1)
-
+                self.put_obj(Block(init_state=0, color="blue"), box * 2 + 2, startRoom)
                 self.put_obj(Block(init_state=0, color="blue"), box * 2 + 2, self.height - startRoom - 1)
-                self.release1 += [(box * 2 + 2, self.height - startRoom - 1)]
-                self.put_obj(Block(init_state=0, color="blue"), box * 2 + 2, self.height - startRoom - atrium - 1)
-                self.release2 += [(box * 2 + 2, self.height - startRoom - atrium - 1)]
+                self.release += [[(box * 2 + 2, startRoom)]]
+                self.release += [[(box * 2 + 2, self.height - startRoom - 1)]]
+
                 self.put_obj(Wall(), box * 2 + 1, self.height - 2)
+                self.put_obj(Block(init_state=0, color="blue"), box * 2 + 2, startRoom + atrium)
+                self.put_obj(Block(init_state=0, color="blue"), box * 2 + 2, self.height - startRoom - atrium - 1)
+                self.release += [[(box * 2 + 2, startRoom + atrium)]]
+                self.release += [[(box * 2 + 2, self.height - startRoom - atrium - 1)]]
             for j in range(lavaHeight):
                 x = box * 2 + 1
                 y = j + startRoom + atrium + 1
@@ -227,33 +231,40 @@ class StandoffEnv(para_MultiGridEnv):
                 if bait + baitSize > baits - 1:
                     self.add_timer("hideall", curTime + swapTime + 1)
             curTime += baitLength
-        self.add_timer("release1", curTime + 1)
-        self.add_timer("release2",
-                       curTime + 1 + releaseGap)  # release2 also checks for the x coord of actor/correctness/ends in test mode
+
+        if followDistance < 0:
+            subRelease = 0
+            domRelease = -followDistance
+        else:
+            subRelease = followDistance
+            domRelease = 0
+        self.add_timer("release0", curTime + 1 + domRelease)
+        self.add_timer("release1", curTime + 1 + subRelease)
+        self.add_timer("release2", curTime + 1 + releaseGap + domRelease)
+        self.add_timer("release3", curTime + 1 + releaseGap + subRelease)
 
     def timer_active(self, name):
+        # todo: make all these events more sensibly written, not dependent on food starting locs
         boxes = self.params["boxes"]
         firstBig = self.params["firstBig"]
         followDistance = self.params["followDistance"]
         y = self.height // 2 - followDistance
-        if name == "release1":
-            for xx, yy in self.release1:
-                self.del_obj(xx, yy)
-        if name == "release2":
-            for xx, yy in self.release2:
+        if "release" in name:
+            release_no = int(name[-1])
+            for xx, yy in self.release[release_no]:
                 self.del_obj(xx, yy)
         if "place" in name or "hide" in name or "remove" in name:
             for box in range(boxes):
                 x = box * 2 + 2
                 if "place" in name:
-                    if box == self.food_locs[0] and "1" in name:
+                    if box == self.food_locs[not firstBig] and "1" in name:
                         self.put_obj(Goal(reward=100, size=1.0, color='green'), x, y)
-                    if box == self.food_locs[1] and "2" in name:
+                    if box == self.food_locs[firstBig] and "2" in name:
                         self.put_obj(Goal(reward=25, size=0.5, color='green'), x, y)
 
                 elif "hide" in name:
-                    if "all" in name or (box == self.food_locs[0] and "1" in name) or (
-                            box == self.food_locs[1] and "2" in name):
+                    if "all" in name or (box == self.food_locs[not firstBig] and "1" in name) or (
+                            box == self.food_locs[firstBig] and "2" in name):
                         b1 = Box(color="yellow")
                         c = self.grid.get(x, y)
                         if c:
@@ -276,10 +287,10 @@ class StandoffEnv(para_MultiGridEnv):
             # currently only does big food, should it do small?
             for box in range(boxes):
                 x = box * 2 + 2
-                y = self.height // 2 - followDistance
+                y = self.height // 2
                 if box == self.food_locs[2]:
                     self.put_obj(Goal(reward=100, size=1.0, color='green'), x, y)
-                elif box == self.food_locs[0]:
+                elif box == self.food_locs[not firstBig]:
                     self.del_obj(x, y)
         if name == "move":
             # both foods are moved to new locations
@@ -289,14 +300,14 @@ class StandoffEnv(para_MultiGridEnv):
                     self.put_obj(Goal(reward=100, size=1.0, color='green'), x, y)
                 if box == self.food_locs[3]:
                     self.put_obj(Goal(reward=25, size=0.5, color='green'), x, y)
-                elif box == self.food_locs[0] or box == self.food_locs[1]:
+                elif box == self.food_locs[not firstBig] or box == self.food_locs[firstBig]:
                     self.del_obj(x, y)
         if name == "swap":
             for box in range(boxes):
                 x = box * 2 + 2
-                if box == self.food_locs[1]:
+                if box == self.food_locs[firstBig]:
                     self.put_obj(Goal(reward=100, size=1.0, color='green'), x, y)
-                elif box == self.food_locs[0]:
+                elif box == self.food_locs[not firstBig]:
                     self.put_obj(Goal(reward=25, size=0.5, color='green'), x, y)
 
         if "blind" in name or "reveal" in name:
@@ -316,7 +327,6 @@ class StandoffEnv(para_MultiGridEnv):
 
         # whenever food updates, remember locations
         if name in ["init", "swap", "replace", "reveal", "release1"] or "remove" in name or "place" in name:
-            # =print(name)
 
             for box in range(boxes):
                 x = box * 2 + 2

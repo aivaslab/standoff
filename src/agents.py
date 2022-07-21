@@ -36,6 +36,7 @@ class GridAgentInterface(GridAgent):
             **kwargs):
         super().__init__(**kwargs)
 
+        self.prestige = None
         if hide_item_types is None:
             hide_item_types = []
         self.view_type = view_type
@@ -56,6 +57,8 @@ class GridAgentInterface(GridAgent):
         self.prestige_scale = prestige_scale
         self.allow_negative_prestige = allow_negative_prestige
         self.spawn_delay = spawn_delay
+
+        self.valence = 1
 
         self.nextActs = []
         self.pathDict = {}
@@ -156,11 +159,11 @@ class GridAgentInterface(GridAgent):
 
     def reward(self, rew):
         if self.allow_negative_prestige:
-            self.prestige += rew
+            self.prestige += self.valence*rew
         else:
-            if rew >= 0:
-                self.prestige += rew
-            else:  # rew < 0
+            if self.valence*rew >= 0:
+                self.prestige += self.valence*rew
+            else:
                 self.prestige = 0
 
     def activate(self):
@@ -192,7 +195,7 @@ class GridAgentInterface(GridAgent):
         Get the direction vector for the agent, pointing in the direction
         of forward movement.
         """
-        assert self.dir >= 0 and self.dir < 4
+        assert 0 <= self.dir < 4
         return np.array([[1, 0], [0, 1], [-1, 0], [0, -1]])[self.dir]
 
     @property

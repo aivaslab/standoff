@@ -1,7 +1,5 @@
 
-
-
-class ScenarioConfigs():
+class ScenarioConfigs:
     tutorial = {
         "empty": {
             "puppets": 0,
@@ -38,8 +36,8 @@ class ScenarioConfigs():
             "eType": "t",
             "eVar": "g"
         },
-        #2 eVariants are all doorkey
-        #3 eVariants are also doorkey
+        # 2 eVariants are all doorkey
+        # 3 eVariants are also doorkey
         "nav_no_goal": {
             "puppets": 0,
             "eType": "n",
@@ -50,15 +48,15 @@ class ScenarioConfigs():
             "eType": "n",
             "eVar": "b"
         },
-        #...
+        # ...
     }
 
     standoff = {
         "tutorial_step_1": {
             "puppets": 0,
             "boxes": [5],
-            "baitSize": [1,2],
-            "followDistance": [0,1],
+            "baitSize": [1 ,2],
+            "followDistance": [0 ,1],
             "visibility": ['full', 'curtains'],
             "informed": "informed",
             "hidden": [False, True]
@@ -66,8 +64,8 @@ class ScenarioConfigs():
         "tutorial_step_1a": {
             "puppets": 0,
             "boxes": [5],
-            "baitSize": [1,2],
-            "followDistance": [0,1],
+            "baitSize": [1 ,2],
+            "followDistance": [0 ,1],
             "visibility": ['full'],
             "informed": "informed",
             "hidden": [False]
@@ -75,24 +73,24 @@ class ScenarioConfigs():
         "tutorial_step_1b": {
             "puppets": 0,
             "boxes": [5],
-            "baitSize": [1,2],
-            "followDistance": [0,1],
+            "baitSize": [1 ,2],
+            "followDistance": [0 ,1],
             "visibility": ['full'],
             "informed": "informed",
             "hidden": [True]
         },
         "tutorial_step_2": {
-            #more eVaried training, including easier cases than eval
+            # more eVaried training, including easier cases than eval
             "puppets": 1,
             "boxes": [5],
             "baitSize": [2],
-            "followDistance": [0,1],
+            "followDistance": [0 ,1],
             "visibility": ['curtains'],
             "informed": "informed",
             "hidden": [False, True]
         },
         "tutorial_step_2_eval": {
-            #single test config that must be passed
+            # single test config that must be passed
             "puppets": 1,
             "boxes": [5],
             "baitSize": [2],
@@ -122,7 +120,7 @@ class ScenarioConfigs():
             "baits": 2,
         },
         "moved": {
-            "informed": "informed", #but uninformed about first baiting
+            "informed": "informed",  # but uninformed about first baiting
             "swapType": 'move',
             "baitSize": 2,
             "baits": 2,
@@ -135,7 +133,7 @@ class ScenarioConfigs():
         },
         "misinformed": {
             "informed": "uninformed",
-            "swapType": ['swap', 'replace'], #any bucket swapped with a food
+            "swapType": ['swap', 'replace'],  # any bucket swapped with a food
             "baitSize": 2,
             "baits": 2,
         },
@@ -155,16 +153,16 @@ class AllParams():
             "hidden": [True, False],
             "rational": [True, False],
             "sharedRewards": [True, False],
-            "firstBig": [True, False],#whether we place big first
-            "boxes": [2,3,4,5],
-            "puppets": [0,1,2],
-            "followDistance": [0,1], #0 = d first, 1=sub first
+            "firstBig": [True, False]  ,  # whether we place big first
+            "boxes": [2 ,3 ,4 ,5],
+            "puppets": [0 ,1 ,2],
+            "followDistance": [0 ,1],  # 0 = d first, 1=sub first
             "lavaHeight": [2],
-            "baits": [1,2],
-            "baitSize": [1,2],
+            "baits": [1 ,2],
+            "baitSize": [1 ,2],
             "informed": ['informed', 'uninformed', 'fake', 'half1', 'half2'],
             "swapType": ['swap', 'replace', 'remove', 'move', 'mis'],
-            "visibility": ['full', 'curtains'], #keys, invisibility potion
+            "visibility": ['full', 'curtains'],  # keys, invisibility potion
             "cause": ['blocks', 'direction', 'accident', 'inability'],
             "lava": ['lava', 'block'],
             }

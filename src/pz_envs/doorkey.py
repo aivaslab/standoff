@@ -1,8 +1,6 @@
-from ..base_AEC import *
-from ..objects import *
+from ..base_AEC import para_MultiGridEnv, MultiGrid
+from ..objects import Door, Key, Goal
 from random import randrange
-import random
-import math
 
 class para_DoorKeyEnv(para_MultiGridEnv):
     """

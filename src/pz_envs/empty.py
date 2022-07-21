@@ -1,5 +1,5 @@
-from ..base_AEC import *
-from ..objects import *
+from ..base_AEC import para_MultiGridEnv, MultiGrid
+from ..objects import Wall, Door, Key, Goal, Lava
 
 
 class EmptyMultiGrid(para_MultiGridEnv):
