@@ -28,7 +28,7 @@ class PlottingCallback(BaseCallback):
     :param verbose: (int) Verbosity level 0: not output 1: info 2: debug
     """
     def __init__(self, verbose=0, savePath='', name='', envs=[], names=[], eval_cbs=[]):
-        super(PlottingCallback, self).__init__(verbose)
+        super().__init__(verbose)
         self.savePath = savePath
         self.logPath = os.path.join(savePath, 'logs.txt')
         self.name = name
@@ -51,7 +51,7 @@ class PlottingCallbackStartStop(BaseCallback):
     # bandaid fix to EveryNTimesteps not triggering at training start and end
     """
     def __init__(self, verbose=0, savePath='', name='', envs=[], names=[], eval_cbs=[], params=[]):
-        super(PlottingCallbackStartStop, self).__init__(verbose)
+        super().__init__(verbose)
         self.savePath = savePath
         self.logPath = os.path.join(savePath, 'logs.txt')
         self.name = name
@@ -62,7 +62,7 @@ class PlottingCallbackStartStop(BaseCallback):
         self.params = params
 
     def _on_training_start(self) -> bool:
-        super(PlottingCallbackStartStop, self)._on_training_start()
+        super()._on_training_start()
 
         with open(self.logPath, 'w') as logfile:
             logfile.write(self.params)
@@ -73,7 +73,7 @@ class PlottingCallbackStartStop(BaseCallback):
         return True
 
     def _on_training_end(self) -> bool:
-        super(PlottingCallbackStartStop, self)._on_training_end()
+        super()._on_training_end()
 
         with open(self.logPath, 'w') as logfile:
             logfile.write('end of training! total time:', time.time()-self.start_time)
