@@ -1,5 +1,6 @@
 # @title Agents.py
 import gym
+import gym.spaces
 import numba
 from .objects import *
 
