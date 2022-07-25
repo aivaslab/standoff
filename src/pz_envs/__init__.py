@@ -79,13 +79,6 @@ register_marl_env(
     n_agents=1,
 )
 
-register_marl_env(
-    "MarlGrid-1AgentSallyAnneEnv15x15-v0",
-    para_SallyAnneEnv,
-    grid_size=15,
-    view_size=7,
-    n_agents=1,
-)
 
 register_marl_env(
     "MarlGrid-1AgentTutorialEnv9x9-v0",
