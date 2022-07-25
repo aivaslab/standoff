@@ -122,9 +122,12 @@ class WorldObj(metaclass=RegisteredObjectType):
         # # if len(self.agents)>0:
         # #     return self.agents[0].encode(str_class=str_class)
         # # else:
-        enc_class = self.type if bool(str_class) else self.recursive_subclasses().index(self.__class__)
+        if bool(str_class):
+            enc_class = self.type
+        else:
+            enc_class = self.recursive_subclasses().index(self.__class__.__name__)
         enc_color = self.color if isinstance(self.color, int) else COLOR_TO_IDX[self.color]
-        return (enc_class, enc_color, self.state)
+        return enc_class, enc_color, self.state
 
     def describe(self):
         return f"Obj: {self.type}({self.color}, {self.state})"
