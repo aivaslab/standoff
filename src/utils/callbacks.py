@@ -7,8 +7,8 @@ import time
 import os
 
 class TqdmCallback(BaseCallback):
-    def __init__(self):
-        super().__init__(threads=1, record_every=1)
+    def __init__(self, threads=1, record_every=1):
+        super().__init__(record_every=1)
         self.progress_bar = None
         self.iteration_size = threads*record_every
     
@@ -16,7 +16,7 @@ class TqdmCallback(BaseCallback):
         self.progress_bar = tqdm(total=self.locals['total_timesteps'])
     
     def _on_step(self):
-        self.progress_bar.update(iteration_size) 
+        self.progress_bar.update(self.iteration_size)
         return True
 
     def _on_training_end(self):
@@ -37,7 +37,7 @@ class PlottingCallback(BaseCallback):
         self.eval_cbs = eval_cbs
 
     def _on_step(self) -> bool:
-        with open(logPath, 'w') as logfile:
+        with open(self.logPath, 'w') as logfile:
             logfile.write('accuracies and stuff')
             #todo: add custom cb for special infos (e.g. avoidance%, bigR%)
 
@@ -75,14 +75,14 @@ class PlottingCallbackStartStop(BaseCallback):
     def _on_training_end(self) -> bool:
         super(PlottingCallbackStartStop, self)._on_training_end()
 
-        with open(logPath, 'w') as logfile:
+        with open(self.logPath, 'w') as logfile:
             logfile.write('end of training! total time:', time.time()-self.start_time)
 
         plot_evals(self.savePath, self.name, self.names, self.eval_cbs)
             
         for env, name in zip(self.envs, self.names):
             make_pic_video(self.model, env, name, False, True, self.savePath)
-        plot_train(savePath, name+'train')
+        plot_train(self.savePath, name+'train')
         return True
 
     def _on_step(self):
