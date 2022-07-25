@@ -1,4 +1,4 @@
-from ..base_AEC import para_MultiGridEnv
+from ..base_AEC import para_MultiGridEnv, MultiGrid
 from ..objects import Wall, Door, Key, Goal, Lava
 from random import randrange
 import random
