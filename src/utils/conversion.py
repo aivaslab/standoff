@@ -2,7 +2,7 @@ from pettingzoo.utils.conversions import aec_to_parallel, parallel_to_aec
 import supersuit as ss
 from pettingzoo.utils import wrappers
 from ..agents import GridAgentInterface
-from marlgrid.marlgrid.pz_envs import env_from_config
+from ..pz_envs import env_from_config
 from stable_baselines3.common.vec_env import VecMonitor, VecFrameStack, VecVideoRecorder, VecTransposeImage
 import os
 
