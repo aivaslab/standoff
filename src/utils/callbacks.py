@@ -8,7 +8,7 @@ import os
 
 class TqdmCallback(BaseCallback):
     def __init__(self, threads=1, record_every=1):
-        super().__init__(record_every=1)
+        super().__init__()
         self.progress_bar = None
         self.iteration_size = threads*record_every
     
