@@ -125,6 +125,9 @@ class WorldObj(metaclass=RegisteredObjectType):
         if bool(str_class):
             enc_class = self.type
         else:
+            if self.__class__.__name__ not in self.recursive_subclasses():
+                self.recursive_subclasses().append(self.__class__.__name__)
+
             enc_class = self.recursive_subclasses().index(self.__class__.__name__)
         enc_color = self.color if isinstance(self.color, int) else COLOR_TO_IDX[self.color]
         return enc_class, enc_color, self.state
