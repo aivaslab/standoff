@@ -37,8 +37,8 @@ class PlottingCallback(BaseCallback):
         self.eval_cbs = eval_cbs
 
     def _on_step(self) -> bool:
-        with open(self.logPath, 'w') as logfile:
-            logfile.write('accuracies and stuff')
+        with open(self.logPath, 'a') as logfile:
+            logfile.write('accuracies and stuff\n')
             #todo: add custom cb for special infos (e.g. avoidance%, bigR%)
 
         plot_evals(self.savePath, self.name, self.names, self.eval_cbs)
