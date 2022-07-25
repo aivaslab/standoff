@@ -4,15 +4,10 @@ from random import randrange
 import random
 import math
 
-from .compfeed import *
 from .tutorial import *
 from .standoff import *
-from .contentFB import *
 from .doorkey import *
 from .empty import *
-from .knowguess import *
-from .yummyyucky import *
-from .sallyanne import *
 
 
 from ..agents import GridAgentInterface
