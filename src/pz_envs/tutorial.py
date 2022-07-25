@@ -1,5 +1,5 @@
 from ..base_AEC import para_MultiGridEnv, MultiGrid
-from ..objects import Wall, Door, Key, Goal, Lava
+from ..objects import Wall, Door, Key, Goal, Lava, Box
 from random import randrange
 import random
 from ..pz_envs.scenario_configs import ScenarioConfigs
