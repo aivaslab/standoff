@@ -4,6 +4,7 @@ from stable_baselines3.common.callbacks import CallbackList, CheckpointCallback,
 from tqdm.notebook import tqdm
 import logging
 import time
+import os
 
 class TqdmCallback(BaseCallback):
     def __init__(self):
