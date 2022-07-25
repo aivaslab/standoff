@@ -84,3 +84,6 @@ class PlottingCallbackStartStop(BaseCallback):
             make_pic_video(self.model, env, name, False, True, self.savePath)
         plot_train(savePath, name+'train')
         return True
+
+    def _on_step(self):
+        pass
