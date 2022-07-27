@@ -35,7 +35,7 @@ def make_env(envClass, player_config, configName=None, memory=1, threads=1, redu
 
     if reduce_color:
         env = ss.color_reduction_v0(env, 'B')
-    env = ss.resize_v0(env, x_size=size, y_size=size)
+    env = ss.resize_v1(env, x_size=size, y_size=size)
     if reduce_color:
         env = ss.reshape_v0(env, (size, size, 1))
     env = ss.pettingzoo_env_to_vec_env_v1(env)
