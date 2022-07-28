@@ -547,7 +547,7 @@ class para_MultiGridEnv(ParallelEnv):
         for name, agent in zip(self.agents + self.puppets, list(self.agent_instances.union(self.puppet_instances))):
             agent.agents = []
             agent.name = name
-            agent.nextActions = []
+            agent.next_actions = []
             agent.pathDict = {}
             self.instance_from_name[name] = agent
             agent.reset(new_episode=True)
@@ -620,12 +620,12 @@ class para_MultiGridEnv(ParallelEnv):
 
         # get all puppet actions
         puppet_actions = {}
-        for agent in self.puppet_instances:
-            nextAct = agent.nextActions[0]
+        for agent in self.puppets:
             a = self.instance_from_name[agent]
+            nextAct = a.next_actions[0]
 
-            if len(a.nextActs) > 0:
-                nextAct = a.nextActs.pop(0)
+            if len(a.next_actions) > 0:
+                nextAct = a.next_actions.pop(0)
             else:
                 if len(a.pathDict.keys()) > 0:
                     pass
@@ -812,7 +812,7 @@ class para_MultiGridEnv(ParallelEnv):
             if self.infos[agent] != {}:
                 # print('received', self.infos[agent])
                 if 'act' in self.infos[agent].keys():
-                    a.nextActs.append(self.infos[agent]['act'])
+                    a.next_actions.append(self.infos[agent]['act'])
                 if 'path' in self.infos[agent].keys():
                     a.pathDict = self.infos[agent]['path']
 
@@ -824,11 +824,11 @@ class para_MultiGridEnv(ParallelEnv):
                     direction = random.choice([0, 1, 2, 3])
                 relative_dir = (a.dir - direction) % 4
                 if relative_dir == 3 or relative_dir == 2:
-                    a.nextActs.append(1)
+                    a.next_actions.append(1)
                 elif relative_dir == 1:
-                    a.nextActs.append(0)
+                    a.next_actions.append(0)
                 elif relative_dir == 0:
-                    a.nextActs.append(2)
+                    a.next_actions.append(2)
 
         # clear puppets from obs, rewards, dones, infos
 

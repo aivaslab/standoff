@@ -61,7 +61,7 @@ class GridAgentInterface(GridAgent):
 
         self.valence = 1
 
-        self.nextActs = []
+        self.next_actions = []
         self.pathDict = {}
 
         if self.prestige_beta > 1:
@@ -179,7 +179,7 @@ class GridAgentInterface(GridAgent):
         self.pos = None
         self.carrying = None
         self.mission = ""
-        self.nextActs = []
+        self.next_actions = []
         self.pathDict = {}
         if new_episode:
             self.prestige = 0
