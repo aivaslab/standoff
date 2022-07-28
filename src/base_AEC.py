@@ -162,7 +162,7 @@ class MultiGrid:
         assert 0 <= j < self.height
         self.grid[i, j] = self.obj_reg.get_key(obj)
 
-    def get(self, i, j):
+    def get(self, i: object, j: object) -> object:
         assert 0 <= i < self.width
         assert 0 <= j < self.height
 
@@ -388,8 +388,6 @@ class para_MultiGridEnv(ParallelEnv):
         """
         self.agent_spawn_pos = None
         self.params = None
-        if puppets is None:
-            puppets = []
         if agents is None:
             agents = []
         if agent_spawn_kwargs is None:

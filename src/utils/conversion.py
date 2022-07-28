@@ -1,3 +1,5 @@
+import random
+
 from pettingzoo.utils.conversions import aec_to_parallel, parallel_to_aec
 import supersuit as ss
 from pettingzoo.utils import wrappers
@@ -11,6 +13,7 @@ def make_env(envClass, player_config, configName=None, memory=1, threads=1, redu
 
     player_interface_config = player_config
     agents = [GridAgentInterface(**player_config) for _ in range(1)]
+    puppets = [GridAgentInterface(**player_config) for _ in range(1)]
 
     env_config =  {
         "env_class": envClass,
@@ -21,6 +24,7 @@ def make_env(envClass, player_config, configName=None, memory=1, threads=1, redu
         "width": 9 if envClass == "para_TutorialEnv" else 19,
         "height": 9 if envClass == "para_TutorialEnv" else 19,
         "agents": agents,
+        "puppets": puppets,
         "memory": memory,
         "step_reward": -0.1,
     }
@@ -28,7 +32,7 @@ def make_env(envClass, player_config, configName=None, memory=1, threads=1, redu
     env = env_from_config(env_config)
     env.agent_view_size = player_interface_config["view_size"]*player_interface_config["view_tile_size"]
 
-    configName = random.choice(list(env.configs.keys())) if configName == None else configName
+    configName = random.choice(list(env.configs.keys())) if configName is None else configName
     env.hard_reset(env.configs[configName])
 
     #train on multiple configs how?
