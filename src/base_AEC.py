@@ -424,8 +424,8 @@ class para_MultiGridEnv(ParallelEnv):
         self.puppets = puppets
         self.grid = MultiGrid(shape=(width, height))  # added this, not sure where grid comes from in og
 
-        self.possible_agents = ["player_" + str(r) for r in range(len(max_agents))]
-        self.possible_puppets = ["player_" + str(r) for r in range(len(max_puppets))]
+        self.possible_agents = ["player_" + str(r) for r in range(max_agents)]
+        self.possible_puppets = ["player_" + str(r) for r in range(max_puppets)]
         # self.agent_name_mapping = dict(zip(self.possible_agents, list(range(len(self.possible_agents)))))
 
         # Gym spaces are defined and documented here: https://gym.openai.com/docs/#spaces
