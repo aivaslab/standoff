@@ -53,7 +53,7 @@ class StandoffEnv(para_MultiGridEnv):
             "boxes": [5],  # [2,3,4,5],
             "sub_valence": [1],
             "dom_valence": [1],
-            "puppets": [1],
+            "num_puppets": [1],
             "followDistance": [1], # subordinate has delayed release. for subordinate first, use negative
             "lavaHeight": [2],
             "baits": [1],
@@ -97,7 +97,7 @@ class StandoffEnv(para_MultiGridEnv):
                   boxes=5,
                   sub_valence=1,
                   dom_valence=1,
-                  puppets=1,
+                  num_puppets=1,
                   followDistance=1,
                   lavaHeight=2,
                   baits=1,
@@ -135,7 +135,7 @@ class StandoffEnv(para_MultiGridEnv):
             self.agent_door_pos[agent] = (xx, h + (1 if agent == "player_0" else -1))
             a = self.instance_from_name[agent]
             a.valence = sub_valence if agent == "player_0" else dom_valence
-            if k > puppets:
+            if k > num_puppets:
                 a.spawn_delay = 1000
                 a.active = False
 
