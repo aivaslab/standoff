@@ -41,6 +41,9 @@ class StandoffEnv(para_MultiGridEnv):
         self.params = None
 
     def hard_reset(self, params=None):
+        """
+        Reset the environment.
+        """
         defaults = {
             "adversarial": [True],
             "hidden": [True],
@@ -74,6 +77,9 @@ class StandoffEnv(para_MultiGridEnv):
         self.params = newParams
 
     def reset_vision(self):
+        """
+        Reset the vision of the agents.
+        """
         boxes = self.params["boxes"]
         for agent in self.agents_and_puppets():
             self.agent_goal[agent] = random.choice(range(boxes))
@@ -120,13 +126,13 @@ class StandoffEnv(para_MultiGridEnv):
         self.grid.wall_rect(1, 1, self.width - 2, self.height - 2)
 
         self.agent_spawn_pos = {}
-        self.agent_box_pos = {}
+        self.agent_door_pos = {}
         for k, agent in enumerate(self.agents_and_puppets()):
             h = 1 if agent == "player_0" else self.height - 2
             d = 1 if agent == "player_0" else 3
             xx = 2 * random.choice(range(boxes)) + 2
             self.agent_spawn_pos[agent] = (xx, h, d)
-            self.agent_box_pos[agent] = (xx, h + (1 if agent == "player_0" else -1))
+            self.agent_door_pos[agent] = (xx, h + (1 if agent == "player_0" else -1))
             a = self.instance_from_name[agent]
             a.valence = sub_valence if agent == "player_0" else dom_valence
             if k > puppets:
@@ -312,7 +318,7 @@ class StandoffEnv(para_MultiGridEnv):
 
         if "blind" in name or "reveal" in name:
             splitName = name.split()
-            b = self.grid.get(*self.agent_box_pos[splitName[1]])
+            b = self.grid.get(*self.agent_door_pos[splitName[1]])
 
             if "blind" in name:
                 b.state = 1
