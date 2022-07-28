@@ -318,6 +318,7 @@ class StandoffEnv(para_MultiGridEnv):
 
         if "blind" in name or "reveal" in name:
             splitName = name.split()
+            print(splitName, self.agent_door_pos)
             b = self.grid.get(*self.agent_door_pos[splitName[1]])
 
             if "blind" in name:
