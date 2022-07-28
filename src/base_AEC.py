@@ -622,8 +622,7 @@ class para_MultiGridEnv(ParallelEnv):
         puppet_actions = {}
         for agent in self.puppets:
             a = self.instance_from_name[agent]
-            nextAct = a.next_actions[0]
-
+            nextAct = 2
             if len(a.next_actions) > 0:
                 nextAct = a.next_actions.pop(0)
             else:
