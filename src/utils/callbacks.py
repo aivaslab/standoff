@@ -76,7 +76,7 @@ class PlottingCallbackStartStop(BaseCallback):
         super()._on_training_end()
 
         with open(self.logPath, 'w') as logfile:
-            logfile.write('end of training! total time:', time.time()-self.start_time)
+            logfile.write('end of training! total time:' + str( time.time()-self.start_time))
 
         plot_evals(self.savePath, self.name, self.names, self.eval_cbs)
             
