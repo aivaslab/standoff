@@ -425,7 +425,7 @@ class para_MultiGridEnv(ParallelEnv):
         self.grid = MultiGrid(shape=(width, height))  # added this, not sure where grid comes from in og
 
         self.possible_agents = ["player_" + str(r) for r in range(max_agents)]
-        self.possible_puppets = ["player_" + str(r) for r in range(max_puppets)]
+        self.possible_puppets = ["player_" + str(r+max_agents) for r in range(max_puppets)]
         # self.agent_name_mapping = dict(zip(self.possible_agents, list(range(len(self.possible_agents)))))
 
         # Gym spaces are defined and documented here: https://gym.openai.com/docs/#spaces
@@ -704,7 +704,7 @@ class para_MultiGridEnv(ParallelEnv):
                             # send signal to override next action
                             if "Arrow" in str(fwd_cell.__class__):
                                 relative_dir = (agent.dir - fwd_cell.dir) % 4
-                                print(relative_dir)
+                                #print(relative_dir)
                                 if relative_dir == 3:
                                     self.infos[agent_name]["act"] = 0
                                 if relative_dir == 1:
@@ -996,14 +996,10 @@ class para_MultiGridEnv(ParallelEnv):
             pass
             # from gym.envs.classic_control.rendering import SimpleImageViewer
             # self.window = SimpleImageViewer(caption="Marlgrid")
-        # print('test')
         # Compute which cells are visible to the agent
         highlight_mask = np.full((self.width, self.height), False, dtype=np.bool)
-        # print('testuy')
         for agentname, agent in zip(self.agents, self.agent_instances):
-            # print('agent', agent, 'an', agentname, 'a', agent[agentname])
             if agent.active:
-                # print('active')
                 xlow, ylow, xhigh, yhigh = agent.get_view_exts()
                 dxlow, dylow = max(0, 0 - xlow), max(0, 0 - ylow)
                 dxhigh, dyhigh = max(0, xhigh - self.grid.width), max(0, yhigh - self.grid.height)
@@ -1014,8 +1010,6 @@ class para_MultiGridEnv(ParallelEnv):
                     highlight_mask[xlow + dxlow:xhigh - dxhigh, ylow + dylow:yhigh - dyhigh] |= (
                         rotate_grid(b, a.orientation)[dxlow:(xhigh - xlow) - dxhigh, dylow:(yhigh - ylow) - dyhigh]
                     )
-        # print('test2')
-        # print('h', highlight) #true
         # Render the whole grid
         img = self.grid.render(
             tile_size, highlight_mask=highlight_mask if highlight else None
@@ -1023,10 +1017,8 @@ class para_MultiGridEnv(ParallelEnv):
         rescale = lambda X, rescale_factor=2: np.kron(
             X, np.ones((int(rescale_factor), int(rescale_factor), 1))
         )
-        # print('test3', img)
 
         if show_agent_views:
-            # print('agent_views')
 
             target_partial_width = int(img.shape[0] * agent_col_width_frac - 2 * agent_col_padding_px)
             target_partial_height = (img.shape[1] - 2 * agent_col_padding_px) // max_agents_per_col
