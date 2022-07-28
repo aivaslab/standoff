@@ -127,6 +127,7 @@ class StandoffEnv(para_MultiGridEnv):
 
         self.agent_spawn_pos = {}
         self.agent_door_pos = {}
+        print("test on _gen", self.agents_and_puppets())
         for k, agent in enumerate(self.agents_and_puppets()):
             h = 1 if agent == "player_0" else self.height - 2
             d = 1 if agent == "player_0" else 3
