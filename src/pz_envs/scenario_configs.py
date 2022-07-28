@@ -126,6 +126,7 @@ class ScenarioConfigs:
             "baits": 2,
         },
         "replaced": {
+            "puppets": 1,
             "informed": "uninformed",
             "swapType": 'replace',
             "baitSize": 1,
