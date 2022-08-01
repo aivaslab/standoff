@@ -41,7 +41,7 @@ class PlottingCallback(BaseCallback):
     def _on_step(self) -> bool:
         with open(self.logPath, 'a') as logfile:
 
-            logfile.write('ts: ', self.eval_cbs[0].evaluations_timesteps[-1],
+            logfile.write('ts: ' + str(self.eval_cbs[0].evaluations_timesteps[-1]) + 
                 #str([str(name), str(np.mean(x.evaluations_results[-1])) for name, x in zip(self.names, self.eval_cbs)]),
                 '\n')
 
