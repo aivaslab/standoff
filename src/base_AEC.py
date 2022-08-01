@@ -190,7 +190,7 @@ class MultiGrid:
         render = (
             lambda x: "  "
             if x is None or not hasattr(x, "str_render")
-            else x.str_render(direction=self.orientation)
+            else x.str_render(dir=self.orientation)
         )
         hstars = "*" * (2 * self.width + 2)
         return (
