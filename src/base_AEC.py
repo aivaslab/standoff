@@ -425,18 +425,16 @@ class para_MultiGridEnv(ParallelEnv):
         self.grid = MultiGrid(shape=(width, height))  # added this, not sure where grid comes from in og
 
         self.possible_agents = ["player_" + str(r) for r in range(max_agents)]
-        self.possible_puppets = ["player_" + str(r+max_agents) for r in range(max_puppets)]
-        # self.agent_name_mapping = dict(zip(self.possible_agents, list(range(len(self.possible_agents)))))
+        if max_puppets > 0:
+            self.possible_puppets = ["player_" + str(r+max_agents) for r in range(1, max_puppets+1)]
+        else:
+            self.possible_puppets = []
 
-        # Gym spaces are defined and documented here: https://gym.openai.com/docs/#spaces
-        # removed march
         self.action_spaces = {agent: Discrete(7) for agent in self.possible_agents}
 
         self.env_done = False
         self.step_count = 0
-        # obshape = (45,45,3)
 
-        # removed march
         self.observation_spaces = {agent: Box(
             low=0,
             high=255,
@@ -450,14 +448,8 @@ class para_MultiGridEnv(ParallelEnv):
 
         self.agent_instances = {agent for agent in agents}
         self.puppet_instances = {puppet for puppet in puppets}
-
-        # print(self.possible_agents, agents)
-
         self.instance_from_name = {name: agent for name, agent in
                                    zip(self.possible_agents + self.possible_puppets, agents + puppets)}
-
-        # print(self.instance_from_name)
-
         self.loadingPickle = False
         self.allRooms = []
 
@@ -536,12 +528,13 @@ class para_MultiGridEnv(ParallelEnv):
         """
         self.agents = self.possible_agents[:]
         self.puppets = self.possible_puppets[:]
-        self.rewards = {agent: 0 for agent in self.agents}
-        self._cumulative_rewards = {agent: 0 for agent in self.agents}
-        self.has_reached_goal = {agent: False for agent in self.agents}
-        self.dones = {agent: False for agent in self.agents}
+        self.rewards = {agent: 0 for agent in self.agents_and_puppets()}
+        self._cumulative_rewards = {agent: 0 for agent in self.agents_and_puppets()}
+        self.has_reached_goal = {agent: False for agent in self.agents_and_puppets()}
+        self.dones = {agent: False for agent in self.agents_and_puppets()}
         self.infos = {agent: {} for agent in self.agents_and_puppets()}
-        self.state = {agent: NONE for agent in self.agents}
+        self.state = {agent: NONE for agent in self.agents_and_puppets()}
+        # we don't generate observations for puppets
         self.observations = {agent: self.gen_agent_obs(a) for agent, a in zip(self.agents, self.agent_instances)}
         self.step_count = 0
         self.env_done = False
