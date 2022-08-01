@@ -64,8 +64,9 @@ class PlottingCallbackStartStop(BaseCallback):
     def _on_training_start(self) -> bool:
         super()._on_training_start()
 
-        with open(self.logPath, 'w') as logfile:
+        with open(self.logPath, 'a') as logfile:
             logfile.write(self.params)
+            logfile.write("\n")
         plot_evals(self.savePath, self.name, self.names, self.eval_cbs)
         for env, name in zip(self.envs, self.names):
             make_pic_video(self.model, env, name, False, True, self.savePath)
@@ -75,8 +76,8 @@ class PlottingCallbackStartStop(BaseCallback):
     def _on_training_end(self) -> bool:
         super()._on_training_end()
 
-        with open(self.logPath, 'w') as logfile:
-            logfile.write('end of training! total time:' + str( time.time()-self.start_time))
+        with open(self.logPath, 'a') as logfile:
+            logfile.write('end of training! total time:' + str( time.time()-self.start_time) + '\n')
 
         plot_evals(self.savePath, self.name, self.names, self.eval_cbs)
             
