@@ -1,3 +1,5 @@
+import numpy as np
+
 from .display import make_pic_video, plot_evals, plot_train
 from stable_baselines3.common.evaluation import evaluate_policy
 from stable_baselines3.common.callbacks import CallbackList, CheckpointCallback, EvalCallback, EveryNTimesteps, BaseCallback
@@ -39,8 +41,8 @@ class PlottingCallback(BaseCallback):
     def _on_step(self) -> bool:
         with open(self.logPath, 'a') as logfile:
 
-            logfile.write('ts: ', self.eval_cbs[0].evaluations_timesteps[-1], 
-                str([name, np.mean(x.evaluations_results[-1]) for name, x in zip(self.names, self.eval_cbs)]), 
+            logfile.write('ts: ', self.eval_cbs[0].evaluations_timesteps[-1],
+                str([str(name, np.mean(x.evaluations_results[-1])) for name, x in zip(self.names, self.eval_cbs)]),
                 '\n')
 
         plot_evals(self.savePath, self.name, self.names, self.eval_cbs)
