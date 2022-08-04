@@ -10,6 +10,7 @@ import pandas
 import json
 import imageio
 import cv2
+import copy
 
 
 def load_results_tempfix(path: str) -> pandas.DataFrame:
@@ -77,7 +78,8 @@ def plot_train(log_folder, title='Learning Curve', window=50):
 
 def make_pic_video(model, env, name, random_policy=False, video_length=50, savePath='', vidName='video.mp4', following="player_0", image_size=320):
 
-    env = parallel_to_aec(env.unwrapped.vec_envs[0].par_env).unwrapped
+    env2 = copy.deepcopy(env)
+    env = parallel_to_aec(env2.unwrapped.vec_envs[0].par_env).unwrapped
     images = []
     obs = env.reset()
     env.reset()
