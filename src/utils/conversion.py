@@ -13,10 +13,6 @@ def make_env(envClass, player_config, configName=None, memory=1, threads=1, redu
     reward_decay=False, ghost_mode=True, max_steps=50, saveVids=False, path="", recordEvery=1e4, max_agents=1,
              max_puppets=1):
 
-    player_interface_config = player_config
-    agents = [GridAgentInterface(**player_config) for _ in range(max_agents)]
-    puppets = [GridAgentInterface(**player_config) for _ in range(max_puppets)]
-
     env_config =  {
         "env_class": envClass,
         "max_steps": max_steps,
@@ -25,8 +21,6 @@ def make_env(envClass, player_config, configName=None, memory=1, threads=1, redu
         "reward_decay": reward_decay,
         "width": 9 if envClass == "para_TutorialEnv" else 19,
         "height": 9 if envClass == "para_TutorialEnv" else 19,
-        "agents": agents,
-        "puppets": puppets,
         "memory": memory,
         "step_reward": -0.1,
     }
@@ -40,13 +34,13 @@ def make_env(envClass, player_config, configName=None, memory=1, threads=1, redu
     if isinstance(reset_configs["num_puppets"], list):
         reset_configs["num_puppets"] = reset_configs["num_puppets"][0]
 
-    env_config['agents'] = [GridAgentInterface(**player_interface_config) for _ in range(reset_configs['num_agents'])]
-    env_config['puppets'] = [GridAgentInterface(**puppet_interface_config) for _ in range(reset_configs['num_puppets'])]
+    env_config['agents'] = [GridAgentInterface(**player_config) for _ in range(reset_configs['num_agents'])]
+    env_config['puppets'] = [GridAgentInterface(**player_config) for _ in range(reset_configs['num_puppets'])]
     env_config['num_agents'] = reset_configs['num_agents']
     env_config['num_puppets'] = reset_configs['num_puppets']
 
     env = env_from_config(env_config)
-    env.agent_view_size = player_interface_config["view_size"]*player_interface_config["view_tile_size"]
+    env.agent_view_size = player_config["view_size"]*player_config["view_tile_size"]
 
     configName = random.choice(list(env.configs.keys())) if configName is None else configName
     env.hard_reset(env.configs[configName])
