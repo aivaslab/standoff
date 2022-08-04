@@ -85,7 +85,7 @@ class PlottingCallbackStartStop(BaseCallback):
             if not os.path.exists(os.path.join(self.savePath, 'videos', name)):
                 os.mkdir(os.path.join(self.savePath, 'videos', name))
             make_pic_video(self.model, env, name, 
-                random_policy=True, video_length=350, savePath=os.path.join(self.savePath, 'videos', name),
+                random_policy=False, video_length=350, savePath=os.path.join(self.savePath, 'videos', name),
                 vidName='random.mp4', following="player_0")
         self.start_time = time.time()
         return True
