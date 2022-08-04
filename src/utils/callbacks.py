@@ -37,6 +37,7 @@ class PlottingCallback(BaseCallback):
         self.envs = envs
         self.names = names
         self.eval_cbs = eval_cbs
+        self.timestep = 0
 
     def _on_step(self) -> bool:
         with open(self.logPath, 'a') as logfile:
@@ -47,7 +48,10 @@ class PlottingCallback(BaseCallback):
 
         plot_evals(self.savePath, self.name, self.names, self.eval_cbs)
         for env, name in zip(self.envs, self.names):
-            make_pic_video(self.model, env, name, False, True, self.savePath)
+            make_pic_video(self.model, env, name, 
+                random_policy=False, video_length=350, savePath=self.savePath, 
+                vidName='video_'+str(self.timestep)+'.mp4', following="player_0")
+        self.timestep += 1
         return True
 
 class PlottingCallbackStartStop(BaseCallback):
@@ -75,7 +79,9 @@ class PlottingCallbackStartStop(BaseCallback):
             logfile.write(str(self.model.policy))
         plot_evals(self.savePath, self.name, self.names, self.eval_cbs)
         for env, name in zip(self.envs, self.names):
-            make_pic_video(self.model, env, name, False, True, self.savePath)
+            make_pic_video(self.model, env, name, 
+                random_policy=False, video_length=350, savePath=self.savePath, 
+                vidName='video_start.mp4', following="player_0")
         self.start_time = time.time()
         return True
 
@@ -88,7 +94,9 @@ class PlottingCallbackStartStop(BaseCallback):
         plot_evals(self.savePath, self.name, self.names, self.eval_cbs)
             
         for env, name in zip(self.envs, self.names):
-            make_pic_video(self.model, env, name, False, True, self.savePath)
+            make_pic_video(self.model, env, name, 
+                random_policy=False, video_length=350, savePath=self.savePath, 
+                vidName='video_end.mp4', following="player_0")
         plot_train(self.savePath, name+'train')
         return True
 

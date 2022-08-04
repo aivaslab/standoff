@@ -76,8 +76,20 @@ def plot_train(log_folder, title='Learning Curve', window=50):
     # plt.show()
 
 
-def make_pic_video(model, env, name, savePics, saveVids, savePath, random_policy=False, video_length=50):
-    pass
+def make_pic_video(model, env, name, random_policy=False, video_length=50, savePath='', vidName='video.mp4', following="player_0"):
+
+    env = from_parallel(env.unwrapped.vec_envs[0].par_env).unwrapped
+    images = []
+    obs = model.env.reset()
+    img = env.observations[following]
+
+    for i in range(video_length):
+        images.append(img)
+        action, _ = model.predict(obs)
+        obs, _, _ ,_ = model.env.step(action)
+        img = env.observations[following]
+
+    imageio.mimsave(os.path.join(savePath, vidName), [img for i, img in enumerate(images)], fps=30)
 
 
 def plot_evals(savePath, name, names, eval_cbs):
