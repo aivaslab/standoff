@@ -1,16 +1,14 @@
 import matplotlib.pyplot as plt
 # %matplotlib inline
 from IPython import display
-import inspect
 import os
-import moviepy.video.io.ImageSequenceClip
 from pettingzoo.utils.conversions import aec_to_parallel, parallel_to_aec
-import datetime
 from stable_baselines3.common.results_plotter import load_results, ts2xy
 from stable_baselines3.common.monitor import get_monitor_files
 import numpy as np
 import pandas
 import json
+import imageio
 
 
 def load_results_tempfix(path: str) -> pandas.DataFrame:
