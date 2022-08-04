@@ -78,7 +78,7 @@ def plot_train(log_folder, title='Learning Curve', window=50):
 
 def make_pic_video(model, env, name, random_policy=False, video_length=50, savePath='', vidName='video.mp4', following="player_0"):
 
-    env = from_parallel(env.unwrapped.vec_envs[0].par_env).unwrapped
+    env = parallel_to_aec(env.unwrapped.vec_envs[0].par_env).unwrapped
     images = []
     obs = model.env.reset()
     img = env.observations[following]
