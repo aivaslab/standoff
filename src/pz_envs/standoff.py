@@ -118,7 +118,7 @@ class StandoffEnv(para_MultiGridEnv):
         self.box_reward = 1
         self.food_locs = list(range(boxes))
         random.shuffle(self.food_locs)
-        self.release = []
+        self.release = [[] for _ in range(4)]
         releaseGap = boxes * 2 + atrium
         self.width = boxes * 2 + 3
         self.height = lavaHeight + startRoom * 2 + atrium * 2 + 2
@@ -159,14 +159,17 @@ class StandoffEnv(para_MultiGridEnv):
                 self.put_obj(Wall(), box * 2 + 1, startRoom - 1)
                 self.put_obj(Block(init_state=0, color="blue"), box * 2 + 2, startRoom)
                 self.put_obj(Block(init_state=0, color="blue"), box * 2 + 2, self.height - startRoom - 1)
-                self.release += [[(box * 2 + 2, startRoom)]]
-                self.release += [[(box * 2 + 2, self.height - startRoom - 1)]]
+
+                self.release[0] += [(box * 2 + 2, startRoom)]
+                self.release[2] += [(box * 2 + 2, self.height - startRoom - 1)]
 
                 self.put_obj(Wall(), box * 2 + 1, self.height - 2)
                 self.put_obj(Block(init_state=0, color="blue"), box * 2 + 2, startRoom + atrium)
                 self.put_obj(Block(init_state=0, color="blue"), box * 2 + 2, self.height - startRoom - atrium - 1)
-                self.release += [[(box * 2 + 2, startRoom + atrium)]]
-                self.release += [[(box * 2 + 2, self.height - startRoom - atrium - 1)]]
+
+                self.release[1] += [(box * 2 + 2, startRoom + atrium)]
+                self.release[3] += [(box * 2 + 2, self.height - startRoom - atrium - 1)]
+
             for j in range(lavaHeight):
                 x = box * 2 + 1
                 y = j + startRoom + atrium + 1
@@ -244,10 +247,10 @@ class StandoffEnv(para_MultiGridEnv):
         else:
             subRelease = followDistance
             domRelease = 0
-        self.add_timer("release0", curTime + 1 + domRelease)
-        self.add_timer("release1", curTime + 1 + subRelease)
-        self.add_timer("release2", curTime + 1 + releaseGap + domRelease)
-        self.add_timer("release3", curTime + 1 + releaseGap + subRelease)
+        self.add_timer("release_0", curTime + 1 + domRelease)
+        self.add_timer("release_1", curTime + 1 + subRelease)
+        self.add_timer("release_2", curTime + 1 + releaseGap + domRelease)
+        self.add_timer("release_3", curTime + 1 + releaseGap + subRelease)
 
     def timer_active(self, name):
         # todo: make all these events more sensibly written, not dependent on food starting locs
@@ -332,7 +335,7 @@ class StandoffEnv(para_MultiGridEnv):
                 self.can_see[splitName[1] + str(box)] = False if "blind" in name else True
 
         # whenever food updates, remember locations
-        if name in ["init", "swap", "replace", "reveal", "release1"] or "remove" in name or "place" in name:
+        if name in ["init", "swap", "replace", "reveal"] or "remove" in name or "place" in name or "release" in name:
 
             for box in range(boxes):
                 x = box * 2 + 2
