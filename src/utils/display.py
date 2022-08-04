@@ -77,32 +77,35 @@ def plot_train(log_folder, title='Learning Curve', window=50):
 
 
 def make_pic_video(model, env, name, random_policy=False, video_length=50, savePath='', vidName='video.mp4', following="player_0", image_size=320):
-
-    env2 = copy.deepcopy(env)
-    env = parallel_to_aec(env2.unwrapped.vec_envs[0].par_env).unwrapped
+    """
+    make a video of the model playing the environment
+    """
+    _env = parallel_to_aec(env.unwrapped.vec_envs[0].par_env).unwrapped
     images = []
-    obs = env.reset()
-    env.reset()
+    obs = _env.reset()
+    _env.reset()
     img = cv2.resize(env.observations[following], dsize=(image_size, image_size), interpolation=cv2.INTER_NEAREST)
 
     for i in range(video_length):
         images.append(img)
         if random_policy:
-            action = {agent: env.action_spaces[agent].sample() for agent in env.agents}
+            action = {agent: _env.action_spaces[agent].sample() for agent in _env.agents}
         else:
             action = {following: model.predict(obs[following])}
-        obs, _, dones, _ = env.step(action)
+        obs, _, dones, _ = _env.step(action)
         img = cv2.resize(obs[following], dsize=(image_size, image_size), interpolation=cv2.INTER_NEAREST)
         if dones[following]:
-            obs = env.reset()
-            env.reset()
+            obs = _env.reset()
+            _env.reset()
             img = cv2.resize(env.observations[following], dsize=(image_size, image_size), interpolation=cv2.INTER_NEAREST)
 
     imageio.mimsave(os.path.join(savePath, vidName), [img for i, img in enumerate(images)], fps=10)
-    env.reset()
 
 
 def plot_evals(savePath, name, names, eval_cbs):
+    """
+    plot the results of the evaluations of the model on the environments
+    """
     fig, axs = plt.subplots(1)
     for env_name, cb in zip(names, eval_cbs):
         plt.plot(cb.evaluations_timesteps, [np.mean(x) for x in cb.evaluations_results], label=env_name, )
