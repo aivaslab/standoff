@@ -79,7 +79,7 @@ def make_pic_video(model, env, name, random_policy=False, video_length=50, saveP
 
     env = parallel_to_aec(env.unwrapped.vec_envs[0].par_env).unwrapped
     images = []
-    obs = model.env.reset()
+    obs = env.reset()
     env.reset()
     img = cv2.resize(env.observations[following], dsize=(image_size, image_size), interpolation=cv2.INTER_NEAREST)
 
@@ -89,7 +89,7 @@ def make_pic_video(model, env, name, random_policy=False, video_length=50, saveP
             action = {agent: env.action_spaces[agent].sample() for agent in env.agents}
         else:
             action = {following: model.predict(obs)}
-        obs, _, _, _ = model.env.step(action)
+        obs, _, _, _ = env.step(action)
         img = cv2.resize(obs[following], dsize=(image_size, image_size), interpolation=cv2.INTER_NEAREST)
 
     imageio.mimsave(os.path.join(savePath, vidName), [img for i, img in enumerate(images)], fps=30)
