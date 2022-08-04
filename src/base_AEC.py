@@ -377,7 +377,7 @@ class para_MultiGridEnv(ParallelEnv):
             done_reward=-10,
             agent_spawn_kwargs=None,
             max_agents=1,
-            max_puppets=1
+            max_puppets=0
     ):
         """
         The init method takes in environment arguments and
@@ -426,7 +426,7 @@ class para_MultiGridEnv(ParallelEnv):
 
         self.possible_agents = ["player_" + str(r) for r in range(max_agents)]
         if max_puppets > 0:
-            self.possible_puppets = ["player_" + str(r+max_agents) for r in range(1, max_puppets+1)]
+            self.possible_puppets = ["player_" + str(r+max_agents) for r in range(max_puppets)]
         else:
             self.possible_puppets = []
 
@@ -512,6 +512,12 @@ class para_MultiGridEnv(ParallelEnv):
         """
         return self.agents + self.puppets
 
+    def agent_and_puppet_instances(self):
+        """
+        For legacy agent functions to also work with puppets
+        """
+        return self.agent_instances.union(self.puppet_instances)
+
     def reset(self):
         """
         Reset needs to initialize the following attributes
@@ -535,11 +541,12 @@ class para_MultiGridEnv(ParallelEnv):
         self.infos = {agent: {} for agent in self.agents_and_puppets()}
         self.state = {agent: NONE for agent in self.agents_and_puppets()}
         # we don't generate observations for puppets
-        self.observations = {agent: self.gen_agent_obs(a) for agent, a in zip(self.agents, self.agent_instances)}
+        self.observations = {agent: self.gen_agent_obs(a) for agent, a in zip(self.agents_and_puppets(),
+                                                                              self.agent_and_puppet_instances())}
         self.step_count = 0
         self.env_done = False
 
-        for name, agent in zip(self.agents + self.puppets, list(self.agent_instances.union(self.puppet_instances))):
+        for name, agent in zip(self.agents + self.puppets, list(self.agent_and_puppet_instances())):
             agent.agents = []
             agent.name = name
             agent.next_actions = []
