@@ -6,6 +6,7 @@ from pettingzoo.utils import wrappers
 from ..agents import GridAgentInterface
 from ..pz_envs import env_from_config
 from stable_baselines3.common.vec_env import VecMonitor, VecFrameStack, VecVideoRecorder, VecTransposeImage
+from ..pz_envs.scenario_configs import ScenarioConfigs
 import os
 
 def make_env(envClass, player_config, configName=None, memory=1, threads=1, reduce_color=False, size=64,
@@ -29,6 +30,20 @@ def make_env(envClass, player_config, configName=None, memory=1, threads=1, redu
         "memory": memory,
         "step_reward": -0.1,
     }
+    configs = ScenarioConfigs().standoff
+    reset_configs = {**configs["defaults"], **configs[configName]}
+    print(configs[configName])
+    print(reset_configs)
+
+    if isinstance(reset_configs["num_agents"], list):
+        reset_configs["num_agents"] = reset_configs["num_agents"][0]
+    if isinstance(reset_configs["num_puppets"], list):
+        reset_configs["num_puppets"] = reset_configs["num_puppets"][0]
+
+    env_config['agents'] = [GridAgentInterface(**player_interface_config) for _ in range(reset_configs['num_agents'])]
+    env_config['puppets'] = [GridAgentInterface(**puppet_interface_config) for _ in range(reset_configs['num_puppets'])]
+    env_config['num_agents'] = reset_configs['num_agents']
+    env_config['num_puppets'] = reset_configs['num_puppets']
 
     env = env_from_config(env_config)
     env.agent_view_size = player_interface_config["view_size"]*player_interface_config["view_tile_size"]
