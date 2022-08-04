@@ -52,8 +52,30 @@ class ScenarioConfigs:
     }
 
     standoff = {
+        "defaults": {
+            "adversarial": True,
+            "hidden": True,
+            "rational": True,
+            "sharedRewards": False,
+            "firstBig": True,
+            "boxes": 5,  
+            "sub_valence": 1,
+            "dom_valence": 1,
+            "followDistance": 1, # subordinate has delayed release. for subordinate first, use negative
+            "lavaHeight": 2,
+            "baits": 1,
+            "baitSize": 2,
+            "informed": 'informed',
+            "swapType": 'swap',
+            "visibility": 'curtains',  # keys, invisibility potion
+            "cause": 'blocks',
+            "lava": 'lava',
+            "num_puppets": 1,
+            "num_agents": 1,
+        },
+
         "tutorial_step_1": {
-            "num_puppets": 0,
+            "num_puppets": [0],
             "boxes": [5],
             "baitSize": [1 ,2],
             "followDistance": [0 ,1],
@@ -62,7 +84,7 @@ class ScenarioConfigs:
             "hidden": [False, True]
         },
         "tutorial_step_1a": {
-            "num_puppets": 0,
+            "num_puppets": [0],
             "boxes": [5],
             "baitSize": [1 ,2],
             "followDistance": [0 ,1],
@@ -71,7 +93,7 @@ class ScenarioConfigs:
             "hidden": [False]
         },
         "tutorial_step_1b": {
-            "num_puppets": 0,
+            "num_puppets": [0],
             "boxes": [5],
             "baitSize": [1 ,2],
             "followDistance": [0 ,1],
@@ -81,7 +103,6 @@ class ScenarioConfigs:
         },
         "tutorial_step_2": {
             # more eVaried training, including easier cases than eval
-            "num_puppets": 1,
             "boxes": [5],
             "baitSize": [2],
             "followDistance": [0 ,1],
@@ -89,14 +110,23 @@ class ScenarioConfigs:
             "informed": "informed",
             "hidden": [False, True]
         },
-        "tutorial_step_2_eval": {
+        "tutorial_step_2a": {
             # single test config that must be passed
-            "num_puppets": 1,
             "boxes": [5],
             "baitSize": [2],
             "visibility": 'curtains',
             "informed": "informed",
-            "hidden": True
+            "hidden": False,
+            "followDistance": [1]
+        },
+        "tutorial_step_2b": {
+            # single test config that must be passed
+            "boxes": [5],
+            "baitSize": [2],
+            "visibility": 'curtains',
+            "informed": "informed",
+            "hidden": True,
+            "followDistance": [1]
         },
         "informed control": {
             "informed": 'informed',
@@ -165,5 +195,7 @@ class AllParams():
             "visibility": ['full', 'curtains'],  # keys, invisibility potion
             "cause": ['blocks', 'direction', 'accident', 'inability'],
             "lava": ['lava', 'block'],
+            "num_agents": [1, 2],
+            "num_puppets": [0, 1, 2]
             }
         }

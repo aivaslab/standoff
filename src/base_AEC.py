@@ -376,8 +376,8 @@ class para_MultiGridEnv(ParallelEnv):
             step_reward=0,
             done_reward=-10,
             agent_spawn_kwargs=None,
-            max_agents=1,
-            max_puppets=0
+            num_agents=1,
+            num_puppets=0
     ):
         """
         The init method takes in environment arguments and
@@ -424,9 +424,9 @@ class para_MultiGridEnv(ParallelEnv):
         self.puppets = puppets
         self.grid = MultiGrid(shape=(width, height))  # added this, not sure where grid comes from in og
 
-        self.possible_agents = ["player_" + str(r) for r in range(max_agents)]
-        if max_puppets > 0:
-            self.possible_puppets = ["player_" + str(r+max_agents) for r in range(max_puppets)]
+        self.possible_agents = ["player_" + str(r) for r in range(num_agents)]
+        if num_puppets > 0:
+            self.possible_puppets = ["player_" + str(r+num_agents) for r in range(num_puppets)]
         else:
             self.possible_puppets = []
 

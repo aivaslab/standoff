@@ -9,11 +9,12 @@ from stable_baselines3.common.vec_env import VecMonitor, VecFrameStack, VecVideo
 import os
 
 def make_env(envClass, player_config, configName=None, memory=1, threads=1, reduce_color=False, size=64,
-    reward_decay=False, ghost_mode=True, max_steps=50, saveVids=False, path="", recordEvery=1e4):
+    reward_decay=False, ghost_mode=True, max_steps=50, saveVids=False, path="", recordEvery=1e4, max_agents=1,
+             max_puppets=1):
 
     player_interface_config = player_config
-    agents = [GridAgentInterface(**player_config) for _ in range(1)]
-    puppets = [GridAgentInterface(**player_config) for _ in range(1)]
+    agents = [GridAgentInterface(**player_config) for _ in range(max_agents)]
+    puppets = [GridAgentInterface(**player_config) for _ in range(max_puppets)]
 
     env_config =  {
         "env_class": envClass,

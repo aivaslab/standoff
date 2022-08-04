@@ -27,7 +27,9 @@ class StandoffEnv(para_MultiGridEnv):
             ghost_mode=True,
             step_reward=0,
             done_reward=-10,
-            agent_spawn_kwargs=None
+            agent_spawn_kwargs=None,
+            num_puppets=1,
+            num_agents=1
     ):
         super().__init__(agents, puppets, grid_size, width, height, max_steps, memory, colorMemory, reward_decay, seed,
                          respawn, ghost_mode, step_reward, done_reward, agent_spawn_kwargs)
@@ -44,26 +46,7 @@ class StandoffEnv(para_MultiGridEnv):
         """
         Reset the environment.
         """
-        defaults = {
-            "adversarial": [True],
-            "hidden": [True],
-            "rational": [True],
-            "sharedRewards": [False],
-            "firstBig": [True],
-            "boxes": [5],  # [2,3,4,5],
-            "sub_valence": [1],
-            "dom_valence": [1],
-            "num_puppets": [1],
-            "followDistance": [1], # subordinate has delayed release. for subordinate first, use negative
-            "lavaHeight": [2],
-            "baits": [1],
-            "baitSize": [2],
-            "informed": ['informed'],
-            "swapType": ['swap'],
-            "visibility": ['curtains'],  # keys, invisibility potion
-            "cause": ['blocks', 'direction', 'accident', 'inability'],
-            "lava": ['lava', 'block'],
-        }
+        defaults = ScenarioConfigs.standoff["defaults"]
 
         newParams = copy.copy(params)
         if params is None:
@@ -75,6 +58,10 @@ class StandoffEnv(para_MultiGridEnv):
             else:
                 newParams[k] = random.choice(defaults[k])
         self.params = newParams
+
+        # special since max_puppets is weird
+        # maybe delete this
+        self.possible_puppets = ["player_" + str(x + len(self.agents)) for x in range(self.params["num_puppets"])]
 
     def reset_vision(self):
         """
@@ -108,6 +95,7 @@ class StandoffEnv(para_MultiGridEnv):
                   cause='blocks',
                   lava='lava',
                   firstBig=True,
+                  num_agents=1,
                   ):
         startRoom = 2
         atrium = 2
@@ -161,13 +149,13 @@ class StandoffEnv(para_MultiGridEnv):
                 self.put_obj(Block(init_state=0, color="blue"), box * 2 + 2, self.height - startRoom - 1)
 
                 self.release[0] += [(box * 2 + 2, startRoom)]
-                self.release[2] += [(box * 2 + 2, self.height - startRoom - 1)]
+                self.release[1] += [(box * 2 + 2, self.height - startRoom - 1)]
 
                 self.put_obj(Wall(), box * 2 + 1, self.height - 2)
                 self.put_obj(Block(init_state=0, color="blue"), box * 2 + 2, startRoom + atrium)
                 self.put_obj(Block(init_state=0, color="blue"), box * 2 + 2, self.height - startRoom - atrium - 1)
 
-                self.release[1] += [(box * 2 + 2, startRoom + atrium)]
+                self.release[2] += [(box * 2 + 2, startRoom + atrium)]
                 self.release[3] += [(box * 2 + 2, self.height - startRoom - atrium - 1)]
 
             for j in range(lavaHeight):
@@ -344,7 +332,7 @@ class StandoffEnv(para_MultiGridEnv):
                         tile = self.grid.get(x, y)
                         if hasattr(tile, "reward") and hasattr(tile, "size"):
                             # size used to distinguish treats from boxes
-                            self.last_seen_reward[agent + str(box)] = tile.reward
+                            self.last_seen_reward[agent + str(box)] = tile.reward if isinstance(tile.reward, int) else 0
                             # print('rew update', agent, box, tile.reward)
                         elif not self.grid.get(x, y) and self.last_seen_reward[agent + str(box)] != 0:
                             # print('0ing', box)
