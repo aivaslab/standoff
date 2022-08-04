@@ -84,7 +84,7 @@ def make_pic_video(model, env, name, random_policy=False, video_length=50, saveP
     images = []
     obs = _env.reset()
     _env.reset()
-    img = cv2.resize(env.observations[following], dsize=(image_size, image_size), interpolation=cv2.INTER_NEAREST)
+    img = cv2.resize(obs[following], dsize=(image_size, image_size), interpolation=cv2.INTER_NEAREST)
 
     for i in range(video_length):
         images.append(img)
@@ -97,7 +97,7 @@ def make_pic_video(model, env, name, random_policy=False, video_length=50, saveP
         if dones[following]:
             obs = _env.reset()
             _env.reset()
-            img = cv2.resize(env.observations[following], dsize=(image_size, image_size), interpolation=cv2.INTER_NEAREST)
+            img = cv2.resize(obs[following], dsize=(image_size, image_size), interpolation=cv2.INTER_NEAREST)
 
     imageio.mimsave(os.path.join(savePath, vidName), [img for i, img in enumerate(images)], fps=10)
 
