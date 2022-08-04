@@ -9,6 +9,7 @@ import numpy as np
 import pandas
 import json
 import imageio
+import cv2
 
 
 def load_results_tempfix(path: str) -> pandas.DataFrame:
@@ -80,13 +81,13 @@ def make_pic_video(model, env, name, random_policy=False, video_length=50, saveP
     images = []
     obs = model.env.reset()
     env.reset()
-    img = np.resize(env.observations[following], (image_size, image_size, 3))
+    img = cv2.resize(env.observations[following], dsize=(image_size, image_size, 3), interpolation=cv2.INTER_NEAREST)
 
     for i in range(video_length):
         images.append(img)
         action, _ = model.predict(obs)
         obs, _, _, _ = model.env.step(action)
-        img = np.resize(env.observations[following], (image_size, image_size, 3))
+        img = cv2.resize(env.observations[following], dsize=(image_size, image_size, 3), interpolation=cv2.INTER_NEAREST)
 
     imageio.mimsave(os.path.join(savePath, vidName), [img for i, img in enumerate(images)], fps=30)
 
