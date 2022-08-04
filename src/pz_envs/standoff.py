@@ -56,7 +56,7 @@ class StandoffEnv(para_MultiGridEnv):
                 if isinstance(params[k], list):
                     newParams[k] = random.choice(params[k])
             else:
-                if isinstance(params[k], list):
+                if isinstance(defaults[k], list):
                     newParams[k] = random.choice(defaults[k])
                 else:
                     newParams[k] = defaults[k]
