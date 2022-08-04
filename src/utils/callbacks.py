@@ -49,7 +49,7 @@ class PlottingCallback(BaseCallback):
         plot_evals(self.savePath, self.name, self.names, self.eval_cbs)
         for env, name in zip(self.envs, self.names):
             make_pic_video(self.model, env, name, 
-                random_policy=False, video_length=350, savePath=self.savePath, 
+                random_policy=False, video_length=350, savePath=os.path.join(self.savePath, 'videos'),
                 vidName='video_'+name+'_'+str(self.timestep)+'.mp4', following="player_0")
         self.timestep += 1
         return True
@@ -80,7 +80,7 @@ class PlottingCallbackStartStop(BaseCallback):
         plot_evals(self.savePath, self.name, self.names, self.eval_cbs)
         for env, name in zip(self.envs, self.names):
             make_pic_video(self.model, env, name, 
-                random_policy=False, video_length=350, savePath=self.savePath, 
+                random_policy=False, video_length=350, savePath=os.path.join(self.savePath, 'videos'),
                 vidName='video_'+name+'_start.mp4', following="player_0")
         self.start_time = time.time()
         return True
@@ -95,7 +95,7 @@ class PlottingCallbackStartStop(BaseCallback):
             
         for env, name in zip(self.envs, self.names):
             make_pic_video(self.model, env, name, 
-                random_policy=False, video_length=350, savePath=self.savePath, 
+                random_policy=False, video_length=350, savePath=os.path.join(self.savePath, 'videos'),
                 vidName='video_'+name+'_end.mp4', following="player_0")
         plot_train(self.savePath, name+'train')
         return True
