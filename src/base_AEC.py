@@ -634,7 +634,7 @@ class para_MultiGridEnv(ParallelEnv):
                     nextAct = 2
             puppet_actions[agent] = nextAct
 
-        actions = {**actions, **puppet_actions}
+        actions = dict(actions, **puppet_actions)
 
         for agent_name in actions:
             action = actions[agent_name]
