@@ -90,6 +90,7 @@ def make_pic_video(model, env, name, random_policy=False, video_length=50, saveP
         img = cv2.resize(obs[following], dsize=(image_size, image_size), interpolation=cv2.INTER_NEAREST)
 
     imageio.mimsave(os.path.join(savePath, vidName), [img for i, img in enumerate(images)], fps=30)
+    env.reset()
 
 
 def plot_evals(savePath, name, names, eval_cbs):
