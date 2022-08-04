@@ -81,6 +81,7 @@ def make_pic_video(model, env, name, random_policy=False, video_length=50, saveP
     env = parallel_to_aec(env.unwrapped.vec_envs[0].par_env).unwrapped
     images = []
     obs = model.env.reset()
+    env.reset()
     img = env.observations[following]
 
     for i in range(video_length):
