@@ -26,8 +26,6 @@ def make_env(envClass, player_config, configName=None, memory=1, threads=1, redu
     }
     configs = ScenarioConfigs().standoff
     reset_configs = {**configs["defaults"], **configs[configName]}
-    print(configs[configName])
-    print(reset_configs)
 
     if isinstance(reset_configs["num_agents"], list):
         reset_configs["num_agents"] = reset_configs["num_agents"][0]
