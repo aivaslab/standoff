@@ -80,7 +80,7 @@ def make_pic_video(model, env, name, random_policy=False, video_length=50, saveP
     images = []
     obs = model.env.reset()
     env.reset()
-    img = env.observations[following]
+    img = np.resize(env.observations[following], (image_size, image_size, 3))
 
     for i in range(video_length):
         images.append(img)
