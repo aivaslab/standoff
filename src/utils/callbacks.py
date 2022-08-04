@@ -47,6 +47,8 @@ class PlottingCallback(BaseCallback):
                 '\n')
 
         plot_evals(self.savePath, self.name, self.names, self.eval_cbs)
+        if !os.path.exists(os.path.join(self.savePath, 'videos')):
+            os.mkdir(os.path.join(self.savePath, 'videos'))
         for env, name in zip(self.envs, self.names):
             make_pic_video(self.model, env, name, 
                 random_policy=False, video_length=350, savePath=os.path.join(self.savePath, 'videos'),
