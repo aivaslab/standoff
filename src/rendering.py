@@ -78,6 +78,7 @@ class InteractivePlayerWindow(SimpleImageViewer):
             pyglet.window.key.LEFT:0,
             pyglet.window.key.RIGHT:1,
             pyglet.window.key.UP:2,
+            pyglet.window.key.DOWN:3,
             # pyglet.window.key.Q:-1,
         }
 

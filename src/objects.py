@@ -368,7 +368,7 @@ class Lava(WorldObj):
         return True  # and self.agent is None
 
     def str_render(self, dir=0):
-        return "VV"
+        return "LL"
 
     def render(self, img):
         c = (255, 128, 0)
@@ -563,7 +563,7 @@ class Box(WorldObj):
     # del self
 
     def str_render(self, dir=0):
-        return "BB"
+        return "[]"
 
     def render(self, img):
         c = COLORS[self.color]
