@@ -56,7 +56,10 @@ class StandoffEnv(para_MultiGridEnv):
                 if isinstance(params[k], list):
                     newParams[k] = random.choice(params[k])
             else:
-                newParams[k] = random.choice(defaults[k])
+                if isinstance(params[k], list):
+                    newParams[k] = random.choice(defaults[k])
+                else:
+                    newParams[k] = defaults[k]
         self.params = newParams
 
         # special since max_puppets is weird
