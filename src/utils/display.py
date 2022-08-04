@@ -75,7 +75,7 @@ def plot_train(log_folder, title='Learning Curve', window=50):
     # plt.show()
 
 
-def make_pic_video(model, env, name, random_policy=False, video_length=50, savePath='', vidName='video.mp4', following="player_0", image_size=128):
+def make_pic_video(model, env, name, random_policy=False, video_length=50, savePath='', vidName='video.mp4', following="player_0", image_size=320):
 
     env = parallel_to_aec(env.unwrapped.vec_envs[0].par_env).unwrapped
     images = []
@@ -87,7 +87,7 @@ def make_pic_video(model, env, name, random_policy=False, video_length=50, saveP
         images.append(img)
         action = {agent: env.action_spaces[agent].sample() for agent in env.agents} if random_policy else model.predict(obs)
         obs, _, _, _ = env.step(action)
-        img = cv2.resize(env.observations[following], dsize=(image_size, image_size), interpolation=cv2.INTER_NEAREST)
+        img = cv2.resize(obs[following], dsize=(image_size, image_size), interpolation=cv2.INTER_NEAREST)
 
     imageio.mimsave(os.path.join(savePath, vidName), [img for i, img in enumerate(images)], fps=30)
 
