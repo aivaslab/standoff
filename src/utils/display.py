@@ -85,7 +85,6 @@ def make_pic_video(model, env, name, random_policy=False, video_length=50, saveP
 
     for i in range(video_length):
         images.append(img)
-        print(env.action_spaces[following])
         action = {agent: env.action_spaces[agent].sample() for agent in env.agents} if random_policy else model.predict(obs)
         obs, _, _, _ = env.step(action)
         img = cv2.resize(env.observations[following], dsize=(image_size, image_size), interpolation=cv2.INTER_NEAREST)
