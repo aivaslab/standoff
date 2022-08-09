@@ -1,10 +1,8 @@
 import numpy as np
 
 from .display import make_pic_video, plot_evals, plot_train
-from stable_baselines3.common.evaluation import evaluate_policy
 from stable_baselines3.common.callbacks import CallbackList, CheckpointCallback, EvalCallback, EveryNTimesteps, BaseCallback
 from tqdm.notebook import tqdm
-import logging
 import time
 import os
 
