@@ -435,7 +435,7 @@ class Curtain(WorldObj):
 
     def render(self, img):
         c = COLORS[self.color]
-        fill_coords(img, point_in_rect(0.1, 0.9, 0.1, 0.9), c)
+        fill_coords(img, point_in_rect(0.0, 1.0, 0.0, 1.0), c)
 
 
 class GlassBlock(WorldObj):
