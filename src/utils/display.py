@@ -91,7 +91,7 @@ def make_pic_video(model, env, name, random_policy=False, video_length=50, saveP
         if random_policy:
             action = {agent: _env.action_spaces[agent].sample() for agent in _env.agents}
         else:
-            action = {following: model.predict(obs[following])}
+            action = {following: model.predict(obs[following])[0]}
         obs, _, dones, _ = _env.step(action)
         img = cv2.resize(obs[following], dsize=(image_size, image_size), interpolation=cv2.INTER_NEAREST)
         cv2.putText(img=img, text=str(action), org=(0, image_size), fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=1, color=(255, 255, 255), thickness=2)
