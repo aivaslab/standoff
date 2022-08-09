@@ -62,7 +62,7 @@ class ScenarioConfigs:
             "sub_valence": 1,
             "dom_valence": 1,
             "followDistance": 1, # subordinate has delayed release. for subordinate first, use negative
-            "lavaHeight": 1, # should be odd
+            "lavaHeight": 3, # should be odd, >=2
             "baits": 1,
             "baitSize": 2,
             "informed": 'informed',
