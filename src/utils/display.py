@@ -98,6 +98,7 @@ def make_pic_video(model, env, name, random_policy=False, video_length=50, saveP
             obs = _env.reset()
             _env.reset()
             img = cv2.resize(obs[following], dsize=(image_size, image_size), interpolation=cv2.INTER_NEAREST)
+            cv2.putText(img=imt, text=action)
 
     imageio.mimsave(os.path.join(savePath, vidName), [img for i, img in enumerate(images)], fps=10)
 
