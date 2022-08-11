@@ -59,9 +59,10 @@ class PlottingCallbackStartStop(BaseCallback):
     """
     # bandaid fix to EveryNTimesteps not triggering at training start and end
     """
-    def __init__(self, verbose=0, savePath='', name='', envs=[], names=[], eval_cbs=[], params=[], model=None):
+    def __init__(self, verbose=0, savePath='', name='', envs=[], names=[], eval_cbs=[], params=[], model=None, global_log_path=''):
         super().__init__(verbose)
         self.savePath = savePath
+        self.global_log_path = os.path.join(global_log_path, 'global_log.txt')
         self.logPath = os.path.join(savePath, 'logs.txt')
         self.name = name
         self.envs = envs
@@ -107,6 +108,9 @@ class PlottingCallbackStartStop(BaseCallback):
                 random_policy=False, video_length=350, savePath=os.path.join(self.savePath, 'videos', name),
                 vidName='end-det.mp4', following="player_0", deterministic=True)
         plot_train(self.savePath, name+'train')
+        meanTrain = np.mean(self.eval_cbs[0].evaluations_results[-1])
+        with open(self.global_log_path, 'a') as logfile:
+            logfile.write( str(self.name, time.time()-self.start_time, meanTrain))
         return True
 
     def _on_step(self):
