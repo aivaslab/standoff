@@ -46,7 +46,7 @@ def make_env(envClass, player_config, configName=None, memory=1, threads=1, redu
     env.configName = configName
     env.hard_reset(env.configs[configName])
 
-    #train on multiple configs how?
+    print('cn', configName)
 
     if reduce_color:
         env = ss.color_reduction_v0(env, 'B')
