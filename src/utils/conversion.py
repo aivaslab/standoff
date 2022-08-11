@@ -38,6 +38,7 @@ def make_env(envClass, player_config, configName=None, memory=1, threads=1, redu
     env_config['num_agents'] = reset_configs['num_agents']
     env_config['num_puppets'] = reset_configs['num_puppets']
     env_config['configs'] = configs
+    env_config['configName'] = configName
 
     env = env_from_config(env_config)
     env.agent_view_size = player_config["view_size"]*player_config["view_tile_size"]
