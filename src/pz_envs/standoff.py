@@ -103,9 +103,6 @@ class StandoffEnv(para_MultiGridEnv):
                   num_agents=1,
                   ):
 
-        print(self.configName)
-        print(self.configs[self.configName])
-        self.hard_reset(self.configs[self.configName])
         startRoom = 2
         atrium = 2
 

@@ -546,6 +546,13 @@ class para_MultiGridEnv(ParallelEnv):
         self.step_count = 0
         self.env_done = False
 
+        if hasattr(self, "hard_reset"):
+            print(self.configName)
+            print(self.configs[self.configName])
+            self.hard_reset(self.configs[self.configName])
+        else:
+            print("No hard reset function found")
+
         for name, agent in zip(self.agents + self.puppets, list(self.agent_and_puppet_instances())):
             agent.agents = []
             agent.name = name
