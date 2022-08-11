@@ -858,7 +858,9 @@ class para_MultiGridEnv(ParallelEnv):
                 topX, topY, agent.view_size, agent.view_size, rot_k=agent.dir + 1
             )
         else:
-            grid = self.grid
+            grid = self.grid.slice(
+                0, 0, agent.view_size, agent.view_size, 0
+            )
 
         # Process occluders and visibility
         # Note that this incurs some slight performance cost
