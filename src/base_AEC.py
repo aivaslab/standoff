@@ -549,8 +549,6 @@ class para_MultiGridEnv(ParallelEnv):
         self.env_done = False
 
         if hasattr(self, "hard_reset"):
-            print(self.configName)
-            print(self.configs)
             self.hard_reset(self.configs[self.configName])
         else:
             print("No hard reset function found")
