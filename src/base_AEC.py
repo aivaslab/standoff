@@ -377,7 +377,8 @@ class para_MultiGridEnv(ParallelEnv):
             done_reward=-10,
             agent_spawn_kwargs=None,
             num_agents=1,
-            num_puppets=0
+            num_puppets=0,
+            configName=''
     ):
         """
         The init method takes in environment arguments and
@@ -404,6 +405,7 @@ class para_MultiGridEnv(ParallelEnv):
 
         self.memory = memory
         self.colorMemory = colorMemory
+        self.configName = configName
 
         self.window = None
 
