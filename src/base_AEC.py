@@ -378,7 +378,7 @@ class para_MultiGridEnv(ParallelEnv):
             agent_spawn_kwargs=None,
             num_agents=1,
             num_puppets=0,
-            configName=''
+            configName='null'
     ):
         """
         The init method takes in environment arguments and
