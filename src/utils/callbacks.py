@@ -109,8 +109,8 @@ class PlottingCallbackStartStop(BaseCallback):
                 vidName='end-det.mp4', following="player_0", deterministic=True)
         plot_train(self.savePath, name+'train')
         meanTrain = np.mean(self.eval_cbs[0].evaluations_results[-1])
-        with open(self.global_log_path, 'a') as logfile:
-            logfile.write( str(self.name, time.time()-self.start_time, meanTrain))
+        #with open(self.global_log_path, 'a') as logfile:
+        #    logfile.write( str(self.name, time.time()-self.start_time, meanTrain))
         return True
 
     def _on_step(self):
