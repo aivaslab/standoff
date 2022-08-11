@@ -25,7 +25,6 @@ def make_env(envClass, player_config, configName=None, memory=1, threads=1, redu
         "step_reward": -0.1,
         "configName": configName,
     }
-    print('cn`1', configName)
     configs = ScenarioConfigs().standoff
     reset_configs = {**configs["defaults"], **configs[configName]}
 
@@ -44,10 +43,8 @@ def make_env(envClass, player_config, configName=None, memory=1, threads=1, redu
     env.agent_view_size = player_config["view_size"]*player_config["view_tile_size"]
 
     configName = random.choice(list(env.configs.keys())) if configName is None else configName
-    env.configName = configName
     env.hard_reset(env.configs[configName])
 
-    print('cn', configName)
 
     if reduce_color:
         env = ss.color_reduction_v0(env, 'B')
