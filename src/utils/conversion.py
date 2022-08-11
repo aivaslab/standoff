@@ -25,6 +25,7 @@ def make_env(envClass, player_config, configName=None, memory=1, threads=1, redu
         "step_reward": -0.1,
         "configName": configName,
     }
+    print('cn`1', configName)
     configs = ScenarioConfigs().standoff
     reset_configs = {**configs["defaults"], **configs[configName]}
 
