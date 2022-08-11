@@ -12,7 +12,7 @@ def train_model(name, train_env, eval_envs, eval_params,
                 saveEval=True, saveTrain=True,
                 savePath="drive/MyDrive/model/", reward_decay=True,
                 extractor_features=32,
-                policy_kwargs=None, ):
+                policy_kwargs=None):
     if policy_kwargs is None:
         policy_kwargs = {}
     if not os.path.exists(savePath):
