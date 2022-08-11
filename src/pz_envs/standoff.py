@@ -29,7 +29,8 @@ class StandoffEnv(para_MultiGridEnv):
             done_reward=-10,
             agent_spawn_kwargs=None,
             num_puppets=1,
-            num_agents=1
+            num_agents=1,
+            configName=""
     ):
         super().__init__(agents, puppets, grid_size, width, height, max_steps, memory, colorMemory, reward_decay, seed,
                          respawn, ghost_mode, step_reward, done_reward, agent_spawn_kwargs)
@@ -41,16 +42,17 @@ class StandoffEnv(para_MultiGridEnv):
         if puppets is None:
             puppets = []
         self.params = None
+        self.configName = configName
 
     def hard_reset(self, params=None):
         """
-        Reset the environment.
+        Reset the environment params.
         """
         defaults = ScenarioConfigs.standoff["defaults"]
 
-        newParams = copy.copy(params)
         if params is None:
             params = {}
+        newParams = copy.copy(params)
         for k in defaults.keys():
             if k in params.keys():
                 if isinstance(params[k], list):
@@ -100,6 +102,8 @@ class StandoffEnv(para_MultiGridEnv):
                   firstBig=True,
                   num_agents=1,
                   ):
+
+        self.hard_reset(self.configs[self.configName])
         startRoom = 2
         atrium = 2
 
