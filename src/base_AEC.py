@@ -752,17 +752,19 @@ class para_MultiGridEnv(ParallelEnv):
                             # step_rewards[agent_no] += rwd
                             self.rewards[agent_name] += rwd
                             self.has_reached_goal[agent_name] = True
-                            self.dones[agent_name] = True
-
-                            # print('reward', rwd)
-                            agent.done = True
+                            
+                            #bandaid fix for possible early stopping
+                            if agent_name == 'player_0':
+                                self.dones[agent_name] = True
+                                agent.done = True
                             agent.reward(rwd)
                             # agent.step_reward = rwd
 
                         if isinstance(fwd_cell, (Lava, Goal)):
-                            agent.done = True
-                            # added below
-                            self.dones[agent_name] = True
+                            if agent_name == 'player_0':
+                                agent.done = True
+                                # added below
+                                self.dones[agent_name] = True
 
                 # Pick up an object
                 elif action == agent.actions.pickup:
