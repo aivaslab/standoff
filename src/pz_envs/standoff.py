@@ -205,7 +205,7 @@ class StandoffEnv(para_MultiGridEnv):
         curTime = 1
         self.add_timer("init", 2)
         for k, event in enumerate(events):
-            self.add_timer(event, curTime, event_args[k])
+            self.add_timer(event, curTime, arg=event_args[k])
             curTime += 1
         if followDistance < 0:
             subRelease = 0
@@ -213,10 +213,10 @@ class StandoffEnv(para_MultiGridEnv):
         else:
             subRelease = followDistance
             domRelease = 0
-        self.add_timer(["release"], curTime + domRelease, 0)
-        self.add_timer(["release"], curTime + subRelease, 1)
-        self.add_timer(["release"], curTime + releaseGap + domRelease, 2)
-        self.add_timer(["release"], curTime + releaseGap + subRelease, 3)
+        self.add_timer(["release"], curTime + domRelease, arg=0)
+        self.add_timer(["release"], curTime + subRelease, arg=1)
+        self.add_timer(["release"], curTime + releaseGap + domRelease, arg=2)
+        self.add_timer(["release"], curTime + releaseGap + subRelease, arg=3)
 
     def timer_active(self, event, arg=None):
         name = event[0]
@@ -251,7 +251,6 @@ class StandoffEnv(para_MultiGridEnv):
             self.put_obj(Goal(reward=r1, size=r1*0.01, color='green'), event[2] * 2 + 2, y)
         elif name == "release":
             for x, y in self.release[arg]:
-                print(x,y)
                 self.del_obj(x, y)
 
         # oracle food location memory for puppet ai
@@ -266,7 +265,6 @@ class StandoffEnv(para_MultiGridEnv):
                             self.last_seen_reward[agent + str(box)] = tile.reward if isinstance(tile.reward, int) else 0
                             # print('rew update', agent, box, tile.reward)
                         elif not self.grid.get(x, y) and self.last_seen_reward[agent + str(box)] != 0:
-                            # print('0ing', box)
                             self.last_seen_reward[agent + str(box)] = 0
 
             new_target = False

@@ -809,7 +809,7 @@ class para_MultiGridEnv(ParallelEnv):
 
         # observe the current state
         for agent_name, agent in zip(self.agents, self.agent_instances):
-            print('observing', agent_name, agent)
+            #print('observing', agent_name, agent)
             self.observations[agent_name] = self.gen_agent_obs(agent)
             # self.rewards[agent_name] = agent.rew
             if not self.dones[agent_name] and self.env_done:
@@ -859,7 +859,7 @@ class para_MultiGridEnv(ParallelEnv):
 
     def gen_obs_grid(self, agent):
 
-        print('gen_obs_grid', agent)
+        #print('gen_obs_grid', agent)
         # If the agent is inactive, return an empty grid and a visibility mask that hides everything.
         if not agent.active:
             # below, not sure orientation is correct but as of 6/27/2020 that doesn't matter because
@@ -903,7 +903,7 @@ class para_MultiGridEnv(ParallelEnv):
         """
         Generate the agent's view (partially observable, low-resolution encoding)
         """
-        print('generating agent obs', agent)
+        #print('generating agent obs', agent)
         grid, vis_mask = self.gen_obs_grid(agent)
         grid_image = grid.render(tile_size=agent.view_tile_size, visible_mask=vis_mask, top_agent=agent)
         if agent.observation_style == 'image':
@@ -1014,7 +1014,7 @@ class para_MultiGridEnv(ParallelEnv):
         # Compute which cells are visible to the agent
         highlight_mask = np.full((self.width, self.height), False, dtype=np.bool)
         for agentname, agent in zip(self.agents, self.agent_instances):
-            print("base render", agentname)
+            #print("base render", agentname)
             if agent.active:
                 xlow, ylow, xhigh, yhigh = agent.get_view_exts()
                 dxlow, dylow = max(0, 0 - xlow), max(0, 0 - ylow)
