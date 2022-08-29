@@ -5,6 +5,7 @@ import gym
 import numpy as np
 import functools
 import random
+import traceback
 
 from .objects import Wall, Goal, Lava, GridAgent, COLORS
 from gym_minigrid.rendering import downsample
@@ -564,16 +565,18 @@ class para_MultiGridEnv(ParallelEnv):
         if self.loadingPickle:
             self.grid = random.choice(self.allRooms)
         else:
-            flag = 0
+            self._gen_grid(self.width, self.height, **self.params)
+            '''flag = 0
             while flag < 100:
                 try:
                     self._gen_grid(self.width, self.height, **self.params)
                     flag = 100
                 except Exception as e:
                     flag = flag + 1
-                    if flag == 100:
+                    if flag == 100 or True:
                         print('exception', e)
-                    pass
+                        traceback.print_exc()
+                    pass'''
 
         for k, agent in enumerate(self.agent_instances.union(self.puppet_instances)):
             if agent.spawn_delay == 0:
@@ -589,13 +592,13 @@ class para_MultiGridEnv(ParallelEnv):
 
         return self.observations
 
-    def add_timer(self, name, time):
+    def add_timer(self, event, time, arg=None):
         if str(time) in self.timers.keys():
-            self.timers[str(time)].append(name)
+            self.timers[str(time)].append((event, arg))
         else:
-            self.timers[str(time)] = [name, ]
+            self.timers[str(time)] = [(event, arg), ]
 
-    def timer_active(self, name):
+    def timer_active(self, event):
         pass
 
     def step(self, actions):
@@ -613,9 +616,8 @@ class para_MultiGridEnv(ParallelEnv):
 
         # activate timed events
         if str(self.step_count + 1) in self.timers.keys():
-            for name in self.timers[str(self.step_count + 1)]:
-                # print(name, "event")
-                self.timer_active(name)
+            for event in self.timers[str(self.step_count + 1)]:
+                self.timer_active(event[0], event[1])
 
         # If a user passes in actions with no agents, then just return empty observations, etc.
         if not actions:

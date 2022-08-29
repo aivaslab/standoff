@@ -71,6 +71,7 @@ class ScenarioConfigs:
             "lava": 'lava',
             "num_puppets": 1,
             "num_agents": 1,
+            "events": [[['bait', 'empty'], ['bait', 'empty']]] #list, event, args
         },
 
         "tutorial_step_1": {
@@ -81,7 +82,6 @@ class ScenarioConfigs:
             "visibility": ['full', 'curtains'],
             "informed": "informed",
             "hidden": [False, True],
-            "events": [('bait', 'empty'), ('bait', 'empty')]
         },
         "tutorial_step_1a": {
             "num_puppets": [0],
@@ -91,7 +91,6 @@ class ScenarioConfigs:
             "visibility": ['full'],
             "informed": "informed",
             "hidden": [False],
-            "events": [('bait', 'empty'), ('bait', 'empty')]
         },
         "tutorial_step_1b": {
             "num_puppets": [0],
@@ -101,7 +100,6 @@ class ScenarioConfigs:
             "visibility": ['full'],
             "informed": "informed",
             "hidden": [True],
-            "events": [('bait', 'empty'), ('bait', 'empty')]
         },
         "tutorial_step_2": {
             # more eVaried training, including easier cases than eval
@@ -111,7 +109,6 @@ class ScenarioConfigs:
             "visibility": ['curtains'],
             "informed": "informed",
             "hidden": [False, True],
-            "events": [('bait', 'empty'), ('bait', 'empty')]
         },
         "tutorial_step_2a": {
             # single test config that must be passed
@@ -121,7 +118,6 @@ class ScenarioConfigs:
             "informed": "informed",
             "hidden": False,
             "followDistance": [1],
-            "events": [('bait', 'empty'), ('bait', 'empty')]
         },
         "tutorial_step_2b": {
             # single test config that must be passed
@@ -131,62 +127,61 @@ class ScenarioConfigs:
             "informed": "informed",
             "hidden": True,
             "followDistance": [1],
-            "events": [('bait', 'empty'), ('bait', 'empty')]
         },
         "informed control": {
             "informed": 'informed',
-            "events": [('bait', 'empty'), ('bait', 'empty')]
+            "events": [[['bait', 'empty'], ['bait', 'empty']]]
         },
         "partially uninformed": {
             "informed": ['half1', 'half2'],
             "firstBig": [True, False],
             "baitSize": 1,
             "baits": 2,
-            "events": [[('bait', 'empty'), ('obscure'), ('bait', 'empty')],
-                       [('obscure'), ('bait', 'empty'), ('reveal'), ('bait', 'empty')]]
+            "events": [[['bait', 'empty'], ['obscure'], ['bait', 'empty']],
+                       [['obscure'], ['bait', 'empty'], ['reveal'], ['bait', 'empty']]]
         },
         "removed informed": {
             "informed": "informed",
             "swapType": 'remove',
             "baitSize": 2,
             "baits": 3,
-            "events": [[('bait', 'empty'), ('bait', 'empty'), ('remove', x)] for x in [0, 1]]
+            "events": [[['bait', 'empty'], ['bait', 'empty'], ['remove', x]] for x in [0, 1]]
         },
         "removed uninformed": {
             "informed": "uninformed",
             "swapType": 'remove',
             "baitSize": 2,
             "baits": 2,
-            "events": [[('bait', 'empty'), ('bait', 'empty'), ('block'), ('remove', x)] for x in [0, 1]]
+            "events": [[['bait', 'empty'], ['bait', 'empty'], ['block'], ['remove', x]] for x in [0, 1]]
         },
         "moved": {
             "informed": "informed",  # but uninformed about first baiting
             "swapType": 'move',
             "baitSize": 2,
             "baits": 2,
-            "events": [('obscure'), ('bait', 'empty'), ('bait', 'empty'), ('reveal'), ('move', 0, 'empty'),
-                       ('move', 1, 'empty')]
+            "events": [[['obscure'], ['bait', 'empty'], ['bait', 'empty'], ['reveal'], ['swap', 1, 'empty'],
+                       ['swap', 2, 'empty']]]
         },
         "replaced": {
             "informed": "uninformed",
             "swapType": 'replace',
             "baitSize": 1,
             "baits": 3,
-            "events": [('bait', 'empty'), ('obscure'), ('move', 0, 'empty'), ('bait', 0)]
+            "events": [[['bait', 'empty'], ['obscure'], ['swap', 0, 'empty'], ['bait', 0]]]
         },
         "misinformed": {
             "informed": "uninformed",
             "swapType": ['swap', 'replace'],  # any bucket swapped with a food
             "baitSize": 2,
             "baits": 2,
-            "events": [[('bait', 'empty'), ('bait', 'empty'), ('obscure'), ('move', x, 'anyElse')] for x in [0, 1]]
+            "events": [[['bait', 'empty'], ['bait', 'empty'], ['obscure'], ['swap', x, 'else']] for x in [0, 1]]
         },
         "swapped": {
             "informed": "uninformed",
             "swapType": 'swap',
             "baitSize": 2,
             "baits": 2,
-            "events": [('bait', 'empty'), ('bait', 'empty'), ('obscure'), ('move', 0, 1)]
+            "events": [[['bait', 'empty'], ['bait', 'empty'], ['obscure'], ['swap', 0, 1]]]
         }
     }
 

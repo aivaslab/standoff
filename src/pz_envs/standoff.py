@@ -52,7 +52,7 @@ class StandoffEnv(para_MultiGridEnv):
 
         if params is None:
             params = {}
-        newParams = copy.copy(params)
+        newParams = copy.deepcopy(params)
         for k in defaults.keys():
             if k in params.keys():
                 if isinstance(params[k], list):
@@ -62,7 +62,7 @@ class StandoffEnv(para_MultiGridEnv):
                     newParams[k] = random.choice(defaults[k])
                 else:
                     newParams[k] = defaults[k]
-        self.params = newParams
+        self.params = copy.deepcopy(newParams)
 
         # special since max_puppets is weird
         # maybe delete this
@@ -101,10 +101,12 @@ class StandoffEnv(para_MultiGridEnv):
                   lava='lava',
                   firstBig=True,
                   num_agents=1,
+                  events = [],
                   ):
 
         startRoom = 2
         atrium = 2
+        self.boxes = boxes
 
         if swapType == "replace" and boxes <= 2:
             swapType = "swap"
@@ -171,167 +173,90 @@ class StandoffEnv(para_MultiGridEnv):
 
         self.agent_goal, self.last_seen_reward, self.can_see, self.best_reward = {}, {}, {}, {}
         self.reset_vision()
-        # init timers
 
+
+        ## Bucket location allocation for timers
+        empty_buckets = [i for i in range(boxes)]
+        event_args = [None for _ in range(len(events))]
+        bait_args = [25, 100]
+        for k, event in enumerate(events):
+            type = event[0]
+            for x in range(len(event)):
+                if event[x] == "empty":
+                    event[x] = empty_buckets.pop(random.randrange(len(empty_buckets)))
+                elif event[x] == "else":
+                    available_spots = [i for i in range(boxes) if i != event[x - 1]]
+                    event[x] = available_spots.pop(random.randrange(len(available_spots)))
+                elif isinstance(event[x], int):
+                    event[x] = events[event[x]][1] #get first location
+
+            if type == "bait":
+                event_args[k] = bait_args.pop(random.randrange(len(bait_args)))
+            elif type == "remove":
+                empty_buckets.append(event[1])
+            elif type == "obscure" or type == "reveal":
+                #hardcoded, will not work for multiple conspecifics
+                event_args[k] = "player_1"
+            # could also add functionality for moving empty buckets which are swapped,
+            # but that is not used in any tasks
+
+        # add timers for events
         self.timers = {}
         curTime = 1
-        self.add_timer("init", 1)
-        for bait in range(0, baits * baitSize, baitSize):
-            baitLength = 7
-            informed2 = informed
-            if informed == "half1":
-                informed2 = "informed" if bait == 0 else "uninformed"
-            elif informed == "half2":
-                informed2 = "informed" if bait == 1 else "uninformed"
-
-            if informed2 == "informed":
-                # no hiding
-                swapTime = random.randint(1, baitLength - 1)
-            elif informed2 == "uninformed":
-                # swap during blind
-                swapTime = random.randint(1, baitLength - 2)
-                blindStart = random.randint(0, swapTime)
-                blindStop = random.randint(swapTime, baitLength)
-                self.add_timer("blind player_1", curTime + blindStart)
-                self.add_timer("reveal player_1", curTime + blindStop)
-            elif informed2 == "fake":
-                # swap/hide before or after blind
-                if random.choice([True, False]):
-                    swapTime = random.randint(1, baitLength)
-                    blindStart = random.randint(0, swapTime - 2)
-                    blindStop = random.randint(blindStart, swapTime - 1)
-                else:
-                    swapTime = random.randint(0, baitLength - 3)
-                    blindStart = swapTime + random.randint(swapTime, baitLength - 1)
-                    blindStop = swapTime + random.randint(blindStart, baitLength)
-
-                assert blindStart < blindStop
-                assert blindStop < baitLength
-
-                self.add_timer("blind player_1", curTime + blindStart)
-                self.add_timer("reveal player_1", curTime + blindStop)
-            else:
-                swapTime = 1000  # no swap
-            if bait < 2:
-                if baitSize == 2:
-                    self.add_timer("place12", curTime + swapTime)
-                elif baitSize == 1:
-                    if firstBig == bait:
-                        self.add_timer("place1", curTime + swapTime)
-                    else:
-                        self.add_timer("place2", curTime + swapTime)
-            else:
-                st = swapType
-                if "remove" in st:
-                    st = st + random.choice(["1", "2"])
-                self.add_timer(st, curTime + swapTime)
-            if hidden:
-                if bait + baitSize < 2:
-                    if firstBig == bait:
-                        self.add_timer("hide1", curTime + swapTime + 1)
-                    else:
-                        self.add_timer("hide2", curTime + swapTime + 1)
-                if bait + baitSize > baits - 1:
-                    self.add_timer("hideall", curTime + swapTime + 1)
-            curTime += baitLength
-
+        self.add_timer("init", 2)
+        for k, event in enumerate(events):
+            self.add_timer(event, curTime, event_args[k])
+            curTime += 1
         if followDistance < 0:
             subRelease = 0
             domRelease = -followDistance
         else:
             subRelease = followDistance
             domRelease = 0
-        self.add_timer("release_0", curTime + 1 + domRelease)
-        self.add_timer("release_1", curTime + 1 + subRelease)
-        self.add_timer("release_2", curTime + 1 + releaseGap + domRelease)
-        self.add_timer("release_3", curTime + 1 + releaseGap + subRelease)
+        self.add_timer(["release"], curTime + domRelease, 0)
+        self.add_timer(["release"], curTime + subRelease, 1)
+        self.add_timer(["release"], curTime + releaseGap + domRelease, 2)
+        self.add_timer(["release"], curTime + releaseGap + subRelease, 3)
 
-    def timer_active(self, name):
-        # todo: make all these events more sensibly written, not dependent on food starting locs
-        boxes = self.params["boxes"]
-        firstBig = self.params["firstBig"]
-        followDistance = self.params["followDistance"]
-        y = self.height // 2 - followDistance
-        if "release" in name:
-            release_no = int(name[-1])
-            for xx, yy in self.release[release_no]:
-                self.del_obj(xx, yy)
-        if "place" in name or "hide" in name or "remove" in name:
-            for box in range(boxes):
+    def timer_active(self, event, arg=None):
+        name = event[0]
+        arg = arg
+        y = self.height // 2
+        if name == 'init':
+            for box in range(self.boxes):
                 x = box * 2 + 2
-                if "place" in name:
-                    if box == self.food_locs[not firstBig] and "1" in name:
-                        self.put_obj(Goal(reward=100, size=1.0, color='green'), x, y)
-                    if box == self.food_locs[firstBig] and "2" in name:
-                        self.put_obj(Goal(reward=25, size=0.5, color='green'), x, y)
-
-                elif "hide" in name:
-                    if "all" in name or (box == self.food_locs[not firstBig] and "1" in name) or (
-                            box == self.food_locs[firstBig] and "2" in name):
-                        b1 = Box(color="yellow")
-                        c = self.grid.get(x, y)
-                        if c:
-                            b1.contains = c
-                            b1.can_overlap = c.can_overlap
-                            b1.get_reward = c.get_reward
-                        else:
-                            b1.can_overlap = lambda: True
-                            b1.get_reward = lambda x: self.box_reward
-                            # todo: why does one of these have arg? overlap is property?
-                        self.put_obj(b1, x, y)
-
-                elif "remove" in name:
-                    if box == self.food_locs[0] and "1" in name:
-                        self.del_obj(x, y)
-                    elif box == self.food_locs[1] and "2" in name:
-                        self.del_obj(x, y)
-        if name == "replace":
-            # swap big food with a no food tile
-            # currently only does big food, should it do small?
-            for box in range(boxes):
-                x = box * 2 + 2
-                y = self.height // 2
-                if box == self.food_locs[2]:
-                    self.put_obj(Goal(reward=100, size=1.0, color='green'), x, y)
-                elif box == self.food_locs[not firstBig]:
-                    self.del_obj(x, y)
-        if name == "move":
-            # both foods are moved to new locations
-            for box in range(boxes):
-                x = box * 2 + 2
-                if box == self.food_locs[2]:
-                    self.put_obj(Goal(reward=100, size=1.0, color='green'), x, y)
-                if box == self.food_locs[3]:
-                    self.put_obj(Goal(reward=25, size=0.5, color='green'), x, y)
-                elif box == self.food_locs[not firstBig] or box == self.food_locs[firstBig]:
-                    self.del_obj(x, y)
-        if name == "swap":
-            for box in range(boxes):
-                x = box * 2 + 2
-                if box == self.food_locs[firstBig]:
-                    self.put_obj(Goal(reward=100, size=1.0, color='green'), x, y)
-                elif box == self.food_locs[not firstBig]:
-                    self.put_obj(Goal(reward=25, size=0.5, color='green'), x, y)
-
-        if "blind" in name or "reveal" in name:
-            splitName = name.split()
-            b = self.grid.get(*self.agent_door_pos[splitName[1]])
-
-            if "blind" in name:
+                self.put_obj(Box(color="orange"), x, y)
+        elif name == 'bait':
+            x = event[1] * 2 + 2
+            self.put_obj(Goal(reward=arg, size=arg*0.01, color='green'), x, y)
+        elif name == "remove":
+            x = event[1] * 2 + 2
+            self.del_obj(x, y)
+        elif name == "obscure" or name == "reveal":
+            b = self.grid.get(*self.agent_door_pos[arg])
+            if name == "obscure":
                 b.state = 1
                 b.see_behind = lambda: False
-            if "reveal" in name:
+            elif name == "reveal":
                 b.state = 0
                 b.see_behind = lambda: True
-            # record whether each agent can see each food
-            agent = self.instance_from_name[splitName[1]]
-            for box in range(boxes):
-                self.can_see[splitName[1] + str(box)] = False if "blind" in name else True
+            for box in range(self.boxes):
+                self.can_see[arg + str(box)] = False if "obscure" in name else True
+        elif name == "swap":
+            b1 = self.grid.get(event[1] * 2 + 2, y)
+            b2 = self.grid.get(event[2] * 2 + 2, y)
+            r1 = b1.reward if hasattr(b1, "get_reward") else 0
+            r2 = b2.reward if hasattr(b2, "get_reward") else 0
+            self.put_obj(Goal(reward=r2, size=r2*0.01, color='green'), event[1] * 2 + 2, y)
+            self.put_obj(Goal(reward=r1, size=r1*0.01, color='green'), event[2] * 2 + 2, y)
+        elif name == "release":
+            for x, y in self.release[arg]:
+                print(x,y)
+                self.del_obj(x, y)
 
-        # whenever food updates, remember locations
-        if name in ["init", "swap", "replace", "reveal"] or "remove" in name or "place" in name or "release" in name:
-
-            for box in range(boxes):
+        # oracle food location memory for puppet ai
+        if name == "bait" or name == "swap" or name == "remove":
+            for box in range(self.boxes):
                 x = box * 2 + 2
                 for agent in self.agents_and_puppets():
                     if self.can_see[agent + str(box)]:
@@ -346,7 +271,7 @@ class StandoffEnv(para_MultiGridEnv):
 
             new_target = False
             target_agent = None
-            for box in range(boxes):
+            for box in range(self.boxes):
                 for agent in self.agents_and_puppets():
                     reward = self.last_seen_reward[agent + str(box)]
                     if (self.agent_goal[agent] != box) and (reward >= self.best_reward[agent]):
