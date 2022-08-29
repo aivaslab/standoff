@@ -12,6 +12,7 @@ from gym_minigrid.rendering import downsample
 from gym.utils.seeding import np_random
 from gym.spaces import Discrete, Box
 from pettingzoo import ParallelEnv
+from gym.envs.classic_control.rendering import SimpleImageViewer
 
 TILE_PIXELS = 9
 NUM_ITERS = 100
@@ -544,12 +545,15 @@ class para_MultiGridEnv(ParallelEnv):
         self.infos = {agent: {} for agent in self.agents_and_puppets()}
         self.state = {agent: NONE for agent in self.agents_and_puppets()}
         # we don't generate observations for puppets
-        self.observations = {agent: self.gen_agent_obs(a) for agent, a in zip(self.agents_and_puppets(),
-                                                                              self.agent_and_puppet_instances())}
+
+        self.observations = {agent: self.gen_agent_obs(a) for agent, a in zip(self.agents, self.agent_instances)}
+        #self.observations = {agent: self.gen_agent_obs(a) for agent, a in zip(self.agents_and_puppets(), self.agent_and_puppet_instances())}
+
         self.step_count = 0
         self.env_done = False
 
         if hasattr(self, "hard_reset"):
+            print(self.configName)
             self.hard_reset(self.configs[self.configName])
         else:
             print("No hard reset function found")
@@ -644,6 +648,7 @@ class para_MultiGridEnv(ParallelEnv):
             puppet_actions[agent] = nextAct
 
         actions = dict(actions, **puppet_actions)
+        print(actions)
 
         for agent_name in actions:
             action = actions[agent_name]
@@ -804,6 +809,7 @@ class para_MultiGridEnv(ParallelEnv):
 
         # observe the current state
         for agent_name, agent in zip(self.agents, self.agent_instances):
+            print('observing', agent_name, agent)
             self.observations[agent_name] = self.gen_agent_obs(agent)
             # self.rewards[agent_name] = agent.rew
             if not self.dones[agent_name] and self.env_done:
@@ -853,7 +859,7 @@ class para_MultiGridEnv(ParallelEnv):
 
     def gen_obs_grid(self, agent):
 
-        # print(agent)
+        print('gen_obs_grid', agent)
         # If the agent is inactive, return an empty grid and a visibility mask that hides everything.
         if not agent.active:
             # below, not sure orientation is correct but as of 6/27/2020 that doesn't matter because
@@ -897,6 +903,7 @@ class para_MultiGridEnv(ParallelEnv):
         """
         Generate the agent's view (partially observable, low-resolution encoding)
         """
+        print('generating agent obs', agent)
         grid, vis_mask = self.gen_obs_grid(agent)
         grid_image = grid.render(tile_size=agent.view_tile_size, visible_mask=vis_mask, top_agent=agent)
         if agent.observation_style == 'image':
@@ -913,9 +920,6 @@ class para_MultiGridEnv(ParallelEnv):
                 agent_dir = agent.dir if agent.dir is not None else 0
                 ret['orientation'] = agent_dir
             return ret
-
-    def gen_obs(self):
-        return [self.gen_agent_obs(agent) for agent in self.agent_instances]
 
     def __str__(self):
         return self.grid.__str__()
@@ -1005,13 +1009,12 @@ class para_MultiGridEnv(ParallelEnv):
                 self.window.close()
             return
 
-        if False and mode == "human" and not self.window:
-            pass
-            # from gym.envs.classic_control.rendering import SimpleImageViewer
-            # self.window = SimpleImageViewer(caption="Marlgrid")
+        if mode == "human" and not self.window:
+            self.window = SimpleImageViewer()
         # Compute which cells are visible to the agent
         highlight_mask = np.full((self.width, self.height), False, dtype=np.bool)
         for agentname, agent in zip(self.agents, self.agent_instances):
+            print("base render", agentname)
             if agent.active:
                 xlow, ylow, xhigh, yhigh = agent.get_view_exts()
                 dxlow, dylow = max(0, 0 - xlow), max(0, 0 - ylow)
@@ -1036,7 +1039,7 @@ class para_MultiGridEnv(ParallelEnv):
             target_partial_width = int(img.shape[0] * agent_col_width_frac - 2 * agent_col_padding_px)
             target_partial_height = (img.shape[1] - 2 * agent_col_padding_px) // max_agents_per_col
 
-            agent_views = [self.gen_agent_obs(agent) for agent in self.agent_instances]
+            agent_views = [self.gen_agent_obs(agent) for agent in self.agent_and_puppet_instances()]
             agent_views = [view['pov'] if isinstance(view, dict) else view for view in agent_views]
             agent_views = [
                 rescale(view, min(target_partial_width / view.shape[0], target_partial_height / view.shape[1])) for view
@@ -1060,12 +1063,12 @@ class para_MultiGridEnv(ParallelEnv):
 
             img = np.concatenate((img, *cols), axis=1)
 
-        '''if mode == "human":
+        if mode == "human":
             if not self.window.isopen:
                 self.window.imshow(img)
                 self.window.window.set_caption("Marlgrid")
             else:
-                self.window.imshow(img)'''
+                self.window.imshow(img)
 
         # print('returning', img)
         return img

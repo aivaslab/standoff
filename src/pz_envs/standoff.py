@@ -115,7 +115,7 @@ class StandoffEnv(para_MultiGridEnv):
         self.food_locs = list(range(boxes))
         random.shuffle(self.food_locs)
         self.release = [[] for _ in range(4)]
-        releaseGap = boxes * 2 + atrium
+        releaseGap = boxes * 2 + atrium-1
         self.width = boxes * 2 + 3
         self.height = lavaHeight + startRoom * 2 + atrium * 2 + 2
         self.grid = MultiGrid((self.width, self.height))
@@ -245,8 +245,8 @@ class StandoffEnv(para_MultiGridEnv):
         elif name == "swap":
             b1 = self.grid.get(event[1] * 2 + 2, y)
             b2 = self.grid.get(event[2] * 2 + 2, y)
-            r1 = b1.reward if hasattr(b1, "get_reward") else 0
-            r2 = b2.reward if hasattr(b2, "get_reward") else 0
+            r1 = b1.reward if hasattr(b1, "reward") else 0
+            r2 = b2.reward if hasattr(b2, "reward") else 0
             self.put_obj(Goal(reward=r2, size=r2*0.01, color='green'), event[1] * 2 + 2, y)
             self.put_obj(Goal(reward=r1, size=r1*0.01, color='green'), event[2] * 2 + 2, y)
         elif name == "release":
