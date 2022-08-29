@@ -25,7 +25,7 @@ def train_model(name, train_env, eval_envs, eval_params,
 
     train_env = make_env(train_env[0], player_config, train_env[1], memory=memory, threads=threads,
                          reduce_color=reduce_color, size=size, reward_decay=reward_decay,
-                         path=savePath)
+                         path=savePath, vecMonitor=True)
 
     eval_envs = [make_env(env_name, player_config, env_param, memory=memory, threads=threads,
                           reduce_color=reduce_color, size=size, saveVids=saveVids, path=savePath,
