@@ -12,7 +12,7 @@ from gym_minigrid.rendering import downsample
 from gym.utils.seeding import np_random
 from gym.spaces import Discrete, Box
 from pettingzoo import ParallelEnv
-from gym.envs.classic_control.rendering import SimpleImageViewer
+#from gym.envs.classic_control.rendering import SimpleImageViewer
 
 TILE_PIXELS = 9
 NUM_ITERS = 100
@@ -1009,8 +1009,8 @@ class para_MultiGridEnv(ParallelEnv):
                 self.window.close()
             return
 
-        if mode == "human" and not self.window:
-            self.window = SimpleImageViewer()
+        #if mode == "human" and not self.window:
+        #    self.window = SimpleImageViewer()
         # Compute which cells are visible to the agent
         highlight_mask = np.full((self.width, self.height), False, dtype=np.bool)
         for agentname, agent in zip(self.agents, self.agent_instances):
