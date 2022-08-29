@@ -553,7 +553,7 @@ class para_MultiGridEnv(ParallelEnv):
         self.env_done = False
 
         if hasattr(self, "hard_reset"):
-            print(self.configName)
+            #print(self.configName)
             self.hard_reset(self.configs[self.configName])
         else:
             print("No hard reset function found")
@@ -648,7 +648,7 @@ class para_MultiGridEnv(ParallelEnv):
             puppet_actions[agent] = nextAct
 
         actions = dict(actions, **puppet_actions)
-        print(actions)
+        #print(actions)
 
         for agent_name in actions:
             action = actions[agent_name]
