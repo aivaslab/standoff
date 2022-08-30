@@ -573,7 +573,8 @@ class para_MultiGridEnv(ParallelEnv):
         if self.loadingPickle:
             self.grid = random.choice(self.allRooms)
         else:
-            self._gen_grid(self.width, self.height, **self.params)
+            print(self.params)
+            self._gen_grid(**self.params)
             '''flag = 0
             while flag < 100:
                 try:

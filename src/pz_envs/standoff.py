@@ -81,27 +81,19 @@ class StandoffEnv(para_MultiGridEnv):
                 if agent + str(box) not in self.can_see.keys():
                     self.can_see[agent + str(box)] = True  # default to not hidden until it is
 
-    def _gen_grid(self, width, height,
-                  adversarial=True,
-                  hidden=True,
-                  rational=True,
-                  sharedRewards=False,
-                  boxes=5,
+    def _gen_grid(self,
                   sub_valence=1,
                   dom_valence=1,
                   num_puppets=1,
-                  followDistance=1,
+                  subject_is_dominant=False,
                   lavaHeight=2,
-                  baits=1,
-                  baitSize=2,
-                  informed='informed',
                   swapType='swap',
                   visibility='curtains',
-                  cause='blocks',
-                  lava='lava',
-                  firstBig=True,
-                  num_agents=1,
                   events = [],
+                  hidden = False,
+                  sharedRewards = False,
+                  boxes=5,
+                  num_agents=2
                   ):
 
         startRoom = 2
@@ -207,12 +199,12 @@ class StandoffEnv(para_MultiGridEnv):
         for k, event in enumerate(events):
             self.add_timer(event, curTime, arg=event_args[k])
             curTime += 1
-        if followDistance < 0:
-            subRelease = 0
-            domRelease = -followDistance
-        else:
-            subRelease = followDistance
+        if subject_is_dominant:
+            subRelease = 1
             domRelease = 0
+        else:
+            subRelease = 0
+            domRelease = 1
         self.add_timer(["release"], curTime + domRelease, arg=0)
         self.add_timer(["release"], curTime + subRelease, arg=1)
         self.add_timer(["release"], curTime + releaseGap + domRelease, arg=2)
