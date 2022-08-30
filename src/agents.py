@@ -392,11 +392,3 @@ def occlude_mask(grid, agent_pos):
                         mask[i - 1, j + 1] = True
 
     return mask
-
-
-class IndependentLearners():
-    def __init__(self, *agents):
-        self.agents = agents
-
-    def action_step(self, obs):
-        return [x.action_step(obs[i]) for i, x in enumerate(self.agents)]
