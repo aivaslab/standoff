@@ -450,8 +450,8 @@ class para_MultiGridEnv(ParallelEnv):
         # self.observation_space = self.observation_spaces[self.possible_agents[0]]
         # cannot define these because it makes uncallable
 
-        self.agent_instances = {agent for agent in agents}
-        self.puppet_instances = {puppet for puppet in puppets}
+        self.agent_instances = [agent for agent in agents]
+        self.puppet_instances = [puppet for puppet in puppets]
         self.instance_from_name = {name: agent for name, agent in
                                    zip(self.possible_agents + self.possible_puppets, agents + puppets)}
         self.loadingPickle = False
@@ -520,7 +520,7 @@ class para_MultiGridEnv(ParallelEnv):
         """
         For legacy agent functions to also work with puppets
         """
-        return self.agent_instances.union(self.puppet_instances)
+        return self.agent_instances + self.puppet_instances
 
     def reset(self):
         """
@@ -558,9 +558,13 @@ class para_MultiGridEnv(ParallelEnv):
         else:
             print("No hard reset function found")
 
+        print("naming instances", self.agents, self.puppets)
+        print(self.agent_and_puppet_instances())
+
         for name, agent in zip(self.agents + self.puppets, list(self.agent_and_puppet_instances())):
             agent.agents = []
             agent.name = name
+            print(agent.name, agent.color)
             agent.next_actions = []
             agent.pathDict = {}
             self.instance_from_name[name] = agent
@@ -582,7 +586,7 @@ class para_MultiGridEnv(ParallelEnv):
                         traceback.print_exc()
                     pass'''
 
-        for k, agent in enumerate(self.agent_instances.union(self.puppet_instances)):
+        for k, agent in enumerate(self.agent_and_puppet_instances()):
             if agent.spawn_delay == 0:
                 try:
                     # print(agent, agent.name, *self.agent_spawn_pos[agent.name])
@@ -622,6 +626,7 @@ class para_MultiGridEnv(ParallelEnv):
         if str(self.step_count + 1) in self.timers.keys():
             for event in self.timers[str(self.step_count + 1)]:
                 self.timer_active(event[0], event[1])
+        print('before puppet', actions)
 
         # If a user passes in actions with no agents, then just return empty observations, etc.
         if not actions:
@@ -648,11 +653,13 @@ class para_MultiGridEnv(ParallelEnv):
             puppet_actions[agent] = nextAct
 
         actions = dict(actions, **puppet_actions)
-        #print(actions)
+        print('after puppet', actions)
 
         for agent_name in actions:
             action = actions[agent_name]
+            print("acting", agent_name, action)
             agent = self.instance_from_name[agent_name]
+            print(agent_name, agent.color)
             agent.step_reward = 0
             self.rewards[agent_name] = 0
 
