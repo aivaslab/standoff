@@ -275,10 +275,11 @@ class BonusTile(WorldObj):
 
 
 class Goal(WorldObj):
-    def __init__(self, reward, size=1.0, *args, **kwargs):
+    def __init__(self, reward, size=1.0, hide=False, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.reward = reward
         self.size = size
+        self.hide = hide
 
     def can_overlap(self):
         return True
@@ -542,9 +543,13 @@ class Door(WorldObj):
 
 
 class Box(WorldObj):
-    def __init__(self, color=0, state=0, contains=None):
+    def __init__(self, color=0, state=0, reward=0, contains=None):
         super().__init__(color, state)
         self.contains = contains
+        self.reward = reward
+        if self.contains is not None:
+            self.get_reward = self.contains.get_reward
+            self.can_overlap = self.contains.can_overlap
 
     def can_pickup(self):
         return True
@@ -553,6 +558,7 @@ class Box(WorldObj):
         # turn into what you're carrying
         # unused
         pass
+
 
     # print('toggling')
     # self.__class__ = self.contains.__class__

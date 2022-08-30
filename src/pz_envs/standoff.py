@@ -93,7 +93,8 @@ class StandoffEnv(para_MultiGridEnv):
                   hidden = False,
                   sharedRewards = False,
                   boxes=5,
-                  num_agents=2
+                  num_agents=2,
+                  special_box_coloring=False,
                   ):
 
         startRoom = 2
@@ -103,6 +104,7 @@ class StandoffEnv(para_MultiGridEnv):
         if swapType == "replace" and boxes <= 2:
             swapType = "swap"
 
+        self.hidden = hidden
         self.box_reward = 1
         self.food_locs = list(range(boxes))
         random.shuffle(self.food_locs)
@@ -112,6 +114,9 @@ class StandoffEnv(para_MultiGridEnv):
         self.height = lavaHeight + startRoom * 2 + atrium * 2 + 2
         self.grid = MultiGrid((self.width, self.height))
         self.grid.wall_rect(1, 1, self.width - 2, self.height - 2)
+        self.special_box_coloring = special_box_coloring
+
+        self.objs_to_hide = []
 
         self.agent_spawn_pos = {}
         self.agent_door_pos = {}
@@ -195,7 +200,7 @@ class StandoffEnv(para_MultiGridEnv):
         # add timers for events
         self.timers = {}
         curTime = 1
-        self.add_timer("init", 2)
+        self.add_timer(["init"], 1)
         for k, event in enumerate(events):
             self.add_timer(event, curTime, arg=event_args[k])
             curTime += 1
@@ -214,13 +219,19 @@ class StandoffEnv(para_MultiGridEnv):
         name = event[0]
         arg = arg
         y = self.height // 2
+        if self.hidden and len(self.objs_to_hide) > 0:
+            for obj in self.objs_to_hide:
+                pos = obj.pos
+                self.put_obj(Box(color="green" if self.special_box_coloring else "orange", contains=obj, reward=obj.reward), pos[0], pos[1])
         if name == 'init':
             for box in range(self.boxes):
                 x = box * 2 + 2
                 self.put_obj(Box(color="orange"), x, y)
         elif name == 'bait':
             x = event[1] * 2 + 2
-            self.put_obj(Goal(reward=arg, size=arg*0.01, color='green'), x, y)
+            obj = Goal(reward=arg, size=arg*0.01, color='green', hide=self.hidden)
+            self.put_obj(obj, x, y)
+            self.objs_to_hide.append(obj)
         elif name == "remove":
             x = event[1] * 2 + 2
             self.del_obj(x, y)
@@ -239,14 +250,18 @@ class StandoffEnv(para_MultiGridEnv):
             b2 = self.grid.get(event[2] * 2 + 2, y)
             r1 = b1.reward if hasattr(b1, "reward") else 0
             r2 = b2.reward if hasattr(b2, "reward") else 0
-            self.put_obj(Goal(reward=r2, size=r2*0.01, color='green'), event[1] * 2 + 2, y)
-            self.put_obj(Goal(reward=r1, size=r1*0.01, color='green'), event[2] * 2 + 2, y)
+            obj1 = Goal(reward=r2, size=r2*0.01, color='green', hide=self.hidden)
+            obj2 = Goal(reward=r1, size=r1*0.01, color='green', hide=self.hidden)
+            self.put_obj(obj1, event[1] * 2 + 2, y)
+            self.put_obj(obj2, event[2] * 2 + 2, y)
+            self.objs_to_hide.append(obj1)
+            self.objs_to_hide.append(obj2)
         elif name == "release":
             for x, y in self.release[arg]:
                 self.del_obj(x, y)
 
         # oracle food location memory for puppet ai
-        if name == "bait" or name == "swap" or name == "remove":
+        if name == "bait" or name == "swap" or name == "remove" or (self.hidden is True and name == "reveal"):
             for box in range(self.boxes):
                 x = box * 2 + 2
                 for agent in self.agents_and_puppets():
