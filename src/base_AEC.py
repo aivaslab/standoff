@@ -558,13 +558,11 @@ class para_MultiGridEnv(ParallelEnv):
         else:
             print("No hard reset function found")
 
-        print("naming instances", self.agents, self.puppets)
-        print(self.agent_and_puppet_instances())
+
 
         for name, agent in zip(self.agents + self.puppets, list(self.agent_and_puppet_instances())):
             agent.agents = []
             agent.name = name
-            print(agent.name, agent.color)
             agent.next_actions = []
             agent.pathDict = {}
             self.instance_from_name[name] = agent
@@ -573,7 +571,6 @@ class para_MultiGridEnv(ParallelEnv):
         if self.loadingPickle:
             self.grid = random.choice(self.allRooms)
         else:
-            print(self.params)
             self._gen_grid(**self.params)
             '''flag = 0
             while flag < 100:
@@ -627,7 +624,6 @@ class para_MultiGridEnv(ParallelEnv):
         if str(self.step_count + 1) in self.timers.keys():
             for event in self.timers[str(self.step_count + 1)]:
                 self.timer_active(event[0], event[1])
-        print('before puppet', actions)
 
         # If a user passes in actions with no agents, then just return empty observations, etc.
         if not actions:
@@ -654,13 +650,10 @@ class para_MultiGridEnv(ParallelEnv):
             puppet_actions[agent] = nextAct
 
         actions = dict(actions, **puppet_actions)
-        print('after puppet', actions)
 
         for agent_name in actions:
             action = actions[agent_name]
-            print("acting", agent_name, action)
             agent = self.instance_from_name[agent_name]
-            print(agent_name, agent.color)
             agent.step_reward = 0
             self.rewards[agent_name] = 0
 
