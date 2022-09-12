@@ -10,7 +10,8 @@ from ..pz_envs.scenario_configs import ScenarioConfigs
 import os
 
 def make_env(envClass, player_config, configName=None, memory=1, threads=1, reduce_color=False, size=64,
-    reward_decay=False, ghost_mode=True, max_steps=50, saveVids=False, path="", recordEvery=1e4, vecMonitor=True):
+            reward_decay=False, ghost_mode=True, max_steps=50, saveVids=False, path="", recordEvery=1e4, vecMonitor=True,
+            rank=0):
 
     env_config =  {
         "env_class": envClass,
@@ -51,7 +52,7 @@ def make_env(envClass, player_config, configName=None, memory=1, threads=1, redu
     env = ss.pettingzoo_env_to_vec_env_v1(env)
     if vecMonitor:
         if path != "":
-            env = VecMonitor(env, filename=os.path.join(path, "timesteps"))
+            env = VecMonitor(env, filename=os.path.join(path, "timesteps"+str(rank)))
         else:
             env = VecMonitor(env)
     env = ss.concat_vec_envs_v1(env, threads, num_cpus=1, base_class='stable_baselines3')

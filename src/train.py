@@ -25,12 +25,12 @@ def train_model(name, train_env, eval_envs, eval_params,
 
     train_env = make_env(train_env[0], player_config, train_env[1], memory=memory, threads=threads,
                          reduce_color=reduce_color, size=size, reward_decay=reward_decay,
-                         path=savePath, vecMonitor=True)
+                         path=savePath, vecMonitor=True, rank=0)
 
     eval_envs = [make_env(env_name, player_config, env_param, memory=memory, threads=threads,
                           reduce_color=reduce_color, size=size, saveVids=saveVids, path=savePath,
-                          recordEvery=recordEvery, reward_decay=reward_decay) for env_name, env_param in
-                 zip(eval_envs, eval_params)]
+                          recordEvery=recordEvery, reward_decay=reward_decay, rank=1+i) for i, env_name, env_param in
+                 enumerate(zip(eval_envs, eval_params))]
     model = framework(policy, train_env, learning_rate=learning_rate,
                       n_steps=batch_size, tensorboard_log="logs", policy_kwargs=policy_kwargs)
     name = str(name + model.policy_class.__name__)
