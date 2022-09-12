@@ -10,7 +10,7 @@ from ..pz_envs.scenario_configs import ScenarioConfigs
 import os
 
 def make_env(envClass, player_config, configName=None, memory=1, threads=1, reduce_color=False, size=64,
-    reward_decay=False, ghost_mode=True, max_steps=50, saveVids=False, path="", recordEvery=1e4, vecMonitor=False):
+    reward_decay=False, ghost_mode=True, max_steps=50, saveVids=False, path="", recordEvery=1e4, vecMonitor=True):
 
     env_config =  {
         "env_class": envClass,
@@ -42,7 +42,6 @@ def make_env(envClass, player_config, configName=None, memory=1, threads=1, redu
 
     configName = random.choice(list(env.configs.keys())) if configName is None else configName
     env.hard_reset(env.configs[configName])
-
 
     if reduce_color:
         env = ss.color_reduction_v0(env, 'B')
