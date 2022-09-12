@@ -50,11 +50,6 @@ def make_env(envClass, player_config, configName=None, memory=1, threads=1, redu
     if reduce_color:
         env = ss.reshape_v0(env, (size, size, 1))
     env = ss.pettingzoo_env_to_vec_env_v1(env)
-    if vecMonitor:
-        if path != "":
-            env = VecMonitor(env, filename=os.path.join(path, "timesteps"+str(rank)))
-        else:
-            env = VecMonitor(env)
     env = ss.concat_vec_envs_v1(env, threads, num_cpus=1, base_class='stable_baselines3')
     # num_cpus=1 changed from 2 to avoid csv issues. does it affect speed?
     env = VecTransposeImage(env)
@@ -64,6 +59,11 @@ def make_env(envClass, player_config, configName=None, memory=1, threads=1, redu
     if saveVids:
         env = VecVideoRecorder(env, path, record_video_trigger=lambda x: x % recordEvery == 0, video_length=50, name_prefix=configName)
 
+    if vecMonitor:
+        if path != "":
+            env = VecMonitor(env, filename=os.path.join(path, configName + "-timesteps-"+str(rank)))
+        else:
+            env = VecMonitor(env, filename=configName + "-timesteps-"+str(rank)))
     return env
 
 def wrap_env(para_env, **kwargs):

@@ -53,14 +53,14 @@ def moving_average(values, window):
     return np.convolve(values.astype(float), weights, 'valid')
 
 
-def plot_train(log_folder, title='Learning Curve', window=50):
+def plot_train(log_folder, configName, rank, title='Learning Curve', window=50):
     """
     plot the results
 
     :param log_folder: (str) the save location of the results to plot
     :param title: (str) the title of the task to plot
     """
-    x, y = ts2xy(load_results_tempfix(log_folder), 'timesteps')
+    x, y = ts2xy(load_results_tempfix(log_folder), configName + '-timesteps-' + "0")
     y = moving_average(y, window=window)
     # Truncate x
     x = x[len(x) - len(y):]
