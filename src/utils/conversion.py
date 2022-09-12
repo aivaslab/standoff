@@ -61,9 +61,9 @@ def make_env(envClass, player_config, configName=None, memory=1, threads=1, redu
 
     if vecMonitor:
         if path != "":
-            env = VecMonitor(env, filename=os.path.join(path, configName + "-timesteps-"+str(rank)))
+            env = VecMonitor(env, filename=os.path.join(path, configName + "-timesteps-" + str(rank)))
         else:
-            env = VecMonitor(env, filename=configName + "-timesteps-"+str(rank)))
+            env = VecMonitor(env, filename=configName + "-timesteps-"+str(rank))
     return env
 
 def wrap_env(para_env, **kwargs):
