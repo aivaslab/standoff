@@ -72,6 +72,7 @@ class StandoffEnv(para_MultiGridEnv):
         """
         Reset the vision of the agents.
         """
+        self.agent_goal, self.last_seen_reward, self.can_see, self.best_reward = {}, {}, {}, {}
         boxes = self.params["boxes"]
         for agent in self.agents_and_puppets():
             self.agent_goal[agent] = random.choice(range(boxes))
@@ -105,10 +106,11 @@ class StandoffEnv(para_MultiGridEnv):
             swapType = "swap"
 
         self.hidden = hidden
+        self.subject_is_dominant = subject_is_dominant
         self.box_reward = 1
         self.food_locs = list(range(boxes))
         random.shuffle(self.food_locs)
-        self.release = [[] for _ in range(4)]
+        self.released_tiles = [[] for _ in range(4)]
         releaseGap = boxes * 2 + atrium-1
         self.width = boxes * 2 + 3
         self.height = lavaHeight + startRoom * 2 + atrium * 2 + 2
@@ -153,24 +155,22 @@ class StandoffEnv(para_MultiGridEnv):
                 self.put_obj(Block(init_state=0, color="blue"), box * 2 + 2, startRoom)
                 self.put_obj(Block(init_state=0, color="blue"), box * 2 + 2, self.height - startRoom - 1)
 
-                self.release[0] += [(box * 2 + 2, startRoom)]
-                self.release[1] += [(box * 2 + 2, self.height - startRoom - 1)]
+                self.released_tiles[0] += [(box * 2 + 2, startRoom)]
+                self.released_tiles[1] += [(box * 2 + 2, self.height - startRoom - 1)]
 
                 self.put_obj(Wall(), box * 2 + 1, self.height - 2)
                 self.put_obj(Block(init_state=0, color="blue"), box * 2 + 2, startRoom + atrium)
                 self.put_obj(Block(init_state=0, color="blue"), box * 2 + 2, self.height - startRoom - atrium - 1)
 
-                self.release[2] += [(box * 2 + 2, startRoom + atrium)]
-                self.release[3] += [(box * 2 + 2, self.height - startRoom - atrium - 1)]
+                self.released_tiles[2] += [(box * 2 + 2, startRoom + atrium)]
+                self.released_tiles[3] += [(box * 2 + 2, self.height - startRoom - atrium - 1)]
 
             for j in range(lavaHeight):
                 x = box * 2 + 1
                 y = j + startRoom + atrium + 1
                 self.put_obj(GlassBlock(color="cyan", init_state=1), x, y)
 
-        self.agent_goal, self.last_seen_reward, self.can_see, self.best_reward = {}, {}, {}, {}
         self.reset_vision()
-
 
         ## Bucket location allocation for timers
         empty_buckets = [i for i in range(boxes)]
@@ -194,8 +194,7 @@ class StandoffEnv(para_MultiGridEnv):
             elif type == "obscure" or type == "reveal":
                 #hardcoded, will not work for multiple conspecifics
                 event_args[k] = "player_1"
-            # could also add functionality for moving empty buckets which are swapped,
-            # but that is not used in any tasks
+            # could also add functionality for moving empty buckets which are swapped, but that is not used in any tasks
 
         # add timers for events
         self.timers = {}
@@ -257,7 +256,7 @@ class StandoffEnv(para_MultiGridEnv):
             self.objs_to_hide.append(obj1)
             self.objs_to_hide.append(obj2)
         elif name == "release":
-            for x, y in self.release[arg]:
+            for x, y in self.released_tiles[arg]:
                 self.del_obj(x, y)
 
         # oracle food location memory for puppet ai
@@ -287,6 +286,13 @@ class StandoffEnv(para_MultiGridEnv):
             if new_target and target_agent != "player_0":
                 a = self.instance_from_name[target_agent]
                 if a.active:
+                    self.infos['player_0']['shouldAvoidBig'] = False
+                    self.infos['player_0']['shouldAvoidSmall'] = False
                     x = self.agent_goal[target_agent] * 2 + 2
                     path = pathfind(self.grid.overlapping, a.pos, (x, y))
                     self.infos[target_agent]["path"] = path
+                    tile = self.grid.get(x, y)
+                    if hasattr(tile, "reward") and tile.reward == 100:
+                        self.infos['player_0']['shouldAvoidBig'] = not self.subject_is_dominant
+                    else:
+                        self.infos['player_0']['shouldAvoidSmall'] = not self.subject_is_dominant
