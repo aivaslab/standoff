@@ -93,7 +93,7 @@ class PlottingCallbackStartStop(BaseCallback):
         super()._on_training_start()
         update_global_logs(self.global_log_path, self.log_line, {
             'timesteps': self.eval_cbs[0].evaluations_timesteps[-1],
-            'rewards': self.eval_cbs[0].evaluations_rewards[-1]
+            'rewards': self.eval_cbs[0].evaluations_rewards[-1],
             'finished': False
         })
 
