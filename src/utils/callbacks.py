@@ -25,12 +25,13 @@ class TqdmCallback(BaseCallback):
         self.progress_bar = None
 
 def update_global_logs(path, log_line, data):
-    df = pd.read_csv(path)
-    for key, value in data.items():
-        if key not in df.columns:
-            df[key] = ''
-        df.loc[log_line, key] = value
-    df.to_csv(path, index=False)
+    with open(path, 'w'):
+        df = pd.read_csv(path)
+        for key, value in data.items():
+            if key not in df.columns:
+                df[key] = ''
+            df.loc[log_line, key] = value
+        df.to_csv(path, index=False)
 
 class PlottingCallback(BaseCallback):
     """
