@@ -5,6 +5,7 @@ from stable_baselines3.common.callbacks import CallbackList, CheckpointCallback,
 from tqdm.notebook import tqdm
 import time
 import os
+import pandas as pd
 
 class TqdmCallback(BaseCallback):
     def __init__(self, threads=1, record_every=1):
@@ -23,14 +24,13 @@ class TqdmCallback(BaseCallback):
         self.progress_bar.close()
         self.progress_bar = None
 
-def update_global_logs(path, timesteps=-1):
-    
-        with open(path, 'w') as logfile:
-            lines = logfile.readlines()
-            
-            header = lines[0]
-            line = lines[log_line]
-            line[header.indexof("timesteps")] = timesteps
+def update_global_logs(path, log_line, data):
+    df = pd.read_csv(path)
+    for key, value in data.items():
+        if key not in df.columns:
+            df.loc[:, key] = ''
+        df.loc[log_line, key] = value
+    df.to_csv(path, index=False)
 
 class PlottingCallback(BaseCallback):
     """
@@ -40,15 +40,19 @@ class PlottingCallback(BaseCallback):
         super().__init__(verbose)
         self.savePath = savePath
         self.logPath = os.path.join(savePath, 'logs.txt')
-        self.global_log_path = os.path.join(global_log_path, 'global_log.txt')
+        self.global_log_path = os.path.join(global_log_path, 'global_log.csv')
         self.name = name
         self.envs = envs
         self.names = names
         self.eval_cbs = eval_cbs
         self.timestep = 0
+        self.log_line = log_line
 
     def _on_step(self) -> bool:
-        update_global_logs(self.global_log_path, timesteps=self.eval_cbs[0].evaluations_timesteps[-1]);
+        update_global_logs(self.global_log_path, self.log_line, {
+            'timesteps': self.eval_cbs[0].evaluations_timesteps[-1],
+            'rewards': self.eval_cbs[0].evaluations_rewards[-1]
+        })
 
         with open(self.logPath, 'a') as logfile:
 
@@ -71,10 +75,10 @@ class PlottingCallbackStartStop(BaseCallback):
     """
     # bandaid fix to EveryNTimesteps not triggering at training start and end
     """
-    def __init__(self, verbose=0, savePath='', name='', envs=[], names=[], eval_cbs=[], params=[], model=None, global_log_path='', train_name=''):
+    def __init__(self, verbose=0, savePath='', name='', envs=[], names=[], eval_cbs=[], params=[], model=None, global_log_path='', train_name='', log_line=-1):
         super().__init__(verbose)
         self.savePath = savePath
-        self.global_log_path = os.path.join(global_log_path, 'global_log.txt')
+        self.global_log_path = os.path.join(global_log_path, 'global_log.csv')
         self.logPath = os.path.join(savePath, 'logs.txt')
         self.name = name
         self.envs = envs
@@ -87,7 +91,11 @@ class PlottingCallbackStartStop(BaseCallback):
 
     def _on_training_start(self) -> bool:
         super()._on_training_start()
-        update_global_logs(self.global_log_path, timesteps=self.eval_cbs[0].evaluations_timesteps[-1])
+        update_global_logs(self.global_log_path, self.log_line, {
+            'timesteps': self.eval_cbs[0].evaluations_timesteps[-1],
+            'rewards': self.eval_cbs[0].evaluations_rewards[-1]
+            'finished': False
+        })
 
         with open(self.logPath, 'a') as logfile:
             logfile.write(self.params)
@@ -108,8 +116,12 @@ class PlottingCallbackStartStop(BaseCallback):
 
     def _on_training_end(self) -> bool:
         super()._on_training_end()
-        
-        update_global_logs(self.global_log_path, timesteps=self.eval_cbs[0].evaluations_timesteps[-1])
+
+        update_global_logs(self.global_log_path, self.log_line, {
+            'timesteps': self.eval_cbs[0].evaluations_timesteps[-1],
+            'rewards': self.eval_cbs[0].evaluations_rewards[-1],
+            'finished': True
+        })
 
         with open(self.logPath, 'a') as logfile:
             logfile.write('end of training! total time:' + str( time.time()-self.start_time) + '\n')
