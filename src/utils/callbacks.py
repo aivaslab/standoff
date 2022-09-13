@@ -23,14 +23,24 @@ class TqdmCallback(BaseCallback):
         self.progress_bar.close()
         self.progress_bar = None
 
+def update_global_logs(path, timesteps=-1):
+    
+        with open(path, 'w') as logfile:
+            lines = logfile.readlines()
+            
+            header = lines[0]
+            line = lines[log_line]
+            line[header.indexof("timesteps")] = timesteps
+
 class PlottingCallback(BaseCallback):
     """
     :param verbose: (int) Verbosity level 0: not output 1: info 2: debug
     """
-    def __init__(self, verbose=0, savePath='', name='', envs=[], names=[], eval_cbs=[]):
+    def __init__(self, verbose=0, savePath='', name='', envs=[], names=[], eval_cbs=[], global_log_path='', log_line=-1):
         super().__init__(verbose)
         self.savePath = savePath
         self.logPath = os.path.join(savePath, 'logs.txt')
+        self.global_log_path = os.path.join(global_log_path, 'global_log.txt')
         self.name = name
         self.envs = envs
         self.names = names
@@ -38,6 +48,8 @@ class PlottingCallback(BaseCallback):
         self.timestep = 0
 
     def _on_step(self) -> bool:
+        update_global_logs(self.global_log_path, timesteps=self.eval_cbs[0].evaluations_timesteps[-1]);
+
         with open(self.logPath, 'a') as logfile:
 
             logfile.write('ts: ' + str(self.eval_cbs[0].evaluations_timesteps[-1]) + 
@@ -75,6 +87,7 @@ class PlottingCallbackStartStop(BaseCallback):
 
     def _on_training_start(self) -> bool:
         super()._on_training_start()
+        update_global_logs(self.global_log_path, timesteps=self.eval_cbs[0].evaluations_timesteps[-1])
 
         with open(self.logPath, 'a') as logfile:
             logfile.write(self.params)
@@ -95,6 +108,8 @@ class PlottingCallbackStartStop(BaseCallback):
 
     def _on_training_end(self) -> bool:
         super()._on_training_end()
+        
+        update_global_logs(self.global_log_path, timesteps=self.eval_cbs[0].evaluations_timesteps[-1])
 
         with open(self.logPath, 'a') as logfile:
             logfile.write('end of training! total time:' + str( time.time()-self.start_time) + '\n')
