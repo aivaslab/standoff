@@ -121,12 +121,6 @@ class PlottingCallbackStartStop(BaseCallback):
     def _on_training_end(self) -> bool:
         super()._on_training_end()
 
-        update_global_logs(self.global_log_path, self.log_line, {
-            'timesteps': self.eval_cbs[0].evaluations_timesteps[-1],
-            'results': self.eval_cbs[0].evaluations_results[-1],
-            'length': self.eval_cbs[0].evaluations_length[-1],
-            'finished': True,
-        })
 
         with open(self.logPath, 'a') as logfile:
             logfile.write('end of training! total time:' + str( time.time()-self.start_time) + '\n')
@@ -142,8 +136,14 @@ class PlottingCallbackStartStop(BaseCallback):
                 vidName='end-det.mp4', following="player_0", deterministic=True)
         plot_train(self.savePath, self.name, 0, self.train_name+'train')
         meanTrain = np.mean(self.eval_cbs[0].evaluations_results[-1])
-        with open(self.global_log_path, 'a') as logfile:
-            logfile.write( str(self.name, time.time()-self.start_time, meanTrain))
+
+        update_global_logs(self.global_log_path, self.log_line, {
+            'timesteps': self.eval_cbs[0].evaluations_timesteps[-1],
+            'results': self.eval_cbs[0].evaluations_results[-1],
+            'length': self.eval_cbs[0].evaluations_length[-1],
+            'finished': True,
+            'meanTrain': meanTrain,
+        })
         return True
 
     def _on_step(self):
