@@ -88,6 +88,7 @@ class PlottingCallbackStartStop(BaseCallback):
         self.params = params
         self.model = model
         self.train_name = train_name
+        self.log_line = log_line
 
     def _on_training_start(self) -> bool:
         super()._on_training_start()
