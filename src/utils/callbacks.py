@@ -52,7 +52,8 @@ class PlottingCallback(BaseCallback):
     def _on_step(self) -> bool:
         update_global_logs(self.global_log_path, self.log_line, {
             'timesteps': self.eval_cbs[0].evaluations_timesteps[-1],
-            'rewards': self.eval_cbs[0].evaluations_rewards[-1]
+            'results': self.eval_cbs[0].evaluations_results[-1],
+            'length': self.eval_cbs[0].evaluations_length[-1],
         })
 
         with open(self.logPath, 'a') as logfile:
@@ -95,8 +96,9 @@ class PlottingCallbackStartStop(BaseCallback):
         super()._on_training_start()
         update_global_logs(self.global_log_path, self.log_line, {
             'timesteps': 0,
-            'mean_reward': 0,
-            'finished': False
+            'results': 0,
+            'finished': False,
+            'length': 0,
         })
 
         with open(self.logPath, 'a') as logfile:
@@ -121,8 +123,9 @@ class PlottingCallbackStartStop(BaseCallback):
 
         update_global_logs(self.global_log_path, self.log_line, {
             'timesteps': self.eval_cbs[0].evaluations_timesteps[-1],
-            'rewards': self.eval_cbs[0].evaluations_rewards[-1],
-            'finished': True
+            'results': self.eval_cbs[0].evaluations_results[-1],
+            'length': self.eval_cbs[0].evaluations_length[-1],
+            'finished': True,
         })
 
         with open(self.logPath, 'a') as logfile:
