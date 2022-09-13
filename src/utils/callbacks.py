@@ -41,7 +41,7 @@ class PlottingCallback(BaseCallback):
         super().__init__(verbose)
         self.savePath = savePath
         self.logPath = os.path.join(savePath, 'logs.txt')
-        self.global_log_path = os.path.join(global_log_path, 'global_log.csv')
+        self.global_log_path = global_log_path
         self.name = name
         self.envs = envs
         self.names = names
@@ -80,7 +80,7 @@ class PlottingCallbackStartStop(BaseCallback):
     def __init__(self, verbose=0, savePath='', name='', envs=[], names=[], eval_cbs=[], params=[], model=None, global_log_path='', train_name='', log_line=-1):
         super().__init__(verbose)
         self.savePath = savePath
-        self.global_log_path = os.path.join(global_log_path, 'global_log.csv')
+        self.global_log_path = 'global_log.csv'
         self.logPath = os.path.join(savePath, 'logs.txt')
         self.name = name
         self.envs = envs
