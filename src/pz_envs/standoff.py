@@ -315,10 +315,8 @@ class StandoffEnv(para_MultiGridEnv):
                     else:
                         self.infos['player_0']['shouldAvoidSmall'] = not self.subject_is_dominant
 
-        if 'shouldAvoidBig' in self.infos['player_0'].keys() and \
-                len(self.big_food_locations) > 0 and \
-                len(self.small_food_locations) > 0:
-            if self.infos['player_0']['shouldAvoidBig']:
+        if len(self.big_food_locations) > 0 and len(self.small_food_locations) > 0:
+            if 'shouldAvoidBig' in self.infos['player_0'].keys() and self.infos['player_0']['shouldAvoidBig']:
                 self.infos['player_0']['correct_selection'] = self.small_food_locations[-1]
             else:
                 self.infos['player_0']['correct_selection'] = self.big_food_locations[-1]
