@@ -59,9 +59,7 @@ def make_env(envClass, player_config, configName=None, memory=1, threads=1, redu
     if saveVids:
         env = VecVideoRecorder(env, path, record_video_trigger=lambda x: x % recordEvery == 0, video_length=50, name_prefix=configName)
 
-    info_keywords = ('shouldAvoidBig', 'shouldAvoidSmall', 'correctSelection', 'selection',
-                     'selectedBig', 'selectedSmall', 'selectedNeither',
-                     'selectedPrevBig', 'selectedPrevSmall', 'selectedPrevNeither')
+    info_keywords = env.info_keywords
     if vecMonitor:
         if path != "":
             env = VecMonitor(env, filename=os.path.join(path, configName + "-timesteps-" + str(rank)), info_keywords=info_keywords)

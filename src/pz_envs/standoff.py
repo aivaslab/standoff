@@ -43,6 +43,9 @@ class StandoffEnv(para_MultiGridEnv):
             puppets = []
         self.params = None
         self.configName = configName
+        self.info_keywords = ('shouldAvoidBig', 'shouldAvoidSmall', 'correctSelection', 'selection',
+                     'selectedBig', 'selectedSmall', 'selectedNeither',
+                     'selectedPrevBig', 'selectedPrevSmall', 'selectedPrevNeither')
 
     def hard_reset(self, params=None):
         """
