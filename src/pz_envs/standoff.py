@@ -233,6 +233,9 @@ class StandoffEnv(para_MultiGridEnv):
             for box in range(self.boxes):
                 x = box * 2 + 2
                 self.put_obj(Box(color="orange"), x, y)
+                self.infos['player_0']['shouldAvoidBig'] = False
+                self.infos['player_0']['shouldAvoidSmall'] = False
+                self.infos['player_0']['correct_selection'] = -1
         elif name == 'bait':
             x = event[1] * 2 + 2
             obj = Goal(reward=arg, size=arg * 0.01, color='green', hide=self.hidden)
@@ -304,8 +307,6 @@ class StandoffEnv(para_MultiGridEnv):
             if new_target and target_agent != "player_0":
                 a = self.instance_from_name[target_agent]
                 if a.active:
-                    self.infos['player_0']['shouldAvoidBig'] = False
-                    self.infos['player_0']['shouldAvoidSmall'] = False
                     x = self.agent_goal[target_agent] * 2 + 2
                     path = pathfind(self.grid.overlapping, a.pos, (x, y))
                     self.infos[target_agent]["path"] = path
