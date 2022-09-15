@@ -271,10 +271,10 @@ class StandoffEnv(para_MultiGridEnv):
             x = box * 2 + 2
             obj = self.grid.get(x, y)
             if hasattr(obj, "reward") and obj.reward == 100:
-                if len(self.big_food_locations) == 0 or self.big_food_locations[-1] != box:
+                if len(self.big_food_locations) == 0 or (self.big_food_locations[-1] != box):
                     self.big_food_locations.append(box)
             elif hasattr(obj, "reward") and obj.reward == 25:
-                if len(self.small_food_locations) == 0 or self.small_food_locations[-1] != box:
+                if len(self.small_food_locations) == 0 or (self.small_food_locations[-1] != box):
                     self.small_food_locations.append(box)
 
         # oracle food location memory for puppet ai
