@@ -26,7 +26,7 @@ class TqdmCallback(BaseCallback):
 
 def update_global_logs(path, log_line, data):
     with open(path, 'w'):
-        df = pd.read_csv(path)
+        df = pd.read_csv(path, index_col=None)
         for key, value in data.items():
             if key not in df.columns:
                 df[key] = ''
