@@ -546,7 +546,7 @@ class para_MultiGridEnv(ParallelEnv):
         self.state = {agent: NONE for agent in self.agents_and_puppets()}
         # we don't generate observations for puppets
         for key in self.info_keywords:
-            self.infos['player_0'[key]] = ''
+            self.infos['player_0'][key] = ''
 
         self.observations = {agent: self.gen_agent_obs(a) for agent, a in zip(self.agents, self.agent_instances)}
         #self.observations = {agent: self.gen_agent_obs(a) for agent, a in zip(self.agents_and_puppets(), self.agent_and_puppet_instances())}
