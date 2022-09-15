@@ -753,10 +753,12 @@ class para_MultiGridEnv(ParallelEnv):
 
                         # Rewards can be got iff. fwd_cell has a "get_reward" method
                         if hasattr(fwd_cell, 'get_reward'):
-                            rwd = fwd_cell.get_reward(agent)
+                            og_rwd = fwd_cell.get_reward(agent)
                             self.grid.set(*fwd_cell.pos, None)
                             if bool(self.reward_decay):
-                                rwd *= (1.0 - 0.9 * (self.step_count / self.max_steps))
+                                rwd = og_rwd*(1.0 - 0.9 * (self.step_count / self.max_steps))
+                            else:
+                                rwd = og_rwd
 
                             # removed, unclear what for
                             # step_rewards[agent_no] += rwd
