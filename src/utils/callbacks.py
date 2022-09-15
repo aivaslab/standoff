@@ -52,9 +52,9 @@ class PlottingCallback(BaseCallback):
 
     def _on_step(self) -> bool:
         update_global_logs(self.global_log_path, self.log_line, {
-            'timesteps': self.eval_cbs[0].evaluations_timesteps[-1],
-            'results': self.eval_cbs[0].evaluations_results[-1],
-            'length': self.eval_cbs[0].evaluations_length[-1],
+            'timesteps': np.mean(self.eval_cbs[0].evaluations_timesteps[-1]),
+            'results': np.mean(self.eval_cbs[0].evaluations_results[-1]),
+            'length': np.mean(self.eval_cbs[0].evaluations_length[-1]),
         })
 
         with open(self.logPath, 'a') as logfile:
