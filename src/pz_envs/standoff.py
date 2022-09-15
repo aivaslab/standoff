@@ -90,9 +90,9 @@ class StandoffEnv(para_MultiGridEnv):
                   lavaHeight=2,
                   swapType='swap',
                   visibility='curtains',
-                  events = [],
-                  hidden = False,
-                  sharedRewards = False,
+                  events=[],
+                  hidden=False,
+                  sharedRewards=False,
                   boxes=5,
                   num_agents=2,
                   special_box_coloring=False,
@@ -111,12 +111,14 @@ class StandoffEnv(para_MultiGridEnv):
         self.food_locs = list(range(boxes))
         random.shuffle(self.food_locs)
         self.released_tiles = [[] for _ in range(4)]
-        releaseGap = boxes * 2 + atrium-1
+        releaseGap = boxes * 2 + atrium - 1
         self.width = boxes * 2 + 3
         self.height = lavaHeight + startRoom * 2 + atrium * 2 + 2
         self.grid = MultiGrid((self.width, self.height))
         self.grid.wall_rect(1, 1, self.width - 2, self.height - 2)
         self.special_box_coloring = special_box_coloring
+        self.small_food_locations = []
+        self.big_food_locations = []
 
         self.objs_to_hide = []
 
@@ -185,14 +187,14 @@ class StandoffEnv(para_MultiGridEnv):
                     available_spots = [i for i in range(boxes) if i != event[x - 1]]
                     event[x] = available_spots.pop(random.randrange(len(available_spots)))
                 elif isinstance(event[x], int):
-                    event[x] = events[event[x]][1] #get first location
+                    event[x] = events[event[x]][1]  # get first location
 
             if type == "bait":
                 event_args[k] = bait_args.pop(random.randrange(len(bait_args)))
             elif type == "remove":
                 empty_buckets.append(event[1])
             elif type == "obscure" or type == "reveal":
-                #hardcoded, will not work for multiple conspecifics
+                # hardcoded, will not work for multiple conspecifics
                 event_args[k] = "player_1"
             # could also add functionality for moving empty buckets which are swapped, but that is not used in any tasks
 
@@ -221,14 +223,16 @@ class StandoffEnv(para_MultiGridEnv):
         if self.hidden and len(self.objs_to_hide) > 0:
             for obj in self.objs_to_hide:
                 pos = obj.pos
-                self.put_obj(Box(color="green" if self.special_box_coloring else "orange", contains=obj, reward=obj.reward), pos[0], pos[1])
+                self.put_obj(
+                    Box(color="green" if self.special_box_coloring else "orange", contains=obj, reward=obj.reward),
+                    pos[0], pos[1])
         if name == 'init':
             for box in range(self.boxes):
                 x = box * 2 + 2
                 self.put_obj(Box(color="orange"), x, y)
         elif name == 'bait':
             x = event[1] * 2 + 2
-            obj = Goal(reward=arg, size=arg*0.01, color='green', hide=self.hidden)
+            obj = Goal(reward=arg, size=arg * 0.01, color='green', hide=self.hidden)
             self.put_obj(obj, x, y)
             self.objs_to_hide.append(obj)
         elif name == "remove":
@@ -249,8 +253,8 @@ class StandoffEnv(para_MultiGridEnv):
             b2 = self.grid.get(event[2] * 2 + 2, y)
             r1 = b1.reward if hasattr(b1, "reward") else 0
             r2 = b2.reward if hasattr(b2, "reward") else 0
-            obj1 = Goal(reward=r2, size=r2*0.01, color='green', hide=self.hidden)
-            obj2 = Goal(reward=r1, size=r1*0.01, color='green', hide=self.hidden)
+            obj1 = Goal(reward=r2, size=r2 * 0.01, color='green', hide=self.hidden)
+            obj2 = Goal(reward=r1, size=r1 * 0.01, color='green', hide=self.hidden)
             self.put_obj(obj1, event[1] * 2 + 2, y)
             self.put_obj(obj2, event[2] * 2 + 2, y)
             self.objs_to_hide.append(obj1)
@@ -258,6 +262,17 @@ class StandoffEnv(para_MultiGridEnv):
         elif name == "release":
             for x, y in self.released_tiles[arg]:
                 self.del_obj(x, y)
+
+        # track where the big and small foods have been
+        for box in range(self.boxes):
+            x = box * 2 + 2
+            obj = self.grid.get(x, y)
+            if hasattr(obj, "reward") and obj.reward == 100:
+                if self.big_food_locations[-1] != box:
+                    self.big_food_locations.append(box)
+            elif hasattr(obj, "reward") and obj.reward == 25:
+                if self.small_food_locations[-1] != box:
+                    self.small_food_locations.append(box)
 
         # oracle food location memory for puppet ai
         if name == "bait" or name == "swap" or name == "remove" or (self.hidden is True and name == "reveal"):
@@ -296,3 +311,8 @@ class StandoffEnv(para_MultiGridEnv):
                         self.infos['player_0']['shouldAvoidBig'] = not self.subject_is_dominant
                     else:
                         self.infos['player_0']['shouldAvoidSmall'] = not self.subject_is_dominant
+
+        if self.infos['player_0']['shouldAvoidBig']:
+            self.infos['player_0']['correct_selection'] = self.small_food_locations[-1]
+        else:
+            self.infos['player_0']['correct_selection'] = self.big_food_locations[-1]
