@@ -783,6 +783,8 @@ class para_MultiGridEnv(ParallelEnv):
                                 self.infos[agent_name]["selectedPrevBig"] = (box in self.big_food_locations)
                                 self.infos[agent_name]["selectedPrevSmall"] = (box in self.small_food_locations)
                                 self.infos[agent_name]["selectedPrevNeither"] = not (box in self.big_food_locations) and not (box in self.small_food_locations)
+                            else:
+                                agent.active = False
                             agent.reward(rwd)
                             # agent.step_reward = rwd
 
