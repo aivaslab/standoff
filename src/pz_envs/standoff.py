@@ -317,8 +317,10 @@ class StandoffEnv(para_MultiGridEnv):
                     tile = self.grid.get(x, y)
                     if hasattr(tile, "reward") and tile.reward == 100:
                         self.infos['player_0']['shouldAvoidBig'] = not self.subject_is_dominant
+                        self.infos['player_0']['shouldAvoidSmall'] = False
                     else:
                         self.infos['player_0']['shouldAvoidSmall'] = not self.subject_is_dominant
+                        self.infos['player_0']['shouldAvoidBig'] = False
 
         if 'shouldAvoidBig' in self.infos['player_0'].keys() and self.infos['player_0']['shouldAvoidBig'] and len(self.small_food_locations) > 0:
             self.infos['player_0']['correctSelection'] = self.small_food_locations[-1]
