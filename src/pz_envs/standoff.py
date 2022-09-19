@@ -11,6 +11,10 @@ class StandoffEnv(para_MultiGridEnv):
     metadata = {'render_modes': ['human', 'rgb_array'], "name": "standoffEnv"}
     configs = ScenarioConfigs.standoff
 
+    info_keywords = ('shouldAvoidBig', 'shouldAvoidSmall', 'correctSelection', 'selection',
+                          'selectedBig', 'selectedSmall', 'selectedNeither',
+                          'selectedPrevBig', 'selectedPrevSmall', 'selectedPrevNeither')
+
     def __init__(
             self,
             agents=None,
@@ -43,9 +47,6 @@ class StandoffEnv(para_MultiGridEnv):
             puppets = []
         self.params = None
         self.configName = configName
-        self.info_keywords = ('shouldAvoidBig', 'shouldAvoidSmall', 'correctSelection', 'selection',
-                     'selectedBig', 'selectedSmall', 'selectedNeither',
-                     'selectedPrevBig', 'selectedPrevSmall', 'selectedPrevNeither')
 
     def hard_reset(self, params=None):
         """
