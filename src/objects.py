@@ -287,6 +287,9 @@ class Goal(WorldObj):
     def get_reward(self, agent):
         return self.reward
 
+    def set_reward(self, reward):
+        self.reward = reward
+
     def str_render(self, dir=0):
         return "GG"
 
@@ -553,6 +556,9 @@ class Box(WorldObj):
 
     def can_pickup(self):
         return True
+
+    def set_reward(self, reward):
+        self.reward = reward
 
     def toggle(self, agent, fwd_pos):
         # turn into what you're carrying
