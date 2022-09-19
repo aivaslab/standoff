@@ -393,6 +393,7 @@ class para_MultiGridEnv(ParallelEnv):
         """
         self.agent_spawn_pos = None
         self.params = None
+        self.info_keywords = []
         if agents is None:
             agents = []
         if agent_spawn_kwargs is None:
