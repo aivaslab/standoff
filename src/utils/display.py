@@ -30,7 +30,7 @@ def load_results_tempfix(path: str) -> pandas.DataFrame:
             data_frame["t"] += header["t_start"]
         data_frames.append(data_frame)
     data_frame = pandas.concat(data_frames)
-    data_frame.sort_values("t", inplace=True)
+    #data_frame.sort_values("t", inplace=True)
     data_frame.reset_index(inplace=True)
     data_frame["t"] -= min(header["t_start"] for header in headers)
     return data_frame
@@ -60,19 +60,31 @@ def plot_train(log_folder, configName, rank, title='Learning Curve', window=50):
     :param log_folder: (str) the save location of the results to plot
     :param title: (str) the title of the task to plot
     """
-    x, y = ts2xy(load_results_tempfix(log_folder), configName + '-timesteps-' + "0")
-    y = moving_average(y, window=window)
-    # Truncate x
-    x = x[len(x) - len(y):]
+    monitor_files = get_monitor_files(log_folder)
+    if len(monitor_files) == 0:
+        raise LoadMonitorResultsError(f"No monitor files of the form *{Monitor.EXT} found in {log_folder}")
 
-    fig = plt.figure(title)
-    plt.plot(x, y)
-    plt.xlabel('Timestep')
-    plt.ylabel('Reward')
-    plt.title(title + " Smoothed")
+    for file_name in monitor_files:
+        if file_name != os.path.join(log_folder, configName + "-" + str(rank) + ".monitor.csv"):
+            continue
+        with open(file_name) as file_handler:
+            first_line = file_handler.readline()
+            assert first_line[0] == "#"
+            header = json.loads(first_line[1:])
+            # cols = pandas.read_csv(file_handler, nrows=1).columns
+            data_frame = pandas.read_csv(file_handler, index_col=None, on_bad_lines='skip')  # , usecols=cols)
+            data_frame["t"] += header["t_start"]
 
-    plt.savefig(os.path.join(log_folder, title + str(len(x))), bbox_inches='tight')
-    plt.close(fig)
+            for var in ["r", "accuracy", "selectedBig", "selectedSmall"]:
+                fig = plt.figure(title)
+                data_frame.plot(x=None, y=[var],)
+                plt.xlabel('Episode, (window={})'.format(window))
+                plt.ylabel(var)
+                plt.title(title + " " + str(var))
+
+
+                plt.savefig(os.path.join(log_folder, title + str(len(x))), bbox_inches='tight')
+                plt.close(fig)
     # plt.show()
 
 
