@@ -772,7 +772,7 @@ class para_MultiGridEnv(ParallelEnv):
                                 # handle infos
                                 box = (agent.pos[0]-2)/2
                                 self.infos[agent_name]["selection"] = box
-                                self.infos[agent_name]["accuracy"] = (box == self.infos[agent_name]["correct_selection"])
+                                self.infos[agent_name]["accuracy"] = (box == self.infos[agent_name]["correctSelection"])
                                 self.infos[agent_name]["selectedBig"] = (rwd == 100)
                                 self.infos[agent_name]["selectedSmall"] = (rwd == 25)
                                 self.infos[agent_name]["selectedNeither"] = (rwd < 25)
