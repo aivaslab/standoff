@@ -43,6 +43,7 @@ def make_env(envClass, player_config, configName=None, memory=1, threads=1, redu
 
     configName = random.choice(list(env.configs.keys())) if configName is None else configName
     env.hard_reset(env.configs[configName])
+    info_keywords = env.info_keywords
 
     if reduce_color:
         env = ss.color_reduction_v0(env, 'B')
@@ -59,7 +60,6 @@ def make_env(envClass, player_config, configName=None, memory=1, threads=1, redu
     if saveVids:
         env = VecVideoRecorder(env, path, record_video_trigger=lambda x: x % recordEvery == 0, video_length=50, name_prefix=configName)
 
-    info_keywords = env.info_keywords
     if vecMonitor:
         if path != "":
             env = VecMonitor(env, filename=os.path.join(path, configName + "-timesteps-" + str(rank)), info_keywords=info_keywords)
