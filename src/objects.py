@@ -559,6 +559,9 @@ class Box(WorldObj):
 
     def set_reward(self, reward):
         self.reward = reward
+        if self.contains is not None:
+            self.contains.set_reward(reward)
+
 
     def toggle(self, agent, fwd_pos):
         # turn into what you're carrying
