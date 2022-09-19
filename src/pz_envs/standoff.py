@@ -219,6 +219,14 @@ class StandoffEnv(para_MultiGridEnv):
         self.add_timer(["release"], curTime + releaseGap + domRelease, arg=2)
         self.add_timer(["release"], curTime + releaseGap + subRelease, arg=3)
 
+    def append_food_locs(self, obj, loc):
+        if hasattr(obj, "reward") and obj.reward == 100:
+            if len(self.big_food_locations) == 0 or (self.big_food_locations[-1] != loc):
+                self.big_food_locations.append(loc)
+        elif hasattr(obj, "reward") and obj.reward == 25:
+            if len(self.small_food_locations) == 0 or (self.small_food_locations[-1] != loc):
+                self.small_food_locations.append(loc)
+
     def timer_active(self, event, arg=None):
         name = event[0]
         arg = arg
@@ -235,7 +243,7 @@ class StandoffEnv(para_MultiGridEnv):
                 self.put_obj(Box(color="orange"), x, y)
                 self.infos['player_0']['shouldAvoidBig'] = False
                 self.infos['player_0']['shouldAvoidSmall'] = False
-                self.infos['player_0']['correct_selection'] = -1
+                self.infos['player_0']['correctSelection'] = -1
         elif name == 'bait':
             x = event[1] * 2 + 2
             obj = Goal(reward=arg, size=arg * 0.01, color='green', hide=self.hidden)
@@ -273,12 +281,7 @@ class StandoffEnv(para_MultiGridEnv):
         for box in range(self.boxes):
             x = box * 2 + 2
             obj = self.grid.get(x, y)
-            if hasattr(obj, "reward") and obj.reward == 100:
-                if len(self.big_food_locations) == 0 or (self.big_food_locations[-1] != box):
-                    self.big_food_locations.append(box)
-            elif hasattr(obj, "reward") and obj.reward == 25:
-                if len(self.small_food_locations) == 0 or (self.small_food_locations[-1] != box):
-                    self.small_food_locations.append(box)
+            self.append_food_locs(obj, box)
 
         # oracle food location memory for puppet ai
         if name == "bait" or name == "swap" or name == "remove" or (self.hidden is True and name == "reveal"):
@@ -317,6 +320,6 @@ class StandoffEnv(para_MultiGridEnv):
                         self.infos['player_0']['shouldAvoidSmall'] = not self.subject_is_dominant
 
         if 'shouldAvoidBig' in self.infos['player_0'].keys() and self.infos['player_0']['shouldAvoidBig'] and len(self.small_food_locations) > 0:
-            self.infos['player_0']['correct_selection'] = self.small_food_locations[-1]
+            self.infos['player_0']['correctSelection'] = self.small_food_locations[-1]
         elif len(self.big_food_locations) > 0:
-            self.infos['player_0']['correct_selection'] = self.big_food_locations[-1]
+            self.infos['player_0']['correctSelection'] = self.big_food_locations[-1]
