@@ -76,20 +76,17 @@ def plot_train(log_folder, configName, rank, title='Learning Curve', window=50):
             data_frame['index_col'] = data_frame.index
             data_frame["t"] += header["t_start"]
 
-            try:
-                fig = plt.figure(title)
-                plt.xlabel('Episode, (window={})'.format(window))
-                plt.ylabel('Reward Type')
-                plt.title(title + " " + str('Reward Type'))
-                plt.plot([],[], label='SelectedBig', color='green')
-                plt.plot([],[], label='SelectedSmall', color='blue')
-                plt.plot([],[], label='SelectedNeither', color='orange')
-                plt.stackplot(data_frame["selectedBig"], data_frame["selectedSmall"], data_frame["selectedNeither"],
-                              colors=['green', 'blue', 'orange'])
-                plt.savefig(os.path.join(log_folder, title + "-reward-type"), bbox_inches='tight')
-                plt.close(fig)
-            except:
-                pass
+            fig = plt.figure(title)
+            plt.xlabel('Episode, (window={})'.format(window))
+            plt.ylabel('Reward Type')
+            plt.title(title + " " + str('Reward Type'))
+            plt.plot([],[], label='SelectedBig', color='green')
+            plt.plot([],[], label='SelectedSmall', color='blue')
+            plt.plot([],[], label='SelectedNeither', color='orange')
+            plt.stackplot(data_frame["selectedBig"], data_frame["selectedSmall"], data_frame["selectedNeither"],
+                          colors=['green', 'blue', 'orange'])
+            plt.savefig(os.path.join(log_folder, title + "-reward-type"), bbox_inches='tight')
+            plt.close(fig)
 
 
             for var in ["r", "accuracy", "selectedBig", "selectedSmall"]:
@@ -100,7 +97,7 @@ def plot_train(log_folder, configName, rank, title='Learning Curve', window=50):
                 plt.title(title + " " + str(var))
 
 
-                plt.savefig(os.path.join(log_folder, title + str(len(x))), bbox_inches='tight')
+                plt.savefig(os.path.join(log_folder, title + str('thingy)), bbox_inches='tight')
                 plt.close(fig)
     # plt.show()
 
