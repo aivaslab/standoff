@@ -73,7 +73,20 @@ def plot_train(log_folder, configName, rank, title='Learning Curve', window=50):
             header = json.loads(first_line[1:])
             # cols = pandas.read_csv(file_handler, nrows=1).columns
             data_frame = pandas.read_csv(file_handler, index_col=None, on_bad_lines='skip')  # , usecols=cols)
+            data_frame['index_col'] = data_frame.index
             data_frame["t"] += header["t_start"]
+
+            try:
+                fig = plt.figure(title)
+                plt.xlabel('Episode, (window={})'.format(window))
+                plt.ylabel('Reward Type')
+                plt.title(title + " " + str('Reward Type'))
+                plt.plot([],[], label='SelectedBig', color='green')
+                plt.plot([],[], label='SelectedSmall', color='blue')
+                plt.plot([],[], label='SelectedNeither', color='orange')
+                plt.stackplot(data_frame["selectedBig"], data_frame["selectedSmall"], data_frame["selectedNeither"],
+                              colors=['green', 'blue', 'orange'])
+
 
             for var in ["r", "accuracy", "selectedBig", "selectedSmall"]:
                 fig = plt.figure(title)
