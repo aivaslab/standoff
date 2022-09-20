@@ -88,6 +88,8 @@ def plot_train(log_folder, configName, rank, title='Learning Curve', window=50):
                               colors=['green', 'blue', 'orange'])
                 plt.savefig(os.path.join(log_folder, title + "-reward-type"), bbox_inches='tight')
                 plt.close(fig)
+            except:
+                pass
 
 
             for var in ["r", "accuracy", "selectedBig", "selectedSmall"]:
