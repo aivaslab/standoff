@@ -65,8 +65,8 @@ def plot_train(log_folder, configName, rank, title='Learning Curve', window=50):
         raise LoadMonitorResultsError(f"No monitor files of the form *{Monitor.EXT} found in {log_folder}")
 
     for file_name in monitor_files:
-        if file_name != os.path.join(log_folder, configName + "-" + str(rank) + ".monitor.csv"):
-            continue
+        #if file_name != os.path.join(log_folder, configName + "-" + str(rank) + ".monitor.csv"):
+        #    continue
         with open(file_name) as file_handler:
             first_line = file_handler.readline()
             assert first_line[0] == "#"
