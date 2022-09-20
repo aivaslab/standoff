@@ -756,8 +756,7 @@ class para_MultiGridEnv(ParallelEnv):
                             og_rwd = fwd_cell.get_reward(agent)
 
                             #self.grid.set(*fwd_cell.pos, None) # don't remove box
-                            obj = self.grid.get(*fwd_cell.pos)
-                            obj.set_reward(0)
+                            fwd_cell.set_reward(0)
 
                             if bool(self.reward_decay):
                                 rwd = og_rwd*(1.0 - 0.9 * (self.step_count / self.max_steps))
