@@ -86,6 +86,8 @@ def plot_train(log_folder, configName, rank, title='Learning Curve', window=50):
                 plt.plot([],[], label='SelectedNeither', color='orange')
                 plt.stackplot(data_frame["selectedBig"], data_frame["selectedSmall"], data_frame["selectedNeither"],
                               colors=['green', 'blue', 'orange'])
+                plt.savefig(os.path.join(log_folder, title + "-reward-type"), bbox_inches='tight')
+                plt.close(fig)
 
 
             for var in ["r", "accuracy", "selectedBig", "selectedSmall"]:
