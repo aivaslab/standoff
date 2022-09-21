@@ -91,7 +91,7 @@ def plot_train(log_folder, configName, rank, title='Learning Curve', window=50):
 
             for var in ["r", "accuracy", "selectedBig", "selectedSmall"]:
                 fig = plt.figure(title)
-                data_frame.plot(x=None, y=[var],)
+                data_frame.plot(x=data_frame['index_col'], y=data_frame[var],)
                 plt.xlabel('Episode, (window={})'.format(window))
                 plt.ylabel(var)
                 plt.title(title + " " + str(var))
