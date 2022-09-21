@@ -97,7 +97,7 @@ def plot_train(log_folder, configName, rank, title='Learning Curve', window=50):
                 plt.title(title + " " + str(var))
 
 
-                plt.savefig(os.path.join(log_folder, title + str('thingy)), bbox_inches='tight')
+                plt.savefig(os.path.join(log_folder, title + str('thingy')), bbox_inches='tight')
                 plt.close(fig)
     # plt.show()
 
