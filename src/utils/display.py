@@ -72,9 +72,18 @@ def plot_train(log_folder, configName, rank, title='Learning Curve', window=50):
             assert first_line[0] == "#"
             header = json.loads(first_line[1:])
             # cols = pandas.read_csv(file_handler, nrows=1).columns
-            data_frame = pandas.read_csv(file_handler, index_col=None, on_bad_lines='skip')  # , usecols=cols)
-            data_frame['index_col'] = data_frame.index
-            data_frame["t"] += header["t_start"]
+            df = pandas.read_csv(file_handler, index_col=None, on_bad_lines='skip')  # , usecols=cols)
+            df['index_col'] = df.index
+            df["t"] += header["t_start"]
+
+            df.SelectedBig = df.SelectedBig.replace({True: 1, False: 0})
+            df.SelectedSmall = df.SelectedSmall.replace({True: 1, False: 0})
+            df.SelectedNeither = df.SelectedNeither.replace({True: 1, False: 0})
+
+            filter = df["selection"] != ""
+            dfSmall = df[filter]
+
+            dfSmall["accuracy"] = dfSmall["selection"] == dfSmall["correctSelection"]
 
             fig = plt.figure(title)
             plt.xlabel('Episode, (window={})'.format(window))
@@ -83,7 +92,7 @@ def plot_train(log_folder, configName, rank, title='Learning Curve', window=50):
             plt.plot([],[], label='SelectedBig', color='green')
             plt.plot([],[], label='SelectedSmall', color='blue')
             plt.plot([],[], label='SelectedNeither', color='orange')
-            plt.stackplot(data_frame["selectedBig"], data_frame["selectedSmall"], data_frame["selectedNeither"],
+            plt.stackplot(dfSmall["selectedBig"], dfSmall["selectedSmall"], dfSmall["selectedNeither"],
                           colors=['green', 'blue', 'orange'])
             plt.savefig(os.path.join(log_folder, title + "-reward-type"), bbox_inches='tight')
             plt.close(fig)
@@ -91,7 +100,7 @@ def plot_train(log_folder, configName, rank, title='Learning Curve', window=50):
 
             for var in ["r", "accuracy", "selectedBig", "selectedSmall"]:
                 fig = plt.figure(title)
-                data_frame.plot(x=data_frame['index_col'], y=data_frame[var],)
+                df.plot(x=dfSmall['index_col'], y=dfSmall[var],)
                 plt.xlabel('Episode, (window={})'.format(window))
                 plt.ylabel(var)
                 plt.title(title + " " + str(var))
