@@ -92,7 +92,7 @@ def plot_train(log_folder, configName, rank, title='Learning Curve', window=50):
             plt.plot([],[], label='SelectedBig', color='green')
             plt.plot([],[], label='SelectedSmall', color='blue')
             plt.plot([],[], label='SelectedNeither', color='orange')
-            plt.stackplot(dfSmall["selectedBig"], dfSmall["selectedSmall"], dfSmall["selectedNeither"],
+            plt.stackplot(dfSmall.iloc["selectedBig"], dfSmall.iloc["selectedSmall"], dfSmall.iloc["selectedNeither"],
                           colors=['green', 'blue', 'orange'])
             plt.savefig(os.path.join(log_folder, title + "-reward-type"), bbox_inches='tight')
             plt.close(fig)
@@ -100,7 +100,7 @@ def plot_train(log_folder, configName, rank, title='Learning Curve', window=50):
 
             for var in ["r", "accuracy", "selectedBig", "selectedSmall"]:
                 fig = plt.figure(title)
-                df.plot(x=dfSmall['index_col'], y=dfSmall[var],)
+                df.plot(x=dfSmall.iloc['index_col'], y=dfSmall.iloc[var],)
                 plt.xlabel('Episode, (window={})'.format(window))
                 plt.ylabel(var)
                 plt.title(title + " " + str(var))
