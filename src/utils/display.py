@@ -76,9 +76,9 @@ def plot_train(log_folder, configName, rank, title='Learning Curve', window=50):
             df['index_col'] = df.index
             df["t"] += header["t_start"]
 
-            df["SelectedBig"] = df["SelectedBig"].replace({True: 1, False: 0})
-            df["SelectedSmall"] = df["SelectedSmall"].replace({True: 1, False: 0})
-            df["SelectedNeither"] = df["SelectedNeither"].replace({True: 1, False: 0})
+            df["selectedBig"] = df["selectedBig"].replace({True: 1, False: 0})
+            df["selectedSmall"] = df["selectedSmall"].replace({True: 1, False: 0})
+            df["selectedNeither"] = df["selectedNeither"].replace({True: 1, False: 0})
 
             filter = df["selection"] != ""
             dfSmall = df[filter]
