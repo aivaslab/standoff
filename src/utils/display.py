@@ -6,14 +6,14 @@ from pettingzoo.utils.conversions import aec_to_parallel, parallel_to_aec
 from stable_baselines3.common.results_plotter import load_results, ts2xy
 from stable_baselines3.common.monitor import get_monitor_files
 import numpy as np
-import pandas
+import pandas as pd
 import json
 import imageio
 import cv2
 import copy
 
 
-def load_results_tempfix(path: str) -> pandas.DataFrame:
+def load_results_tempfix(path: str) -> pd.DataFrame:
     # something causes broken csvs, here we ignore extra data
     monitor_files = get_monitor_files(path)
     if len(monitor_files) == 0:
@@ -25,11 +25,11 @@ def load_results_tempfix(path: str) -> pandas.DataFrame:
             assert first_line[0] == "#"
             header = json.loads(first_line[1:])
             # cols = pandas.read_csv(file_handler, nrows=1).columns
-            data_frame = pandas.read_csv(file_handler, index_col=None, on_bad_lines='skip')  # , usecols=cols)
+            data_frame = pd.read_csv(file_handler, index_col=None, on_bad_lines='skip')  # , usecols=cols)
             headers.append(header)
             data_frame["t"] += header["t_start"]
         data_frames.append(data_frame)
-    data_frame = pandas.concat(data_frames)
+    data_frame = pd.concat(data_frames)
     #data_frame.sort_values("t", inplace=True)
     data_frame.reset_index(inplace=True)
     data_frame["t"] -= min(header["t_start"] for header in headers)
