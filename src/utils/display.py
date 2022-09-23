@@ -63,7 +63,7 @@ def plot_train(log_folder, configName, rank, title='fig', window=50):
     if len(monitor_files) == 0:
         raise LoadMonitorResultsError(f"No monitor files of the form *{Monitor.EXT} found in {log_folder}")
 
-    # TODO: Change from episode to minibatch?
+    # TODO: Change from episode to minibatch/eval episodes. Also skip figs (and print) if no info.
 
     for file_name in monitor_files:
         #if file_name != os.path.join(log_folder, configName + "-" + str(rank) + ".monitor.csv"):
