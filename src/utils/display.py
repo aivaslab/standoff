@@ -53,10 +53,9 @@ def moving_average(values, window):
     return np.convolve(values.astype(float), weights, 'valid')
 
 
-def plot_train(log_folder, configName, rank, title='Learning Curve', window=50):
+def plot_train(log_folder, configName, rank, title='fig', window=50):
     """
     plot the results
-
     :param log_folder: (str) the save location of the results to plot
     :param title: (str) the title of the task to plot
     """
@@ -64,15 +63,18 @@ def plot_train(log_folder, configName, rank, title='Learning Curve', window=50):
     if len(monitor_files) == 0:
         raise LoadMonitorResultsError(f"No monitor files of the form *{Monitor.EXT} found in {log_folder}")
 
+    # TODO: Change from episode to minibatch?
+
     for file_name in monitor_files:
         #if file_name != os.path.join(log_folder, configName + "-" + str(rank) + ".monitor.csv"):
         #    continue
+        title2 = os.path.basename(file_name).replace('.','-')
         with open(file_name) as file_handler:
             first_line = file_handler.readline()
             assert first_line[0] == "#"
             header = json.loads(first_line[1:])
             # cols = pandas.read_csv(file_handler, nrows=1).columns
-            df = pandas.read_csv(file_handler, index_col=None, on_bad_lines='skip')  # , usecols=cols)
+            df = pd.read_csv(file_handler, index_col=None, on_bad_lines='skip')  # , usecols=cols)
             df['index_col'] = df.index
             df["t"] += header["t_start"]
 
@@ -80,34 +82,45 @@ def plot_train(log_folder, configName, rank, title='Learning Curve', window=50):
             df["selectedSmall"] = df["selectedSmall"].replace({True: 1, False: 0})
             df["selectedNeither"] = df["selectedNeither"].replace({True: 1, False: 0})
 
-            filter = df["selection"] != ""
-            dfSmall = df[filter]
+            filter = df["selection"].notnull()
+            filter2 = df["selectedBig"].notnull()
+            dfSmall = df[filter2]
 
-            dfSmall["accuracy"] = dfSmall["selection"] == dfSmall["correctSelection"]
+            df["selection"] = df["selection"].fillna(-1)
+            df["accuracy"] = df["selection"] == df["correctSelection"]
+            df["valid"] = df["selection"] != -1
+            df["accuracy"] = df["accuracy"].replace({True: 1, False: 0})
+            df["valid"] = df["valid"].replace({True: 1, False: 0})
 
-            fig = plt.figure(title)
-            plt.xlabel('Episode, (window={})'.format(window))
-            plt.ylabel('Reward Type')
-            plt.title(title + " " + str('Reward Type'))
-            plt.plot([],[], label='SelectedBig', color='green')
-            plt.plot([],[], label='SelectedSmall', color='blue')
-            plt.plot([],[], label='SelectedNeither', color='orange')
-            plt.stackplot(dfSmall.iloc["selectedBig"], dfSmall.iloc["selectedSmall"], dfSmall.iloc["selectedNeither"],
-                          colors=['green', 'blue', 'orange'])
-            plt.savefig(os.path.join(log_folder, title + "-reward-type"), bbox_inches='tight')
-            plt.close(fig)
+            dr = df.rolling(window).mean()
+            drSmall = dfSmall.rolling(window).mean()
 
-
-            for var in ["r", "accuracy", "selectedBig", "selectedSmall"]:
-                fig = plt.figure(title)
-                df.plot(x=dfSmall.iloc['index_col'], y=dfSmall.iloc[var],)
+            # plot accuracy curve
+            if True:
+                fig = plt.figure(title2)
+                plt.plot(dr["index_col"], dr["valid"], label="selected any box")
+                plt.plot(dr["index_col"], dr["accuracy"], label="selected best box")
+                plt.legend(['selected any box', 'selected best box'])
                 plt.xlabel('Episode, (window={})'.format(window))
-                plt.ylabel(var)
-                plt.title(title + " " + str(var))
+                plt.ylabel('Percent')
+                plt.title(title2 + " " + str('Accuracy'))
+                plt.savefig(os.path.join(log_folder, title2+"-" + 'accuracy'))
+                plt.close()
 
-
-                plt.savefig(os.path.join(log_folder, title + str('thingy')), bbox_inches='tight')
-                plt.close(fig)
+            # plot selection type curve (assumes valid selection)
+            if True:
+                fig = plt.figure(title2)
+                plt.xlabel('Episode, (window={})'.format(window))
+                plt.ylabel('Reward Type')
+                plt.plot([],[], label='SelectedBig', color='green')
+                plt.plot([],[], label='SelectedSmall', color='blue')
+                plt.plot([],[], label='SelectedNeither', color='orange')
+                plt.stackplot(drSmall["index_col"], drSmall["selectedBig"], drSmall["selectedSmall"], drSmall["selectedNeither"],
+                              colors=['green', 'blue', 'orange',])
+                plt.legend(['Big','Small','Neither'])
+                plt.title(title2 + "-" + str('Reward Type'))
+                plt.savefig(os.path.join(log_folder, title2+"-" + 'reward-type'))
+                plt.close()
     # plt.show()
 
 
