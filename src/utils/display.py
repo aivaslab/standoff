@@ -63,7 +63,7 @@ def plot_train(log_folder, configName, rank, title='fig', window=50):
     if len(monitor_files) == 0:
         raise LoadMonitorResultsError(f"No monitor files of the form *{Monitor.EXT} found in {log_folder}")
 
-    # TODO: Change from episode to minibatch/eval episodes. Also skip figs (and print) if no info.
+    # TODO: Skip figs and print if no info
 
     for file_name in monitor_files:
         #if file_name != os.path.join(log_folder, configName + "-" + str(rank) + ".monitor.csv"):
@@ -82,9 +82,6 @@ def plot_train(log_folder, configName, rank, title='fig', window=50):
             df["selectedSmall"] = df["selectedSmall"].replace({True: 1, False: 0})
             df["selectedNeither"] = df["selectedNeither"].replace({True: 1, False: 0})
 
-            filter = df["selection"].notnull()
-            filter2 = df["selectedBig"].notnull()
-            dfSmall = df[filter2]
 
             df["selection"] = df["selection"].fillna(-1)
             df["accuracy"] = df["selection"] == df["correctSelection"]
@@ -92,36 +89,43 @@ def plot_train(log_folder, configName, rank, title='fig', window=50):
             df["accuracy"] = df["accuracy"].replace({True: 1, False: 0})
             df["valid"] = df["valid"].replace({True: 1, False: 0})
 
-            dr = df.rolling(window).mean()
-            drSmall = dfSmall.rolling(window).mean()
+            filter = df["selection"].notnull()
+            filter2 = df["selectedBig"].notnull()
+            dfSmall = df[filter2]
+            real_window = window if len(df) > 100 else 1
+            dr = df.rolling(real_window).mean()
+            drSmall = dfSmall.rolling(real_window).mean()
 
-            # plot accuracy curve
-            if True:
-                fig = plt.figure(title2)
-                plt.plot(dr["index_col"], dr["valid"], label="selected any box")
-                plt.plot(dr["index_col"], dr["accuracy"], label="selected best box")
-                plt.legend(['selected any box', 'selected best box'])
-                plt.xlabel('Episode, (window={})'.format(window))
-                plt.ylabel('Percent')
-                plt.title(title2 + " " + str('Accuracy'))
-                plt.savefig(os.path.join(log_folder, title2+"-" + 'accuracy'))
-                plt.close()
+            for indexer in ["t", "index_col"]:
+                mypath = os.path.join(log_folder, indexer+'-figs')
+                if not os.path.exists(mypath):
+                    os.mkdir(mypath)
+                # plot accuracy curve
+                if True:
+                    fig = plt.figure(title2)
+                    plt.plot(dr[indexer], dr["valid"], label="selected any box")
+                    plt.plot(dr[indexer], dr["accuracy"], label="selected best box")
+                    plt.legend(['selected any box', 'selected best box'])
+                    plt.xlabel('Episode, (window={})'.format(real_window))
+                    plt.ylabel('Percent')
+                    plt.title(title2 + " " + str('Accuracy'))
+                    plt.savefig(os.path.join(mypath, title2+"-" + 'accuracy'))
+                    plt.close()
 
-            # plot selection type curve (assumes valid selection)
-            if True:
-                fig = plt.figure(title2)
-                plt.xlabel('Episode, (window={})'.format(window))
-                plt.ylabel('Reward Type')
-                plt.plot([],[], label='SelectedBig', color='green')
-                plt.plot([],[], label='SelectedSmall', color='blue')
-                plt.plot([],[], label='SelectedNeither', color='orange')
-                plt.stackplot(drSmall["index_col"], drSmall["selectedBig"], drSmall["selectedSmall"], drSmall["selectedNeither"],
-                              colors=['green', 'blue', 'orange',])
-                plt.legend(['Big','Small','Neither'])
-                plt.title(title2 + "-" + str('Reward Type'))
-                plt.savefig(os.path.join(log_folder, title2+"-" + 'reward-type'))
-                plt.close()
-    # plt.show()
+                # plot selection type curve (assumes valid selection)
+                if True:
+                    fig = plt.figure(title2)
+                    plt.xlabel('Episode, (window={})'.format(real_window))
+                    plt.ylabel('Reward Type')
+                    plt.plot([],[], label='SelectedBig', color='green')
+                    plt.plot([],[], label='SelectedSmall', color='blue')
+                    plt.plot([],[], label='SelectedNeither', color='orange')
+                    plt.stackplot(drSmall[indexer], drSmall["selectedBig"], drSmall["selectedSmall"], drSmall["selectedNeither"],
+                                colors=['green', 'blue', 'orange',])
+                    plt.legend(['Big','Small','Neither'])
+                    plt.title(title2 + "-" + str('Reward Type'))
+                    plt.savefig(os.path.join(mypath, title2+"-" + 'reward-type'))
+                    plt.close()
 
 
 def make_pic_video(model, env, name, random_policy=False, video_length=50, savePath='', vidName='video.mp4', following="player_0", image_size=320, deterministic=False):
