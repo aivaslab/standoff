@@ -39,7 +39,7 @@ class PlottingCallback(BaseCallback):
     :param verbose: (int) Verbosity level 0: not output 1: info 2: debug
     """
     def __init__(self, verbose=0, savePath='', name='', envs=[], names=[], eval_cbs=[], global_log_path='', log_line=-1,
-                 mid_vids=False):
+                 mid_vids=False, memory=1):
         super().__init__(verbose)
         self.savePath = savePath
         self.logPath = os.path.join(savePath, 'logs.txt')
@@ -51,6 +51,7 @@ class PlottingCallback(BaseCallback):
         self.timestep = 0
         self.log_line = log_line
         self.mid_vids = mid_vids
+        self.memory = memory
 
     def _on_step(self) -> bool:
         update_global_logs(self.global_log_path, self.log_line, {
@@ -70,10 +71,10 @@ class PlottingCallback(BaseCallback):
             for env, name in zip(self.envs, self.names):
                 make_pic_video(self.model, env, name,
                     random_policy=False, video_length=350, savePath=os.path.join(self.savePath, 'videos', name),
-                    vidName='video_'+str(self.timestep)+'-det.mp4', following="player_0", deterministic=True)
+                    vidName='video_'+str(self.timestep)+'-det.mp4', following="player_0", deterministic=True, memory=self.memory)
                 make_pic_video(self.model, env, name,
                     random_policy=False, video_length=350, savePath=os.path.join(self.savePath, 'videos', name),
-                    vidName='video_'+str(self.timestep)+'.mp4', following="player_0", deterministic=False)
+                    vidName='video_'+str(self.timestep)+'.mp4', following="player_0", deterministic=False, memory=self.memory)
         self.timestep += 1
         return True
 
@@ -82,7 +83,7 @@ class PlottingCallbackStartStop(BaseCallback):
     # bandaid fix to EveryNTimesteps not triggering at training start and end
     """
     def __init__(self, verbose=0, savePath='', name='', envs=[], names=[], eval_cbs=[], params=[], model=None, global_log_path='', train_name='', log_line=-1,
-                 start_vid=False):
+                 start_vid=False, memory=1):
         super().__init__(verbose)
         self.savePath = savePath
         self.global_log_path = global_log_path
@@ -97,6 +98,7 @@ class PlottingCallbackStartStop(BaseCallback):
         self.train_name = train_name
         self.log_line = log_line
         self.start_vid = start_vid
+        self.memory = memory
 
     def _on_training_start(self) -> bool:
         super()._on_training_start()
@@ -121,7 +123,7 @@ class PlottingCallbackStartStop(BaseCallback):
             if self.start_vid:
                 make_pic_video(self.model, env, name,
                     random_policy=True, video_length=350, savePath=os.path.join(self.savePath, 'videos', name),
-                    vidName='random.mp4', following="player_0")
+                    vidName='random.mp4', following="player_0", memory=self.memory)
         self.start_time = time.time()
         return True
 
@@ -137,10 +139,10 @@ class PlottingCallbackStartStop(BaseCallback):
         for env, name in zip(self.envs, self.names):
             make_pic_video(self.model, env, name, 
                 random_policy=False, video_length=350, savePath=os.path.join(self.savePath, 'videos', name),
-                vidName='end.mp4', following="player_0", deterministic=False)
+                vidName='end.mp4', following="player_0", deterministic=False, memory=self.memory)
             make_pic_video(self.model, env, name,
                 random_policy=False, video_length=350, savePath=os.path.join(self.savePath, 'videos', name),
-                vidName='end-det.mp4', following="player_0", deterministic=True)
+                vidName='end-det.mp4', following="player_0", deterministic=True, memory=self.memory)
         plot_train(self.savePath, self.name, 0, self.train_name+'train')
         meanTrain = np.mean(self.eval_cbs[0].evaluations_results[-1])
 

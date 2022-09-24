@@ -128,7 +128,7 @@ def plot_train(log_folder, configName, rank, title='fig', window=50):
                     plt.close()
 
 
-def make_pic_video(model, env, name, random_policy=False, video_length=50, savePath='', vidName='video.mp4', following="player_0", image_size=320, deterministic=False):
+def make_pic_video(model, env, name, random_policy=False, video_length=50, savePath='', vidName='video.mp4', following="player_0", image_size=320, deterministic=False, memory=1):
     """
     make a video of the model playing the environment
     """
@@ -143,7 +143,8 @@ def make_pic_video(model, env, name, random_policy=False, video_length=50, saveP
         if random_policy:
             action = {agent: _env.action_spaces[agent].sample() for agent in _env.agents}
         else:
-            action = {following: model.predict(obs[following], deterministic=deterministic)[0]}
+            action = {following: model.predict(obs[following], deterministic=deterministic)[0] if memory <= 1 else
+                      model.predict(obs[following], deterministic=deterministic)}
         obs, _, dones, _ = _env.step(action)
         img = cv2.resize(obs[following], dsize=(image_size, image_size), interpolation=cv2.INTER_NEAREST)
         cv2.putText(img=img, text=str(action), org=(0, image_size), fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=1, color=(255, 255, 255), thickness=2)
