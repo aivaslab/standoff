@@ -9,7 +9,7 @@ import pandas as pd
 
 class TrainUpdateCallback(BaseCallback):
     def __init__(self, envs, batch_size):
-        self.envs = self.envs
+        self.envs = envs
         self.batch_size = batch_size
     def _on_rollout_end(self):
         for env in self.envs:
