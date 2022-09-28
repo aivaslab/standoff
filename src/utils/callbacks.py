@@ -14,7 +14,8 @@ class TrainUpdateCallback(BaseCallback):
         self.batch_size = batch_size
     def _on_rollout_end(self):
         for env in self.envs:
-            env.unwrapped.vec_envs[0].par_env.minibatch += self.batch_size
+            _env = parallel_to_aec(env.unwrapped.vec_envs[0].par_env).unwrapped
+            _env.minibatch += self.batch_size
     def _on_step(self):
         return True
 
