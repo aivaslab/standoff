@@ -47,6 +47,7 @@ class StandoffEnv(para_MultiGridEnv):
             puppets = []
         self.params = None
         self.configName = configName
+        self.minibatch = 0
 
     def hard_reset(self, params=None):
         """
