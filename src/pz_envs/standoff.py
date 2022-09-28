@@ -10,7 +10,10 @@ class StandoffEnv(para_MultiGridEnv):
     mission = "get the best food before your opponent"
     metadata = {'render_modes': ['human', 'rgb_array'], "name": "standoffEnv"}
     configs = ScenarioConfigs.standoff
-
+    info_keywords = ('minibatch', 'timestep',
+                     'shouldAvoidBig', 'shouldAvoidSmall', 'correctSelection', 'selection',
+                    'selectedBig', 'selectedSmall', 'selectedNeither',
+                    'selectedPrevBig', 'selectedPrevSmall', 'selectedPrevNeither')
 
     def __init__(
             self,
@@ -44,9 +47,6 @@ class StandoffEnv(para_MultiGridEnv):
             puppets = []
         self.params = None
         self.configName = configName
-        self.info_keywords = ('shouldAvoidBig', 'shouldAvoidSmall', 'correctSelection', 'selection',
-                          'selectedBig', 'selectedSmall', 'selectedNeither',
-                          'selectedPrevBig', 'selectedPrevSmall', 'selectedPrevNeither')
 
     def hard_reset(self, params=None):
         """
@@ -245,6 +245,8 @@ class StandoffEnv(para_MultiGridEnv):
                 self.infos['player_0']['shouldAvoidBig'] = False
                 self.infos['player_0']['shouldAvoidSmall'] = False
                 self.infos['player_0']['correctSelection'] = -1
+                self.infos['player_0']['minibatch'] = self.minibatch
+                self.infos['player_0']['timestep'] = self.total_step_count
         elif name == 'bait':
             x = event[1] * 2 + 2
             obj = Goal(reward=arg, size=arg * 0.01, color='green', hide=self.hidden)

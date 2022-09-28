@@ -439,6 +439,9 @@ class para_MultiGridEnv(ParallelEnv):
         self.env_done = False
         self.step_count = 0
 
+        self.minibatch = 0
+        self.total_step_count = 0
+
         self.observation_spaces = {agent: Box(
             low=0,
             high=255,
@@ -551,6 +554,7 @@ class para_MultiGridEnv(ParallelEnv):
         self.observations = {agent: self.gen_agent_obs(a) for agent, a in zip(self.agents, self.agent_instances)}
         #self.observations = {agent: self.gen_agent_obs(a) for agent, a in zip(self.agents_and_puppets(), self.agent_and_puppet_instances())}
 
+        self.total_step_count += self.step_count
         self.step_count = 0
         self.env_done = False
 
