@@ -9,13 +9,14 @@ import pandas as pd
 
 class TrainUpdateCallback(BaseCallback):
     def __init__(self, envs, batch_size):
+        super().__init__()
         self.envs = envs
         self.batch_size = batch_size
     def _on_rollout_end(self):
         for env in self.envs:
             env.minibatch += self.batch_size
     def _on_step(self):
-        pass
+        return True
 
 class TqdmCallback(BaseCallback):
     def __init__(self, threads=1, record_every=1, batch_size=2048):
@@ -27,7 +28,7 @@ class TqdmCallback(BaseCallback):
         self.progress_bar = tqdm(total=self.locals['total_timesteps'])
         
     def _on_step(self):
-        pass
+        return True
 
     def _on_rollout_end(self):
         self.progress_bar.update(self.iteration_size)
