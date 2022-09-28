@@ -14,6 +14,8 @@ class TrainUpdateCallback(BaseCallback):
     def _on_rollout_end(self):
         for env in self.envs:
             env.minibatch += self.batch_size
+    def _on_step(self):
+        pass
 
 class TqdmCallback(BaseCallback):
     def __init__(self, threads=1, record_every=1, batch_size=2048):
@@ -23,6 +25,9 @@ class TqdmCallback(BaseCallback):
     
     def _on_training_start(self):
         self.progress_bar = tqdm(total=self.locals['total_timesteps'])
+        
+    def _on_step(self):
+        pass
 
     def _on_rollout_end(self):
         self.progress_bar.update(self.iteration_size)
