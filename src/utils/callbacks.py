@@ -3,19 +3,28 @@ import numpy as np
 from .display import make_pic_video, plot_evals, plot_train
 from stable_baselines3.common.callbacks import CallbackList, CheckpointCallback, EvalCallback, EveryNTimesteps, BaseCallback
 from tqdm.notebook import tqdm
+from pettingzoo.utils.conversions import aec_to_parallel, parallel_to_aec
 import time
 import os
 import pandas as pd
 
 class TrainUpdateCallback(BaseCallback):
+
     def __init__(self, envs, batch_size):
-        self.envs = self.envs
+        super().__init__()
+        self.envs = envs
         self.batch_size = batch_size
         self.minibatch = 0
+
     def _on_rollout_end(self):
         self.minibatch += self.batch_size
         for env in self.envs:
-            env.minibatch = self.minibatch
+            _env = parallel_to_aec(env.unwrapped.vec_envs[0].par_env).unwrapped
+            _env.minibatch = self.minibatch
+
+    def _on_step(self):
+        return True
+        
 
 class TqdmCallback(BaseCallback):
     def __init__(self, threads=1, record_every=1, batch_size=2048):
@@ -25,6 +34,9 @@ class TqdmCallback(BaseCallback):
     
     def _on_training_start(self):
         self.progress_bar = tqdm(total=self.locals['total_timesteps'])
+        
+    def _on_step(self):
+        return True
 
     def _on_rollout_start(self):
         self.progress_bar.update(self.iteration_size)
