@@ -88,11 +88,16 @@ def plot_train(log_folder, configName, rank, title='Learning Curve', window=2048
 
     merged_df = pd.DataFrame()
     merged_df_small = pd.DataFrame()
+    mypath = os.path.join(log_folder, 'figs')
+    if not os.path.exists(mypath):
+        os.mkdir(mypath)
 
     for file_name in monitor_files:
         #if file_name != os.path.join(log_folder, configName + "-" + str(rank) + ".monitor.csv"):
         #    continue
-        title2 = os.path.basename(file_name).replace('.','-')
+        title2 = os.path.basename(file_name).replace('.','-')[:-12]
+        print(title2)
+        rank = title2[-1]
         with open(file_name) as file_handler:
             first_line = file_handler.readline()
             assert first_line[0] == "#"
@@ -121,23 +126,22 @@ def plot_train(log_folder, configName, rank, title='Learning Curve', window=2048
             grouped = df.groupby('minibatch', as_index=False).mean().sort_values('minibatch')
             groupedSmall = dfSmall.groupby('minibatch', as_index=False).mean().sort_values('minibatch')
 
-            merged_df = merged_df.append(grouped)
-            merged_df_small = merged_df_small.append(groupedSmall)
+            print(rank)
+            if rank != '0':
+                pass
+                merged_df = merged_df.append(grouped)
+                merged_df_small = merged_df_small.append(groupedSmall)
 
             #dr = df.rolling(real_window).mean()
             #drSmall = dfSmall.rolling(real_window).mean()
 
-            mypath = os.path.join(log_folder, indexer+'-figs')
-            if not os.path.exists(mypath):
-                os.mkdir(mypath)
             plot_train_acc(indexer='minibatch', df=grouped, mypath=mypath, title=title2, window=window)
             plot_selection(indexer='minibatch', df=groupedSmall, mypath=mypath, title=title2, window=window)
 
-        mypath = os.path.join(log_folder, 'merged-figs')
-        if not os.path.exists(mypath):
-            os.mkdir(mypath)
-        plot_train_acc(indexer='minibatch', df=grouped, mypath=mypath, title='merged', window=window)
-        plot_selection(indexer='minibatch', df=groupedSmall, mypath=mypath, title='merged', window=window)
+    merged_df = merged_df.groupby('minibatch', as_index=False).mean().sort_values('minibatch')
+    merged_df_small = merged_df_small.groupby('minibatch', as_index=False).mean().sort_values('minibatch')
+    plot_train_acc(indexer='minibatch', df=merged_df, mypath=mypath, title='merged_evals', window=window)
+    plot_selection(indexer='minibatch', df=merged_df_small, mypath=mypath, title='merged_evals', window=window)
 
 
 
