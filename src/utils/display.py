@@ -96,7 +96,6 @@ def plot_train(log_folder, configName, rank, title='Learning Curve', window=2048
         #if file_name != os.path.join(log_folder, configName + "-" + str(rank) + ".monitor.csv"):
         #    continue
         title2 = os.path.basename(file_name).replace('.','-')[:-12]
-        print(title2)
         rank = title2[-1]
         with open(file_name) as file_handler:
             first_line = file_handler.readline()
@@ -126,9 +125,7 @@ def plot_train(log_folder, configName, rank, title='Learning Curve', window=2048
             grouped = df.groupby('minibatch', as_index=False).mean().sort_values('minibatch')
             groupedSmall = dfSmall.groupby('minibatch', as_index=False).mean().sort_values('minibatch')
 
-            print(rank)
             if rank != '0':
-                pass
                 merged_df = merged_df.append(grouped)
                 merged_df_small = merged_df_small.append(groupedSmall)
 
