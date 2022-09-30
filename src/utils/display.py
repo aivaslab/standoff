@@ -52,7 +52,30 @@ def moving_average(values, window):
         values[_position] = _new_value
     return np.convolve(values.astype(float), weights, 'valid')
 
+def plot_train_acc(indexer, df, mypath, title, window):
+    fig = plt.figure(title)
+    plt.plot(df[indexer], df["valid"], label="selected any box")
+    plt.plot(df[indexer], df["accuracy"], label="selected best box")
+    plt.legend(['selected any box', 'selected best box'])
+    plt.xlabel('Timestep, (window={})'.format(window))
+    plt.ylabel('Percent')
+    plt.title(title + " " + str('Accuracy'))
+    plt.savefig(os.path.join(mypath, title + "-" + 'accuracy'))
+    plt.close()
 
+def plot_selection(indexer, df, mypath, title, window):
+    fig = plt.figure(title)
+    plt.xlabel('Timestep, (window={})'.format(window))
+    plt.ylabel('Reward Type')
+    plt.plot([], [], label='SelectedBig', color='green')
+    plt.plot([], [], label='SelectedSmall', color='blue')
+    plt.plot([], [], label='SelectedNeither', color='orange')
+    plt.stackplot(df[indexer], df["selectedBig"], df["selectedSmall"], df["selectedNeither"],
+                  colors=['green', 'blue', 'orange', ])
+    plt.legend(['Big', 'Small', 'Neither'])
+    plt.title(title + "-" + str('Reward Type'))
+    plt.savefig(os.path.join(mypath, title + "-" + 'reward-type'))
+    plt.close()
 def plot_train(log_folder, configName, rank, title='Learning Curve', window=2048):
     """
     plot the results
@@ -63,7 +86,8 @@ def plot_train(log_folder, configName, rank, title='Learning Curve', window=2048
     if len(monitor_files) == 0:
         raise LoadMonitorResultsError(f"No monitor files of the form *{Monitor.EXT} found in {log_folder}")
 
-    # TODO: Change from episode to minibatch?
+    merged_df = pd.DataFrame()
+    merged_df_small = pd.DataFrame()
 
     for file_name in monitor_files:
         #if file_name != os.path.join(log_folder, configName + "-" + str(rank) + ".monitor.csv"):
@@ -82,7 +106,6 @@ def plot_train(log_folder, configName, rank, title='Learning Curve', window=2048
             df["selectedSmall"] = df["selectedSmall"].replace({True: 1, False: 0})
             df["selectedNeither"] = df["selectedNeither"].replace({True: 1, False: 0})
 
-
             df["selection"] = df["selection"].fillna(-1)
             df["accuracy"] = df["selection"] == df["correctSelection"]
             df["valid"] = df["selection"] != -1
@@ -98,39 +121,25 @@ def plot_train(log_folder, configName, rank, title='Learning Curve', window=2048
             grouped = df.groupby('minibatch', as_index=False).mean().sort_values('minibatch')
             groupedSmall = dfSmall.groupby('minibatch', as_index=False).mean().sort_values('minibatch')
 
+            merged_df = merged_df.append(grouped)
+            merged_df_small = merged_df_small.append(groupedSmall)
+
             #dr = df.rolling(real_window).mean()
             #drSmall = dfSmall.rolling(real_window).mean()
 
-            for indexer in ["minibatch"]:
-                mypath = os.path.join(log_folder, indexer+'-figs')
-                if not os.path.exists(mypath):
-                    os.mkdir(mypath)
-                # plot accuracy curve
-                if True:
-                    fig = plt.figure(title2)
-                    plt.plot(grouped[indexer], grouped["valid"], label="selected any box")
-                    plt.plot(grouped[indexer], grouped["accuracy"], label="selected best box")
-                    plt.legend(['selected any box', 'selected best box'])
-                    plt.xlabel('Timestep, (window={})'.format(window))
-                    plt.ylabel('Percent')
-                    plt.title(title2 + " " + str('Accuracy'))
-                    plt.savefig(os.path.join(mypath, title2+"-" + 'accuracy'))
-                    plt.close()
+            mypath = os.path.join(log_folder, indexer+'-figs')
+            if not os.path.exists(mypath):
+                os.mkdir(mypath)
+            plot_train_acc(indexer='minibatch', df=grouped, mypath=mypath, title=title2, window=window)
+            plot_selection(indexer='minibatch', df=groupedSmall, mypath=mypath, title=title2, window=window)
 
-                # plot selection type curve (assumes valid selection)
-                if True:
-                    fig = plt.figure(title2)
-                    plt.xlabel('Timestep, (window={})'.format(window))
-                    plt.ylabel('Reward Type')
-                    plt.plot([],[], label='SelectedBig', color='green')
-                    plt.plot([],[], label='SelectedSmall', color='blue')
-                    plt.plot([],[], label='SelectedNeither', color='orange')
-                    plt.stackplot(groupedSmall[indexer], groupedSmall["selectedBig"], groupedSmall["selectedSmall"], groupedSmall["selectedNeither"],
-                                colors=['green', 'blue', 'orange',])
-                    plt.legend(['Big','Small','Neither'])
-                    plt.title(title2 + "-" + str('Reward Type'))
-                    plt.savefig(os.path.join(mypath, title2+"-" + 'reward-type'))
-                    plt.close()
+        mypath = os.path.join(log_folder, 'merged-figs')
+        if not os.path.exists(mypath):
+            os.mkdir(mypath)
+        plot_train_acc(indexer='minibatch', df=grouped, mypath=mypath, title='merged', window=window)
+        plot_selection(indexer='minibatch', df=groupedSmall, mypath=mypath, title='merged', window=window)
+
+
 
 
 def make_pic_video(model, env, name, random_policy=False, video_length=50, savePath='', vidName='video.mp4', following="player_0", image_size=320, deterministic=False, memory=1):
