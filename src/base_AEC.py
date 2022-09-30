@@ -428,9 +428,9 @@ class para_MultiGridEnv(ParallelEnv):
         self.puppets = puppets
         self.grid = MultiGrid(shape=(width, height))  # added this, not sure where grid comes from in og
 
-        self.possible_agents = ["player_" + str(r) for r in range(num_agents)]
+        self.possible_agents = [f"player_{r}" for r in range(num_agents)]
         if num_puppets > 0:
-            self.possible_puppets = ["player_" + str(r+num_agents) for r in range(num_puppets)]
+            self.possible_puppets = [f"player_{r+num_agents}" for r in range(num_puppets)]
         else:
             self.possible_puppets = []
 

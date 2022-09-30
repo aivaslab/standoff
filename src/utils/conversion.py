@@ -62,9 +62,9 @@ def make_env(envClass, player_config, configName=None, memory=1, threads=1, redu
 
     if vecMonitor:
         if path != "":
-            env = VecMonitor(env, filename=os.path.join(path, configName + "-" + str(rank)), info_keywords=info_keywords)
+            env = VecMonitor(env, filename=os.path.join(path, f"{configName}-{rank}"), info_keywords=info_keywords)
         else:
-            env = VecMonitor(env, filename=configName + "-"+str(rank), info_keywords=info_keywords)
+            env = VecMonitor(env, filename=f"{configName}-{rank}", info_keywords=info_keywords)
     return env
 
 def wrap_env(para_env, **kwargs):
