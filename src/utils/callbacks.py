@@ -36,6 +36,7 @@ class TqdmCallback(BaseCallback):
         self.progress_bar = tqdm(total=self.locals['total_timesteps'])
         
     def _on_step(self):
+        self.progress_bar.update(self.iteration_size)
         return True
 
     def _on_rollout_start(self):
