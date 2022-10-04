@@ -132,17 +132,6 @@ def plot_train(log_folder, configName, rank, title='Learning Curve', window=2048
             df["selectedSmall"] = df["selectedSmall"].replace({True: 1, False: 0})
             df["selectedNeither"] = df["selectedNeither"].replace({True: 1, False: 0})
 
-            df["avoidedBig"] = df.apply(lambda row: row["selectedSmall"] or row["selectedNeither"])
-            df["avoidedSmall"] = df.apply(lambda row: row["selectedBig"] or row["selectedNeither"])
-
-            dfSmall["avoidCorrect"] = dfSmall.apply(lambda row: (row["avoidedBig"] and row["shouldAvoidBig"]) or (
-                    row["avoidedSmall"] and row["shouldAvoidSmall"]))
-            dfSmall["avoidCorrect"] = dfSmall["avoidedBig"] and dfSmall["shouldAvoidBig"] or dfSmall["avoidedSmall"] and \
-                                      dfSmall["shouldAvoidSmall"]
-
-            # df["avoidBigCorrect"] = df.filter("shouldAvoidBig")["avoidedBig"]
-            # df["avoidSmallCorrect"] = df.filter("shouldAvoidSmall")["avoidedSmall"]
-
             df["selection"] = df["selection"].fillna(-1)
             df["accuracy"] = df["selection"] == df["correctSelection"]
             df["valid"] = df["selection"] != -1
@@ -155,30 +144,43 @@ def plot_train(log_folder, configName, rank, title='Learning Curve', window=2048
             filter2 = df["selectedBig"].notnull()
             dfSmall = df[filter2]
 
+            dfSmall["avoidedBig"] = dfSmall.apply(lambda row: row["selectedSmall"] or row["selectedNeither"], axis=1)
+            dfSmall["avoidedSmall"] = dfSmall.apply(lambda row: row["selectedBig"] or row["selectedNeither"], axis=1)
+
+            dfSmall["avoidCorrect"] = dfSmall.apply(lambda row: (row["avoidedBig"] == row["shouldAvoidBig"]) or (
+                    row["avoidedSmall"] == row["shouldAvoidSmall"]), axis=1)
+
             grouped = df.groupby('minibatch', as_index=False).mean().sort_values('minibatch')
             groupedSmall = dfSmall.groupby('minibatch', as_index=False).mean().sort_values('minibatch')
-
-            grouped['name'] = title2
+            # small is valid rows
 
             if rank != '0':
+                grouped['name'] = title2
+                groupedSmall['name'] = title2
                 merged_df = merged_df.append(grouped)
                 merged_df_small = merged_df_small.append(groupedSmall)
 
             # dr = df.rolling(real_window).mean()
             # drSmall = dfSmall.rolling(real_window).mean()
 
-            #plot_train_acc(indexer='minibatch', df=grouped, mypath=mypath, title=title2, window=window)
+            # plot_train_acc(indexer='minibatch', df=grouped, mypath=mypath, title=title2, window=window)
             plot_selection(indexer='minibatch', df=groupedSmall, mypath=mypath, title=title2, window=window)
 
-    merged_df = merged_df.groupby('minibatch', as_index=False).mean().sort_values('minibatch')
-    merged_df_small = merged_df_small.groupby('minibatch', as_index=False).mean().sort_values('minibatch')
+    merged_df = merged_df.groupby(['minibatch'], as_index=False).mean().sort_values('minibatch')
+    merged_df_small = merged_df_small.groupby(['minibatch', 'name'], as_index=False).mean().sort_values('minibatch')
+    merged_df_noname = merged_df_small.groupby(['minibatch'], as_index=False).mean().sort_values('minibatch')
+
+    # normalize r
+    merged_df["r"] = (merged_df["r"] - merged_df["r"].min()) / (merged_df["r"].max() - merged_df["r"].min())
+
     plot_merged(indexer='minibatch', df=merged_df, mypath=mypath, title='merged_evals', window=window,
-                values=['validity', 'accuracy'], labels=['selected any box', 'selected best box'])
-    plot_selection(indexer='minibatch', df=merged_df_small, mypath=mypath, title='merged_evals', window=window)
+                values=['valid', 'accuracy', 'r'],
+                labels=['selected any box', 'selected best box', 'reward (normalized)'])
     plot_split(indexer='minibatch', df=merged_df_small, mypath=mypath, title='merged_evals', window=window,
-                values="accuracy")
-    plot_merged(indexer='minibatch', df=merged_df_small, mypath=mypath, title='merged_evals', window=window,
+               values="accuracy")
+    plot_merged(indexer='minibatch', df=merged_df_noname, mypath=mypath, title='merged_evals', window=window,
                 values=["avoidCorrect"], labels=["avoided correct box"])
+    plot_selection(indexer='minibatch', df=merged_df_noname, mypath=mypath, title='merged_evals', window=window)
 
 def make_pic_video(model, env, name, random_policy=False, video_length=50, savePath='', vidName='video.mp4',
                    following="player_0", image_size=320, deterministic=False, memory=1):
