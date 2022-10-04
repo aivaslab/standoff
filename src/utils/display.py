@@ -52,6 +52,17 @@ def moving_average(values, window):
         values[_position] = _new_value
     return np.convolve(values.astype(float), weights, 'valid')
 
+def plot_merged(indexer, df, mypath, title, window, values="accuracy"):
+
+    new_df = df.pivot(index=indexer, columns="name", values=values)
+    fig = plt.figure(title)
+    new_df.plot()
+    plt.xlabel('Timestep, (window={})'.format(window))
+    plt.ylabel(values)
+    plt.title(title + " " + values)
+    plt.savefig(os.path.join(mypath, title + "-" + 'accuracy-split'))
+    plt.close()
+
 def plot_train_acc(indexer, df, mypath, title, window):
     fig = plt.figure(title)
     plt.plot(df[indexer], df["valid"], label="selected any box")
@@ -125,6 +136,8 @@ def plot_train(log_folder, configName, rank, title='Learning Curve', window=2048
             grouped = df.groupby('minibatch', as_index=False).mean().sort_values('minibatch')
             groupedSmall = dfSmall.groupby('minibatch', as_index=False).mean().sort_values('minibatch')
 
+            grouped['name'] = title2
+
             if rank != '0':
                 merged_df = merged_df.append(grouped)
                 merged_df_small = merged_df_small.append(groupedSmall)
@@ -139,6 +152,7 @@ def plot_train(log_folder, configName, rank, title='Learning Curve', window=2048
     merged_df_small = merged_df_small.groupby('minibatch', as_index=False).mean().sort_values('minibatch')
     plot_train_acc(indexer='minibatch', df=merged_df, mypath=mypath, title='merged_evals', window=window)
     plot_selection(indexer='minibatch', df=merged_df_small, mypath=mypath, title='merged_evals', window=window)
+    plot_merged(indexer='minibatch', df=merged_df_small, mypath=mypath, title='merged_evals', window=window, values="accuracy")
 
 
 
