@@ -30,7 +30,7 @@ def load_results_tempfix(path: str) -> pd.DataFrame:
             data_frame["t"] += header["t_start"]
         data_frames.append(data_frame)
     data_frame = pd.concat(data_frames)
-    #data_frame.sort_values("t", inplace=True)
+    # data_frame.sort_values("t", inplace=True)
     data_frame.reset_index(inplace=True)
     data_frame["t"] -= min(header["t_start"] for header in headers)
     return data_frame
@@ -52,15 +52,18 @@ def moving_average(values, window):
         values[_position] = _new_value
     return np.convolve(values.astype(float), weights, 'valid')
 
-def plot_merged(indexer, df, mypath, title, window, values="accuracy"):
 
+def plot_merged(indexer, df, mypath, title, window, values="accuracy", grouped=False):
     new_df = df.pivot(index=indexer, columns="name", values=values)
+    if grouped:
+        new_df = new_df.groupby('minibatch', as_index=False).mean().sort_values('minibatch')
     fig = plt.figure(title)
     new_df.plot()
     plt.xlabel('Timestep, (window={})'.format(window))
     plt.ylabel(values)
     plt.title(title + " " + values)
-    plt.savefig(os.path.join(mypath, title + "-" + 'accuracy-split'))
+    name = title + "-" + values + "-merged" if grouped else title + "-" + values + "-split"
+    plt.savefig(os.path.join(mypath, name))
     plt.close()
 
 def plot_train_acc(indexer, df, mypath, title, window):
@@ -73,6 +76,7 @@ def plot_train_acc(indexer, df, mypath, title, window):
     plt.title(title + " " + str('Accuracy'))
     plt.savefig(os.path.join(mypath, title + "-" + 'accuracy'))
     plt.close()
+
 
 def plot_selection(indexer, df, mypath, title, window):
     fig = plt.figure(title)
@@ -87,6 +91,8 @@ def plot_selection(indexer, df, mypath, title, window):
     plt.title(title + "-" + str('Reward Type'))
     plt.savefig(os.path.join(mypath, title + "-" + 'reward-type'))
     plt.close()
+
+
 def plot_train(log_folder, configName, rank, title='Learning Curve', window=2048):
     """
     plot the results
@@ -104,9 +110,9 @@ def plot_train(log_folder, configName, rank, title='Learning Curve', window=2048
         os.mkdir(mypath)
 
     for file_name in monitor_files:
-        #if file_name != os.path.join(log_folder, configName + "-" + str(rank) + ".monitor.csv"):
+        # if file_name != os.path.join(log_folder, configName + "-" + str(rank) + ".monitor.csv"):
         #    continue
-        title2 = os.path.basename(file_name).replace('.','-')[:-12]
+        title2 = os.path.basename(file_name).replace('.', '-')[:-12]
         rank = title2[-1]
         with open(file_name) as file_handler:
             first_line = file_handler.readline()
@@ -124,9 +130,13 @@ def plot_train(log_folder, configName, rank, title='Learning Curve', window=2048
             df["avoidedBig"] = df.apply(lambda row: row["selectedSmall"] or row["selectedNeither"])
             df["avoidedSmall"] = df.apply(lambda row: row["selectedBig"] or row["selectedNeither"])
 
+            dfSmall["avoidCorrect"] = dfSmall.apply(lambda row: (row["avoidedBig"] and row["shouldAvoidBig"]) or (
+                        row["avoidedSmall"] and row["shouldAvoidSmall"]))
+            dfSmall["avoidCorrect"] = dfSmall["avoidedBig"] and dfSmall["shouldAvoidBig"] or dfSmall["avoidedSmall"] and \
+                                      dfSmall["shouldAvoidSmall"]
 
-            df["avoidBigCorrect"] = df.filter("shouldAvoidBig")["avoidedBig"]
-            df["avoidSmallCorrect"] = df.filter("shouldAvoidSmall")["avoidedSmall"]
+            # df["avoidBigCorrect"] = df.filter("shouldAvoidBig")["avoidedBig"]
+            # df["avoidSmallCorrect"] = df.filter("shouldAvoidSmall")["avoidedSmall"]
 
             df["selection"] = df["selection"].fillna(-1)
             df["accuracy"] = df["selection"] == df["correctSelection"]
@@ -149,8 +159,8 @@ def plot_train(log_folder, configName, rank, title='Learning Curve', window=2048
                 merged_df = merged_df.append(grouped)
                 merged_df_small = merged_df_small.append(groupedSmall)
 
-            #dr = df.rolling(real_window).mean()
-            #drSmall = dfSmall.rolling(real_window).mean()
+            # dr = df.rolling(real_window).mean()
+            # drSmall = dfSmall.rolling(real_window).mean()
 
             plot_train_acc(indexer='minibatch', df=grouped, mypath=mypath, title=title2, window=window)
             plot_selection(indexer='minibatch', df=groupedSmall, mypath=mypath, title=title2, window=window)
@@ -159,12 +169,12 @@ def plot_train(log_folder, configName, rank, title='Learning Curve', window=2048
     merged_df_small = merged_df_small.groupby('minibatch', as_index=False).mean().sort_values('minibatch')
     plot_train_acc(indexer='minibatch', df=merged_df, mypath=mypath, title='merged_evals', window=window)
     plot_selection(indexer='minibatch', df=merged_df_small, mypath=mypath, title='merged_evals', window=window)
-    plot_merged(indexer='minibatch', df=merged_df_small, mypath=mypath, title='merged_evals', window=window, values="accuracy")
+    plot_merged(indexer='minibatch', df=merged_df_small, mypath=mypath, title='merged_evals', window=window,
+                values="accuracy")
 
 
-
-
-def make_pic_video(model, env, name, random_policy=False, video_length=50, savePath='', vidName='video.mp4', following="player_0", image_size=320, deterministic=False, memory=1):
+def make_pic_video(model, env, name, random_policy=False, video_length=50, savePath='', vidName='video.mp4',
+                   following="player_0", image_size=320, deterministic=False, memory=1):
     """
     make a video of the model playing the environment
     """
@@ -180,15 +190,17 @@ def make_pic_video(model, env, name, random_policy=False, video_length=50, saveP
             action = {agent: _env.action_spaces[agent].sample() for agent in _env.agents}
         else:
             action = {following: model.predict(obs[following], deterministic=deterministic)[0] if memory <= 1 else
-                      model.predict(obs[following], deterministic=deterministic)}
+            model.predict(obs[following], deterministic=deterministic)}
         obs, _, dones, _ = _env.step(action)
         img = cv2.resize(obs[following], dsize=(image_size, image_size), interpolation=cv2.INTER_NEAREST)
-        cv2.putText(img=img, text=str(action), org=(0, image_size), fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=1, color=(255, 255, 255), thickness=2)
+        cv2.putText(img=img, text=str(action), org=(0, image_size), fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=1,
+                    color=(255, 255, 255), thickness=2)
         if dones[following]:
             obs = _env.reset()
             _env.reset()
             img = cv2.resize(obs[following], dsize=(image_size, image_size), interpolation=cv2.INTER_NEAREST)
-            cv2.putText(img=img, text=str(action), org=(0, image_size), fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=1, color=(255, 255, 255), thickness=2)
+            cv2.putText(img=img, text=str(action), org=(0, image_size), fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=1,
+                        color=(255, 255, 255), thickness=2)
 
     imageio.mimsave(os.path.join(savePath, vidName), [img for i, img in enumerate(images)], fps=10)
 
