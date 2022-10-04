@@ -66,12 +66,13 @@ def plot_split(indexer, df, mypath, title, window, values="accuracy"):
 
 
 def plot_merged(indexer, df, mypath, title, window, values=None,
-                labels=None):
+                labels=None, range=[0,1]):
     if labels is None:
         labels = ["selected any box", "selected best box"]
     if values is None:
         values = ["valid", "accuracy"]
     fig = plt.figure(title)
+    plt.ylim(range[0], range[1])
     for value, label in zip(values, labels):
         plt.plot(df[indexer], df[value], label=label)
     plt.legend(labels)
