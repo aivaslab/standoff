@@ -121,6 +121,13 @@ def plot_train(log_folder, configName, rank, title='Learning Curve', window=2048
             df["selectedSmall"] = df["selectedSmall"].replace({True: 1, False: 0})
             df["selectedNeither"] = df["selectedNeither"].replace({True: 1, False: 0})
 
+            df["avoidedBig"] = df.apply(lambda row: row["selectedSmall"] or row["selectedNeither"])
+            df["avoidedSmall"] = df.apply(lambda row: row["selectedBig"] or row["selectedNeither"])
+
+
+            df["avoidBigCorrect"] = df.filter("shouldAvoidBig")["avoidedBig"]
+            df["avoidSmallCorrect"] = df.filter("shouldAvoidSmall")["avoidedSmall"]
+
             df["selection"] = df["selection"].fillna(-1)
             df["accuracy"] = df["selection"] == df["correctSelection"]
             df["valid"] = df["selection"] != -1
