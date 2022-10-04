@@ -53,30 +53,32 @@ def moving_average(values, window):
     return np.convolve(values.astype(float), weights, 'valid')
 
 
-def plot_merged(indexer, df, mypath, title, window, values="accuracy", grouped=False):
-    if grouped:
-        new_df = df.groupby('minibatch', as_index=False).mean().sort_values('minibatch')
-    else:
-        new_df = df
-    new_df = new_df.pivot(index=indexer, columns="name", values=values)
+def plot_split(indexer, df, mypath, title, window, values="accuracy"):
+    new_df = df.pivot(index=indexer, columns="name", values=values)
     fig = plt.figure(title)
     new_df.plot()
     plt.xlabel('Timestep, (window={})'.format(window))
     plt.ylabel(values)
     plt.title(title + " " + values)
-    name = title + "-" + values + "-merged" if grouped else title + "-" + values + "-split"
+    name = title + "-split-" + values
     plt.savefig(os.path.join(mypath, name))
     plt.close()
 
-def plot_train_acc(indexer, df, mypath, title, window):
+
+def plot_merged(indexer, df, mypath, title, window, values=None,
+                labels=None):
+    if labels is None:
+        labels = ["selected any box", "selected best box"]
+    if values is None:
+        values = ["valid", "accuracy"]
     fig = plt.figure(title)
-    plt.plot(df[indexer], df["valid"], label="selected any box")
-    plt.plot(df[indexer], df["accuracy"], label="selected best box")
-    plt.legend(['selected any box', 'selected best box'])
+    for value, label in zip(values, labels):
+        plt.plot(df[indexer], df[value], label=label)
+    plt.legend(labels)
     plt.xlabel('Timestep, (window={})'.format(window))
     plt.ylabel('Percent')
     plt.title(title + " " + str('Accuracy'))
-    plt.savefig(os.path.join(mypath, title + "-" + 'accuracy'))
+    plt.savefig(os.path.join(mypath, title + "-merged-" + values[0]))
     plt.close()
 
 
@@ -133,7 +135,7 @@ def plot_train(log_folder, configName, rank, title='Learning Curve', window=2048
             df["avoidedSmall"] = df.apply(lambda row: row["selectedBig"] or row["selectedNeither"])
 
             dfSmall["avoidCorrect"] = dfSmall.apply(lambda row: (row["avoidedBig"] and row["shouldAvoidBig"]) or (
-                        row["avoidedSmall"] and row["shouldAvoidSmall"]))
+                    row["avoidedSmall"] and row["shouldAvoidSmall"]))
             dfSmall["avoidCorrect"] = dfSmall["avoidedBig"] and dfSmall["shouldAvoidBig"] or dfSmall["avoidedSmall"] and \
                                       dfSmall["shouldAvoidSmall"]
 
@@ -164,16 +166,18 @@ def plot_train(log_folder, configName, rank, title='Learning Curve', window=2048
             # dr = df.rolling(real_window).mean()
             # drSmall = dfSmall.rolling(real_window).mean()
 
-            plot_train_acc(indexer='minibatch', df=grouped, mypath=mypath, title=title2, window=window)
+            #plot_train_acc(indexer='minibatch', df=grouped, mypath=mypath, title=title2, window=window)
             plot_selection(indexer='minibatch', df=groupedSmall, mypath=mypath, title=title2, window=window)
 
     merged_df = merged_df.groupby('minibatch', as_index=False).mean().sort_values('minibatch')
     merged_df_small = merged_df_small.groupby('minibatch', as_index=False).mean().sort_values('minibatch')
-    plot_train_acc(indexer='minibatch', df=merged_df, mypath=mypath, title='merged_evals', window=window)
+    plot_merged(indexer='minibatch', df=merged_df, mypath=mypath, title='merged_evals', window=window,
+                values=['validity', 'accuracy'], labels=['selected any box', 'selected best box'])
     plot_selection(indexer='minibatch', df=merged_df_small, mypath=mypath, title='merged_evals', window=window)
-    plot_merged(indexer='minibatch', df=merged_df_small, mypath=mypath, title='merged_evals', window=window,
+    plot_split(indexer='minibatch', df=merged_df_small, mypath=mypath, title='merged_evals', window=window,
                 values="accuracy")
-
+    plot_merged(indexer='minibatch', df=merged_df_small, mypath=mypath, title='merged_evals', window=window,
+                values=["avoidCorrect"], labels=["avoided correct box"])
 
 def make_pic_video(model, env, name, random_policy=False, video_length=50, savePath='', vidName='video.mp4',
                    following="player_0", image_size=320, deterministic=False, memory=1):
