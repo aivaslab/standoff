@@ -54,9 +54,9 @@ def moving_average(values, window):
 
 
 def plot_merged(indexer, df, mypath, title, window, values="accuracy", grouped=False):
-    new_df = df.pivot(index=indexer, columns="name", values=values)
     if grouped:
         new_df = new_df.groupby('minibatch', as_index=False).mean().sort_values('minibatch')
+    new_df = df.pivot(index=indexer, columns="name", values=values)
     fig = plt.figure(title)
     new_df.plot()
     plt.xlabel('Timestep, (window={})'.format(window))
