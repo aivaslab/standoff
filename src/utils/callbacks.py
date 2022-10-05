@@ -84,7 +84,8 @@ class PlottingCallback(BaseCallback):
         })
 
         with open(self.logPath, 'a') as logfile:
-            logfile.write(f'ts: {self.eval_cbs[0].evaluations_timesteps[-1]}\tkl: {self.model.approxkl}\n')
+            logfile.write(f'ts: {self.eval_cbs[0].evaluations_timesteps[-1]}\n')
+            #logfile.write(f'ts: {self.eval_cbs[0].evaluations_timesteps[-1]}\tkl: {self.model.approxkl}\n')
 
         plot_evals(self.savePath, self.name, self.names, self.eval_cbs)
         if self.mid_vids:
