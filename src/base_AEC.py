@@ -434,7 +434,8 @@ class para_MultiGridEnv(ParallelEnv):
         else:
             self.possible_puppets = []
 
-        self.action_spaces = {agent: Discrete(7) for agent in self.possible_agents}
+        self.action_spaces = {agent: Discrete(4) for agent in self.possible_agents}
+        #7 for additional things
 
         self.env_done = False
         self.step_count = 0
