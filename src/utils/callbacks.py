@@ -84,8 +84,7 @@ class PlottingCallback(BaseCallback):
         })
 
         with open(self.logPath, 'a') as logfile:
-
-            logfile.write(f'ts: {self.eval_cbs[0].evaluations_timesteps[-1]}\n')
+            logfile.write(f'ts: {self.eval_cbs[0].evaluations_timesteps[-1]}\tkl: {self.model.approxkl}\n')
 
         plot_evals(self.savePath, self.name, self.names, self.eval_cbs)
         if self.mid_vids:
@@ -156,6 +155,13 @@ class PlottingCallbackStartStop(BaseCallback):
             logfile.write('end of training! total time:' + str( time.time()-self.start_time) + '\n')
 
         plot_evals(self.savePath, self.name, self.names, self.eval_cbs)
+
+        update_global_logs(self.global_log_path, self.log_line, {
+            'timesteps': np.mean(self.eval_cbs[0].evaluations_timesteps[-1]),
+            'results': np.mean(self.eval_cbs[0].evaluations_results[-1]),
+            'length': np.mean(self.eval_cbs[0].evaluations_length[-1]),
+            'finished': True,
+        })
             
         for env, name in zip(self.envs, self.names):
             make_pic_video(self.model, env, name, 
@@ -165,14 +171,8 @@ class PlottingCallbackStartStop(BaseCallback):
                 random_policy=False, video_length=350, savePath=os.path.join(self.savePath, 'videos', name),
                 vidName='end-det.mp4', following="player_0", deterministic=True, memory=self.memory)
         plot_train(self.savePath, self.name, 0, self.train_name+'train')
-        meanTrain = np.mean(self.eval_cbs[0].evaluations_results[-1])
 
-        update_global_logs(self.global_log_path, self.log_line, {
-            'timesteps': np.mean(self.eval_cbs[0].evaluations_timesteps[-1]),
-            'results': np.mean(self.eval_cbs[0].evaluations_results[-1]),
-            'length': np.mean(self.eval_cbs[0].evaluations_length[-1]),
-            'finished': True,
-        })
+
         return True
 
     def _on_step(self):
