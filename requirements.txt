@@ -13,3 +13,4 @@ sb3-contrib==1.6.1
 SuperSuit==3.3.0
 tqdm==4.64.1
 imageio-ffmpeg==0.4.6
+importlib_metadata==4.11.3
