@@ -235,6 +235,13 @@ class StandoffEnv(para_MultiGridEnv):
             if len(self.small_food_locations) == 0 or (self.small_food_locations[-1] != loc):
                 self.small_food_locations.append(loc)
 
+    def get_all_paths(self):
+        if not self.deterministic:
+            return None
+        for box in range(self.boxes):
+            pass
+
+
     def timer_active(self, event, arg=None):
         name = event[0]
         arg = arg
@@ -249,11 +256,12 @@ class StandoffEnv(para_MultiGridEnv):
             for box in range(self.boxes):
                 x = box * 2 + 2
                 self.put_obj(Box(color="orange"), x, y)
-                self.infos['player_0']['shouldAvoidBig'] = False
-                self.infos['player_0']['shouldAvoidSmall'] = False
-                self.infos['player_0']['correctSelection'] = -1
-                self.infos['player_0']['minibatch'] = self.minibatch
-                self.infos['player_0']['timestep'] = self.total_step_count
+            self.infos['player_0']['shouldAvoidBig'] = False
+            self.infos['player_0']['shouldAvoidSmall'] = False
+            self.infos['player_0']['correctSelection'] = -1
+            self.infos['player_0']['minibatch'] = self.minibatch
+            self.infos['player_0']['timestep'] = self.total_step_count
+            self.infos['player_0']['all_paths'] = self.get_all_paths()
         elif name == 'bait':
             x = event[1] * 2 + 2
             obj = Goal(reward=arg, size=arg * 0.01, color='green', hide=self.hidden)
