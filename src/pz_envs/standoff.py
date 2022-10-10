@@ -236,16 +236,14 @@ class StandoffEnv(para_MultiGridEnv):
                 self.small_food_locations.append(loc)
 
     def get_all_paths(self, position):
-        print('get_all_paths')
         if not self.deterministic:
             return None
         y = self.height//2
         paths = []
         for box in range(self.boxes):
             x = box * 2 + 2
-            path = pathfind(self.grid.overlapping, position, (x, y))
+            path = pathfind(self.grid.overlapping, position[0:2], (x, y))
             paths += [path, ]
-        print(paths)
         return paths
 
     def timer_active(self, event, arg=None):
@@ -267,7 +265,7 @@ class StandoffEnv(para_MultiGridEnv):
             self.infos['player_0']['correctSelection'] = -1
             self.infos['player_0']['minibatch'] = self.minibatch
             self.infos['player_0']['timestep'] = self.total_step_count
-            self.infos['player_0']['all_paths'] = self.get_all_paths()
+            self.infos['player_0']['all_paths'] = self.get_all_paths(self.agent_spawn_pos['player_0'])
         elif name == 'bait':
             x = event[1] * 2 + 2
             obj = Goal(reward=arg, size=arg * 0.01, color='green', hide=self.hidden)
