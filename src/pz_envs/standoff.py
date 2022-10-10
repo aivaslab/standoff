@@ -48,7 +48,8 @@ class StandoffEnv(para_MultiGridEnv):
         self.params = None
         self.configName = configName
         self.minibatch = 0
-        self.deterministic = False #used for generating deterministic levels for ground-truth evaluation
+        self.deterministic = False #used for generating deterministic baiting events for ground-truth evaluation
+        self.deterministic_mod = 0 #cycles baiting locations, changes by one each time it is used
 
     def hard_reset(self, params=None):
         """
@@ -87,6 +88,10 @@ class StandoffEnv(para_MultiGridEnv):
                 self.last_seen_reward[agent + str(box)] = -100
                 if agent + str(box) not in self.can_see.keys():
                     self.can_see[agent + str(box)] = True  # default to not hidden until it is
+
+    def get_deterministic_mod(self):
+        self.deterministic_mod += 1
+        return self.deterministic_mod
 
     def _gen_grid(self,
                   sub_valence=1,
@@ -188,15 +193,15 @@ class StandoffEnv(para_MultiGridEnv):
             type = event[0]
             for x in range(len(event)):
                 if event[x] == "empty":
-                    event[x] = empty_buckets.pop(random.randrange(len(empty_buckets)) if self.deterministic else 0)
+                    event[x] = empty_buckets.pop(random.randrange(len(empty_buckets)) if self.deterministic else self.get_deterministic_mod() % len(empty_buckets))
                 elif event[x] == "else":
                     available_spots = [i for i in range(boxes) if i != event[x - 1]]
-                    event[x] = available_spots.pop(random.randrange(len(available_spots)) if self.deterministic else 0)
+                    event[x] = available_spots.pop(random.randrange(len(available_spots)) if self.deterministic else self.get_deterministic_mod % len(available_spots))
                 elif isinstance(event[x], int):
                     event[x] = events[event[x]][1]  # get first location
 
             if type == "bait":
-                event_args[k] = bait_args.pop(random.randrange(len(bait_args)) if self.deterministic else 0)
+                event_args[k] = bait_args.pop(random.randrange(len(bait_args)) if self.deterministic else self.deterministic_mod % len(bait_args))
             elif type == "remove":
                 empty_buckets.append(event[1])
             elif type == "obscure" or type == "reveal":
