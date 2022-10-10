@@ -49,7 +49,7 @@ class StandoffEnv(para_MultiGridEnv):
         self.configName = configName
         self.minibatch = 0
         self.deterministic = False #used for generating deterministic baiting events for ground-truth evaluation
-        self.deterministic_mod = 0 #cycles baiting locations, changes by one each time it is used
+        self.deterministic_seed = 0 #cycles baiting locations, changes by one each time it is used
 
     def hard_reset(self, params=None):
         """
@@ -89,9 +89,9 @@ class StandoffEnv(para_MultiGridEnv):
                 if agent + str(box) not in self.can_see.keys():
                     self.can_see[agent + str(box)] = True  # default to not hidden until it is
 
-    def get_deterministic_mod(self):
-        self.deterministic_mod += 1
-        return self.deterministic_mod
+    def get_deterministic_seed(self):
+        self.deterministic_seed += 1
+        return self.deterministic_seed
 
     def _gen_grid(self,
                   sub_valence=1,
@@ -193,15 +193,15 @@ class StandoffEnv(para_MultiGridEnv):
             type = event[0]
             for x in range(len(event)):
                 if event[x] == "empty":
-                    event[x] = empty_buckets.pop(random.randrange(len(empty_buckets)) if self.deterministic else self.get_deterministic_mod() % len(empty_buckets))
+                    event[x] = empty_buckets.pop(random.randrange(len(empty_buckets)) if self.deterministic else self.get_deterministic_seed() % len(empty_buckets))
                 elif event[x] == "else":
                     available_spots = [i for i in range(boxes) if i != event[x - 1]]
-                    event[x] = available_spots.pop(random.randrange(len(available_spots)) if self.deterministic else self.get_deterministic_mod % len(available_spots))
+                    event[x] = available_spots.pop(random.randrange(len(available_spots)) if self.deterministic else self.get_deterministic_seed() % len(available_spots))
                 elif isinstance(event[x], int):
                     event[x] = events[event[x]][1]  # get first location
 
             if type == "bait":
-                event_args[k] = bait_args.pop(random.randrange(len(bait_args)) if self.deterministic else self.deterministic_mod % len(bait_args))
+                event_args[k] = bait_args.pop(random.randrange(len(bait_args)) if self.deterministic else self.get_deterministic_seed() % len(bait_args))
             elif type == "remove":
                 empty_buckets.append(event[1])
             elif type == "obscure" or type == "reveal":
@@ -235,12 +235,18 @@ class StandoffEnv(para_MultiGridEnv):
             if len(self.small_food_locations) == 0 or (self.small_food_locations[-1] != loc):
                 self.small_food_locations.append(loc)
 
-    def get_all_paths(self):
+    def get_all_paths(self, position):
+        print('get_all_paths')
         if not self.deterministic:
             return None
+        y = self.height//2
+        paths = []
         for box in range(self.boxes):
-            pass
-
+            x = box * 2 + 2
+            path = pathfind(self.grid.overlapping, position, (x, y))
+            paths += [path, ]
+        print(paths)
+        return paths
 
     def timer_active(self, event, arg=None):
         name = event[0]
