@@ -79,6 +79,11 @@ class ScenarioConfigs:
             "boxes": [5],
             "hidden": [True],
         },
+        "tutorial_step_1c": {
+            "num_puppets": [1],
+            "boxes": [5],
+            "hidden": [False],
+        },
         "tutorial_step_2": {
             # more eVaried training, including easier cases than eval
             "num_puppets": [1],
