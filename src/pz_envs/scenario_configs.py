@@ -96,7 +96,7 @@ class ScenarioConfigs:
             "events": [[['bait', 'empty'], ['bait', 'empty'], ['remove', x]] for x in [0, 1]]
         },
         "removed uninformed": {
-            "events": [[['bait', 'empty'], ['bait', 'empty'], ['block'], ['remove', x]] for x in [0, 1]]
+            "events": [[['bait', 'empty'], ['bait', 'empty'], ['obscure'], ['remove', x]] for x in [0, 1]]
         },
         "moved": {
             "events": [[['obscure'], ['bait', 'empty'], ['bait', 'empty'], ['reveal'], ['swap', 1, 'empty'],
