@@ -141,6 +141,8 @@ class StandoffEnv(para_MultiGridEnv):
             xx = 2 * random.choice(range(boxes)) + 2
             self.agent_spawn_pos[agent] = (xx, h, d)
             if agent == "player_0":
+                #this was on init, but didn't perform correctly.
+                print("agent 0 spawn pos", self.agent_spawn_pos[agent])
                 self.infos['player_0']['all_paths'] = self.get_all_paths(self.agent_spawn_pos['player_0'])
             self.agent_door_pos[agent] = (xx, h + (1 if agent == "player_0" else -1))
             a = self.instance_from_name[agent]
