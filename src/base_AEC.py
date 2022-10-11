@@ -614,6 +614,30 @@ class para_MultiGridEnv(ParallelEnv):
     def timer_active(self, event):
         pass
 
+    def puppet_pathing(self):
+        for agent in self.puppets:
+            a = self.instance_from_name[agent]
+            if self.infos[agent] != {}:
+                # print('received', self.infos[agent])
+                if 'act' in self.infos[agent].keys():
+                    a.next_actions.append(self.infos[agent]['act'])
+                if 'path' in self.infos[agent].keys():
+                    a.pathDict = self.infos[agent]['path']
+
+            if a.pathDict != {}:
+                sname = str(tuple(a.pos))
+                if sname in a.pathDict.keys():
+                    direction = a.pathDict[sname]
+                else:
+                    direction = random.choice([0, 1, 2, 3])
+                relative_dir = (a.dir - direction) % 4
+                if relative_dir == 3 or relative_dir == 2:
+                    a.next_actions.append(1)
+                elif relative_dir == 1:
+                    a.next_actions.append(0)
+                elif relative_dir == 0:
+                    a.next_actions.append(2)
+
     def step(self, actions):
 
         '''
@@ -850,28 +874,7 @@ class para_MultiGridEnv(ParallelEnv):
 
         # self._accumulate_rewards() #not defined
 
-        for agent in self.puppets:
-            a = self.instance_from_name[agent]
-            if self.infos[agent] != {}:
-                # print('received', self.infos[agent])
-                if 'act' in self.infos[agent].keys():
-                    a.next_actions.append(self.infos[agent]['act'])
-                if 'path' in self.infos[agent].keys():
-                    a.pathDict = self.infos[agent]['path']
-
-            if a.pathDict != {}:
-                sname = str(tuple(a.pos))
-                if sname in a.pathDict.keys():
-                    direction = a.pathDict[sname]
-                else:
-                    direction = random.choice([0, 1, 2, 3])
-                relative_dir = (a.dir - direction) % 4
-                if relative_dir == 3 or relative_dir == 2:
-                    a.next_actions.append(1)
-                elif relative_dir == 1:
-                    a.next_actions.append(0)
-                elif relative_dir == 0:
-                    a.next_actions.append(2)
+        self.puppet_pathing()
 
         # clear puppets from obs, rewards, dones, infos
 
