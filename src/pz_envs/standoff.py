@@ -326,7 +326,7 @@ class StandoffEnv(para_MultiGridEnv):
             self.new_target = False
             target_agent = None
             for box in range(self.boxes):
-                for agent in self.puppets():
+                for agent in self.puppets:
                     reward = self.last_seen_reward[agent + str(box)]
                     if (self.agent_goal[agent] != box) and (reward >= self.best_reward[agent]):
                         self.agent_goal[agent] = box
