@@ -86,10 +86,10 @@ def astar(maze, start, end):
                     len(maze[len(maze) - 1]) - 1) or node_position[1] < 0:
                 continue
 
-            solid = maze[node_position[0]][node_position[1]]
-            if solid:
+            # Make sure walkable terrain
+            if maze[node_position[0]][node_position[1]]:
                 continue
-            # Append
+
             children.append(Node(current_node, node_position))
 
         # Loop through children
