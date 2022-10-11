@@ -103,6 +103,9 @@ class WorldObj(metaclass=RegisteredObjectType):
     def can_overlap(self):
         return False
 
+    def can_overlap_pathing(self):
+        return False
+
     def can_pickup(self):
         return False
 
@@ -183,6 +186,9 @@ class GridAgent(WorldObj):
     def can_overlap(self):
         return True
 
+    def can_overlap_pathing(self):
+        return True
+
     def render(self, img):
         if self.adversary:
             tri_fn = point_in_agent()
@@ -207,6 +213,9 @@ class BulkObj(WorldObj, metaclass=RegisteredObjectType):
 
 class InvisibleObject(WorldObj):
     def can_overlap(self):
+        return True
+
+    def can_overlap_pathing(self):
         return True
 
     def render(self, img):
@@ -237,6 +246,9 @@ class BonusTile(WorldObj):
         self.reset_on_mistake = reset_on_mistake
 
     def can_overlap(self):
+        return True
+
+    def can_overlap_pathing(self):
         return True
 
     def str_render(self, dir=0):
@@ -284,6 +296,9 @@ class Goal(WorldObj):
     def can_overlap(self):
         return True
 
+    def can_overlap_pathing(self):
+        return True
+
     def get_reward(self, agent):
         return self.reward
 
@@ -302,6 +317,9 @@ class SubGoal(WorldObj):
         super().__init__(*args, **kwargs)
 
     def can_overlap(self):
+        return True
+
+    def can_overlap_pathing(self):
         return True
 
     def can_pickup(self):
@@ -323,6 +341,9 @@ class TerminalGoal(WorldObj):
     def can_overlap(self):
         return True
 
+    def can_overlap_pathing(self):
+        return True
+
     def get_reward(self, agent):
         if agent.carrying is not None and isinstance(agent.carrying, SubGoal):
             return self.reward_future
@@ -340,6 +361,9 @@ class Floor(WorldObj):
     def can_overlap(self):
         return True  # and self.agent is None
 
+    def can_overlap_pathing(self):
+        return True
+
     def str_render(self, dir=0):
         return "FF"
 
@@ -348,6 +372,8 @@ class Floor(WorldObj):
         c = COLORS[self.color]
         img.setLineColor(100, 100, 100, 0)
         img.setColor(*c / 2)
+
+
 # img.drawPolygon([
 #     (1          , TILE_PIXELS),
 #     (TILE_PIXELS, TILE_PIXELS),
@@ -586,12 +612,10 @@ class Box(WorldObj):
     def can_overlap_pathing(self):
         return True
 
-
     def toggle(self, agent, fwd_pos):
         # turn into what you're carrying
         # unused
         pass
-
 
     # print('toggling')
     # self.__class__ = self.contains.__class__
