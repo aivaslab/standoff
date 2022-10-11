@@ -80,14 +80,8 @@ def astar(maze, start, end):
                     len(maze[len(maze) - 1]) - 1) or node_position[1] < 0:
                 continue
 
-            # Make sure walkable terrain
-            solid = maze[node_position[0]][node_position[1]]
-
-            # Create new node
-            new_node = Node(current_node, node_position, solid)
-
             # Append
-            children.append(new_node)
+            children.append(Node(current_node, node_position, solid=maze[node_position[0]][node_position[1]]))
 
         # Loop through children
         for child in children:
@@ -95,7 +89,7 @@ def astar(maze, start, end):
             if child not in closed_list:
 
                 # Create the f, g, and h values
-                child.g = current_node.g + 1 + child.solid
+                child.g = current_node.g + 1 + 10*child.solid
                 # child.h = ((child.position[0] - end_node.position[0]) ** 2) + ((child.position[1] -
                 # end_node.position[1]) ** 2)
                 child.h = (child.position[0] - end_node.position[0]) + (child.position[1] - end_node.position[1])
