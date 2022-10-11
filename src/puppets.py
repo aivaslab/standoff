@@ -15,10 +15,9 @@ def pathfind(board, start, goal):
 class Node:
     """A node class for A* Pathfinding"""
 
-    def __init__(self, parent=None, position=None, solid=False):
+    def __init__(self, parent=None, position=None):
         self.parent = parent
         self.position = position
-        self.solid = solid
 
         self.g = 0
         self.h = 0
@@ -80,8 +79,11 @@ def astar(maze, start, end):
                     len(maze[len(maze) - 1]) - 1) or node_position[1] < 0:
                 continue
 
+            solid = maze[node_position[0]][node_position[1]]
+            if solid:
+                continue
             # Append
-            children.append(Node(current_node, node_position, solid=maze[node_position[0]][node_position[1]]))
+            children.append(Node(current_node, node_position))
 
         # Loop through children
         for child in children:
@@ -89,7 +91,7 @@ def astar(maze, start, end):
             if child not in closed_list:
 
                 # Create the f, g, and h values
-                child.g = current_node.g + 1 + 10*child.solid
+                child.g = current_node.g + 1
                 # child.h = ((child.position[0] - end_node.position[0]) ** 2) + ((child.position[1] -
                 # end_node.position[1]) ** 2)
                 child.h = (child.position[0] - end_node.position[0]) + (child.position[1] - end_node.position[1])
