@@ -145,8 +145,8 @@ def plot_train(log_folder, configName, rank, title='Learning Curve', window=2048
             dfSmall = df[filter2]
 
             if not len(dfSmall):
-                continue
-                
+                return
+
             #ValueError: Wrong number of items passed 18, placement implies 1;
             #maybe happens when no good data, so exit if so?
             dfSmall["avoidedBig"] = dfSmall.apply(lambda row: row["selectedSmall"] or row["selectedNeither"], axis=1)
