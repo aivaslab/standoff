@@ -38,6 +38,7 @@ class StandoffEnv(para_MultiGridEnv):
     ):
         super().__init__(agents, puppets, grid_size, width, height, max_steps, memory, colorMemory, reward_decay, seed,
                          respawn, ghost_mode, step_reward, done_reward, agent_spawn_kwargs)
+        self.new_target = None
         if agent_spawn_kwargs is None:
             agent_spawn_kwargs = {'top': (0, 0), 'size': (2, self.width)}
         self.agent_spawn_kwargs = agent_spawn_kwargs
@@ -322,29 +323,30 @@ class StandoffEnv(para_MultiGridEnv):
                         elif not self.grid.get(x, y) and self.last_seen_reward[agent + str(box)] != 0:
                             self.last_seen_reward[agent + str(box)] = 0
 
-            new_target = False
+            self.new_target = False
             target_agent = None
             for box in range(self.boxes):
-                for agent in self.agents_and_puppets():
+                for agent in self.puppets():
                     reward = self.last_seen_reward[agent + str(box)]
                     if (self.agent_goal[agent] != box) and (reward >= self.best_reward[agent]):
                         self.agent_goal[agent] = box
                         self.best_reward[agent] = reward
-                        new_target = True
-                        target_agent = agent
-            if new_target and target_agent != "player_0":
-                a = self.instance_from_name[target_agent]
-                if a.active:
-                    x = self.agent_goal[target_agent] * 2 + 2
-                    path = pathfind(self.grid.overlapping_pathing, a.pos, (x, y), self.cached_paths)
-                    self.infos[target_agent]["path"] = path
-                    tile = self.grid.get(x, y)
-                    if hasattr(tile, "reward") and tile.reward == 100:
-                        self.infos['player_0']['shouldAvoidBig'] = not self.subject_is_dominant
-                        self.infos['player_0']['shouldAvoidSmall'] = False
-                    else:
-                        self.infos['player_0']['shouldAvoidSmall'] = not self.subject_is_dominant
-                        self.infos['player_0']['shouldAvoidBig'] = False
+                        self.new_target = True
+                        self.target_agent = agent
+        if name == "reveal" and self.new_target:
+            self.new_target = False
+            a = self.instance_from_name[self.target_agent]
+            if a.active:
+                x = self.agent_goal[self.target_agent] * 2 + 2
+                path = pathfind(self.grid.overlapping_pathing, a.pos, (x, y), self.cached_paths)
+                self.infos[self.target_agent]["path"] = path
+                tile = self.grid.get(x, y)
+                if hasattr(tile, "reward") and tile.reward == 100:
+                    self.infos['player_0']['shouldAvoidBig'] = not self.subject_is_dominant
+                    self.infos['player_0']['shouldAvoidSmall'] = False
+                else:
+                    self.infos['player_0']['shouldAvoidSmall'] = not self.subject_is_dominant
+                    self.infos['player_0']['shouldAvoidBig'] = False
 
         if 'shouldAvoidBig' in self.infos['player_0'].keys() and self.infos['player_0']['shouldAvoidBig'] and len(self.small_food_locations) > 0:
             self.infos['player_0']['correctSelection'] = self.small_food_locations[-1]
