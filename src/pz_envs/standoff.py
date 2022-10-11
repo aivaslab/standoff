@@ -245,7 +245,7 @@ class StandoffEnv(para_MultiGridEnv):
         paths = []
         for box in range(self.boxes):
             x = box * 2 + 2
-            path = pathfind(self.grid.overlapping, position[0:2], (x, y))
+            path = pathfind(self.grid.overlapping_pathing, position[0:2], (x, y))
             paths += [path, ]
         return paths
 
@@ -335,7 +335,7 @@ class StandoffEnv(para_MultiGridEnv):
                 a = self.instance_from_name[target_agent]
                 if a.active:
                     x = self.agent_goal[target_agent] * 2 + 2
-                    path = pathfind(self.grid.overlapping, a.pos, (x, y))
+                    path = pathfind(self.grid.overlapping_pathing, a.pos, (x, y))
                     self.infos[target_agent]["path"] = path
                     tile = self.grid.get(x, y)
                     if hasattr(tile, "reward") and tile.reward == 100:

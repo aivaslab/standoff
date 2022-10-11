@@ -360,6 +360,9 @@ class EmptySpace(WorldObj):
     def can_verlap(self):
         return True
 
+    def can_overlap_pathing(self):
+        return True
+
     def str_render(self, dir=0):
         return "  "
 
@@ -370,6 +373,9 @@ class EmptySpace(WorldObj):
 class Lava(WorldObj):
     def can_overlap(self):
         return True  # and self.agent is None
+
+    def can_overlap_pathing(self):
+        return True
 
     def str_render(self, dir=0):
         return "LL"
@@ -409,6 +415,9 @@ class Block(WorldObj):
     def see_behind(self):
         return True
 
+    def can_overlap_pathing(self):
+        return True
+
     def str_render(self, dir=0):
         return "BB"
 
@@ -429,6 +438,9 @@ class Curtain(WorldObj):
         self.color = color
 
     def can_overlap(self):
+        return True
+
+    def can_overlap_pathing(self):
         return True
 
     def see_behind(self):
@@ -471,6 +483,9 @@ class Key(WorldObj):
     def str_render(self, dir=0):
         return "KK"
 
+    def can_overlap_pathing(self):
+        return True
+
     def render(self, img):
         c = COLORS[self.color]
 
@@ -493,6 +508,9 @@ class Ball(WorldObj):
     def str_render(self, dir=0):
         return "AA"
 
+    def can_overlap_pathing(self):
+        return True
+
     def render(self, img):
         fill_coords(img, point_in_circle(0.5, 0.5, 0.31), COLORS[self.color])
 
@@ -501,6 +519,9 @@ class Door(WorldObj):
 
     def can_overlap(self):
         return self.state == STATES.open  # and self.agent is None  # is open
+
+    def can_overlap_pathing(self):
+        return True
 
     def see_behind(self):
         return self.state == STATES.open  # is open
@@ -561,6 +582,9 @@ class Box(WorldObj):
         self.reward = reward
         if self.contains is not None:
             self.contains.set_reward(reward)
+
+    def can_overlap_pathing(self):
+        return True
 
 
     def toggle(self, agent, fwd_pos):

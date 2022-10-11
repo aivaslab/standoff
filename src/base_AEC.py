@@ -119,6 +119,13 @@ class MultiGrid:
                                                                     'can_overlap') else True))
         return ~overlap_fun(self.grid)
 
+    @property
+    def overlapping_pathing(self):
+        overlap_fun = np.vectorize(lambda k: (
+            self.obj_reg.key_to_obj_map[k].can_overlap_pathing() if hasattr(self.obj_reg.key_to_obj_map[k],
+                                                                    'can_overlap_pathing') else True))
+        return ~overlap_fun(self.grid)
+
     def __getitem__(self, *args, **kwargs):
         return self.__class__(
             np.ndarray.__getitem__(self.grid, *args, **kwargs),
