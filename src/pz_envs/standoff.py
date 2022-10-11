@@ -50,6 +50,7 @@ class StandoffEnv(para_MultiGridEnv):
         self.minibatch = 0
         self.deterministic = False #used for generating deterministic baiting events for ground-truth evaluation
         self.deterministic_seed = 0 #cycles baiting locations, changes by one each time it is used
+        self.cached_paths = {}
 
     def hard_reset(self, params=None):
         """
@@ -245,7 +246,7 @@ class StandoffEnv(para_MultiGridEnv):
         paths = []
         for box in range(self.boxes):
             x = box * 2 + 2
-            path = pathfind(self.grid.overlapping_pathing, position[0:2], (x, y))
+            path = pathfind(self.grid.overlapping_pathing, position[0:2], (x, y), self.cached_paths)
             paths += [path, ]
         return paths
 
@@ -335,7 +336,7 @@ class StandoffEnv(para_MultiGridEnv):
                 a = self.instance_from_name[target_agent]
                 if a.active:
                     x = self.agent_goal[target_agent] * 2 + 2
-                    path = pathfind(self.grid.overlapping_pathing, a.pos, (x, y))
+                    path = pathfind(self.grid.overlapping_pathing, a.pos, (x, y), self.cached_paths)
                     self.infos[target_agent]["path"] = path
                     tile = self.grid.get(x, y)
                     if hasattr(tile, "reward") and tile.reward == 100:

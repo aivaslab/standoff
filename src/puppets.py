@@ -1,13 +1,20 @@
 from operator import sub
 
 
-def pathfind(board, start, goal):
+def pathfind(board, start, goal, cached_paths):
     # returns dict describing directions (allocentric) at tiles along path
+    if str(start) + str(goal) in cached_paths:
+        return cached_paths[str(start) + str(goal)]
+
     path = astar(board, start, goal)
+
     pathDict = {}
     for i, pos in enumerate(path):
         if i < len(path) - 1:
             pathDict[str(pos)] = [(1, 0), (0, 1), (-1, 0), (0, -1)].index(tuple(map(sub, path[i + 1], pos)))
+
+    cached_paths[str(start) + str(goal)] = pathDict
+
     return pathDict
 
 
