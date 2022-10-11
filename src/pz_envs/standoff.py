@@ -138,13 +138,10 @@ class StandoffEnv(para_MultiGridEnv):
         for k, agent in enumerate(self.agents_and_puppets()):
             h = 1 if agent == "player_0" else self.height - 2
             d = 1 if agent == "player_0" else 3
-            xx = 2 * random.choice(range(boxes)) + 2
+            xx = self.deterministic_seed % self.boxes if self.deterministic else 2 * random.choice(range(boxes)) + 2
             self.agent_spawn_pos[agent] = (xx, h, d)
-            if agent == "player_0":
-                #this was on init, but didn't perform correctly.
-                print("agent 0 spawn pos", self.agent_spawn_pos[agent])
+            if agent == "player_0" and self.deterministic:
                 self.infos['player_0']['all_paths'] = self.get_all_paths(self.agent_spawn_pos['player_0'])
-                print("all paths", self.infos['player_0']['all_paths'])
             self.agent_door_pos[agent] = (xx, h + (1 if agent == "player_0" else -1))
             a = self.instance_from_name[agent]
             a.valence = sub_valence if agent == "player_0" else dom_valence
