@@ -2,7 +2,7 @@ from operator import sub
 
 
 def pathfind(board, start, goal):
-    # returns dict describing directions at tiles along path
+    # returns dict describing directions (allocentric) at tiles along path
     path = astar(board, start, goal)
     pathDict = {}
     for i, pos in enumerate(path):
