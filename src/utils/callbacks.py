@@ -61,6 +61,117 @@ def update_global_logs(path, log_line, data):
         df.loc[log_line, key] = value
     df.to_csv(path, index=False)
 
+def get_relative_direction(agent, path):
+    sname = str(tuple(agent.pos))
+    if sname in path.keys():
+        direction = path[sname]
+    else:
+        print('unknown', sname, path.keys())
+        direction = agent.dir#random.choice([0, 1, 2, 3])
+    relative_dir = (agent.dir - direction) % 4
+    if relative_dir == 3 or relative_dir == 2:
+        return 1
+    elif relative_dir == 1:
+        return 0
+    elif relative_dir == 0:
+        return 2
+def get_key(my_dict, val):
+    for key, value in my_dict.items():
+        if val == value:
+            return key
+
+    return "key doesn't exist"
+def ground_truth_evals(eval_envs):
+    df = pd.DataFrame()
+    for env in eval_envs:
+        env = env.unwrapped.vec_envs[0].par_env.unwrapped
+        for k in range(5):
+
+            env.deterministic = True
+            env.deterministic_seed = k
+            env.reset()
+
+            all_paths = env.get_all_paths(env.grid.overlapping_pathing, env.instance_from_name['player_0'].pos)
+
+            # todo: advance paths to point of divergence instead of first chance
+
+            # advance to release
+            release = int(
+                get_key(env.timers, [(['release'], 1)]))  # the timestep of the subject's first 'release' timer
+
+            '''for _ in range(release):
+                obs, rewards, dones, info = env.step({'player_0': 2})
+                #todo: update LSTM states to use on envs'''
+
+            all_path_infos = []
+
+            for path in all_paths:
+                total_likelihood = 0
+                obs = env.reset()
+                lstm_states = None
+                episode_starts = torch.from_numpy(np.ones((1,), dtype=int))
+                a = env.instance_from_name['player_0']
+
+                taken_path = []
+                for t in range(50):
+
+                    env.deterministic = True
+                    env.deterministic_seed = k
+                    act = get_relative_direction(a, path)
+
+                    obs = torch.from_numpy(obs['player_0']).swapdims(0, 2).unsqueeze(0)
+
+                    # todo: update episode starts?
+                    value, log, entropy = model.policy.evaluate_actions(obs, actions=torch.tensor(act),
+                                                                        lstm_states=model._last_lstm_states,
+                                                                        episode_starts=episode_starts)
+
+                    total_likelihood += log.detach().numpy()[0]
+                    obs, rewards, dones, info = env.step({'player_0': act})
+                    taken_path += [env.instance_from_name['player_0'].pos]
+                    if dones['player_0']:
+                        '''print(t, taken_path[release:])
+                        grid2 = env.grid.overlapping_pathing.astype(int)
+                        for pos in taken_path[release:]:
+                            #print('pos', pos[0], pos[1])
+                            grid2[pos[0], pos[1]] += 10
+                        print(grid2)
+                        print(env.infos['player_0'])'''
+                        break
+
+                infos = env.infos['player_0']
+                infos['likelihood'] = total_likelihood
+                infos['configName'] = env.configName
+                all_path_infos.append(infos)
+
+            max_likelihood = max(all_path_infos, key=lambda x: x['likelihood'])['likelihood']
+
+            prob_sum = 0
+            for infos in all_path_infos:
+                infos['normed_likelihood'] = infos['likelihood'] - max_likelihood
+                infos['probability'] = math.exp(infos['normed_likelihood'])
+                infos['accuracy'] = 1 if infos['selection'] == infos['correctSelection'] else 0
+                prob_sum += infos['probability']
+
+            new_infos = {}
+            for infos in all_path_infos:
+                infos['probability'] = infos['probability'] / prob_sum
+                for key in infos.keys():
+                    if key in ['minibatch', 'timestep']:
+                        new_infos[key] = infos[key]
+                        continue
+                    if isinstance(infos[key], bool) or isinstance(infos[key], int) or isinstance(infos[key], float):
+                        value = float(infos[key])
+                        key2 = key + '-c'
+                        if key2 in new_infos.keys():
+                            new_infos[key2] += value * infos['probability']
+                        else:
+                            new_infos[key2] = value * infos['probability']
+                    else:
+                        new_infos[key] = infos[key]
+
+            df = df.append(new_infos, ignore_index=True)
+    return df
 
 class PlottingCallback(BaseCallback):
     """
@@ -93,7 +204,8 @@ class PlottingCallback(BaseCallback):
             logfile.write(f'ts: {self.eval_cbs[0].evaluations_timesteps[-1]}\n')
             # logfile.write(f'ts: {self.eval_cbs[0].evaluations_timesteps[-1]}\tkl: {self.model.approxkl}\n')
 
-        plot_evals(self.savePath, self.name, self.names, self.eval_cbs)
+        #plot_evals(self.savePath, self.name, self.names, self.eval_cbs)
+        eval_df = ground_truth_evals(self.envs)
         if self.mid_vids:
             for env, name in zip(self.envs, self.names):
                 make_pic_video(self.model, env, name,
@@ -147,7 +259,8 @@ class PlottingCallbackStartStop(BaseCallback):
             logfile.write(self.params)
             logfile.write("\n")
             logfile.write(str(self.model.policy))
-        plot_evals(self.savePath, self.name, self.names, self.eval_cbs)
+        #plot_evals(self.savePath, self.name, self.names, self.eval_cbs)
+        eval_df = ground_truth_evals(self.envs)
         if not os.path.exists(os.path.join(self.savePath, 'videos')):
             os.mkdir(os.path.join(self.savePath, 'videos'))
         for env, name in zip(self.envs, self.names):
@@ -169,7 +282,8 @@ class PlottingCallbackStartStop(BaseCallback):
             with open(self.logPath, 'a') as logfile:
                 logfile.write('end of training! total time:' + str(time.time() - self.start_time) + '\n')
 
-            plot_evals(self.savePath, self.name, self.names, self.eval_cbs)
+            #plot_evals(self.savePath, self.name, self.names, self.eval_cbs)
+            eval_df = ground_truth_evals(self.envs)
 
             update_global_logs(self.global_log_path, self.log_line, {
                 'timesteps': np.mean(self.eval_cbs[0].evaluations_timesteps[-1]),
