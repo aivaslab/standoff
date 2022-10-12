@@ -240,11 +240,11 @@ class StandoffEnv(para_MultiGridEnv):
             if len(self.small_food_locations) == 0 or (self.small_food_locations[-1] != loc):
                 self.small_food_locations.append(loc)
 
-    def get_all_paths(self, maze, position):
+    def get_all_paths(self, maze, position, offset=1):
         maze = np.array(maze).astype(int)
         if not self.deterministic:
             return None
-        y = self.height//2
+        y = self.height//2 + offset
         paths = []
         for box in range(self.boxes):
             x = box * 2 + 2
