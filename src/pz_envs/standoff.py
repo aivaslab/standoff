@@ -143,8 +143,6 @@ class StandoffEnv(para_MultiGridEnv):
             bb = self.deterministic_seed % self.boxes if self.deterministic else random.choice(range(boxes))
             xx = 2 * bb + 2
             self.agent_spawn_pos[agent] = (xx, h, d)
-            if agent == "player_0" and self.deterministic:
-                self.infos['player_0']['all_paths'] = self.get_all_paths(self.agent_spawn_pos['player_0'])
             self.agent_door_pos[agent] = (xx, h + (1 if agent == "player_0" else -1))
             a = self.instance_from_name[agent]
             a.valence = sub_valence if agent == "player_0" else dom_valence
@@ -240,14 +238,14 @@ class StandoffEnv(para_MultiGridEnv):
             if len(self.small_food_locations) == 0 or (self.small_food_locations[-1] != loc):
                 self.small_food_locations.append(loc)
 
-    def get_all_paths(self, position):
+    def get_all_paths(self, maze, position):
         if not self.deterministic:
             return None
         y = self.height//2
         paths = []
         for box in range(self.boxes):
             x = box * 2 + 2
-            path = pathfind(self.grid.overlapping_pathing, position[0:2], (x, y), self.cached_paths)
+            path = pathfind(maze, position[0:2], (x, y), self.cached_paths)
             paths += [path, ]
         return paths
 
