@@ -86,7 +86,7 @@ class StandoffEnv(para_MultiGridEnv):
         self.agent_goal, self.last_seen_reward, self.can_see, self.best_reward = {}, {}, {}, {}
         boxes = self.params["boxes"]
         for agent in self.agents_and_puppets():
-            self.agent_goal[agent] = random.choice(range(boxes))
+            self.agent_goal[agent] = self.deterministic_seed % boxes if self.deterministic else random.choice(range(boxes))
             self.best_reward[agent] = -100
             for box in range(boxes):
                 self.last_seen_reward[agent + str(box)] = -100
@@ -94,7 +94,7 @@ class StandoffEnv(para_MultiGridEnv):
                     self.can_see[agent + str(box)] = True  # default to not hidden until it is
 
     def get_deterministic_seed(self):
-        self.deterministic_seed += 1
+        #self.deterministic_seed += 1
         return self.deterministic_seed
 
     def _gen_grid(self,
@@ -124,7 +124,8 @@ class StandoffEnv(para_MultiGridEnv):
         self.subject_is_dominant = subject_is_dominant
         self.box_reward = 1
         self.food_locs = list(range(boxes))
-        random.shuffle(self.food_locs)
+        if not self.deterministic:
+            random.shuffle(self.food_locs)
         self.released_tiles = [[] for _ in range(4)]
         releaseGap = boxes * 2 + atrium - 1
         self.width = boxes * 2 + 3
