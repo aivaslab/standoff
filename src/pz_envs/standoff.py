@@ -1,3 +1,5 @@
+import numpy as np
+
 from ..base_AEC import para_MultiGridEnv, MultiGrid
 from ..objects import Wall, Goal, Curtain, Block, GlassBlock, Box
 import random
@@ -239,6 +241,7 @@ class StandoffEnv(para_MultiGridEnv):
                 self.small_food_locations.append(loc)
 
     def get_all_paths(self, maze, position):
+        maze = np.array(maze).astype(int)
         if not self.deterministic:
             return None
         y = self.height//2
