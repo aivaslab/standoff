@@ -619,6 +619,9 @@ class Box(WorldObj):
         # turn into what you're carrying
         # unused
         pass
+    
+    def get_reward(self):
+        return self.reward
 
     # print('toggling')
     # self.__class__ = self.contains.__class__
