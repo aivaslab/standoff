@@ -67,10 +67,10 @@ class StandoffEnv(para_MultiGridEnv):
         for k in defaults.keys():
             if k in params.keys():
                 if isinstance(params[k], list):
-                    newParams[k] = params[k][self.deterministic_seed % len(params[k])] if self.deterministic else random.choice(params[k])
+                    newParams[k] = params[k][self.get_deterministic_seed() % len(params[k])] if self.deterministic else random.choice(params[k])
             else:
                 if isinstance(defaults[k], list):
-                    newParams[k] = defaults[k][self.deterministic_seed % len(defaults[k])] if self.deterministic else random.choice(defaults[k])
+                    newParams[k] = defaults[k][self.get_deterministic_seed() % len(defaults[k])] if self.deterministic else random.choice(defaults[k])
                 else:
                     newParams[k] = defaults[k]
         self.params = copy.deepcopy(newParams)
@@ -86,7 +86,7 @@ class StandoffEnv(para_MultiGridEnv):
         self.agent_goal, self.last_seen_reward, self.can_see, self.best_reward = {}, {}, {}, {}
         boxes = self.params["boxes"]
         for agent in self.agents_and_puppets():
-            self.agent_goal[agent] = self.deterministic_seed % boxes if self.deterministic else random.choice(range(boxes))
+            self.agent_goal[agent] = self.get_deterministic_seed() % boxes if self.deterministic else random.choice(range(boxes))
             self.best_reward[agent] = -100
             for box in range(boxes):
                 self.last_seen_reward[agent + str(box)] = -100
@@ -94,7 +94,7 @@ class StandoffEnv(para_MultiGridEnv):
                     self.can_see[agent + str(box)] = True  # default to not hidden until it is
 
     def get_deterministic_seed(self):
-        #self.deterministic_seed += 1
+        self.deterministic_seed += 1
         return self.deterministic_seed
 
     def _gen_grid(self,
@@ -146,7 +146,7 @@ class StandoffEnv(para_MultiGridEnv):
         for k, agent in enumerate(self.agents_and_puppets()):
             h = 1 if agent == "player_0" else self.height - 2
             d = 1 if agent == "player_0" else 3
-            bb = self.deterministic_seed % self.boxes if self.deterministic else random.choice(range(boxes))
+            bb = self.get_deterministic_seed() % self.boxes if self.deterministic else random.choice(range(boxes))
             xx = 2 * bb + 2
             self.agent_spawn_pos[agent] = (xx, h, d)
             self.agent_door_pos[agent] = (xx, h + (1 if agent == "player_0" else -1))
