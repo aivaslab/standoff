@@ -67,10 +67,10 @@ class StandoffEnv(para_MultiGridEnv):
         for k in defaults.keys():
             if k in params.keys():
                 if isinstance(params[k], list):
-                    newParams[k] = random.choice(params[k])
+                    newParams[k] = params[k][self.deterministic_seed % len(params[k])] if self.deterministic else random.choice(params[k])
             else:
                 if isinstance(defaults[k], list):
-                    newParams[k] = random.choice(defaults[k])
+                    newParams[k] = defaults[k][self.deterministic_seed % len(defaults[k])] if self.deterministic else random.choice(defaults[k])
                 else:
                     newParams[k] = defaults[k]
         self.params = copy.deepcopy(newParams)
