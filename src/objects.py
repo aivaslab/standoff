@@ -619,8 +619,8 @@ class Box(WorldObj):
         # turn into what you're carrying
         # unused
         pass
-    
-    def get_reward(self):
+
+    def get_reward(self, agent):
         return self.reward
 
     # print('toggling')
