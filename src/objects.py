@@ -609,6 +609,9 @@ class Box(WorldObj):
         if self.contains is not None:
             self.contains.set_reward(reward)
 
+    def can_overlap(self):
+        return True
+
     def can_overlap_pathing(self):
         return True
 
