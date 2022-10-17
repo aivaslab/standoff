@@ -62,13 +62,14 @@ def update_global_logs(path, log_line, data):
         df.loc[log_line, key] = value
     df.to_csv(path, index=False)
 
+
 def get_relative_direction(agent, path):
     sname = str(tuple(agent.pos))
     if sname in path.keys():
         direction = path[sname]
     else:
         print('unknown', sname, path.keys())
-        direction = agent.dir#random.choice([0, 1, 2, 3])
+        direction = agent.dir  # random.choice([0, 1, 2, 3])
     relative_dir = (agent.dir - direction) % 4
     if relative_dir == 3 or relative_dir == 2:
         return 1
@@ -76,12 +77,16 @@ def get_relative_direction(agent, path):
         return 0
     elif relative_dir == 0:
         return 2
+
+
 def get_key(my_dict, val):
     for key, value in my_dict.items():
         if val == value:
             return key
 
     return "key doesn't exist"
+
+
 def ground_truth_evals(eval_envs, model):
     df = pd.DataFrame()
     for env in eval_envs:
@@ -123,9 +128,12 @@ def ground_truth_evals(eval_envs, model):
                     obs = torch.from_numpy(obs['player_0']).swapdims(0, 2).unsqueeze(0)
 
                     # todo: update episode starts?
-                    value, log, entropy = model.policy.evaluate_actions(obs, actions=torch.tensor(act),
-                                                                        lstm_states=model._last_lstm_states,
-                                                                        episode_starts=episode_starts)
+                    if hasattr(model, '_last_lstm_states'):
+                        value, log, entropy = model.policy.evaluate_actions(obs, actions=torch.tensor(act),
+                                                                            lstm_states=model._last_lstm_states,
+                                                                            episode_starts=episode_starts)
+                    else:
+                        value, log, entropy = model.policy.evaluate_actions(obs, actions=torch.tensor(act))
 
                     total_likelihood += log.detach().numpy()[0]
                     obs, rewards, dones, info = env.step({'player_0': act})
@@ -174,6 +182,7 @@ def ground_truth_evals(eval_envs, model):
             df = df.append(new_infos, ignore_index=True)
     return df
 
+
 class PlottingCallback(BaseCallback):
     """
     :param verbose: (int) Verbosity level 0: not output 1: info 2: debug
@@ -206,8 +215,8 @@ class PlottingCallback(BaseCallback):
             logfile.write(f'ts: {self.eval_cbs[0].evaluations_timesteps[-1]}\n')
             # logfile.write(f'ts: {self.eval_cbs[0].evaluations_timesteps[-1]}\tkl: {self.model.approxkl}\n')
 
-        #plot_evals(self.savePath, self.name, self.names, self.eval_cbs)
-        self.eval_df = self.eval_df.append( ground_truth_evals(self.envs, self.model), ignore_index=True)
+        # plot_evals(self.savePath, self.name, self.names, self.eval_cbs)
+        self.eval_df = self.eval_df.append(ground_truth_evals(self.envs, self.model), ignore_index=True)
         plot_evals_df(self.eval_df, self.savePath, self.name)
 
         if self.mid_vids:
@@ -264,8 +273,8 @@ class PlottingCallbackStartStop(BaseCallback):
             logfile.write(self.params)
             logfile.write("\n")
             logfile.write(str(self.model.policy))
-        #plot_evals(self.savePath, self.name, self.names, self.eval_cbs)
-        self.eval_df = self.eval_df.append( ground_truth_evals(self.envs, self.model), ignore_index=True)
+        # plot_evals(self.savePath, self.name, self.names, self.eval_cbs)
+        self.eval_df = self.eval_df.append(ground_truth_evals(self.envs, self.model), ignore_index=True)
         plot_evals_df(self.eval_df, self.savePath, self.name)
         if not os.path.exists(os.path.join(self.savePath, 'videos')):
             os.mkdir(os.path.join(self.savePath, 'videos'))
@@ -288,8 +297,8 @@ class PlottingCallbackStartStop(BaseCallback):
             with open(self.logPath, 'a') as logfile:
                 logfile.write('end of training! total time:' + str(time.time() - self.start_time) + '\n')
 
-            #plot_evals(self.savePath, self.name, self.names, self.eval_cbs)
-            self.eval_df = self.eval_df.append( ground_truth_evals(self.envs, self.model), ignore_index=True)
+            # plot_evals(self.savePath, self.name, self.names, self.eval_cbs)
+            self.eval_df = self.eval_df.append(ground_truth_evals(self.envs, self.model), ignore_index=True)
             plot_evals_df(self.eval_df, self.savePath, self.name)
 
             update_global_logs(self.global_log_path, self.log_line, {
