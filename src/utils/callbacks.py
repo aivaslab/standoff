@@ -193,6 +193,7 @@ class PlottingCallback(BaseCallback):
         self.mid_vids = mid_vids
         self.memory = memory
         self.eval_df = eval_df
+        print(self.eval_df)
 
     def _on_step(self) -> bool:
         update_global_logs(self.global_log_path, self.log_line, {
@@ -249,6 +250,7 @@ class PlottingCallbackStartStop(BaseCallback):
         self.start_vid = start_vid
         self.memory = memory
         self.eval_df = eval_df
+        print(self.eval_df)
 
     def _on_training_start(self) -> bool:
         super()._on_training_start()
