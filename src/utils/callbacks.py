@@ -8,8 +8,7 @@ from pettingzoo.utils.conversions import aec_to_parallel, parallel_to_aec
 import time
 import os
 import pandas as pd
-import hiddenlayer as hl
-import pytorch as torch
+import torch
 
 
 class TrainUpdateCallback(BaseCallback):
