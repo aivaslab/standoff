@@ -1,6 +1,6 @@
 import numpy as np
 
-from .display import make_pic_video, plot_evals_df, plot_train
+from .display import make_pic_video, plot_evals_df, plot_train, plot_evals
 from stable_baselines3.common.callbacks import CallbackList, CheckpointCallback, EvalCallback, EveryNTimesteps, \
     BaseCallback
 from tqdm.notebook import tqdm
@@ -189,7 +189,7 @@ class PlottingCallback(BaseCallback):
     """
 
     def __init__(self, verbose=0, savePath='', name='', envs=[], names=[], eval_cbs=[], global_log_path='', log_line=-1,
-                 mid_vids=False, memory=1, eval_df=None):
+                 mid_vids=False, memory=1, eval_df=None, gtr=False):
         super().__init__(verbose)
         self.savePath = savePath
         self.logPath = os.path.join(savePath, 'logs.txt')
@@ -203,6 +203,7 @@ class PlottingCallback(BaseCallback):
         self.mid_vids = mid_vids
         self.memory = memory
         self.eval_df = eval_df
+        self.gtr = gtr
 
     def _on_step(self) -> bool:
         update_global_logs(self.global_log_path, self.log_line, {
@@ -215,9 +216,11 @@ class PlottingCallback(BaseCallback):
             logfile.write(f'ts: {self.eval_cbs[0].evaluations_timesteps[-1]}\n')
             # logfile.write(f'ts: {self.eval_cbs[0].evaluations_timesteps[-1]}\tkl: {self.model.approxkl}\n')
 
-        # plot_evals(self.savePath, self.name, self.names, self.eval_cbs)
-        self.eval_df = self.eval_df.append(ground_truth_evals(self.envs, self.model), ignore_index=True)
-        plot_evals_df(self.eval_df, self.savePath, self.name)
+        if not self.gtr:
+            plot_evals(self.savePath, self.name, self.names, self.eval_cbs)
+        else:
+            self.eval_df = self.eval_df.append(ground_truth_evals(self.envs, self.model), ignore_index=True)
+            plot_evals_df(self.eval_df, self.savePath, self.name)
 
         if self.mid_vids:
             for env, name in zip(self.envs, self.names):
@@ -242,7 +245,7 @@ class PlottingCallbackStartStop(BaseCallback):
 
     def __init__(self, verbose=0, savePath='', name='', envs=[], names=[], eval_cbs=[], params=[], model=None,
                  global_log_path='', train_name='', log_line=-1,
-                 start_vid=False, memory=1, eval_df=None):
+                 start_vid=False, memory=1, eval_df=None, gtr=False):
         super().__init__(verbose)
         self.savePath = savePath
         self.global_log_path = global_log_path
@@ -259,6 +262,7 @@ class PlottingCallbackStartStop(BaseCallback):
         self.start_vid = start_vid
         self.memory = memory
         self.eval_df = eval_df
+        self.gtr = gtr
 
     def _on_training_start(self) -> bool:
         super()._on_training_start()
@@ -273,9 +277,11 @@ class PlottingCallbackStartStop(BaseCallback):
             logfile.write(self.params)
             logfile.write("\n")
             logfile.write(str(self.model.policy))
-        # plot_evals(self.savePath, self.name, self.names, self.eval_cbs)
-        self.eval_df = self.eval_df.append(ground_truth_evals(self.envs, self.model), ignore_index=True)
-        plot_evals_df(self.eval_df, self.savePath, self.name)
+        if not self.gtr:
+            plot_evals(self.savePath, self.name, self.names, self.eval_cbs)
+        else:
+            self.eval_df = self.eval_df.append(ground_truth_evals(self.envs, self.model), ignore_index=True)
+            plot_evals_df(self.eval_df, self.savePath, self.name)
         if not os.path.exists(os.path.join(self.savePath, 'videos')):
             os.mkdir(os.path.join(self.savePath, 'videos'))
         for env, name in zip(self.envs, self.names):
@@ -297,9 +303,11 @@ class PlottingCallbackStartStop(BaseCallback):
             with open(self.logPath, 'a') as logfile:
                 logfile.write('end of training! total time:' + str(time.time() - self.start_time) + '\n')
 
-            # plot_evals(self.savePath, self.name, self.names, self.eval_cbs)
-            self.eval_df = self.eval_df.append(ground_truth_evals(self.envs, self.model), ignore_index=True)
-            plot_evals_df(self.eval_df, self.savePath, self.name)
+            if not self.gtr:
+                plot_evals(self.savePath, self.name, self.names, self.eval_cbs)
+            else:
+                self.eval_df = self.eval_df.append(ground_truth_evals(self.envs, self.model), ignore_index=True)
+                plot_evals_df(self.eval_df, self.savePath, self.name)
 
             update_global_logs(self.global_log_path, self.log_line, {
                 'timesteps': np.mean(self.eval_cbs[0].evaluations_timesteps[-1]),
