@@ -87,7 +87,7 @@ def get_key(my_dict, val):
     return "key doesn't exist"
 
 
-def ground_truth_evals(eval_envs, model, repetitions=5):
+def ground_truth_evals(eval_envs, model, repetitions=25):
     df = pd.DataFrame()
     for env in eval_envs:
         env = env.unwrapped.vec_envs[0].par_env.unwrapped
