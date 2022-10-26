@@ -245,7 +245,7 @@ def plot_evals_df(df, savePath, name):
     """
     given dataframe of rollouts, plot things
     """
-    print(df)
+    print(list(df.columns))
     fig, axs = plt.subplots(1)
     for cf in df.configName.unique():
         plt.plot(df.minibatch, df.filter(df.configName == cf)['accuracy-c'], label=cf, )
