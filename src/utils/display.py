@@ -246,9 +246,10 @@ def plot_evals_df(df, savePath, name):
     given dataframe of rollouts, plot things
     """
     fig, axs = plt.subplots(1)
-    for cf in df.configName.unique():
+    unique_names = df.configName.unique()
+    for cf in unique_names:
         print('ddd', cf, df.configName)
-        df2 = df.filter(df['configName'] == cf)
+        df2 = df[df['configName'] == cf]
         print(len(df2), list(df2.columns))
         plt.plot(df.minibatch, df2['accuracy-c'], label=cf, )
     plt.legend(bbox_to_anchor=(1, 1), loc="upper left")
