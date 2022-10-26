@@ -87,11 +87,11 @@ def get_key(my_dict, val):
     return "key doesn't exist"
 
 
-def ground_truth_evals(eval_envs, model):
+def ground_truth_evals(eval_envs, model, repetitions=5):
     df = pd.DataFrame()
     for env in eval_envs:
         env = env.unwrapped.vec_envs[0].par_env.unwrapped
-        for k in range(5):
+        for k in range(repetitions):
 
             env.deterministic = True
             env.deterministic_seed = k

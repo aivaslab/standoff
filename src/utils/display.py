@@ -66,7 +66,7 @@ def plot_split(indexer, df, mypath, title, window, values="accuracy"):
 
 
 def plot_merged(indexer, df, mypath, title, window, values=None,
-                labels=None, range=[0,1]):
+                labels=None, range=[0, 1]):
     if labels is None:
         labels = ["selected any box", "selected best box"]
     if values is None:
@@ -147,8 +147,8 @@ def plot_train(log_folder, configName, rank, title='Learning Curve', window=2048
             if not len(dfSmall):
                 return
 
-            #ValueError: Wrong number of items passed 18, placement implies 1;
-            #maybe happens when no good data, so exit if so?
+            # ValueError: Wrong number of items passed 18, placement implies 1;
+            # maybe happens when no good data, so exit if so?
             dfSmall["avoidedBig"] = dfSmall.apply(lambda row: row["selectedSmall"] or row["selectedNeither"], axis=1)
             dfSmall["avoidedSmall"] = dfSmall.apply(lambda row: row["selectedBig"] or row["selectedNeither"], axis=1)
 
@@ -186,6 +186,7 @@ def plot_train(log_folder, configName, rank, title='Learning Curve', window=2048
     plot_merged(indexer='minibatch', df=merged_df_noname, mypath=mypath, title='merged_evals', window=window,
                 values=["avoidCorrect"], labels=["avoided correct box"])
     plot_selection(indexer='minibatch', df=merged_df_noname, mypath=mypath, title='merged_evals', window=window)
+
 
 def make_pic_video(model, env, name, random_policy=False, video_length=50, savePath='', vidName='video.mp4',
                    following="player_0", image_size=320, deterministic=False, memory=1):
@@ -233,20 +234,22 @@ def plot_evals(savePath, name, names, eval_cbs):
     plt.savefig(os.path.join(savePath, name + '_evals'), bbox_inches='tight')
     plt.close(fig)
 
+
 def plot_evals_df(df, savePath, name):
     """
     given dataframe of rollouts, plot things
     """
     print(df)
-    '''fig, axs = plt.subplots(1)
-    for env_name, cb in zip(names, eval_cbs):
-        plt.plot(cb.evaluations_timesteps, [np.mean(x) for x in cb.evaluations_results], label=env_name, )
+    fig, axs = plt.subplots(1)
+    for configName in df.configName.unique():
+        plt.plot(df.minibatch, df[configName == configName], label=configName, )
     plt.legend(bbox_to_anchor=(1, 1), loc="upper left")
     plt.title(name)
     plt.xlabel('Timestep')
-    plt.ylabel('Reward')
-    plt.savefig(os.path.join(savePath, name + '_evals'), bbox_inches='tight')
-    plt.close(fig)'''
+    plt.ylabel('Accuracy')
+    plt.savefig(os.path.join(savePath, name + '_evals-gtr'), bbox_inches='tight')
+    plt.close(fig)
+
 
 def show_state(env, step=0, info=""):
     plt.figure(3)
