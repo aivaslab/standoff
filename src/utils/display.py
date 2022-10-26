@@ -234,8 +234,11 @@ def plot_evals(savePath, name, names, eval_cbs):
     plt.savefig(os.path.join(savePath, name + '_evals'), bbox_inches='tight')
     plt.close(fig)
 
-def gtr_to_monitor(savePath, df):
 
+def gtr_to_monitor(savePath, df):
+    for cf in df.configName.unique():
+        new_df = df.filter(df.configName == cf)
+        new_df.to_csv(os.path.join(savePath, cf + '.monitor'), index=False)
 
 
 def plot_evals_df(df, savePath, name):
@@ -245,7 +248,7 @@ def plot_evals_df(df, savePath, name):
     print(df)
     fig, axs = plt.subplots(1)
     for cf in df.configName.unique():
-        plt.plot(df.minibatch, df.filter(df.configName==cf)['accuracy-c'], label=cf, )
+        plt.plot(df.minibatch, df.filter(df.configName == cf)['accuracy-c'], label=cf, )
     plt.legend(bbox_to_anchor=(1, 1), loc="upper left")
     plt.title(name)
     plt.xlabel('Timestep')
