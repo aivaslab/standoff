@@ -245,10 +245,11 @@ def plot_evals_df(df, savePath, name):
     """
     given dataframe of rollouts, plot things
     """
-    print(list(df.columns))
     fig, axs = plt.subplots(1)
     for cf in df.configName.unique():
-        plt.plot(df.minibatch, df.filter(df.configName == cf)['accuracy-c'], label=cf, )
+        df2 = df.filter(df.configName == cf)
+        print(list(df2.columns))
+        plt.plot(df.minibatch, df2['accuracy-c'], label=cf, )
     plt.legend(bbox_to_anchor=(1, 1), loc="upper left")
     plt.title(name)
     plt.xlabel('Timestep')
