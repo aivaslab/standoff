@@ -248,7 +248,7 @@ def plot_evals_df(df, savePath, name):
     fig, axs = plt.subplots(1)
     unique_names = df.configName.unique()
     for cf in unique_names:
-        df2 = df[df['configName'] == cf]
+        df2 = df[df['configName'] == cf].groupby('minibatch', as_index=False).mean().sort_values('minibatch')
         plt.plot(df2.minibatch, df2['accuracy-c'], label=cf, )
     plt.legend(bbox_to_anchor=(1, 1), loc="upper left")
     plt.title(name)
