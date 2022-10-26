@@ -242,7 +242,7 @@ def plot_evals_df(df, savePath, name):
     print(df)
     fig, axs = plt.subplots(1)
     for configName in df.configName.unique():
-        plt.plot(df.minibatch, df[configName == configName]['accuracy-c'], label=configName, )
+        plt.plot(df.minibatch, df.filter(configName=configName)['accuracy-c'], label=configName, )
     plt.legend(bbox_to_anchor=(1, 1), loc="upper left")
     plt.title(name)
     plt.xlabel('Timestep')
