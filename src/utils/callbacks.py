@@ -144,11 +144,11 @@ def ground_truth_evals(eval_envs, model, repetitions=25, memory=1):
 
                     # todo: update episode starts?
                     if hasattr(model, '_last_lstm_states'):
-                        value, log, entropy = model.policy.evaluate_actions(remembered_obs, actions=torch.tensor(act),
+                        value, log, entropy = model.policy.evaluate_actions(cur_obs, actions=torch.tensor(act),
                                                                             lstm_states=model._last_lstm_states,
                                                                             episode_starts=episode_starts)
                     else:
-                        value, log, entropy = model.policy.evaluate_actions(remembered_obs, actions=torch.tensor(act))
+                        value, log, entropy = model.policy.evaluate_actions(cur_obs, actions=torch.tensor(act))
 
                     total_likelihood += log.detach().numpy()[0]
                     obs, rewards, dones, info = env.step({'player_0': act})
