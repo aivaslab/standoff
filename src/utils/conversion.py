@@ -56,7 +56,7 @@ def make_env(envClass, player_config, configName=None, memory=1, threads=1, redu
     # num_cpus=1 changed from 2 to avoid csv issues. does it affect speed?
     env = VecTransposeImage(env)
     if memory > 1:
-        env = VecFrameStack(env, n_stack=memory)
+        env = VecFrameStack(env, n_stack=memory, channels_order='first')
         #consider StackedObservations
     if saveVids:
         env = VecVideoRecorder(env, path, record_video_trigger=lambda x: x % recordEvery == 0, video_length=50, name_prefix=configName)
