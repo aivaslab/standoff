@@ -123,7 +123,7 @@ def ground_truth_evals(eval_envs, model, repetitions=25, memory=1, channels=3):
                 taken_path = []
                 obs_shape = list(torch.from_numpy(obs['player_0']).swapdims(0, 2).unsqueeze(0).shape)
                 #obs shape 1,3,51,51
-                obs_shape[1] = obs_shape[1] * memory * channels
+                obs_shape[1] = obs_shape[1] * memory
                 remembered_obs = torch.zeros(obs_shape)
                 for t in range(50):
 
