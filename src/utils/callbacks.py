@@ -122,7 +122,8 @@ def ground_truth_evals(eval_envs, model, repetitions=25, memory=1):
                 a = env.instance_from_name['player_0']
 
                 taken_path = []
-                print('debug_shape', obs_shape)
+                #obs shape 1,3,51,51
+                obs_shape[1] = obs_shape[1] * memory
                 remembered_obs = torch.zeros(obs_shape)
                 for t in range(50):
 
@@ -132,8 +133,10 @@ def ground_truth_evals(eval_envs, model, repetitions=25, memory=1):
                     # print('obs shape', obs['player_0'].shape)
 
                     obs = torch.from_numpy(obs['player_0']).swapdims(0, 2).unsqueeze(0)
-                    remembered_obs = torch.stack([remembered_obs, obs], dim=1).squeeze(0)
+                    remembered_obs = torch.stack([remembered_obs, obs], dim=1)
+                    print('debug_shape2', remembered_obs.shape)
                     cur_obs = remembered_obs[-memory:]
+                    print('debug_shape3', cur_obs.shape)
 
                     # print('obs shape 2', obs.shape)
 
