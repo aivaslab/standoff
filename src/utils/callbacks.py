@@ -130,24 +130,24 @@ def ground_truth_evals(eval_envs, model, repetitions=25, memory=1, channels=3):
                     env.deterministic = True
                     env.deterministic_seed = k
                     act = get_relative_direction(a, path)
-                    print('obs shape', obs['player_0'].shape)
+                    #print('obs shape', obs['player_0'].shape)
 
                     obs = torch.from_numpy(obs['player_0']).swapdims(0, 2).unsqueeze(0)
                     print('debug_shape1', obs.shape)
-                    remembered_obs = torch.cat([obs, remembered_obs[:, -memory*channels-channels:, :, :]], dim=1).reshape(obs_shape)
+                    remembered_obs = torch.cat([obs, remembered_obs], dim=1).reshape(obs_shape)
                     print('debug_shape2', remembered_obs.shape)
-                    cur_obs = remembered_obs[-memory*channels:]
+                    cur_obs = remembered_obs[:, -memory*channels-channels:, :, :]
                     print('debug_shape3', cur_obs.shape)
 
                     # print('obs shape 2', obs.shape)
 
                     # todo: update episode starts?
                     if hasattr(model, '_last_lstm_states'):
-                        value, log, entropy = model.policy.evaluate_actions(cur_obs, actions=torch.tensor(act),
+                        value, log, entropy = model.policy.evaluate_actions(remembered_obs, actions=torch.tensor(act),
                                                                             lstm_states=model._last_lstm_states,
                                                                             episode_starts=episode_starts)
                     else:
-                        value, log, entropy = model.policy.evaluate_actions(cur_obs, actions=torch.tensor(act))
+                        value, log, entropy = model.policy.evaluate_actions(remembered_obs, actions=torch.tensor(act))
 
                     total_likelihood += log.detach().numpy()[0]
                     obs, rewards, dones, info = env.step({'player_0': act})
