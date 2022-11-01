@@ -87,7 +87,7 @@ def get_key(my_dict, val):
     return "key doesn't exist"
 
 
-def ground_truth_evals(eval_envs, model, repetitions=25, memory=1):
+def ground_truth_evals(eval_envs, model, repetitions=25, memory=1, channels=3):
     df = pd.DataFrame()
     for env in eval_envs:
         env = env.unwrapped.vec_envs[0].par_env.unwrapped
@@ -123,7 +123,7 @@ def ground_truth_evals(eval_envs, model, repetitions=25, memory=1):
                 taken_path = []
                 obs_shape = list(torch.from_numpy(obs['player_0']).swapdims(0, 2).unsqueeze(0).shape)
                 #obs shape 1,3,51,51
-                obs_shape[1] = obs_shape[1] * memory
+                obs_shape[1] = obs_shape[1] * memory * channels
                 remembered_obs = torch.zeros(obs_shape)
                 for t in range(50):
 
@@ -134,9 +134,9 @@ def ground_truth_evals(eval_envs, model, repetitions=25, memory=1):
 
                     obs = torch.from_numpy(obs['player_0']).swapdims(0, 2).unsqueeze(0)
                     print('debug_shape1', obs.shape)
-                    remembered_obs = torch.stack([obs, remembered_obs[:, -memory:, :, :]], dim=1).reshape(obs_shape)
+                    remembered_obs = torch.stack([obs, remembered_obs[:, -memory*channels-channels:, :, :]], dim=1).reshape(obs_shape)
                     print('debug_shape2', remembered_obs.shape)
-                    cur_obs = remembered_obs[-memory:]
+                    cur_obs = remembered_obs[-memory*channels:]
                     print('debug_shape3', cur_obs.shape)
 
                     # print('obs shape 2', obs.shape)
