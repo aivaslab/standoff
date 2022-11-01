@@ -137,7 +137,7 @@ def ground_truth_evals(eval_envs, model, repetitions=25, memory=1):
                     print('debug_shape1', obs.shape)
                     remembered_obs = torch.cat([obs, remembered_obs], dim=1)
                     print('debug_shape2', remembered_obs.shape)
-                    cur_obs = remembered_obs[:, -memory*channels-channels:, :, :]
+                    cur_obs = remembered_obs[:, -(memory*channels-channels):, :, :]
                     print('debug_shape3', cur_obs.shape)
 
                     # print('obs shape 2', obs.shape)
