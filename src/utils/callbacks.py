@@ -115,7 +115,6 @@ def ground_truth_evals(eval_envs, model, repetitions=25, memory=1):
                 total_likelihood = 0
                 obs = env.reset()
 
-
                 lstm_states = None
                 episode_starts = torch.from_numpy(np.ones((1,), dtype=int))
                 a = env.instance_from_name['player_0']
@@ -131,16 +130,10 @@ def ground_truth_evals(eval_envs, model, repetitions=25, memory=1):
                     env.deterministic = True
                     env.deterministic_seed = k
                     act = get_relative_direction(a, path)
-                    #print('obs shape', obs['player_0'].shape)
 
                     obs = torch.from_numpy(obs['player_0']).swapdims(0, 2).unsqueeze(0)
-                    print('debug_shape1', obs.shape)
                     remembered_obs = torch.cat([obs, remembered_obs], dim=1)
-                    print('debug_shape2', remembered_obs.shape)
-                    cur_obs = remembered_obs[:, -(memory*channels):, :, :]
-                    print('debug_shape3', cur_obs.shape)
-
-                    # print('obs shape 2', obs.shape)
+                    cur_obs = remembered_obs[:, -memory*channels:, :, :]
 
                     # todo: update episode starts?
                     if hasattr(model, '_last_lstm_states'):
