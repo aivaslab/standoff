@@ -87,7 +87,7 @@ def get_key(my_dict, val):
     return "key doesn't exist"
 
 
-def ground_truth_evals(eval_envs, model, repetitions=25, memory=1, channels=3):
+def ground_truth_evals(eval_envs, model, repetitions=25, memory=1):
     df = pd.DataFrame()
     for env in eval_envs:
         env = env.unwrapped.vec_envs[0].par_env.unwrapped
@@ -123,7 +123,8 @@ def ground_truth_evals(eval_envs, model, repetitions=25, memory=1, channels=3):
                 taken_path = []
                 obs_shape = list(torch.from_numpy(obs['player_0']).swapdims(0, 2).unsqueeze(0).shape)
                 #obs shape 1,3,51,51
-                obs_shape[1] = obs_shape[1] * memory
+                channels = obs_shape[1]
+                obs_shape[1] = channels * memory
                 remembered_obs = torch.zeros(obs_shape)
                 for t in range(50):
 
