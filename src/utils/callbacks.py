@@ -115,13 +115,13 @@ def ground_truth_evals(eval_envs, model, repetitions=25, memory=1):
                 total_likelihood = 0
                 obs = env.reset()
 
-                obs_shape = list(torch.from_numpy(obs['player_0']).swapdims(0, 2).unsqueeze(0).shape)
 
                 lstm_states = None
                 episode_starts = torch.from_numpy(np.ones((1,), dtype=int))
                 a = env.instance_from_name['player_0']
 
                 taken_path = []
+                obs_shape = list(torch.from_numpy(obs['player_0']).swapdims(0, 2).unsqueeze(0).shape)
                 #obs shape 1,3,51,51
                 obs_shape[1] = obs_shape[1] * memory
                 remembered_obs = torch.zeros(obs_shape)
@@ -133,7 +133,7 @@ def ground_truth_evals(eval_envs, model, repetitions=25, memory=1):
                     # print('obs shape', obs['player_0'].shape)
 
                     obs = torch.from_numpy(obs['player_0']).swapdims(0, 2).unsqueeze(0)
-                    remembered_obs = torch.stack([remembered_obs, obs], dim=1)
+                    remembered_obs = torch.stack([obs, remembered_obs[:, :-1, :, :]], dim=1).reshape(obs_shape)
                     print('debug_shape2', remembered_obs.shape)
                     cur_obs = remembered_obs[-memory:]
                     print('debug_shape3', cur_obs.shape)
