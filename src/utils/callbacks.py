@@ -218,10 +218,11 @@ class PlottingCallback(BaseCallback):
             logfile.write(f'ts: {self.eval_cbs[0].evaluations_timesteps[-1]}\n')
             # logfile.write(f'ts: {self.eval_cbs[0].evaluations_timesteps[-1]}\tkl: {self.model.approxkl}\n')
 
-        if not self.gtr:
+        if not self.gtr or self.memory > 1:
             plot_evals(self.savePath, self.name, self.names, self.eval_cbs)
         elif self.memory == 1:
-            self.eval_df = self.eval_df.append(ground_truth_evals(self.envs, self.model), ignore_index=True)
+            #all df operations must be inplace
+            self.eval_df = pd.concat( self.eval_df, ground_truth_evals(self.envs, self.model), ignore_index=True)
             plot_evals_df(self.eval_df, self.savePath, self.name)
 
         if self.mid_vids:
@@ -279,10 +280,11 @@ class PlottingCallbackStartStop(BaseCallback):
             logfile.write(self.params)
             logfile.write("\n")
             logfile.write(str(self.model.policy))
-        if not self.gtr:
+
+        if not self.gtr or self.memory > 1:
             plot_evals(self.savePath, self.name, self.names, self.eval_cbs)
         elif self.memory == 1:
-            self.eval_df = self.eval_df.append(ground_truth_evals(self.envs, self.model), ignore_index=True)
+            self.eval_df = pd.concat( self.eval_df, ground_truth_evals(self.envs, self.model), ignore_index=True)
             plot_evals_df(self.eval_df, self.savePath, self.name)
         if not os.path.exists(os.path.join(self.savePath, 'videos')):
             os.mkdir(os.path.join(self.savePath, 'videos'))
@@ -305,10 +307,10 @@ class PlottingCallbackStartStop(BaseCallback):
             with open(self.logPath, 'a') as logfile:
                 logfile.write('end of training! total time:' + str(time.time() - self.start_time) + '\n')
 
-            if not self.gtr:
+            if not self.gtr or self.memory > 1:
                 plot_evals(self.savePath, self.name, self.names, self.eval_cbs)
             elif self.memory == 1:
-                self.eval_df = self.eval_df.append(ground_truth_evals(self.envs, self.model), ignore_index=True)
+                self.eval_df = pd.concat( self.eval_df, ground_truth_evals(self.envs, self.model), ignore_index=True)
                 plot_evals_df(self.eval_df, self.savePath, self.name)
 
             update_global_logs(self.global_log_path, self.log_line, {
