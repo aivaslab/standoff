@@ -222,7 +222,7 @@ class PlottingCallback(BaseCallback):
             plot_evals(self.savePath, self.name, self.names, self.eval_cbs)
         elif self.memory == 1:
             #all df operations must be inplace
-            self.eval_df = pd.concat( self.eval_df, ground_truth_evals(self.envs, self.model), ignore_index=True)
+            self.eval_df = pd.concat( [self.eval_df, ground_truth_evals(self.envs, self.model)], ignore_index=True)
             plot_evals_df(self.eval_df, self.savePath, self.name)
 
         if self.mid_vids:
@@ -284,7 +284,7 @@ class PlottingCallbackStartStop(BaseCallback):
         if not self.gtr or self.memory > 1:
             plot_evals(self.savePath, self.name, self.names, self.eval_cbs)
         elif self.memory == 1:
-            self.eval_df = pd.concat( self.eval_df, ground_truth_evals(self.envs, self.model), ignore_index=True)
+            self.eval_df = pd.concat( [self.eval_df, ground_truth_evals(self.envs, self.model)], ignore_index=True)
             plot_evals_df(self.eval_df, self.savePath, self.name)
         if not os.path.exists(os.path.join(self.savePath, 'videos')):
             os.mkdir(os.path.join(self.savePath, 'videos'))
@@ -310,7 +310,7 @@ class PlottingCallbackStartStop(BaseCallback):
             if not self.gtr or self.memory > 1:
                 plot_evals(self.savePath, self.name, self.names, self.eval_cbs)
             elif self.memory == 1:
-                self.eval_df = pd.concat( self.eval_df, ground_truth_evals(self.envs, self.model), ignore_index=True)
+                self.eval_df = pd.concat( [self.eval_df, ground_truth_evals(self.envs, self.model)], ignore_index=True)
                 plot_evals_df(self.eval_df, self.savePath, self.name)
 
             update_global_logs(self.global_log_path, self.log_line, {
