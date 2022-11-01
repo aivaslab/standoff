@@ -220,7 +220,7 @@ class PlottingCallback(BaseCallback):
 
         if not self.gtr:
             plot_evals(self.savePath, self.name, self.names, self.eval_cbs)
-        else:
+        elif self.memory == 1:
             self.eval_df = self.eval_df.append(ground_truth_evals(self.envs, self.model), ignore_index=True)
             plot_evals_df(self.eval_df, self.savePath, self.name)
 
@@ -281,7 +281,7 @@ class PlottingCallbackStartStop(BaseCallback):
             logfile.write(str(self.model.policy))
         if not self.gtr:
             plot_evals(self.savePath, self.name, self.names, self.eval_cbs)
-        else:
+        elif self.memory == 1:
             self.eval_df = self.eval_df.append(ground_truth_evals(self.envs, self.model), ignore_index=True)
             plot_evals_df(self.eval_df, self.savePath, self.name)
         if not os.path.exists(os.path.join(self.savePath, 'videos')):
@@ -307,7 +307,7 @@ class PlottingCallbackStartStop(BaseCallback):
 
             if not self.gtr:
                 plot_evals(self.savePath, self.name, self.names, self.eval_cbs)
-            else:
+            elif self.memory == 1:
                 self.eval_df = self.eval_df.append(ground_truth_evals(self.envs, self.model), ignore_index=True)
                 plot_evals_df(self.eval_df, self.savePath, self.name)
 
