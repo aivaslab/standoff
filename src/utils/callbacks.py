@@ -87,7 +87,7 @@ def get_key(my_dict, val):
     return "key doesn't exist"
 
 
-def ground_truth_evals(eval_envs, model, repetitions=25):
+def ground_truth_evals(eval_envs, model, repetitions=25, memory=1):
     df = pd.DataFrame()
     for env in eval_envs:
         env = env.unwrapped.vec_envs[0].par_env.unwrapped
@@ -114,11 +114,16 @@ def ground_truth_evals(eval_envs, model, repetitions=25):
             for path in all_paths:
                 total_likelihood = 0
                 obs = env.reset()
+
+                obs_shape = torch.from_numpy(obs['player_0']).swapdims(0, 2).unsqueeze(0).shape
+
                 lstm_states = None
                 episode_starts = torch.from_numpy(np.ones((1,), dtype=int))
                 a = env.instance_from_name['player_0']
 
                 taken_path = []
+                print('debug_shape', obs_shape)
+                remembered_obs = torch.zeros(obs_shape)
                 for t in range(50):
 
                     env.deterministic = True
@@ -127,15 +132,18 @@ def ground_truth_evals(eval_envs, model, repetitions=25):
                     # print('obs shape', obs['player_0'].shape)
 
                     obs = torch.from_numpy(obs['player_0']).swapdims(0, 2).unsqueeze(0)
+                    remembered_obs = torch.stack([remembered_obs, obs], dim=1).squeeze(0)
+                    cur_obs = remembered_obs[-memory:]
+
                     # print('obs shape 2', obs.shape)
 
                     # todo: update episode starts?
                     if hasattr(model, '_last_lstm_states'):
-                        value, log, entropy = model.policy.evaluate_actions(obs, actions=torch.tensor(act),
+                        value, log, entropy = model.policy.evaluate_actions(cur_obs, actions=torch.tensor(act),
                                                                             lstm_states=model._last_lstm_states,
                                                                             episode_starts=episode_starts)
                     else:
-                        value, log, entropy = model.policy.evaluate_actions(obs, actions=torch.tensor(act))
+                        value, log, entropy = model.policy.evaluate_actions(cur_obs, actions=torch.tensor(act))
 
                     total_likelihood += log.detach().numpy()[0]
                     obs, rewards, dones, info = env.step({'player_0': act})
@@ -190,7 +198,7 @@ def plotting_evals(self, vids=False):
     if not self.gtr:
         plot_evals(self.savePath, self.name, self.names, self.eval_cbs)
     else:
-        self.eval_df = pd.concat([self.eval_df, ground_truth_evals(self.envs, self.model)], ignore_index=True)
+        self.eval_df = pd.concat([self.eval_df, ground_truth_evals(self.envs, self.model, memory=self.memory)], ignore_index=True)
         plot_evals_df(self.eval_df, self.savePath, self.name)
 
     if not os.path.exists(os.path.join(self.savePath, 'videos')):
