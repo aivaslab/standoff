@@ -115,7 +115,7 @@ def ground_truth_evals(eval_envs, model, repetitions=25, memory=1):
                 total_likelihood = 0
                 obs = env.reset()
 
-                obs_shape = torch.from_numpy(obs['player_0']).swapdims(0, 2).unsqueeze(0).shape
+                obs_shape = list(torch.from_numpy(obs['player_0']).swapdims(0, 2).unsqueeze(0).shape)
 
                 lstm_states = None
                 episode_starts = torch.from_numpy(np.ones((1,), dtype=int))
