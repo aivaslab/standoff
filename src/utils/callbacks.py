@@ -124,10 +124,10 @@ def ground_truth_evals(eval_envs, model, repetitions=25):
                     env.deterministic = True
                     env.deterministic_seed = k
                     act = get_relative_direction(a, path)
-                    print('obs shape', obs['player_0'].shape)
+                    #print('obs shape', obs['player_0'].shape)
 
                     obs = torch.from_numpy(obs['player_0']).swapdims(0, 2).unsqueeze(0)
-                    print('obs shape 2', obs.shape)
+                    #print('obs shape 2', obs.shape)
 
                     # todo: update episode starts?
                     if hasattr(model, '_last_lstm_states'):
