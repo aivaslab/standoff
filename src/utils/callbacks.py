@@ -124,10 +124,10 @@ def ground_truth_evals(eval_envs, model, repetitions=25):
                     env.deterministic = True
                     env.deterministic_seed = k
                     act = get_relative_direction(a, path)
-                    #print('obs shape', obs['player_0'].shape)
+                    # print('obs shape', obs['player_0'].shape)
 
                     obs = torch.from_numpy(obs['player_0']).swapdims(0, 2).unsqueeze(0)
-                    #print('obs shape 2', obs.shape)
+                    # print('obs shape 2', obs.shape)
 
                     # todo: update episode starts?
                     if hasattr(model, '_last_lstm_states'):
@@ -185,6 +185,33 @@ def ground_truth_evals(eval_envs, model, repetitions=25):
     return df
 
 
+def plotting_evals(self, vids=False):
+
+    if not self.gtr:
+        plot_evals(self.savePath, self.name, self.names, self.eval_cbs)
+    else:
+        self.eval_df = pd.concat([self.eval_df, ground_truth_evals(self.envs, self.model)], ignore_index=True)
+        plot_evals_df(self.eval_df, self.savePath, self.name)
+
+    if not os.path.exists(os.path.join(self.savePath, 'videos')):
+        os.mkdir(os.path.join(self.savePath, 'videos'))
+    for env, name in zip(self.envs, self.names):
+
+        if not os.path.exists(os.path.join(self.savePath, 'videos', name)):
+            os.mkdir(os.path.join(self.savePath, 'videos', name))
+        if vids:
+                make_pic_video(self.model, env, name,
+                               random_policy=False, video_length=350,
+                               savePath=os.path.join(self.savePath, 'videos', name),
+                               vidName='video_' + str(self.timestep) + '-det.mp4', following="player_0",
+                               deterministic=True, memory=self.memory)
+                make_pic_video(self.model, env, name,
+                               random_policy=False, video_length=350,
+                               savePath=os.path.join(self.savePath, 'videos', name),
+                               vidName='video_' + str(self.timestep) + '.mp4', following="player_0",
+                               deterministic=False, memory=self.memory)
+
+
 class PlottingCallback(BaseCallback):
     """
     :param verbose: (int) Verbosity level 0: not output 1: info 2: debug
@@ -218,25 +245,7 @@ class PlottingCallback(BaseCallback):
             logfile.write(f'ts: {self.eval_cbs[0].evaluations_timesteps[-1]}\n')
             # logfile.write(f'ts: {self.eval_cbs[0].evaluations_timesteps[-1]}\tkl: {self.model.approxkl}\n')
 
-        if not self.gtr or self.memory > 1:
-            plot_evals(self.savePath, self.name, self.names, self.eval_cbs)
-        elif self.memory == 1:
-            #all df operations must be inplace
-            self.eval_df = pd.concat( [self.eval_df, ground_truth_evals(self.envs, self.model)], ignore_index=True)
-            plot_evals_df(self.eval_df, self.savePath, self.name)
-
-        if self.mid_vids:
-            for env, name in zip(self.envs, self.names):
-                make_pic_video(self.model, env, name,
-                               random_policy=False, video_length=350,
-                               savePath=os.path.join(self.savePath, 'videos', name),
-                               vidName='video_' + str(self.timestep) + '-det.mp4', following="player_0",
-                               deterministic=True, memory=self.memory)
-                make_pic_video(self.model, env, name,
-                               random_policy=False, video_length=350,
-                               savePath=os.path.join(self.savePath, 'videos', name),
-                               vidName='video_' + str(self.timestep) + '.mp4', following="player_0",
-                               deterministic=False, memory=self.memory)
+        plotting_evals(self, self.mid_vids)
         self.timestep += 1
         return True
 
@@ -281,22 +290,7 @@ class PlottingCallbackStartStop(BaseCallback):
             logfile.write("\n")
             logfile.write(str(self.model.policy))
 
-        if not self.gtr or self.memory > 1:
-            plot_evals(self.savePath, self.name, self.names, self.eval_cbs)
-        elif self.memory == 1:
-            self.eval_df = pd.concat( [self.eval_df, ground_truth_evals(self.envs, self.model)], ignore_index=True)
-            plot_evals_df(self.eval_df, self.savePath, self.name)
-        if not os.path.exists(os.path.join(self.savePath, 'videos')):
-            os.mkdir(os.path.join(self.savePath, 'videos'))
-        for env, name in zip(self.envs, self.names):
-
-            if not os.path.exists(os.path.join(self.savePath, 'videos', name)):
-                os.mkdir(os.path.join(self.savePath, 'videos', name))
-            if self.start_vid:
-                make_pic_video(self.model, env, name,
-                               random_policy=True, video_length=350,
-                               savePath=os.path.join(self.savePath, 'videos', name),
-                               vidName='random.mp4', following="player_0", memory=self.memory)
+        plotting_evals(self, vids=self.start_vid)
         self.start_time = time.time()
         return True
 
@@ -307,12 +301,6 @@ class PlottingCallbackStartStop(BaseCallback):
             with open(self.logPath, 'a') as logfile:
                 logfile.write('end of training! total time:' + str(time.time() - self.start_time) + '\n')
 
-            if not self.gtr or self.memory > 1:
-                plot_evals(self.savePath, self.name, self.names, self.eval_cbs)
-            elif self.memory == 1:
-                self.eval_df = pd.concat( [self.eval_df, ground_truth_evals(self.envs, self.model)], ignore_index=True)
-                plot_evals_df(self.eval_df, self.savePath, self.name)
-
             update_global_logs(self.global_log_path, self.log_line, {
                 'timesteps': np.mean(self.eval_cbs[0].evaluations_timesteps[-1]),
                 'results': np.mean(self.eval_cbs[0].evaluations_results[-1]),
@@ -320,15 +308,7 @@ class PlottingCallbackStartStop(BaseCallback):
                 'finished': True,
             })
 
-            for env, name in zip(self.envs, self.names):
-                make_pic_video(self.model, env, name,
-                               random_policy=False, video_length=350,
-                               savePath=os.path.join(self.savePath, 'videos', name),
-                               vidName='end.mp4', following="player_0", deterministic=False, memory=self.memory)
-                make_pic_video(self.model, env, name,
-                               random_policy=False, video_length=350,
-                               savePath=os.path.join(self.savePath, 'videos', name),
-                               vidName='end-det.mp4', following="player_0", deterministic=True, memory=self.memory)
+            plotting_evals(self, vids=False)
             plot_train(self.savePath, self.name, 0, self.train_name + 'train')
         except Exception as e:
             print(e)
