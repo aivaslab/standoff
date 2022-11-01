@@ -134,7 +134,7 @@ def ground_truth_evals(eval_envs, model, repetitions=25, memory=1, channels=3):
 
                     obs = torch.from_numpy(obs['player_0']).swapdims(0, 2).unsqueeze(0)
                     print('debug_shape1', obs.shape)
-                    remembered_obs = torch.stack([obs, remembered_obs[:, -memory*channels-channels:, :, :]], dim=1).reshape(obs_shape)
+                    remembered_obs = torch.vstack([obs, remembered_obs[:, -memory*channels-channels:, :, :]], dim=1).reshape(obs_shape)
                     print('debug_shape2', remembered_obs.shape)
                     cur_obs = remembered_obs[-memory*channels:]
                     print('debug_shape3', cur_obs.shape)
