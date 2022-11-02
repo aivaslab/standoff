@@ -203,19 +203,19 @@ def plotting_evals(self, vids=False):
         os.mkdir(os.path.join(self.savePath, 'videos'))
     for env, name in zip(self.envs, self.names):
 
-        if not os.path.exists(os.path.join(self.savePath, 'videos', name)):
-            os.mkdir(os.path.join(self.savePath, 'videos', name))
         if vids:
-                make_pic_video(self.model, env, name,
-                               random_policy=False, video_length=350,
-                               savePath=os.path.join(self.savePath, 'videos', name),
-                               vidName='video_' + str(self.timestep) + '-det.mp4', following="player_0",
-                               deterministic=True, memory=self.memory)
-                make_pic_video(self.model, env, name,
-                               random_policy=False, video_length=350,
-                               savePath=os.path.join(self.savePath, 'videos', name),
-                               vidName='video_' + str(self.timestep) + '.mp4', following="player_0",
-                               deterministic=False, memory=self.memory)
+            if not os.path.exists(os.path.join(self.savePath, 'videos', name)):
+                os.mkdir(os.path.join(self.savePath, 'videos', name))
+            make_pic_video(self.model, env, name,
+                           random_policy=False, video_length=350,
+                           savePath=os.path.join(self.savePath, 'videos', name),
+                           vidName='video_' + str(self.timestep) + '-det.mp4', following="player_0",
+                           deterministic=True, memory=self.memory)
+            make_pic_video(self.model, env, name,
+                           random_policy=False, video_length=350,
+                           savePath=os.path.join(self.savePath, 'videos', name),
+                           vidName='video_' + str(self.timestep) + '.mp4', following="player_0",
+                           deterministic=False, memory=self.memory)
 
 
 class PlottingCallback(BaseCallback):
