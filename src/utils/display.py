@@ -134,6 +134,7 @@ def plot_train(log_folder, configName, rank, title='Learning Curve', window=2048
 
             df["selection"] = df["selection"].fillna(-1)
             df["accuracy"] = df["selection"] == df["correctSelection"]
+            df["weakAccuracy"] = df["selection"] == df["incorrectSelection"] or df["selection"] == df["correctSelection"]
             df["valid"] = df["selection"] != -1
             df["accuracy"] = pd.to_numeric(df["accuracy"])
             df["valid"] = pd.to_numeric(df["valid"])
@@ -194,8 +195,8 @@ def plot_train(log_folder, configName, rank, title='Learning Curve', window=2048
             merged_df_noname_f = merged_df_noname
 
         plot_merged(indexer='minibatch', df=merged_df_f, mypath=mypath, title=title, window=window,
-                    values=['valid', 'accuracy', 'r'],
-                    labels=['selected any box', 'selected best box', 'reward (normalized)'])
+                    values=['valid', 'weakAccuracy', 'accuracy', 'r'],
+                    labels=['selected any box', 'selected any treat', 'selected correct treat', 'reward (normalized)'])
         plot_split(indexer='minibatch', df=merged_df_small_f, mypath=mypath, title=title, window=window,
                    values="accuracy")
         plot_merged(indexer='minibatch', df=merged_df_noname_f, mypath=mypath, title=title, window=window,

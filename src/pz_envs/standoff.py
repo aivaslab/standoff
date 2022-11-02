@@ -197,7 +197,7 @@ class StandoffEnv(para_MultiGridEnv):
         ## Bucket location allocation for timers
         empty_buckets = [i for i in range(boxes)]
         event_args = [None for _ in range(len(events))]
-        bait_args = [25, 100]
+        bait_args = [100/self.boxes, 100]
         for k, event in enumerate(events):
             type = event[0]
             for x in range(len(event)):
@@ -240,7 +240,7 @@ class StandoffEnv(para_MultiGridEnv):
         if hasattr(obj, "reward") and obj.reward == 100:
             if len(self.big_food_locations) == 0 or (self.big_food_locations[-1] != loc):
                 self.big_food_locations.append(loc)
-        elif hasattr(obj, "reward") and obj.reward == 25:
+        elif hasattr(obj, "reward") and obj.reward == 100/self.boxes:
             if len(self.small_food_locations) == 0 or (self.small_food_locations[-1] != loc):
                 self.small_food_locations.append(loc)
 
@@ -273,6 +273,7 @@ class StandoffEnv(para_MultiGridEnv):
             self.infos['player_0']['shouldAvoidBig'] = False
             self.infos['player_0']['shouldAvoidSmall'] = False
             self.infos['player_0']['correctSelection'] = -1
+            self.infos['player_0']['incorrectSelection'] = -1
             self.infos['player_0']['minibatch'] = self.minibatch
             self.infos['player_0']['timestep'] = self.total_step_count
         elif name == 'bait':
@@ -355,5 +356,7 @@ class StandoffEnv(para_MultiGridEnv):
 
         if 'shouldAvoidBig' in self.infos['player_0'].keys() and self.infos['player_0']['shouldAvoidBig'] and len(self.small_food_locations) > 0:
             self.infos['player_0']['correctSelection'] = self.small_food_locations[-1]
+            self.infos['player_0']['incorrectSelection'] = self.big_food_locations[-1]
         elif len(self.big_food_locations) > 0:
             self.infos['player_0']['correctSelection'] = self.big_food_locations[-1]
+            self.infos['player_0']['incorrectSelection'] = self.small_food_locations[-1]
