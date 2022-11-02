@@ -197,7 +197,7 @@ class StandoffEnv(para_MultiGridEnv):
         ## Bucket location allocation for timers
         empty_buckets = [i for i in range(boxes)]
         event_args = [None for _ in range(len(events))]
-        bait_args = [100/self.boxes, 100]
+        bait_args = [int(100/(self.boxes-2)), 100]
         for k, event in enumerate(events):
             type = event[0]
             for x in range(len(event)):
@@ -240,7 +240,7 @@ class StandoffEnv(para_MultiGridEnv):
         if hasattr(obj, "reward") and obj.reward == 100:
             if len(self.big_food_locations) == 0 or (self.big_food_locations[-1] != loc):
                 self.big_food_locations.append(loc)
-        elif hasattr(obj, "reward") and obj.reward == 100/self.boxes:
+        elif hasattr(obj, "reward") and obj.reward == int(100/(self.boxes-2)):
             if len(self.small_food_locations) == 0 or (self.small_food_locations[-1] != loc):
                 self.small_food_locations.append(loc)
 
