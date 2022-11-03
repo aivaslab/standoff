@@ -15,7 +15,7 @@ class StandoffEnv(para_MultiGridEnv):
     info_keywords = ('minibatch', 'timestep',
                      'shouldAvoidBig', 'shouldAvoidSmall', 'correctSelection', 'selection',
                     'selectedBig', 'selectedSmall', 'selectedNeither',
-                    'selectedPrevBig', 'selectedPrevSmall', 'selectedPrevNeither')
+                    'selectedPrevBig', 'selectedPrevSmall', 'selectedPrevNeither', 'incorrectSolution')
 
     def __init__(
             self,
