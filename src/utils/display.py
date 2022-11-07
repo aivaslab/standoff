@@ -259,7 +259,7 @@ def plot_evals(savePath, name, names, eval_cbs):
 def gtr_to_monitor(savePath, df):
     for cf in df.configName.unique():
         new_df = df.filter(df.configName == cf)
-        new_df.to_csv(os.path.join(savePath, cf + '-gtr.monitor'), index=False)
+        new_df.to_csv(os.path.join(savePath, cf + '-gtr.monitor.csv'), index=False)
 
 
 def plot_evals_df(df, savePath, name):
