@@ -188,16 +188,16 @@ def plot_train(log_folder, configName, rank, title='Learning Curve', window=2048
     merged_df["r"] = (merged_df["r"] - merged_df["r"].min()) / (merged_df["r"].max() - merged_df["r"].min())
 
     for include_train in [True, False]:
-        title = 'merged_all' if include_train else 'merged_evals'
+        title = 'train' if include_train else 'merged_evals'
         # print(merged_df['eval'])
         if not include_train:
             merged_df_f = merged_df[merged_df['eval'] == True]
             merged_df_small_f = merged_df_small[merged_df_small['eval'] == True]
             merged_df_noname_f = merged_df_noname[merged_df_noname['eval'] == True]
         else:
-            merged_df_f = merged_df
-            merged_df_small_f = merged_df_small
-            merged_df_noname_f = merged_df_noname
+            merged_df_f = merged_df[merged_df['eval'] == False]
+            merged_df_small_f = merged_df_small[merged_df_small['eval'] == False]
+            merged_df_noname_f = merged_df_noname[merged_df_noname['eval'] == False]
 
         plot_merged(indexer='minibatch', df=merged_df_f, mypath=mypath, title=title, window=window,
                     values=['valid', 'weakAccuracy', 'accuracy', 'r'],
