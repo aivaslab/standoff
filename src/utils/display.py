@@ -266,9 +266,8 @@ def gtr_to_monitor(savePath, df):
 
         file_handler = open(filename, f"{mode}t", newline="\n")
         file_handler.write(f"#{json.dumps(header)}\n")
-
-        new_df.to_csv(filename, index=False, mode="a")
         file_handler.close()
+        new_df.to_csv(filename, index=False, mode="a")
 
 
 def plot_evals_df(df, savePath, name):
