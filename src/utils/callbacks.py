@@ -1,6 +1,6 @@
 import numpy as np
 
-from .display import make_pic_video, plot_evals_df, plot_train, plot_evals
+from .display import make_pic_video, plot_evals_df, plot_train, plot_evals, gtr_to_monitor
 from stable_baselines3.common.callbacks import CallbackList, CheckpointCallback, EvalCallback, EveryNTimesteps, \
     BaseCallback
 from tqdm.notebook import tqdm
@@ -315,6 +315,7 @@ class PlottingCallbackStartStop(BaseCallback):
             })
 
             plotting_evals(self, vids=False)
+            gtr_to_monitor(self.savePath, self.eval_df)
             plot_train(self.savePath, self.name, 0, self.train_name + 'train')
         except Exception as e:
             print(e)

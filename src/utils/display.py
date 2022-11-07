@@ -78,7 +78,7 @@ def plot_merged(indexer, df, mypath, title, window, values=None,
     plt.legend(labels)
     plt.xlabel('Timestep, (window={})'.format(window))
     plt.ylabel('Percent')
-    plt.title(title + " " + str('Accuracy'))
+    plt.title(title + " " + values[0])
     plt.savefig(os.path.join(mypath, title + "-merged-" + values[0]))
     plt.close()
 
@@ -259,7 +259,7 @@ def plot_evals(savePath, name, names, eval_cbs):
 def gtr_to_monitor(savePath, df):
     for cf in df.configName.unique():
         new_df = df.filter(df.configName == cf)
-        new_df.to_csv(os.path.join(savePath, cf + '.monitor'), index=False)
+        new_df.to_csv(os.path.join(savePath, cf + '-gtr.monitor'), index=False)
 
 
 def plot_evals_df(df, savePath, name):
