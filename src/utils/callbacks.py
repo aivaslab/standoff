@@ -188,6 +188,8 @@ def ground_truth_evals(eval_envs, model, repetitions=25, memory=1):
                         new_infos[key] = infos[key]
 
             df = df.append(new_infos, ignore_index=True)
+
+    print('gtr', df.head())
     return df
 
 
