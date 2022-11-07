@@ -201,7 +201,6 @@ def plotting_evals(self, vids=False, plots=True):
         self.eval_df = pd.concat([self.eval_df, ground_truth_evals(self.envs, self.model, memory=self.memory)], ignore_index=True)
         if plots:
             plot_evals_df(self.eval_df, self.savePath, self.name)
-        print('post-gtr', self.eval_df.head())
 
     if not os.path.exists(os.path.join(self.savePath, 'videos')):
         os.mkdir(os.path.join(self.savePath, 'videos'))
