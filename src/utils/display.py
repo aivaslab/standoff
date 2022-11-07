@@ -258,8 +258,17 @@ def plot_evals(savePath, name, names, eval_cbs):
 
 def gtr_to_monitor(savePath, df):
     for cf in df.configName.unique():
+        header = {'n': cf}
+        mode = "a"
+        filename = os.path.join(savePath, cf + '-gtr.monitor.csv')
+
         new_df = df.filter(df.configName == cf)
-        new_df.to_csv(os.path.join(savePath, cf + '-gtr.monitor.csv'), index=False)
+
+        file_handler = open(filename, f"{mode}t", newline="\n")
+        file_handler.write(f"#{json.dumps(header)}\n")
+
+        new_df.to_csv(filename, index=False, mode="a")
+        file_handler.close()
 
 
 def plot_evals_df(df, savePath, name):
