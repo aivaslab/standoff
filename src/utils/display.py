@@ -126,7 +126,13 @@ def plot_train(log_folder, configName, rank, title='Learning Curve', window=2048
             # cols = pandas.read_csv(file_handler, nrows=1).columns
             df = pd.read_csv(file_handler, index_col=None, on_bad_lines='skip')  # , usecols=cols)
             df['index_col'] = df.index
-            df["t"] += header["t_start"]
+
+            if "t" in df.columns:
+                df["t"] += header["t_start"]
+            else:
+                # this is a gtr monitor file
+                # remove -c from all columns
+                df.rename(columns={x: x[:-2] if x[-2:] == "-c" else x for x in df.columns}, inplace=True)
 
             df["selectedBig"] = pd.to_numeric(df["selectedBig"])
             df["selectedSmall"] = pd.to_numeric(df["selectedSmall"])
