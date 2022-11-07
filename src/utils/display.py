@@ -134,7 +134,8 @@ def plot_train(log_folder, configName, rank, title='Learning Curve', window=2048
 
             df["selection"] = df["selection"].fillna(-1)
             df["accuracy"] = df["selection"] == df["correctSelection"]
-            df["weakAccuracy"] = df["selection"] == df["incorrectSelection"] or df["selection"] == df["correctSelection"]
+            #print(df.columns)
+            df["weakAccuracy"] = df.apply(lambda row: row["selection"] == row["incorrectSelection"] or row["selection"] == row["correctSelection"], axis=1)
             df["valid"] = df["selection"] != -1
             df["accuracy"] = pd.to_numeric(df["accuracy"])
             df["valid"] = pd.to_numeric(df["valid"])
@@ -176,15 +177,16 @@ def plot_train(log_folder, configName, rank, title='Learning Curve', window=2048
 
             plot_selection(indexer='minibatch', df=groupedSmall, mypath=mypath, title=title2, window=window)
 
-    merged_df = merged_df.groupby(['minibatch'], as_index=False).mean().sort_values('minibatch')
-    merged_df_small = merged_df_small.groupby(['minibatch', 'name'], as_index=False).mean().sort_values('minibatch')
-    merged_df_noname = merged_df_small.groupby(['minibatch'], as_index=False).mean().sort_values('minibatch')
+    merged_df = merged_df.groupby(['minibatch', 'eval'], as_index=False).mean().sort_values('minibatch')
+    merged_df_small = merged_df_small.groupby(['minibatch', 'name', 'eval'], as_index=False).mean().sort_values('minibatch')
+    merged_df_noname = merged_df_small.groupby(['minibatch', 'eval'], as_index=False).mean().sort_values('minibatch')
 
     # normalize r
     merged_df["r"] = (merged_df["r"] - merged_df["r"].min()) / (merged_df["r"].max() - merged_df["r"].min())
 
     for include_train in [True, False]:
         title = 'merged_all' if include_train else 'merged_evals'
+        #print(merged_df['eval'])
         if not include_train:
             merged_df_f = merged_df[merged_df['eval'] == False]
             merged_df_small_f = merged_df_small[merged_df_small['eval'] == False]
