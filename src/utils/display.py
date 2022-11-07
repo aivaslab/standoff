@@ -260,15 +260,17 @@ def gtr_to_monitor(savePath, df):
     for cf in df.configName.unique():
         header = {'n': cf}
         mode = "a"
-        filename = os.path.join(savePath, cf + '-gtr.monitor.csv')
+        filename1 = os.path.join(savePath, cf + '-gtr.monitor.temp')
+        filename2 = os.path.join(savePath, cf + '-gtr.monitor.csv')
 
         new_df = df[df['configName'] == cf]
 
-        new_df.to_csv(filename, index=False, mode="a")
+        new_df.to_csv(filename1, index=False, mode="a")
 
-        with open(filename, mode) as f:
+        with open(filename1, mode) as f:
             data = f.read()
-        with open(filename, mode) as f:
+        os.remove(filename1)
+        with open(filename2, mode) as f:
             f.write(f"#{json.dumps(header)}\n" + data)
 
 
