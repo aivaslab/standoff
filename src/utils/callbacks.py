@@ -191,13 +191,14 @@ def ground_truth_evals(eval_envs, model, repetitions=25, memory=1):
     return df
 
 
-def plotting_evals(self, vids=False):
+def plotting_evals(self, vids=False, plots=True):
 
     if not self.gtr:
         plot_evals(self.savePath, self.name, self.names, self.eval_cbs)
     else:
         self.eval_df = pd.concat([self.eval_df, ground_truth_evals(self.envs, self.model, memory=self.memory)], ignore_index=True)
-        plot_evals_df(self.eval_df, self.savePath, self.name)
+        if plots:
+            plot_evals_df(self.eval_df, self.savePath, self.name)
 
     if not os.path.exists(os.path.join(self.savePath, 'videos')):
         os.mkdir(os.path.join(self.savePath, 'videos'))
@@ -251,7 +252,7 @@ class PlottingCallback(BaseCallback):
             logfile.write(f'ts: {self.eval_cbs[0].evaluations_timesteps[-1]}\n')
             # logfile.write(f'ts: {self.eval_cbs[0].evaluations_timesteps[-1]}\tkl: {self.model.approxkl}\n')
 
-        plotting_evals(self, self.mid_vids)
+        plotting_evals(self, self.mid_vids, plots=False)
         self.timestep += 1
         return True
 
@@ -296,7 +297,7 @@ class PlottingCallbackStartStop(BaseCallback):
             logfile.write("\n")
             logfile.write(str(self.model.policy))
 
-        plotting_evals(self, vids=self.start_vid)
+        plotting_evals(self, vids=self.start_vid, plots=False)
         self.start_time = time.time()
         return True
 
@@ -314,7 +315,7 @@ class PlottingCallbackStartStop(BaseCallback):
                 'finished': True,
             })
 
-            plotting_evals(self, vids=False)
+            plotting_evals(self, vids=False, plots=True)
             gtr_to_monitor(self.savePath, self.eval_df)
             plot_train(self.savePath, self.name, 0, self.train_name + 'train')
         except Exception as e:
