@@ -257,12 +257,13 @@ def plot_evals(savePath, name, names, eval_cbs):
 
 
 def gtr_to_monitor(savePath, df):
+    print('ingtr_to_monitor', df.head())
     for cf in df.configName.unique():
         header = {'n': cf}
         mode = "a"
         filename = os.path.join(savePath, cf + '-gtr.monitor.csv')
 
-        new_df = df.filter(df.configName == cf)
+        new_df = df[df['configName'] == cf]
 
         file_handler = open(filename, f"{mode}t", newline="\n")
         file_handler.write(f"#{json.dumps(header)}\n")
