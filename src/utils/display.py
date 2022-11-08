@@ -59,8 +59,8 @@ def plot_split(indexer, df, mypath, title, window, values="accuracy"):
     new_df.plot()
     plt.xlabel('Timestep, (window={})'.format(window))
     plt.ylabel(values)
-    plt.title(title + " " + values)
-    name = title + "-split-" + values
+    plt.title(title + " " + values[0])
+    name = title + "-filtered-" + values[0]
     plt.savefig(os.path.join(mypath, name))
     plt.close()
 
@@ -129,9 +129,11 @@ def plot_train(log_folder, configName, rank, title='Learning Curve', window=2048
 
             if "t" in df.columns:
                 df["t"] += header["t_start"]
+                df['gtr'] = False
             else:
                 # this is a gtr monitor file
                 # remove -c from all columns
+                df['gtr'] = True
                 df.rename(columns={x: x[:-2] if x[-2:] == "-c" else x for x in df.columns}, inplace=True)
 
             df["selectedBig"] = pd.to_numeric(df["selectedBig"])
@@ -199,22 +201,26 @@ def plot_train(log_folder, configName, rank, title='Learning Curve', window=2048
                 continue
             title = title + ('-gtr' if use_gtr else '-rollout')
 
-            merged_df_f = merged_df[merged_df['eval'] != use_train and merged_df['gtr'] == use_gtr]
-            merged_df_small_f = merged_df_small[merged_df_small['eval'] != use_train and merged_df_small['gtr'] == use_gtr]
-            merged_df_noname_f = merged_df_noname[merged_df_noname['eval'] != use_train and merged_df_noname['gtr'] == use_gtr]
+            merged_df_f = merged_df[(merged_df['eval'] != use_train) & (merged_df['gtr'] == use_gtr)]
+            merged_df_small_f = merged_df_small[(merged_df_small['eval'] != use_train) & (merged_df_small['gtr'] == use_gtr)]
+            merged_df_noname_f = merged_df_noname[(merged_df_noname['eval'] != use_train) & (merged_df_noname['gtr'] == use_gtr)]
             # print(merged_df['eval'])
 
             # normalize r after all the filtering
             merged_df_f["r"] = (merged_df_f["r"] - merged_df_f["r"].min()) / (merged_df_f["r"].max() - merged_df_f["r"].min())
 
-            plot_merged(indexer='minibatch', df=merged_df_f, mypath=mypath, title=title, window=window,
-                        values=['valid', 'weakAccuracy', 'accuracy', 'r'],
-                        labels=['selected any box', 'selected any treat', 'selected correct treat', 'reward (normalized)'])
-            plot_split(indexer='minibatch', df=merged_df_small_f, mypath=mypath, title=title, window=window,
-                       values="accuracy")
-            plot_merged(indexer='minibatch', df=merged_df_noname_f, mypath=mypath, title=title, window=window,
-                        values=["avoidCorrect"], labels=["avoided correct box"])
-            plot_selection(indexer='minibatch', df=merged_df_noname_f, mypath=mypath, title=title, window=window)
+            if len(merged_df_f):
+                plot_merged(indexer='minibatch', df=merged_df_f, mypath=mypath, title=title, window=window,
+                            values=['valid', 'weakAccuracy', 'accuracy', 'r'],
+                            labels=['selected any box', 'selected any treat', 'selected correct treat', 'reward (normalized)'])
+            if len(merged_df_small_f):
+                # this graph is the same as above, but only taking into account valid samples
+                plot_split(indexer='minibatch', df=merged_df_small_f, mypath=mypath, title=title + '-valid', window=window,
+                        values=["accuracy", "weakAccuracy"])
+            if len(merged_df_noname_f):
+                plot_merged(indexer='minibatch', df=merged_df_noname_f, mypath=mypath, title=title, window=window,
+                            values=["avoidCorrect"], labels=["avoided correct box"])
+                plot_selection(indexer='minibatch', df=merged_df_noname_f, mypath=mypath, title=title, window=window)
 
 
 def make_pic_video(model, env, name, random_policy=False, video_length=50, savePath='', vidName='video.mp4',
