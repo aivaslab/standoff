@@ -187,10 +187,10 @@ def plot_train(log_folder, configName, rank, title='Learning Curve', window=2048
 
             plot_selection(indexer='minibatch', df=groupedSmall, mypath=mypath, title=title2, window=window)
 
-    merged_df = merged_df.groupby(['minibatch', 'eval'], as_index=False).mean().sort_values('minibatch')
-    merged_df_small = merged_df_small.groupby(['minibatch', 'name', 'eval'], as_index=False).mean().sort_values(
+    merged_df = merged_df.groupby(['minibatch', 'eval', 'gtr'], as_index=False).mean().sort_values('minibatch')
+    merged_df_small = merged_df_small.groupby(['minibatch', 'name', 'eval', 'gtr'], as_index=False).mean().sort_values(
         'minibatch')
-    merged_df_noname = merged_df_small.groupby(['minibatch', 'eval'], as_index=False).mean().sort_values('minibatch')
+    merged_df_noname = merged_df_small.groupby(['minibatch', 'eval', 'gtr'], as_index=False).mean().sort_values('minibatch')
 
 
     for use_train in [True, False]:
@@ -215,8 +215,9 @@ def plot_train(log_folder, configName, rank, title='Learning Curve', window=2048
                             labels=['selected any box', 'selected any treat', 'selected correct treat', 'reward (normalized)'])
             if len(merged_df_small_f):
                 # this graph is the same as above, but only taking into account valid samples
+                # avoidcorrect should be identical to weakaccuracy when no opponent is present
                 plot_split(indexer='minibatch', df=merged_df_small_f, mypath=mypath, title=title + '-valid', window=window,
-                        values=["accuracy", "weakAccuracy"])
+                        values=["accuracy", "weakAccuracy", "avoidCorrect"])
             if len(merged_df_noname_f):
                 plot_merged(indexer='minibatch', df=merged_df_noname_f, mypath=mypath, title=title, window=window,
                             values=["avoidCorrect"], labels=["avoided correct box"])
