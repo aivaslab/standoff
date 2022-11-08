@@ -63,8 +63,7 @@ class VecNormalizeMultiAgent(VecEnvWrapper):
         self.clip_obs = clip_obs
         self.clip_reward = clip_reward
         # Returns: discounted rewards
-        self.num_agents = num_agents
-        self.returns = np.zeros(self.num_envs*self.num_agents)
+        self.returns = np.zeros(self.num_envs)
         self.gamma = gamma
         self.epsilon = epsilon
         self.training = training
@@ -142,7 +141,7 @@ class VecNormalizeMultiAgent(VecEnvWrapper):
 
         # Check only that the observation_space match
         utils.check_for_correct_spaces(venv, self.observation_space, venv.action_space)
-        self.returns = np.zeros(self.num_envs*self.num_agents)
+        self.returns = np.zeros(self.num_envs)
 
     def step_wait(self) -> VecEnvStepReturn:
         """
@@ -262,7 +261,7 @@ class VecNormalizeMultiAgent(VecEnvWrapper):
         """
         obs = self.venv.reset()
         self.old_obs = obs
-        self.returns = np.zeros(self.num_envs*self.num_agents)
+        self.returns = np.zeros(self.num_envs)
         if self.training and self.norm_obs:
             if isinstance(obs, dict) and isinstance(self.obs_rms, dict):
                 for key in self.obs_rms.keys():
