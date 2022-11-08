@@ -63,6 +63,7 @@ class VecNormalize(VecEnvWrapper):
         self.clip_obs = clip_obs
         self.clip_reward = clip_reward
         # Returns: discounted rewards
+        self.num_agents = num_agents
         self.returns = np.zeros(self.num_envs*self.num_agents)
         self.gamma = gamma
         self.epsilon = epsilon
@@ -71,7 +72,6 @@ class VecNormalize(VecEnvWrapper):
         self.norm_reward = norm_reward
         self.old_obs = np.array([])
         self.old_reward = np.array([])
-        self.num_agents = num_agents
 
     def _sanity_checks(self) -> None:
         """
