@@ -175,7 +175,7 @@ class VecNormalizeMultiAgent(VecEnvWrapper):
             if "terminal_observation" in infos[idx]:
                 infos[idx]["terminal_observation"] = self.normalize_obs(infos[idx]["terminal_observation"])
 
-            self.returns[done] = 0
+            self.returns[idx] = 0
         return obs, rewards, dones, infos
 
     def _update_reward(self, reward: np.ndarray) -> None:
