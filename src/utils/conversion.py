@@ -52,7 +52,6 @@ def make_env(envClass, player_config, configName=None, memory=1, threads=1, redu
     if reduce_color:
         env = ss.reshape_v0(env, (size, size, 1))
     env = ss.pettingzoo_env_to_vec_env_v1(env)
-    env = VecNormalize(env, norm_obs=True, norm_reward=True, clip_obs=10.)
     env = ss.concat_vec_envs_v1(env, threads, num_cpus=1, base_class='stable_baselines3')
     # num_cpus=1 changed from 2 to avoid csv issues. does it affect speed?
     env = VecTransposeImage(env)
@@ -67,6 +66,7 @@ def make_env(envClass, player_config, configName=None, memory=1, threads=1, redu
             env = VecMonitor(env, filename=os.path.join(path, f"{configName}-{rank}"), info_keywords=info_keywords)
         else:
             env = VecMonitor(env, filename=f"{configName}-{rank}", info_keywords=info_keywords)
+    env = VecNormalize(env, norm_obs=True, norm_reward=True, clip_obs=10.)
     return env
 
 def wrap_env(para_env, **kwargs):
