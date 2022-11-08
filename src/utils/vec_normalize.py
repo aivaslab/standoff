@@ -13,7 +13,7 @@ from stable_baselines3.common.vec_env.base_vec_env import VecEnv, VecEnvStepRetu
 # this is a custom implementation of SB3 VecNormalize to fix of "dones" referring to envs and not multiple agents
 
 
-class VecNormalize(VecEnvWrapper):
+class VecNormalizeMultiAgent(VecEnvWrapper):
     """
     A moving average, normalizing wrapper for vectorized environment.
     has support for saving/loading moving average,
@@ -175,7 +175,7 @@ class VecNormalize(VecEnvWrapper):
             if "terminal_observation" in infos[idx]:
                 infos[idx]["terminal_observation"] = self.normalize_obs(infos[idx]["terminal_observation"])
 
-        self.returns[dones] = 0
+            self.returns[done] = 0
         return obs, rewards, dones, infos
 
     def _update_reward(self, reward: np.ndarray) -> None:

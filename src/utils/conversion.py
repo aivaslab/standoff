@@ -6,7 +6,7 @@ from pettingzoo.utils import wrappers
 from ..agents import GridAgentInterface
 from ..pz_envs import env_from_config
 from stable_baselines3.common.vec_env import VecMonitor, VecFrameStack, VecVideoRecorder, VecTransposeImage
-from ..utils.vec_normalize import VecNormalize
+from ..utils.vec_normalize import VecNormalizeMultiAgent
 from ..pz_envs.scenario_configs import ScenarioConfigs
 import os
 
@@ -55,7 +55,7 @@ def make_env(envClass, player_config, configName=None, memory=1, threads=1, redu
     env = ss.pettingzoo_env_to_vec_env_v1(env)
     env = ss.concat_vec_envs_v1(env, threads, num_cpus=1, base_class='stable_baselines3')
     # num_cpus=1 changed from 2 to avoid csv issues. does it affect speed?
-    env = VecNormalize(env, norm_obs=True, norm_reward=True, clip_obs=10., num_agents=env_config['num_agents']+env_config['num_puppets'])
+    env = VecNormalizeMultiAgent(env, norm_obs=True, norm_reward=True, clip_obs=10., num_agents=env_config['num_agents']+env_config['num_puppets'])
     env = VecTransposeImage(env)
     if memory > 1:
         env = VecFrameStack(env, n_stack=memory, channels_order='first')
