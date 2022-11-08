@@ -468,11 +468,6 @@ class para_MultiGridEnv(ParallelEnv):
         self.loadingPickle = False
         self.allRooms = []
 
-        self._num_agents = num_agents + num_puppets #used for vecnorm
-
-    @property
-    def num_agents(self):
-        return self._num_agents
 
     @functools.lru_cache(maxsize=None)
     def action_space(self, agent):
