@@ -59,6 +59,7 @@ def plot_split(indexer, df, mypath, title, window, values="accuracy"):
     new_df.plot()
     plt.xlabel('Timestep, (window={})'.format(window))
     plt.ylabel(values)
+    plt.xlim(0, plt.xlim()[1])
     plt.title(title + " " + values[0])
     name = title + "-filtered-" + values[0]
     plt.savefig(os.path.join(mypath, name))
@@ -73,6 +74,7 @@ def plot_merged(indexer, df, mypath, title, window, values=None,
         values = ["valid", "accuracy"]
     fig = plt.figure(title)
     plt.ylim(range[0], range[1])
+    plt.xlim(0, plt.xlim()[1])
     for value, label in zip(values, labels):
         plt.plot(df[indexer], df[value], label=label)
     plt.legend(labels)
@@ -90,6 +92,7 @@ def plot_selection(indexer, df, mypath, title, window):
     plt.plot([], [], label='SelectedBig', color='green')
     plt.plot([], [], label='SelectedSmall', color='blue')
     plt.plot([], [], label='SelectedNeither', color='orange')
+    plt.xlim(0, plt.xlim()[1])
     plt.stackplot(df[indexer], df["selectedBig"], df["selectedSmall"], df["selectedNeither"],
                   colors=['green', 'blue', 'orange', ])
     plt.legend(['Big', 'Small', 'Neither'])
