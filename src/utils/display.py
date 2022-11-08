@@ -190,29 +190,31 @@ def plot_train(log_folder, configName, rank, title='Learning Curve', window=2048
         'minibatch')
     merged_df_noname = merged_df_small.groupby(['minibatch', 'eval'], as_index=False).mean().sort_values('minibatch')
 
-    # normalize r
-    merged_df["r"] = (merged_df["r"] - merged_df["r"].min()) / (merged_df["r"].max() - merged_df["r"].min())
 
-    for include_train in [True, False]:
-        title = 'train' if include_train else 'merged_evals'
-        # print(merged_df['eval'])
-        if not include_train:
-            merged_df_f = merged_df[merged_df['eval'] == True]
-            merged_df_small_f = merged_df_small[merged_df_small['eval'] == True]
-            merged_df_noname_f = merged_df_noname[merged_df_noname['eval'] == True]
-        else:
-            merged_df_f = merged_df[merged_df['eval'] == False]
-            merged_df_small_f = merged_df_small[merged_df_small['eval'] == False]
-            merged_df_noname_f = merged_df_noname[merged_df_noname['eval'] == False]
+    for use_train in [True, False]:
+        title = 'train' if use_train else 'eval'
+        for use_gtr in [True, False]:
+            if use_train and use_gtr:
+                # gtr is only used for evals
+                continue
+            title = title + ('-gtr' if use_gtr else '-rollout')
 
-        plot_merged(indexer='minibatch', df=merged_df_f, mypath=mypath, title=title, window=window,
-                    values=['valid', 'weakAccuracy', 'accuracy', 'r'],
-                    labels=['selected any box', 'selected any treat', 'selected correct treat', 'reward (normalized)'])
-        plot_split(indexer='minibatch', df=merged_df_small_f, mypath=mypath, title=title, window=window,
-                   values="accuracy")
-        plot_merged(indexer='minibatch', df=merged_df_noname_f, mypath=mypath, title=title, window=window,
-                    values=["avoidCorrect"], labels=["avoided correct box"])
-        plot_selection(indexer='minibatch', df=merged_df_noname_f, mypath=mypath, title=title, window=window)
+            merged_df_f = merged_df[merged_df['eval'] != use_train and merged_df['gtr'] == use_gtr]
+            merged_df_small_f = merged_df_small[merged_df_small['eval'] != use_train and merged_df_small['gtr'] == use_gtr]
+            merged_df_noname_f = merged_df_noname[merged_df_noname['eval'] != use_train and merged_df_noname['gtr'] == use_gtr]
+            # print(merged_df['eval'])
+
+            # normalize r after all the filtering
+            merged_df_f["r"] = (merged_df_f["r"] - merged_df_f["r"].min()) / (merged_df_f["r"].max() - merged_df_f["r"].min())
+
+            plot_merged(indexer='minibatch', df=merged_df_f, mypath=mypath, title=title, window=window,
+                        values=['valid', 'weakAccuracy', 'accuracy', 'r'],
+                        labels=['selected any box', 'selected any treat', 'selected correct treat', 'reward (normalized)'])
+            plot_split(indexer='minibatch', df=merged_df_small_f, mypath=mypath, title=title, window=window,
+                       values="accuracy")
+            plot_merged(indexer='minibatch', df=merged_df_noname_f, mypath=mypath, title=title, window=window,
+                        values=["avoidCorrect"], labels=["avoided correct box"])
+            plot_selection(indexer='minibatch', df=merged_df_noname_f, mypath=mypath, title=title, window=window)
 
 
 def make_pic_video(model, env, name, random_policy=False, video_length=50, savePath='', vidName='video.mp4',
