@@ -71,6 +71,7 @@ class VecNormalize(VecEnvWrapper):
         self.norm_reward = norm_reward
         self.old_obs = np.array([])
         self.old_reward = np.array([])
+        self.num_agents = num_agents
 
     def _sanity_checks(self) -> None:
         """
