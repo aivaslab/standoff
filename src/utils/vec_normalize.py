@@ -28,7 +28,6 @@ class VecNormalizeMultiAgent(VecEnvWrapper):
     :param epsilon: To avoid division by zero
     :param norm_obs_keys: Which keys from observation dict to normalize.
         If not specified, all keys will be normalized.
-    :param num_agents: number of agents in the environment
     """
 
     def __init__(
@@ -42,7 +41,6 @@ class VecNormalizeMultiAgent(VecEnvWrapper):
         gamma: float = 0.99,
         epsilon: float = 1e-8,
         norm_obs_keys: Optional[List[str]] = None,
-        num_agents: int = 1,
     ):
         VecEnvWrapper.__init__(self, venv)
 
