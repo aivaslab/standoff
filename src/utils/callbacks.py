@@ -199,7 +199,9 @@ def plotting_evals(self, vids=False, plots=True):
     if not self.gtr:
         plot_evals(self.savePath, self.name, self.names, self.eval_cbs)
     else:
-        self.eval_df = pd.concat([self.eval_df, ground_truth_evals(self.envs, self.model, memory=self.memory)], ignore_index=True)
+        temp = pd.concat([self.eval_df, ground_truth_evals(self.envs, self.model, memory=self.memory)], ignore_index=True)
+        self.eval_df.drop(self.eval_df.index, inplace=True)
+        self.eval_df = self.eval_df.append(temp, ignore_index=True)
         if plots:
             plot_evals_df(self.eval_df, self.savePath, self.name)
 
