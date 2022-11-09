@@ -200,8 +200,8 @@ def plotting_evals(self, vids=False, plots=True):
         plot_evals(self.savePath, self.name, self.names, self.eval_cbs)
     else:
         temp = pd.concat([self.eval_df, ground_truth_evals(self.envs, self.model, memory=self.memory)], ignore_index=True)
-        self.eval_df.drop(self.eval_df.index, inplace=True)
-        self.eval_df[self.eval_df.columns] = temp
+        self.eval_df.drop(self.eval_df.index[0:], inplace=True)
+        self.eval_df[temp.columns] = temp
 
         if plots:
             plot_evals_df(self.eval_df, self.savePath, self.name)
