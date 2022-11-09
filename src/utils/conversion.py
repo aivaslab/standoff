@@ -56,7 +56,7 @@ def make_env(envClass, player_config, configName=None, memory=1, threads=1, redu
     env = ss.concat_vec_envs_v1(env, threads, num_cpus=1, base_class='stable_baselines3')
     # num_cpus=1 changed from 2 to avoid csv issues. does it affect speed?
     if rank == 0:
-        env = VecNormalizeMultiAgent(env, norm_obs=True, norm_reward=True, clip_obs=10.)
+        env = VecNormalizeMultiAgent(env, norm_obs=True, norm_reward=False, clip_obs=10.)
     env = VecTransposeImage(env)
     if memory > 1:
         env = VecFrameStack(env, n_stack=memory, channels_order='first')
