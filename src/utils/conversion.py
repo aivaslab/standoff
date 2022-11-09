@@ -55,8 +55,6 @@ def make_env(envClass, player_config, configName=None, memory=1, threads=1, redu
     env = ss.pettingzoo_env_to_vec_env_v1(env)
     env = ss.concat_vec_envs_v1(env, threads, num_cpus=1, base_class='stable_baselines3')
     # num_cpus=1 changed from 2 to avoid csv issues. does it affect speed?
-    if rank == 0 and False:
-        env = VecNormalizeMultiAgent(env, norm_obs=True, norm_reward=False, clip_obs=10.)
     env = VecTransposeImage(env)
     if memory > 1:
         env = VecFrameStack(env, n_stack=memory, channels_order='first')
@@ -69,6 +67,9 @@ def make_env(envClass, player_config, configName=None, memory=1, threads=1, redu
             env = VecMonitor(env, filename=os.path.join(path, f"{configName}-{rank}"), info_keywords=info_keywords)
         else:
             env = VecMonitor(env, filename=f"{configName}-{rank}", info_keywords=info_keywords)
+    if rank == 0 and False:
+        # must be after VecMonitor for monitor to show unnormed rewards
+        env = VecNormalizeMultiAgent(env, norm_obs=True, norm_reward=True, clip_obs=10.)
     return env
 
 def wrap_env(para_env, **kwargs):
