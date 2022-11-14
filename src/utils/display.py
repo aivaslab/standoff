@@ -74,9 +74,9 @@ def plot_merged(indexer, df, mypath, title, window, values=None,
         values = ["valid", "accuracy"]
     fig = plt.figure(title)
     plt.ylim(range[0], range[1])
-    plt.xlim(0, plt.xlim()[1])
     for value, label in zip(values, labels):
         plt.plot(df[indexer], df[value], label=label)
+    plt.xlim(0, plt.xlim()[1])
     plt.legend(labels)
     plt.xlabel('Timestep, (window={})'.format(window))
     plt.ylabel('Percent')
@@ -92,9 +92,9 @@ def plot_selection(indexer, df, mypath, title, window):
     plt.plot([], [], label='SelectedBig', color='green')
     plt.plot([], [], label='SelectedSmall', color='blue')
     plt.plot([], [], label='SelectedNeither', color='orange')
-    plt.xlim(0, plt.xlim()[1])
     plt.stackplot(df[indexer], df["selectedBig"], df["selectedSmall"], df["selectedNeither"],
                   colors=['green', 'blue', 'orange', ])
+    plt.xlim(0, plt.xlim()[1])
     plt.legend(['Big', 'Small', 'Neither'])
     plt.title(title + "-" + str('Reward Type'))
     plt.savefig(os.path.join(mypath, title + "-" + 'reward-type'))
