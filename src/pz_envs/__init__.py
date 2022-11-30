@@ -9,10 +9,9 @@ from .standoff import *
 from .doorkey import *
 from .empty import *
 
-
 from ..agents import GridAgentInterface
 from gym.envs.registration import register as gym_register
-
+from src.pz_envs.scenario_configs import ScenarioConfigs
 
 import sys
 import inspect
@@ -22,68 +21,89 @@ this_module = sys.modules[__name__]
 registered_envs = []
 
 
-def register_marl_env(
-    env_name,
-    env_class,
-    n_agents,
-    grid_size,
-    view_size,
-    view_tile_size=8,
-    view_offset=0,
-    agent_color=None,
-    env_kwargs={},
+def register_standoff_env(
+        env_name,
+        env_class,
+        config_name,
+        env_difficulty,
+        reward_decay=True
 ):
-    colors = ["red", "blue", "purple", "orange", "olive", "pink"]
-    assert n_agents <= len(colors)
+    configs = ScenarioConfigs().standoff
+
+    env_config = {
+        "env_class": env_class,
+        "max_steps": 50,
+        "respawn": True,
+        "reward_decay": reward_decay,
+        "width": 19,
+        "height": 19,
+        "step_reward": -0.1,
+        "configName": config_name,
+    }
+
+    reset_configs = {**configs["defaults"], **configs[config_name]}
+
+    if isinstance(reset_configs["num_agents"], list):
+        reset_configs["num_agents"] = reset_configs["num_agents"][0]
+    if isinstance(reset_configs["num_puppets"], list):
+        reset_configs["num_puppets"] = reset_configs["num_puppets"][0]
+
+    env_config['configName'] = config_name
+    env_config['agents'] = [GridAgentInterface() for _ in range(reset_configs['num_agents'])]
+    env_config['puppets'] = [GridAgentInterface() for _ in range(reset_configs['num_puppets'])]
+    env_config['num_agents'] = reset_configs['num_agents']
+    env_config['num_puppets'] = reset_configs['num_puppets']
 
     class RegEnv(env_class):
         def __new__(cls):
             instance = super(env_class, RegEnv).__new__(env_class)
-            instance.__init__(
-                agents=[
-                    GridAgentInterface(
-                        color=c if agent_color is None else agent_color,
-                        view_size=view_size,
-                        view_tile_size=8,
-                        view_offset=view_offset,
-                        )
-                    for c in colors[:n_agents]
-                ],
-                grid_size=grid_size,
-                **env_kwargs,
-            )
+            if difficulty == 0:
+                instance.__init__(env_config)
             return instance
 
     env_class_name = f"env_{len(registered_envs)}"
     setattr(this_module, env_class_name, RegEnv)
     registered_envs.append(env_name)
-    gym_register(env_name, entry_point=f"marlgrid.envs:{env_class_name}")
+    gym_register(env_name, entry_point=f"standoff.pz_envs:{env_class_name}")
 
 
 def env_from_config(env_config, randomize_seed=True):
-    possible_envs = {k:v for k,v in globals().items() if inspect.isclass(v) and issubclass(v, para_MultiGridEnv)}
-    
+    possible_envs = {k: v for k, v in globals().items() if inspect.isclass(v) and issubclass(v, para_MultiGridEnv)}
+
     env_class = possible_envs[env_config['env_class']]
-    
-    env_kwargs = {k:v for k,v in env_config.items() if k != 'env_class'}
+
+    env_kwargs = {k: v for k, v in env_config.items() if k != 'env_class'}
     if randomize_seed:
-        env_kwargs['seed'] = env_kwargs.get('seed', 0) + random.randint(0, 1337*1337)
-    
+        env_kwargs['seed'] = env_kwargs.get('seed', 0) + random.randint(0, 1337 * 1337)
+
     return env_class(**env_kwargs)
 
-register_marl_env(
-    "MarlGrid-1AgentDoorKeyEnv7x7-v0",
-    para_DoorKeyEnv,
-    grid_size=7,
-    view_size=7,
-    n_agents=1,
-)
 
-
-register_marl_env(
-    "MarlGrid-1AgentTutorialEnv9x9-v0",
-    para_TutorialEnv,
-    grid_size=9,
-    view_size=7,
-    n_agents=1,
-)
+for difficulty in range(3):
+    register_standoff_env(
+        "Standoff-S1-{0}-v0".format(difficulty),
+        StandoffEnv,
+        "tutorial_step_1",
+        difficulty,
+    )
+    register_standoff_env(
+        "Standoff-S2-{0}-v0".format(difficulty),
+        StandoffEnv,
+        "tutorial_step_2",
+        difficulty,
+    )
+    for config in ["informed control",
+                   "partially uninformed",
+                   "removed informed",
+                   "removed uninformed",
+                   "moved",
+                   "replaced",
+                   "misinformed",
+                   "swapped"
+                   ]:
+        register_standoff_env(
+            "Standoff-S3-{0}-{1}-v0".format(config, difficulty),
+            StandoffEnv,
+            config,
+            difficulty,
+        )
