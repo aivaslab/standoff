@@ -25,8 +25,6 @@ class StandoffEnv(para_MultiGridEnv):
             width=11,
             height=11,
             max_steps=100,
-            memory=1,
-            colorMemory=False,
             reward_decay=False,
             seed=1337,
             respawn=False,
@@ -34,11 +32,9 @@ class StandoffEnv(para_MultiGridEnv):
             step_reward=0,
             done_reward=-10,
             agent_spawn_kwargs=None,
-            num_puppets=1,
-            num_agents=1,
-            configName="error"
+            config_name="error"
     ):
-        super().__init__(agents, puppets, grid_size, width, height, max_steps, memory, colorMemory, reward_decay, seed,
+        super().__init__(agents, puppets, grid_size, width, height, max_steps, reward_decay, seed,
                          respawn, ghost_mode, step_reward, done_reward, agent_spawn_kwargs)
         self.new_target = None
         if agent_spawn_kwargs is None:
@@ -49,11 +45,13 @@ class StandoffEnv(para_MultiGridEnv):
         if puppets is None:
             puppets = []
         self.params = None
-        self.configName = configName
+        self.configName = config_name
         self.minibatch = 0
         self.deterministic = False #used for generating deterministic baiting events for ground-truth evaluation
         self.deterministic_seed = 0 #cycles baiting locations, changes by one each time it is used
         self.cached_paths = {}
+
+        self.persistent_treat_images = True
 
     def hard_reset(self, params=None):
         """
@@ -102,23 +100,18 @@ class StandoffEnv(para_MultiGridEnv):
                   dom_valence=1,
                   num_puppets=1,
                   subject_is_dominant=False,
-                  lavaHeight=2,
-                  swapType='swap',
-                  visibility='curtains',
+                  lava_height=2,
+                  subject_visible_decs=False,
+                  opponent_visible_decs=False,
                   events=[],
                   hidden=False,
-                  sharedRewards=False,
+                  share_rewards=False,
                   boxes=5,
-                  num_agents=2,
-                  special_box_coloring=False,
                   ):
 
         startRoom = 2
         atrium = 2
         self.boxes = boxes
-
-        if swapType == "replace" and boxes <= 2:
-            swapType = "swap"
 
         self.hidden = hidden
         self.subject_is_dominant = subject_is_dominant
@@ -130,12 +123,11 @@ class StandoffEnv(para_MultiGridEnv):
             #rotate food locs list by deterministic seed
             self.food_locs = self.food_locs[self.deterministic_seed % len(self.food_locs):] + self.food_locs[:self.deterministic_seed % len(self.food_locs)]
         self.released_tiles = [[] for _ in range(4)]
-        releaseGap = boxes * 2 + atrium - 1
+        release_gap = boxes * 2 + atrium - 1
         self.width = boxes * 2 + 3
-        self.height = lavaHeight + startRoom * 2 + atrium * 2 + 2
+        self.height = lava_height + startRoom * 2 + atrium * 2 + 2
         self.grid = MultiGrid((self.width, self.height))
         self.grid.wall_rect(1, 1, self.width - 2, self.height - 2)
-        self.special_box_coloring = special_box_coloring
         self.small_food_locations = []
         self.big_food_locations = []
 
@@ -165,9 +157,10 @@ class StandoffEnv(para_MultiGridEnv):
             self.put_obj(Wall(), j, self.height - startRoom - 1)
 
         for j in range(2, self.width - 2):
-            if visibility == "curtains":
+            if subject_visible_decs:
                 for i in range(startRoom + 1, startRoom + atrium):
                     self.put_obj(Curtain(color='red'), j, i)
+            if opponent_visible_decs:
                 for i in range(self.height - startRoom - atrium - 1 + 1, self.height - startRoom - 1):
                     self.put_obj(Curtain(color='red'), j, i)
 
@@ -189,7 +182,7 @@ class StandoffEnv(para_MultiGridEnv):
                 self.released_tiles[2] += [(box * 2 + 2, startRoom + atrium)]
                 self.released_tiles[3] += [(box * 2 + 2, self.height - startRoom - atrium - 1)]
 
-            for j in range(lavaHeight):
+            for j in range(lava_height):
                 x = box * 2 + 1
                 y = j + startRoom + atrium + 1
                 self.put_obj(GlassBlock(color="cyan", init_state=1), x, y)
@@ -228,15 +221,15 @@ class StandoffEnv(para_MultiGridEnv):
             self.add_timer(event, curTime, arg=event_args[k])
             curTime += 1
         if subject_is_dominant:
-            subRelease = 1
-            domRelease = 0
+            sub_release = 1
+            dom_release = 0
         else:
-            subRelease = 0
-            domRelease = 1
-        self.add_timer(["release"], curTime + domRelease, arg=0)
-        self.add_timer(["release"], curTime + subRelease, arg=1)
-        self.add_timer(["release"], curTime + releaseGap + domRelease, arg=2)
-        self.add_timer(["release"], curTime + releaseGap + subRelease, arg=3)
+            sub_release = 0
+            dom_release = 1
+        self.add_timer(["release"], curTime + dom_release, arg=0)
+        self.add_timer(["release"], curTime + sub_release, arg=1)
+        self.add_timer(["release"], curTime + release_gap + dom_release, arg=2)
+        self.add_timer(["release"], curTime + release_gap + sub_release, arg=3)
 
     def append_food_locs(self, obj, loc):
         if hasattr(obj, "reward") and obj.reward == 100:
@@ -266,7 +259,7 @@ class StandoffEnv(para_MultiGridEnv):
             for obj in self.objs_to_hide:
                 pos = obj.pos
                 self.put_obj(
-                    Box(color="green" if self.special_box_coloring else "orange", contains=obj, reward=obj.reward),
+                    Box("orange", contains=obj, reward=obj.reward, show_contains=self.persistent_treat_images),
                     pos[0], pos[1])
         if name == 'init':
             for box in range(self.boxes):
@@ -332,7 +325,6 @@ class StandoffEnv(para_MultiGridEnv):
                             self.last_seen_reward[agent + str(box)] = 0
 
             self.new_target = False
-            target_agent = None
             for box in range(self.boxes):
                 for agent in self.puppets:
                     reward = self.last_seen_reward[agent + str(box)]

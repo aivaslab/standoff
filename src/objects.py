@@ -593,10 +593,11 @@ class Door(WorldObj):
 
 
 class Box(WorldObj):
-    def __init__(self, color=0, state=0, reward=0, contains=None):
+    def __init__(self, color=0, state=0, reward=0, contains=None, show_contains=False):
         super().__init__(color, state)
         self.contains = contains
         self.reward = reward
+        self.show_contains = show_contains
         if self.contains is not None:
             self.get_reward = self.contains.get_reward
             self.can_overlap = self.contains.can_overlap
@@ -643,3 +644,6 @@ class Box(WorldObj):
 
         # Horizontal slit
         fill_coords(img, point_in_rect(0.16, 0.84, 0.47, 0.53), c)
+
+        if self.contains and self.show_contains:
+            self.contains.render(img)
