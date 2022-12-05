@@ -58,7 +58,7 @@ class ScenarioConfigs:
             "sub_valence": 1,
             "dom_valence": 1,
             "subject_is_dominant": False,  # subordinate has delayed release. for subordinate first, use negative
-            "lavaHeight": 3,  # should be odd, >=2
+            "lava_height": 3,  # should be odd, >=2
             "num_puppets": 1,
             "num_agents": 1,
             "events": [[['bait', 'empty'], ['bait', 'empty']]] #list, event, args
@@ -129,7 +129,7 @@ class AllParams():
         "boxes": [2, 3, 4, 5],
         "num_puppets": [0, 1, 2],
         "followDistance": [0, 1],  # 0 = d first, 1=sub first
-        "lavaHeight": [2],
+        "lava_height": [2],
         "baits": [1, 2],
         "baitSize": [1, 2],
         "informed": ['informed', 'uninformed', 'fake', 'half1', 'half2'],
