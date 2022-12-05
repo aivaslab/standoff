@@ -61,7 +61,7 @@ def register_standoff_env(
                         opponent_visible_decs=(difficulty<1),
                         persistent_treat_images=(difficulty<2),
                         subject_visible_decs=(difficulty<3),
-                        gaze=False
+                        gaze=False,
                         **env_config)
             return env
 
