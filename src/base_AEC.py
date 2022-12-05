@@ -385,7 +385,7 @@ class para_MultiGridEnv(ParallelEnv):
             agent_spawn_kwargs=None,
             num_agents=1,
             num_puppets=0,
-            configName='null'
+            config_name='null'
     ):
         """
         The init method takes in environment arguments and
@@ -410,9 +410,7 @@ class para_MultiGridEnv(ParallelEnv):
 
         self.respawn = respawn
 
-        self.memory = memory
-        self.colorMemory = colorMemory
-        self.configName = configName
+        self.config_name = config_name
 
         self.window = None
 
@@ -566,8 +564,8 @@ class para_MultiGridEnv(ParallelEnv):
         self.env_done = False
 
         if hasattr(self, "hard_reset"):
-            #print(self.configName)
-            self.hard_reset(self.configs[self.configName])
+            #print(self.config_name)
+            self.hard_reset(self.configs[self.config_name])
         else:
             print("No hard reset function found")
 
