@@ -56,14 +56,13 @@ def register_standoff_env(
 
     class RegEnv(env_class):
         def __new__(cls):
-            instance = super(env_class, RegEnv).__new__(env_class)
-            instance.__init__(env_config,
-                              config_name=config_name,
-                              opponent_visible_decs=(difficulty<1),
-                              persistent_treat_images=(difficulty<2),
-                              subject_visible_decs=(difficulty<3),
-                              gaze=False)
-            return instance
+            env = super(env_class, RegEnv).__new__(env_class)
+            env.__init__(
+                        opponent_visible_decs=(difficulty<1),
+                        persistent_treat_images=(difficulty<2),
+                        subject_visible_decs=(difficulty<3),
+                        gaze=False
+                        **env_config)
 
     env_class_name = f"env_{len(registered_envs)}"
     setattr(this_module, env_class_name, RegEnv)
