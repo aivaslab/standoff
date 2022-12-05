@@ -102,7 +102,7 @@ for difficulty in range(3):
                    "swapped"
                    ]:
         register_standoff_env(
-            "Standoff-S3-{0}-{1}-v0".format(config, difficulty),
+            "Standoff-S3-{0}-{1}-v0".format(config.replace(" ", ""), difficulty),
             StandoffEnv,
             config,
             difficulty,
