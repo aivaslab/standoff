@@ -53,7 +53,7 @@ class ScenarioConfigs:
     standoff = {
         "defaults": {
             "hidden": True,
-            "sharedRewards": False,
+            "shared_rewards": False,
             "boxes": 5,
             "sub_valence": 1,
             "dom_valence": 1,
@@ -124,7 +124,7 @@ class AllParams():
         "adversarial": [True, False],
         "hidden": [True, False],
         "rational": [True, False],
-        "sharedRewards": [True, False],
+        "shared_rewards": [True, False],
         "firstBig": [True, False],  # whether we place big first
         "boxes": [2, 3, 4, 5],
         "num_puppets": [0, 1, 2],
