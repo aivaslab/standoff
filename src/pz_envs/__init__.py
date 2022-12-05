@@ -37,7 +37,7 @@ def register_standoff_env(
         "width": 19,
         "height": 19,
         "step_reward": -0.1,
-        "configName": config_name,
+        "config_name": config_name,
     }
 
     reset_configs = {**configs["defaults"], **configs[config_name]}
@@ -47,11 +47,11 @@ def register_standoff_env(
     if isinstance(reset_configs["num_puppets"], list):
         reset_configs["num_puppets"] = reset_configs["num_puppets"][0]
 
-    env_config['configName'] = config_name
+    env_config['config_name'] = config_name
     env_config['agents'] = [GridAgentInterface() for _ in range(reset_configs['num_agents'])]
     env_config['puppets'] = [GridAgentInterface() for _ in range(reset_configs['num_puppets'])]
-    env_config['num_agents'] = reset_configs['num_agents']
-    env_config['num_puppets'] = reset_configs['num_puppets']
+    #env_config['num_agents'] = reset_configs['num_agents']
+    #env_config['num_puppets'] = reset_configs['num_puppets']
 
     class RegEnv(env_class):
         def __new__(cls):
