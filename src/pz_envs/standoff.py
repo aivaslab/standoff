@@ -37,9 +37,26 @@ class StandoffEnv(para_MultiGridEnv):
             persistent_treat_images=False,
             gaze=False
     ):
-        super().__init__(agents, puppets, grid_size, width, height, max_steps, reward_decay, seed,
-                         respawn, ghost_mode, step_reward, done_reward, agent_spawn_kwargs, config_name,
-                         subject_visible_decs, opponent_visible_decs, persistent_treat_images, gaze)
+        super().__init__(agents,
+                         puppets,
+                         grid_size,
+                         width,
+                         height,
+                         max_steps,
+                         reward_decay,
+                         seed,
+                         respawn,
+                         ghost_mode,
+                         step_reward,
+                         done_reward,
+                         agent_spawn_kwargs,
+                         num_agents=len(agents),
+                         num_puppets=len(puppets),
+                         config_name=config_name,
+                         subject_visible_decs=subject_visible_decs,
+                         opponent_visible_decs=opponent_visible_decs,
+                         persistent_treat_images=persistent_treat_images,
+                         gaze=gaze)
         self.new_target = None
         if agent_spawn_kwargs is None:
             agent_spawn_kwargs = {'top': (0, 0), 'size': (2, self.width)}
