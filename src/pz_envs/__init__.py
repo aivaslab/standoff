@@ -63,6 +63,7 @@ def register_standoff_env(
                         subject_visible_decs=(difficulty<3),
                         gaze=False
                         **env_config)
+            return env
 
     env_class_name = f"env_{len(registered_envs)}"
     setattr(this_module, env_class_name, RegEnv)
