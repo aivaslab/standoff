@@ -7,7 +7,6 @@ from ..puppets import pathfind
 import copy
 from ..pz_envs.scenario_configs import ScenarioConfigs
 
-
 class StandoffEnv(para_MultiGridEnv):
     mission = "get the best food before your opponent"
     metadata = {'render_modes': ['human', 'rgb_array'], "name": "standoffEnv"}
@@ -32,7 +31,11 @@ class StandoffEnv(para_MultiGridEnv):
             step_reward=0,
             done_reward=-10,
             agent_spawn_kwargs=None,
-            config_name="error"
+            config_name="error",
+            subject_visible_decs=False,
+            opponent_visible_decs=False,
+            persistent_treat_images=False,
+            gaze=False
     ):
         super().__init__(agents, puppets, grid_size, width, height, max_steps, reward_decay, seed,
                          respawn, ghost_mode, step_reward, done_reward, agent_spawn_kwargs)
@@ -51,7 +54,11 @@ class StandoffEnv(para_MultiGridEnv):
         self.deterministic_seed = 0 #cycles baiting locations, changes by one each time it is used
         self.cached_paths = {}
 
-        self.persistent_treat_images = True
+        # difficulty settings
+        self.subject_visible_decs = subject_visible_decs
+        self.opponent_visible_decs = opponent_visible_decs
+        self.persistent_treat_images = persistent_treat_images
+        self.gaze = gaze
 
     def hard_reset(self, params=None):
         """
@@ -101,8 +108,6 @@ class StandoffEnv(para_MultiGridEnv):
                   num_puppets=1,
                   subject_is_dominant=False,
                   lava_height=2,
-                  subject_visible_decs=False,
-                  opponent_visible_decs=False,
                   events=[],
                   hidden=False,
                   share_rewards=False,
@@ -157,10 +162,10 @@ class StandoffEnv(para_MultiGridEnv):
             self.put_obj(Wall(), j, self.height - startRoom - 1)
 
         for j in range(2, self.width - 2):
-            if subject_visible_decs:
+            if self.subject_visible_decs:
                 for i in range(startRoom + 1, startRoom + atrium):
                     self.put_obj(Curtain(color='red'), j, i)
-            if opponent_visible_decs:
+            if self.opponent_visible_decs:
                 for i in range(self.height - startRoom - atrium - 1 + 1, self.height - startRoom - 1):
                     self.put_obj(Curtain(color='red'), j, i)
 
