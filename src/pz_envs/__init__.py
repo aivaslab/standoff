@@ -31,7 +31,6 @@ def register_standoff_env(
     configs = ScenarioConfigs().standoff
 
     env_config = {
-        "env_class": env_class,
         "max_steps": 50,
         "respawn": True,
         "reward_decay": reward_decay,
