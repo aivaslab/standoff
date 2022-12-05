@@ -586,7 +586,9 @@ class para_MultiGridEnv(ParallelEnv):
         if self.loadingPickle:
             self.grid = random.choice(self.allRooms)
         else:
-            self._gen_grid(**self.params)
+            valid_params = ['sub_valence, dom_valence, num_puppets, subject_is_dominant, lava_height, events, hidden, boxes']
+            params2 = {x: self.params[x] for x in valid_params}
+            self._gen_grid(**params2)
             '''flag = 0
             while flag < 100:
                 try:
