@@ -11,7 +11,7 @@ from .empty import *
 
 from ..agents import GridAgentInterface
 from gym.envs.registration import register as gym_register
-from src.pz_envs.scenario_configs import ScenarioConfigs
+from .scenario_configs import ScenarioConfigs
 
 import sys
 import inspect
