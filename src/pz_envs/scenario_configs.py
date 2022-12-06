@@ -61,7 +61,7 @@ class ScenarioConfigs:
             "lava_height": 3,  # should be odd, >=2
             "num_puppets": 1,
             "num_agents": 1,
-            "events": [[['bait', 'empty'], ['bait', 'empty']]] #list, event, args
+            "events": [[['bait', 'empty'], ['bait', 'empty']]]  # list, event, args
         },
 
         "tutorial_step_1": {
@@ -105,7 +105,7 @@ class ScenarioConfigs:
         },
         "moved": {
             "events": [[['obscure'], ['bait', 'empty'], ['bait', 'empty'], ['reveal'], ['swap', 1, 'empty'],
-                       ['swap', 2, 'empty']]]
+                        ['swap', 2, 'empty']]]
         },
         "replaced": {
             "events": [[['bait', 'empty'], ['obscure'], ['swap', 0, 'empty'], ['bait', 0]]]
@@ -115,6 +115,21 @@ class ScenarioConfigs:
         },
         "swapped": {
             "events": [[['bait', 'empty'], ['bait', 'empty'], ['obscure'], ['swap', 0, 1]]]
+        },
+        "all": {
+            "events": [[['bait', 'empty'], ['bait', 'empty']],
+                       [['bait', 'empty'], ['obscure'], ['bait', 'empty']],
+                       [['obscure'], ['bait', 'empty'], ['reveal'], ['bait', 'empty']],
+                       [['bait', 'empty'], ['bait', 'empty'], ['remove', 0]],
+                       [['bait', 'empty'], ['bait', 'empty'], ['remove', 1]],
+                       [['bait', 'empty'], ['bait', 'empty'], ['obscure'], ['remove', 0]],
+                       [['bait', 'empty'], ['bait', 'empty'], ['obscure'], ['remove', 1]],
+                       [['obscure'], ['bait', 'empty'], ['bait', 'empty'], ['reveal'], ['swap', 1, 'empty'],
+                        ['swap', 2, 'empty']],
+                       [['bait', 'empty'], ['obscure'], ['swap', 0, 'empty'], ['bait', 0]],
+                       [['bait', 'empty'], ['bait', 'empty'], ['obscure'], ['swap', 0, 'else']],
+                       [['bait', 'empty'], ['bait', 'empty'], ['obscure'], ['swap', 1, 'else']],
+                       [['bait', 'empty'], ['bait', 'empty'], ['obscure'], ['swap', 0, 1]]]
         }
     }
 

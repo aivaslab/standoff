@@ -50,18 +50,19 @@ def register_standoff_env(
     env_config['config_name'] = config_name
     env_config['agents'] = [GridAgentInterface() for _ in range(reset_configs['num_agents'])]
     env_config['puppets'] = [GridAgentInterface() for _ in range(reset_configs['num_puppets'])]
-    #env_config['num_agents'] = reset_configs['num_agents']
-    #env_config['num_puppets'] = reset_configs['num_puppets']
+
+    # env_config['num_agents'] = reset_configs['num_agents']
+    # env_config['num_puppets'] = reset_configs['num_puppets']
 
     class RegEnv(env_class):
         def __new__(cls):
             env = super(env_class, RegEnv).__new__(env_class)
             env.__init__(
-                        opponent_visible_decs=(difficulty<1),
-                        persistent_treat_images=(difficulty<2),
-                        subject_visible_decs=(difficulty<3),
-                        gaze=False,
-                        **env_config)
+                opponent_visible_decs=(difficulty < 1),
+                persistent_treat_images=(difficulty < 2),
+                subject_visible_decs=(difficulty < 3),
+                gaze=False,
+                **env_config)
             return env
 
     env_class_name = f"env_{len(registered_envs)}"
@@ -102,7 +103,8 @@ for difficulty in range(3):
                    "moved",
                    "replaced",
                    "misinformed",
-                   "swapped"
+                   "swapped",
+                   "all"
                    ]:
         register_standoff_env(
             "Standoff-S3-{0}-{1}-v0".format(config.replace(" ", ""), difficulty),
