@@ -40,6 +40,17 @@ def register_standoff_env(
         "config_name": config_name,
     }
 
+    player_config = {
+        "view_size": 17,
+        "view_offset": 4,
+        "view_tile_size": 3,
+        "observation_style": "image",
+        "see_through_walls": False,
+        "color": "prestige",
+        "view_type": 0,
+        "move_type": 0
+    }
+
     reset_configs = {**configs["defaults"], **configs[config_name]}
 
     if isinstance(reset_configs["num_agents"], list):
@@ -48,8 +59,8 @@ def register_standoff_env(
         reset_configs["num_puppets"] = reset_configs["num_puppets"][0]
 
     env_config['config_name'] = config_name
-    env_config['agents'] = [GridAgentInterface() for _ in range(reset_configs['num_agents'])]
-    env_config['puppets'] = [GridAgentInterface() for _ in range(reset_configs['num_puppets'])]
+    env_config['agents'] = [GridAgentInterface(**player_config) for _ in range(reset_configs['num_agents'])]
+    env_config['puppets'] = [GridAgentInterface(**player_config) for _ in range(reset_configs['num_puppets'])]
 
     # env_config['num_agents'] = reset_configs['num_agents']
     # env_config['num_puppets'] = reset_configs['num_puppets']
