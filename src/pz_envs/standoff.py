@@ -35,7 +35,8 @@ class StandoffEnv(para_MultiGridEnv):
             subject_visible_decs=False,
             opponent_visible_decs=False,
             persistent_treat_images=False,
-            gaze=False
+            gaze_highlighting=False,
+            persistent_gaze_highlighting=False,
     ):
         super().__init__(agents,
                          puppets,
@@ -56,7 +57,8 @@ class StandoffEnv(para_MultiGridEnv):
                          subject_visible_decs=subject_visible_decs,
                          opponent_visible_decs=opponent_visible_decs,
                          persistent_treat_images=persistent_treat_images,
-                         gaze=gaze)
+                         gaze_highlighting=gaze_highlighting,
+                         persistent_gaze_highlighting=persistent_gaze_highlighting,)
         self.new_target = None
         if agent_spawn_kwargs is None:
             agent_spawn_kwargs = {'top': (0, 0), 'size': (2, self.width)}
@@ -76,7 +78,9 @@ class StandoffEnv(para_MultiGridEnv):
         self.subject_visible_decs = subject_visible_decs
         self.opponent_visible_decs = opponent_visible_decs
         self.persistent_treat_images = persistent_treat_images
-        self.gaze = gaze
+        self.gaze_highlighting = gaze_highlighting
+        self.persistent_gaze_highlighting = persistent_gaze_highlighting
+
 
     def hard_reset(self, params=None):
         """
