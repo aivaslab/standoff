@@ -12,7 +12,7 @@ import os
 
 def make_env(envClass, player_config, configName=None, memory=1, threads=1, reduce_color=False, size=64,
             reward_decay=False, ghost_mode=True, max_steps=50, saveVids=False, path="", recordEvery=1e4, vecMonitor=True,
-            rank=0):
+            rank=0, vecNormalize=False):
 
     env_config =  {
         "env_class": envClass,
@@ -67,7 +67,7 @@ def make_env(envClass, player_config, configName=None, memory=1, threads=1, redu
             env = VecMonitor(env, filename=os.path.join(path, f"{configName}-{rank}"), info_keywords=info_keywords)
         else:
             env = VecMonitor(env, filename=f"{configName}-{rank}", info_keywords=info_keywords)
-    if rank == 0 and False:
+    if rank == 0 and vecNormalize:
         # must be after VecMonitor for monitor to show unnormed rewards
         env = VecNormalizeMultiAgent(env, norm_obs=True, norm_reward=True, clip_obs=10.)
     return env
