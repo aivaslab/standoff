@@ -81,6 +81,8 @@ class StandoffEnv(para_MultiGridEnv):
         self.gaze_highlighting = gaze_highlighting
         self.persistent_gaze_highlighting = persistent_gaze_highlighting
 
+        self.fill_spawn_holes = False
+
 
     def hard_reset(self, params=None):
         """
@@ -163,6 +165,8 @@ class StandoffEnv(para_MultiGridEnv):
         self.agent_spawn_pos = {}
         self.agent_door_pos = {}
 
+        all_door_poses = []
+
         self.smallReward = int(100/(self.boxes-2))
         for k, agent in enumerate(self.agents_and_puppets()):
             h = 1 if agent == "player_0" else self.height - 2
@@ -171,6 +175,7 @@ class StandoffEnv(para_MultiGridEnv):
             xx = 2 * bb + 2
             self.agent_spawn_pos[agent] = (xx, h, d)
             self.agent_door_pos[agent] = (xx, h + (1 if agent == "player_0" else -1))
+            all_door_poses.append(self.agent_door_pos[agent])
             a = self.instance_from_name[agent]
             a.valence = sub_valence if agent == "player_0" else dom_valence
             if k > num_puppets:
@@ -196,12 +201,22 @@ class StandoffEnv(para_MultiGridEnv):
         for box in range(boxes + 1):
             if box < boxes:
                 self.put_obj(Wall(), box * 2 + 1, startRoom - 1)
-                self.put_obj(Block(init_state=0, color="blue"), box * 2 + 2, startRoom)
-                self.put_obj(Block(init_state=0, color="blue"), box * 2 + 2, self.height - startRoom - 1)
+
+                # initial door release, only where door is not in all_door_poses
+                if [box * 2 + 2, startRoom] in all_door_poses:
+                    self.put_obj(Block(init_state=0, color="blue"), box * 2 + 2, startRoom)
+                else:
+                    self.put_obj(Wall(), box * 2 + 2, startRoom)
+
+                if [box * 2 + 2, self.height - startRoom - 1] in all_door_poses:
+                    self.put_obj(Block(init_state=0, color="blue"), box * 2 + 2, self.height - startRoom - 1)
+                else:
+                    self.put_obj(Wall(), box * 2 + 2, self.height - startRoom - 1)
 
                 self.released_tiles[0] += [(box * 2 + 2, startRoom)]
                 self.released_tiles[1] += [(box * 2 + 2, self.height - startRoom - 1)]
 
+                # secondary door release
                 self.put_obj(Wall(), box * 2 + 1, self.height - 2)
                 self.put_obj(Block(init_state=0, color="blue"), box * 2 + 2, startRoom + atrium)
                 self.put_obj(Block(init_state=0, color="blue"), box * 2 + 2, self.height - startRoom - atrium - 1)

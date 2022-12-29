@@ -449,11 +449,15 @@ class Block(WorldObj):
 
     def render(self, img):
         c = COLORS[self.color]
+
+
         if self.state == 1:
-            fill_coords(img, point_in_rect(0.1, 0.9, 0.1, 0.9), c)
+            # opaque, uses wall color
+            fill_coords(img, point_in_rect(0.1, 0.9, 0.1, 0.9), COLORS["worst"])
             fill_coords(img, point_in_line(0.15, 0.15, 0.85, 0.85, r=0.04), (0, 0, 0))
             fill_coords(img, point_in_line(0.85, 0.15, 0.15, 0.85, r=0.04), (0, 0, 0))
         else:
+            # transparent, uses assigned color
             fill_coords(img, point_in_line(0.15, 0.15, 0.85, 0.85, r=0.04), c)
             fill_coords(img, point_in_line(0.85, 0.15, 0.15, 0.85, r=0.04), c)
 
