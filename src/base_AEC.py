@@ -966,6 +966,8 @@ class para_MultiGridEnv(ParallelEnv):
                         puppet_mask = self.prev_puppet_mask
                     else:
                         puppet_mask = np.logical_and(vis_mask, puppet_mask)
+                else:
+                    puppet_mask = None
         else:
             puppet_mask = None
 
