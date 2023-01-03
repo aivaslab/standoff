@@ -957,6 +957,7 @@ class para_MultiGridEnv(ParallelEnv):
 
         if self.gaze_highlighting is True:
             # get the puppet's view mask
+            puppet_mask = None # if we don't find a puppet instance? unclear when this happens
             for puppet in self.puppet_instances:
                 if puppet.name is not "player_0" and puppet.name is not agent.name:
                     _, puppet_mask = self.gen_obs_grid(puppet)
@@ -966,8 +967,6 @@ class para_MultiGridEnv(ParallelEnv):
                         puppet_mask = self.prev_puppet_mask
                     else:
                         puppet_mask = np.logical_and(vis_mask, puppet_mask)
-                else:
-                    puppet_mask = None
         else:
             puppet_mask = None
 
