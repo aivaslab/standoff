@@ -167,7 +167,7 @@ class MultiGrid:
 
         return sub_grid
 
-    def set(self, i, j, obj, update_vis_mask):
+    def set(self, i, j, obj, update_vis_mask=None):
         assert 0 <= i < self.width
         assert 0 <= j < self.height
         if update_vis_mask is not None:
@@ -183,13 +183,13 @@ class MultiGrid:
         if length is None:
             length = self.width - x
         for i in range(0, length):
-            self.set(x + i, y, obj_type())
+            self.set(x + i, y, obj_type(), update_vis_mask=None)
 
     def vert_wall(self, x, y, length=None, obj_type=Wall):
         if length is None:
             length = self.height - y
         for j in range(0, length):
-            self.set(x, y + j, obj_type())
+            self.set(x, y + j, obj_type(), update_vis_mask=None)
 
     def wall_rect(self, x, y, w, h, obj_type=Wall):
         self.horz_wall(x, y, w, obj_type=obj_type)
