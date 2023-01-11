@@ -25,7 +25,7 @@ def register_standoff_env(
         env_name,
         env_class,
         config_name,
-        env_difficulty,
+        difficulty,
         reward_decay=True
 ):
     configs = ScenarioConfigs().standoff
@@ -75,12 +75,13 @@ def register_standoff_env(
                 gaze_highlighting=(difficulty < 3),
                 persistent_gaze_highlighting=(difficulty < 2),
                 **env_config)
+
             return env
 
     env_class_name = f"env_{len(registered_envs)}"
     setattr(this_module, env_class_name, RegEnv)
     registered_envs.append(env_name)
-    gym_register(env_name, entry_point=f"standoff.src.pz_envs:{env_class_name}")
+    gym_register(env_name, entry_point=f"standoff.src.pz_envs:{env_class_name}", kwargs=env_config)
 
 
 def env_from_config(env_config, randomize_seed=True):
