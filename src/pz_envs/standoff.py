@@ -193,10 +193,10 @@ class StandoffEnv(para_MultiGridEnv):
             self.put_obj(Wall(), j, self.height - startRoom - 1)
 
         for j in range(2, self.width - 2):
-            if self.subject_visible_decs:
+            if not self.subject_visible_decs:
                 for i in range(startRoom + 1, startRoom + atrium):
                     self.put_obj(Curtain(color='red'), j, i)
-            if self.opponent_visible_decs:
+            if not self.opponent_visible_decs:
                 for i in range(self.height - startRoom - atrium - 1 + 1, self.height - startRoom - 1):
                     self.put_obj(Curtain(color='red'), j, i)
 
@@ -307,6 +307,7 @@ class StandoffEnv(para_MultiGridEnv):
         if self.hidden and len(self.objs_to_hide) > 0:
             for obj in self.objs_to_hide:
                 pos = obj.pos
+                print('contains', self.persistent_treat_images)
                 self.put_obj(
                     Box("orange", contains=obj, reward=obj.reward, show_contains=self.persistent_treat_images),
                     pos[0], pos[1])
