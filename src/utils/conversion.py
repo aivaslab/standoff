@@ -1,6 +1,6 @@
 import random
 
-from pettingzoo.utils.conversions import aec_to_parallel, parallel_to_aec
+#from pettingzoo.utils.conversions import aec_to_parallel, parallel_to_aec
 import supersuit as ss
 from pettingzoo.utils import wrappers
 from ..agents import GridAgentInterface
@@ -37,9 +37,9 @@ def make_env(envClass, player_config, configName=None, memory=1, threads=1, redu
 
     env_config['agents'] = [GridAgentInterface(**player_config) for _ in range(reset_configs['num_agents'])]
     env_config['puppets'] = [GridAgentInterface(**player_config) for _ in range(reset_configs['num_puppets'])]
-    env_config['num_agents'] = reset_configs['num_agents']
-    env_config['num_puppets'] = reset_configs['num_puppets']
-    env_config['configName'] = configName
+    #env_config['num_agents'] = reset_configs['num_agents']
+    #env_config['num_puppets'] = reset_configs['num_puppets']
+    env_config['config_name'] = configName
 
     env = env_from_config(env_config)
     env.agent_view_size = player_config["view_size"] * player_config["view_tile_size"]
