@@ -12,6 +12,7 @@ from gym_minigrid.rendering import downsample
 from gym.utils.seeding import np_random
 from gym.spaces import Discrete, Box
 from pettingzoo import ParallelEnv
+from .agents import occlude_mask
 
 # from gym.envs.classic_control.rendering import SimpleImageViewer
 
@@ -261,10 +262,16 @@ class MultiGrid:
                     cls.render_object, obj, tile_size, subdivs
                 )
             else:
-                img = cls.cache_render_fun(
-                    (tile_size, obj.__class__.__name__ + str(obj.size), *obj.encode()),
-                    cls.render_object, obj, tile_size, subdivs
-                )
+                if obj.type == 'Box' and obj.show_contains is True and obj.contains is not None:
+                    img = cls.cache_render_fun(
+                        (tile_size, obj.__class__.__name__ + str(obj.contains.reward), *obj.encode()),
+                        cls.render_object, obj, tile_size, subdivs
+                    )
+                else:
+                    img = cls.cache_render_fun(
+                        (tile_size, obj.__class__.__name__ + str(obj.size), *obj.encode()),
+                        cls.render_object, obj, tile_size, subdivs
+                    )
             if hasattr(obj, 'render_post'):
                 return obj.render_post(img)
             else:
@@ -960,13 +967,16 @@ class para_MultiGridEnv(ParallelEnv):
             puppet_mask = None # if we don't find a puppet instance? unclear when this happens
             for puppet in self.puppet_instances:
                 if puppet != self.instance_from_name["player_0"]:
-                    _, puppet_mask = self.gen_obs_grid(puppet)
+                    print(self.grid.grid, puppet.pos)
+                    if puppet.pos is not None:
+                        puppet_mask = occlude_mask(self.grid.grid, puppet.pos)
+                        print(puppet_mask)
 
-                    if self.persistent_gaze_highlighting is True:
-                        self.prev_puppet_mask = np.logical_or(self.prev_puppet_mask, puppet_mask)
-                        puppet_mask = self.prev_puppet_mask
-                    else:
-                        puppet_mask = np.logical_and(vis_mask, puppet_mask)
+                        if self.persistent_gaze_highlighting is True:
+                            self.prev_puppet_mask = np.logical_or(self.prev_puppet_mask, puppet_mask)
+                            puppet_mask = self.prev_puppet_mask
+                        else:
+                            puppet_mask = np.logical_and(vis_mask, puppet_mask)
         else:
             puppet_mask = None
 
