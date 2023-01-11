@@ -367,10 +367,11 @@ class StandoffEnv(para_MultiGridEnv):
                 for agent in self.agents_and_puppets():
                     if self.can_see[agent + str(box)]:
                         tile = self.grid.get(x, y)
-                        if hasattr(tile, "reward") and hasattr(tile, "size"):
+                        #if hasattr(tile, "reward") and hasattr(tile, "size"):
+                        if tile.type == "Goal":
                             # size used to distinguish treats from boxes
                             self.last_seen_reward[agent + str(box)] = tile.reward if isinstance(tile.reward, int) else 0
-                            # print('rew update', agent, box, tile.reward)
+                            print('rew update', agent, box, tile.reward)
                         elif not self.grid.get(x, y) and self.last_seen_reward[agent + str(box)] != 0:
                             self.last_seen_reward[agent + str(box)] = 0
 
@@ -383,7 +384,7 @@ class StandoffEnv(para_MultiGridEnv):
                         self.best_reward[agent] = reward
                         self.new_target = True
                         self.target_agent = agent
-        if name == "reveal" and self.new_target:
+        if self.new_target:
             self.new_target = False
             a = self.instance_from_name[self.target_agent]
             if a.active:
