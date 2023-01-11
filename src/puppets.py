@@ -7,6 +7,7 @@ def pathfind(board, start, goal, cached_paths):
         return cached_paths[str(start) + str(goal)]
 
     path = astar(board, start, goal)
+    assert path is not None, "No path found" + str(board) + str(start) + str(goal)
 
     pathDict = {}
     for i, pos in enumerate(path):
