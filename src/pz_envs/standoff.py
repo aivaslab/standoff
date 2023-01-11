@@ -82,6 +82,7 @@ class StandoffEnv(para_MultiGridEnv):
         self.persistent_gaze_highlighting = persistent_gaze_highlighting
 
         self.fill_spawn_holes = False
+        self.random_subject_spawn = False
 
 
     def hard_reset(self, params=None):
@@ -171,8 +172,11 @@ class StandoffEnv(para_MultiGridEnv):
         for k, agent in enumerate(self.agents_and_puppets()):
             h = 1 if agent == "player_0" else self.height - 2
             d = 1 if agent == "player_0" else 3
-            bb = self.deterministic_seed % self.boxes if self.deterministic else random.choice(range(boxes))
-            xx = 2 * bb + 2
+            if self.random_subject_spawn:
+                bb = self.deterministic_seed % self.boxes if self.deterministic else random.choice(range(boxes))
+                xx = 2 * bb + 2
+            else:
+                xx = 2 * self.boxes//2 + 1
             self.agent_spawn_pos[agent] = (xx, h, d)
             self.agent_door_pos[agent] = (xx, h + (1 if agent == "player_0" else -1))
             all_door_poses.append(self.agent_door_pos[agent])
@@ -214,8 +218,10 @@ class StandoffEnv(para_MultiGridEnv):
                 else:
                     self.put_obj(Wall(), box * 2 + 2, self.height - startRoom - 1)
 
-                self.released_tiles[0] += [(box * 2 + 2, startRoom)]
-                self.released_tiles[1] += [(box * 2 + 2, self.height - startRoom - 1)]
+                if (box * 2 + 2, startRoom) in all_door_poses:
+                    self.released_tiles[0] += [(box * 2 + 2, startRoom)]
+                if (box * 2 + 2, self.height - startRoom - 1) in all_door_poses:
+                    self.released_tiles[1] += [(box * 2 + 2, self.height - startRoom - 1)]
 
                 # secondary door release
                 self.put_obj(Wall(), box * 2 + 1, self.height - 2)
