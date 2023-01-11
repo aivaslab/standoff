@@ -96,31 +96,12 @@ def env_from_config(env_config, randomize_seed=True):
 
 
 for difficulty in range(3):
-    register_standoff_env(
-        "Standoff-S1-{0}-v0".format(difficulty),
-        StandoffEnv,
-        "tutorial_step_1",
-        difficulty,
-    )
-    register_standoff_env(
-        "Standoff-S2-{0}-v0".format(difficulty),
-        StandoffEnv,
-        "tutorial_step_2",
-        difficulty,
-    )
-    for config in ["informed control",
-                   "partially uninformed",
-                   "removed informed",
-                   "removed uninformed",
-                   "moved",
-                   "replaced",
-                   "misinformed",
-                   "swapped",
-                   "all"
-                   ]:
-        register_standoff_env(
-            "Standoff-S3-{0}-{1}-v0".format(config.replace(" ", ""), difficulty),
-            StandoffEnv,
-            config,
-            difficulty,
-        )
+    for stage in range(3):
+        for config in ScenarioConfigs.stageNames[stage+1]:
+            configName = difficulty if stage < 2 else config.replace(" ", "") + "-" + difficulty
+            register_standoff_env(
+                "Standoff-S{0}-{1}-v0".format(stage+1, configName),
+                StandoffEnv,
+                config,
+                difficulty,
+            )

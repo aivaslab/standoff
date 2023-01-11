@@ -50,6 +50,19 @@ class ScenarioConfigs:
         # ...
     }
 
+    stageNames = {1: ["stage_1"],
+                  2: ["stage_2"],
+                  3: ["informed control",
+                      "partially uninformed",
+                      "removed informed",
+                      "removed uninformed",
+                      "moved",
+                      "replaced",
+                      "misinformed",
+                      "swapped",
+                      "all"
+                      ]}
+
     standoff = {
         "defaults": {
             "hidden": True,
@@ -64,31 +77,13 @@ class ScenarioConfigs:
             "events": [[['bait', 'empty'], ['bait', 'empty']]]  # list, event, args
         },
 
-        "tutorial_step_1": {
+        "stage_1": {
             "num_puppets": [0],
             "boxes": [5],
-            "hidden": [False, True],
         },
-        "tutorial_step_1a": {
-            "num_puppets": [0],
-            "boxes": [5],
-            "hidden": [False],
-        },
-        "tutorial_step_1b": {
-            "num_puppets": [0],
-            "boxes": [5],
-            "hidden": [True],
-        },
-        "tutorial_step_1c": {
+        "stage_2": {
             "num_puppets": [1],
             "boxes": [5],
-            "hidden": [False],
-        },
-        "tutorial_step_2": {
-            # more eVaried training, including easier cases than eval
-            "num_puppets": [1],
-            "boxes": [5],
-            "hidden": [True],
         },
         "informed control": {
             "events": [[['bait', 'empty'], ['bait', 'empty']]]
@@ -153,6 +148,5 @@ class AllParams():
         "cause": ['blocks', 'direction', 'accident', 'inability'],
         "lava": ['lava', 'block'],
         "num_agents": [1, 2],
-        "num_puppets": [0, 1, 2]
     }
     }
