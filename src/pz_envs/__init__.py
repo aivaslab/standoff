@@ -98,7 +98,7 @@ def env_from_config(env_config, randomize_seed=True):
 for difficulty in range(3):
     for stage in range(3):
         for config in ScenarioConfigs.stageNames[stage+1]:
-            configName = difficulty if stage < 2 else config.replace(" ", "") + "-" + difficulty
+            configName = difficulty if stage < 2 else config.replace(" ", "") + "-" + str(difficulty)
             register_standoff_env(
                 "Standoff-S{0}-{1}-v0".format(stage+1, configName),
                 StandoffEnv,
