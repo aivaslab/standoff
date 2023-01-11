@@ -203,12 +203,13 @@ class StandoffEnv(para_MultiGridEnv):
                 self.put_obj(Wall(), box * 2 + 1, startRoom - 1)
 
                 # initial door release, only where door is not in all_door_poses
-                if [box * 2 + 2, startRoom] in all_door_poses:
+                if (box * 2 + 2, startRoom) in all_door_poses:
                     self.put_obj(Block(init_state=0, color="blue"), box * 2 + 2, startRoom)
                 else:
                     self.put_obj(Wall(), box * 2 + 2, startRoom)
 
-                if [box * 2 + 2, self.height - startRoom - 1] in all_door_poses:
+                # same as above, for opponent
+                if (box * 2 + 2, self.height - startRoom - 1) in all_door_poses:
                     self.put_obj(Block(init_state=0, color="blue"), box * 2 + 2, self.height - startRoom - 1)
                 else:
                     self.put_obj(Wall(), box * 2 + 2, self.height - startRoom - 1)
