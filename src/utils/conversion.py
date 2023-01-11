@@ -10,11 +10,12 @@ from ..utils.vec_normalize import VecNormalizeMultiAgent
 from ..pz_envs.scenario_configs import ScenarioConfigs
 import os
 
-def make_env(envClass, player_config, configName=None, memory=1, threads=1, reduce_color=False, size=64,
-            reward_decay=False, ghost_mode=True, max_steps=50, saveVids=False, path="", recordEvery=1e4, vecMonitor=True,
-            rank=0, vecNormalize=False):
 
-    env_config =  {
+def make_env(envClass, player_config, configName=None, memory=1, threads=1, reduce_color=False, size=64,
+             reward_decay=False, ghost_mode=True, max_steps=50, saveVids=False, path="", recordEvery=1e4,
+             vecMonitor=True,
+             rank=0, vecNormalize=False):
+    env_config = {
         "env_class": envClass,
         "max_steps": max_steps,
         "respawn": True,
@@ -41,7 +42,7 @@ def make_env(envClass, player_config, configName=None, memory=1, threads=1, redu
     env_config['configName'] = configName
 
     env = env_from_config(env_config)
-    env.agent_view_size = player_config["view_size"]*player_config["view_tile_size"]
+    env.agent_view_size = player_config["view_size"] * player_config["view_tile_size"]
 
     configName = random.choice(list(env.configs.keys())) if configName is None else configName
     env.hard_reset(env.configs[configName])
@@ -58,9 +59,10 @@ def make_env(envClass, player_config, configName=None, memory=1, threads=1, redu
     env = VecTransposeImage(env)
     if memory > 1:
         env = VecFrameStack(env, n_stack=memory, channels_order='first')
-        #consider StackedObservations
+        # consider StackedObservations
     if saveVids:
-        env = VecVideoRecorder(env, path, record_video_trigger=lambda x: x % recordEvery == 0, video_length=50, name_prefix=configName)
+        env = VecVideoRecorder(env, path, record_video_trigger=lambda x: x % recordEvery == 0, video_length=50,
+                               name_prefix=configName)
 
     if vecMonitor:
         if path != "":
@@ -71,6 +73,36 @@ def make_env(envClass, player_config, configName=None, memory=1, threads=1, redu
         # must be after VecMonitor for monitor to show unnormed rewards
         env = VecNormalizeMultiAgent(env, norm_obs=True, norm_reward=True, clip_obs=10.)
     return env
+
+
+def wrap_env_full(env, reduce_color=False, memory=1, size=32, saveVids=False, vecMonitor=False, path=None,
+                  configName=None, threads=1, rank=0):
+    if reduce_color:
+        env = ss.color_reduction_v0(env, 'B')
+    env = ss.resize_v0(env, x_size=size, y_size=size)
+    if reduce_color:
+        env = ss.reshape_v0(env, (size, size, 1))
+    env = ss.pettingzoo_env_to_vec_env_v1(env)
+    env = ss.concat_vec_envs_v1(env, threads, num_cpus=1, base_class='stable_baselines3')
+    # num_cpus=1 changed from 2 to avoid csv issues. does it affect speed?
+    env = VecTransposeImage(env)
+    if memory > 1:
+        env = VecFrameStack(env, n_stack=memory, channels_order='first')
+        # consider StackedObservations
+    if saveVids:
+        env = VecVideoRecorder(env, path, record_video_trigger=lambda x: x % recordEvery == 0, video_length=50,
+                               name_prefix=configName)
+
+    if vecMonitor:
+        if path != "":
+            env = VecMonitor(env, filename=os.path.join(path, f"{configName}-{rank}"), info_keywords=info_keywords)
+        else:
+            env = VecMonitor(env, filename=f"{configName}-{rank}", info_keywords=info_keywords)
+    if rank == 0 and False:
+        # must be after VecMonitor for monitor to show unnormed rewards
+        env = VecNormalizeMultiAgent(env, norm_obs=True, norm_reward=True, clip_obs=10.)
+    return env
+
 
 def wrap_env(para_env, **kwargs):
     '''
@@ -86,6 +118,7 @@ def wrap_env(para_env, **kwargs):
     env = wrappers.OrderEnforcingWrapper(env)
     return env
 
+
 def raw_env(para_env, **kwargs):
     '''
     To support the AEC API, the raw_env() function just uses the from_parallel
@@ -94,6 +127,7 @@ def raw_env(para_env, **kwargs):
     env = para_env(**kwargs)
     env = parallel_to_aec(env)
     return env
+
 
 def pz2sb3(env, num_cpus=2):
     '''
