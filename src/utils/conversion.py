@@ -6,7 +6,7 @@ from pettingzoo.utils import wrappers
 from ..agents import GridAgentInterface
 from ..pz_envs import env_from_config
 from stable_baselines3.common.vec_env import VecMonitor, VecFrameStack, VecVideoRecorder, VecTransposeImage
-from src.utils.VecVideoRecorder import VecVideoRecorderCustom
+from ..utils.VecVideoRecorder import VecVideoRecorderCustom
 from ..utils.vec_normalize import VecNormalizeMultiAgent
 from ..pz_envs.scenario_configs import ScenarioConfigs
 import os
