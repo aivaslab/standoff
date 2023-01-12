@@ -363,7 +363,7 @@ class MultiGrid:
 
                 img[ymin:ymax, xmin:xmax, :] = rotate_grid(tile_img, self.orientation)
 
-                c = COLORS['yellow']
+                c = COLORS['red']
                 if gaze_highlight_mask is not None and gaze_highlight_mask[i, j]:
                     img[ymin:ymax, xmin, :] = c
                     img[ymin:ymax, xmax - 1, :] = c
@@ -1000,17 +1000,11 @@ class para_MultiGridEnv(ParallelEnv):
                     if puppet.pos is not None:
                         puppet_mask = occlude_mask(~self.grid.opacity, puppet.pos)  # only reveals one tile?
                         if self.only_highlight_treats:
-                            all_goals = self.grid.all_treats
-                            print('goals:', all_goals.astype(int))
-                            puppet_mask = np.logical_and(puppet_mask, all_goals)
-
-                        #print('mask', puppet_mask.astype(int) if puppet_mask is not None else "x")
-                        #print('grid', self.grid.opacity.astype(int))
+                            puppet_mask = np.logical_and(puppet_mask, self.grid.all_treats)
 
                         if self.persistent_gaze_highlighting is True:
                             self.prev_puppet_mask = np.logical_or(self.prev_puppet_mask, puppet_mask)
                             puppet_mask = self.prev_puppet_mask
-                            #print('mask2', puppet_mask.astype(int) if puppet_mask is not None else "x")
 
                         puppet_mask = self.slice_gaze_grid(agent, puppet_mask) # get relative gaze mask in agent view
         else:
