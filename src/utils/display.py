@@ -193,8 +193,8 @@ def plot_train(log_folder, configName, rank, title='Learning Curve', window=2048
     merged_df = merged_df.groupby(['minibatch', 'eval', 'gtr'], as_index=False).mean().sort_values('minibatch')
     merged_df_small = merged_df_small.groupby(['minibatch', 'name', 'eval', 'gtr'], as_index=False).mean().sort_values(
         'minibatch')
-    merged_df_noname = merged_df_small.groupby(['minibatch', 'eval', 'gtr'], as_index=False).mean().sort_values('minibatch')
-
+    merged_df_noname = merged_df_small.groupby(['minibatch', 'eval', 'gtr'], as_index=False).mean().sort_values(
+        'minibatch')
 
     for use_train in [True, False]:
         title = 'train' if use_train else 'eval'
@@ -205,22 +205,27 @@ def plot_train(log_folder, configName, rank, title='Learning Curve', window=2048
             title = title + ('-gtr' if use_gtr else '-rollout')
 
             merged_df_f = merged_df[(merged_df['eval'] != use_train) & (merged_df['gtr'] == use_gtr)]
-            merged_df_small_f = merged_df_small[(merged_df_small['eval'] != use_train) & (merged_df_small['gtr'] == use_gtr)]
-            merged_df_noname_f = merged_df_noname[(merged_df_noname['eval'] != use_train) & (merged_df_noname['gtr'] == use_gtr)]
+            merged_df_small_f = merged_df_small[
+                (merged_df_small['eval'] != use_train) & (merged_df_small['gtr'] == use_gtr)]
+            merged_df_noname_f = merged_df_noname[
+                (merged_df_noname['eval'] != use_train) & (merged_df_noname['gtr'] == use_gtr)]
             # print(merged_df['eval'])
 
             # normalize r after all the filtering
-            merged_df_f["r"] = (merged_df_f["r"] - merged_df_f["r"].min()) / (merged_df_f["r"].max() - merged_df_f["r"].min())
+            merged_df_f["r"] = (merged_df_f["r"] - merged_df_f["r"].min()) / (
+                        merged_df_f["r"].max() - merged_df_f["r"].min())
 
             if len(merged_df_f):
                 plot_merged(indexer='minibatch', df=merged_df_f, mypath=mypath, title=title, window=window,
                             values=['valid', 'weakAccuracy', 'accuracy', 'r'],
-                            labels=['selected any box', 'selected any treat', 'selected correct treat', 'reward (normalized)'])
+                            labels=['selected any box', 'selected any treat', 'selected correct treat',
+                                    'reward (normalized)'])
             if len(merged_df_small_f):
                 # this graph is the same as above, but only taking into account valid samples
                 # avoidcorrect should be identical to weakaccuracy when no opponent is present
-                plot_split(indexer='minibatch', df=merged_df_small_f, mypath=mypath, title=title + '-valid', window=window,
-                        values=["accuracy", "weakAccuracy", "avoidCorrect"])
+                plot_split(indexer='minibatch', df=merged_df_small_f, mypath=mypath, title=title + '-valid',
+                           window=window,
+                           values=["accuracy", "weakAccuracy", "avoidCorrect"])
             if len(merged_df_noname_f):
                 plot_merged(indexer='minibatch', df=merged_df_noname_f, mypath=mypath, title=title, window=window,
                             values=["avoidCorrect"], labels=["avoided correct box"])
@@ -228,13 +233,15 @@ def plot_train(log_folder, configName, rank, title='Learning Curve', window=2048
 
 
 def make_pic_video(model, env, name, random_policy=False, video_length=50, savePath='', vidName='video.mp4',
-                   following="player_0", image_size=320, deterministic=False, memory=1):
+                   following="player_0", image_size=320, deterministic=False, memory=1, obs_size=32):
     """
     make a video of the model playing the environment
     """
     _env = parallel_to_aec(env.unwrapped.vec_envs[0].par_env).unwrapped
     images = []
     obs = _env.reset()
+    # reshape obs[following] to be channels, height, width
+
     _env.reset()
     img = cv2.resize(obs[following], dsize=(image_size, image_size), interpolation=cv2.INTER_NEAREST)
 
@@ -243,8 +250,9 @@ def make_pic_video(model, env, name, random_policy=False, video_length=50, saveP
         if random_policy:
             action = {agent: _env.action_spaces[agent].sample() for agent in _env.agents}
         else:
-            action = {following: model.predict(obs[following], deterministic=deterministic)[0] if memory <= 1 else
-            model.predict(obs[following], deterministic=deterministic)}
+            obs_used = np.transpose(obs[following], (2, 0, 1))
+            action = {following: model.predict(obs_used, deterministic=deterministic)[0] if memory <= 1 else
+                    model.predict(obs_used, deterministic=deterministic)}
         obs, _, dones, _ = _env.step(action)
         img = cv2.resize(obs[following], dsize=(image_size, image_size), interpolation=cv2.INTER_NEAREST)
         cv2.putText(img=img, text=str(action), org=(0, image_size), fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=1,
