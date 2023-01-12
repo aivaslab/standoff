@@ -369,7 +369,7 @@ class StandoffEnv(para_MultiGridEnv):
                     if self.can_see[agent + str(box)]:
                         tile = self.grid.get(x, y)
                         #if hasattr(tile, "reward") and hasattr(tile, "size"):
-                        if tile.type == "Goal":
+                        if tile is not None and tile.type == "Goal":
                             # size used to distinguish treats from boxes
                             self.last_seen_reward[agent + str(box)] = tile.reward if isinstance(tile.reward, int) else 0
                             #print('rew update', agent, box, tile.reward)
