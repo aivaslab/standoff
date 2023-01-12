@@ -1,5 +1,6 @@
 # Multi-agent gridworld.
 # Based on MiniGrid: https://github.com/maximecb/gym-minigrid.
+from __future__ import annotations
 
 import gym
 import numpy as np
@@ -312,8 +313,9 @@ class MultiGrid:
                  ) / max_alpha
         ).astype(img1.dtype)
 
+
     @classmethod
-    def render_tile(cls, obj: WorldObj,
+    def render_tile(cls, obj,
                     tile_size: int = TILE_PIXELS,
                     subdivs: int = 3,
                     top_agent=None):
@@ -346,6 +348,7 @@ class MultiGrid:
         height_px = self.height * tile_size
 
         img = np.zeros(shape=(height_px, width_px), dtype=np.uint8)[..., None] + COLORS['shadow']
+        #img[:] = COLORS['shadow']
 
         for j in range(0, self.height):
             for i in range(0, self.width):
@@ -374,7 +377,7 @@ class MultiGrid:
                     img[ymax - 1, xmin:xmax, :] = c
 
         if highlight_mask is not None:
-            hm = np.kron(highlight_mask.T, np.full((tile_size, tile_size), 255, dtype=np.uint16)
+            hm = np.kron(highlight_mask.T, np.full((tile_size, tile_size), 255, dtype=np.uint8)
                          )[..., None]  # arcane magic.
             img = np.right_shift(img.astype(np.uint16) * 8 + hm * 2, 3).clip(0, 255).astype(np.uint8)
 
