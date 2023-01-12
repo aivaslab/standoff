@@ -271,7 +271,7 @@ class PlottingCallbackStartStop(BaseCallback):
 
     def __init__(self, verbose=0, savePath='', name='', envs=[], names=[], eval_cbs=[], params=[], model=None,
                  global_log_path='', train_name='', log_line=-1,
-                 start_vid=False, memory=1, eval_df=None, gtr=False):
+                 start_vid=False, end_vid=True, memory=1, eval_df=None, gtr=False):
         super().__init__(verbose)
         self.savePath = savePath
         self.global_log_path = global_log_path
@@ -289,6 +289,7 @@ class PlottingCallbackStartStop(BaseCallback):
         self.memory = memory
         self.eval_df = eval_df
         self.gtr = gtr
+        self.end_vid = end_vid
 
     def _on_training_start(self) -> bool:
         super()._on_training_start()
@@ -322,7 +323,7 @@ class PlottingCallbackStartStop(BaseCallback):
                 'finished': True,
             })
 
-            plotting_evals(self, vids=False, plots=True)
+            plotting_evals(self, vids=self.end_vid, plots=True)
             gtr_to_monitor(self.savePath, self.eval_df)
             plot_train(self.savePath, self.name, 0, self.train_name + 'train')
         except Exception as e:
