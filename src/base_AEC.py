@@ -347,8 +347,8 @@ class MultiGrid:
         width_px = self.width * tile_size
         height_px = self.height * tile_size
 
-        img = np.zeros(shape=(height_px, width_px), dtype=np.uint8)[..., None] + COLORS['shadow']
-        #img[:] = COLORS['shadow']
+        img = np.zeros(shape=(height_px, width_px, 3), dtype=np.uint8)#[..., None] + COLORS['shadow']
+        img[:] = COLORS['shadow']
 
         for j in range(0, self.height):
             for i in range(0, self.width):
