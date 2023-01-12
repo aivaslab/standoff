@@ -461,7 +461,7 @@ class para_MultiGridEnv(ParallelEnv):
         self.seed(seed=seed)
         self.agent_spawn_kwargs = agent_spawn_kwargs
         self.ghost_mode = ghost_mode
-        self.agent_view_size = 51
+        self.agent_view_size = agents[0].view_size * agents[0].view_tile_size #34 magic number fix?
 
         self.agents = agents
         self.puppets = puppets
