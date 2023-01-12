@@ -6,6 +6,7 @@ from pettingzoo.utils import wrappers
 from ..agents import GridAgentInterface
 from ..pz_envs import env_from_config
 from stable_baselines3.common.vec_env import VecMonitor, VecFrameStack, VecVideoRecorder, VecTransposeImage
+from src.utils.VecVideoRecorder import VecVideoRecorderCustom
 from ..utils.vec_normalize import VecNormalizeMultiAgent
 from ..pz_envs.scenario_configs import ScenarioConfigs
 import os
@@ -61,7 +62,7 @@ def make_env(envClass, player_config, configName=None, memory=1, threads=1, redu
         env = VecFrameStack(env, n_stack=memory, channels_order='first')
         # consider StackedObservations
     if saveVids:
-        env = VecVideoRecorder(env, path, record_video_trigger=lambda x: x % recordEvery == 0, video_length=50,
+        env = VecVideoRecorderCustom(env, path, record_video_trigger=lambda x: x % recordEvery == 0, video_length=50,
                                name_prefix=configName)
 
     if vecMonitor:
@@ -90,7 +91,7 @@ def wrap_env_full(env, reduce_color=False, memory=1, size=32, saveVids=False, ve
         env = VecFrameStack(env, n_stack=memory, channels_order='first')
         # consider StackedObservations
     if saveVids:
-        env = VecVideoRecorder(env, path, record_video_trigger=lambda x: x % recordEvery == 0, video_length=50,
+        env = VecVideoRecorderCustom(env, path, record_video_trigger=lambda x: x % recordEvery == 0, video_length=50,
                                name_prefix=configName)
 
     if vecMonitor:
