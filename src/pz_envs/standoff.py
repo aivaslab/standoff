@@ -80,6 +80,7 @@ class StandoffEnv(para_MultiGridEnv):
         self.persistent_treat_images = persistent_treat_images
         self.gaze_highlighting = gaze_highlighting
         self.persistent_gaze_highlighting = persistent_gaze_highlighting
+        self.only_highlight_treats = True
 
         self.fill_spawn_holes = False
         self.random_subject_spawn = False
@@ -309,7 +310,8 @@ class StandoffEnv(para_MultiGridEnv):
                 pos = obj.pos
                 self.put_obj(
                     Box("orange", contains=obj, reward=obj.reward, show_contains=self.persistent_treat_images),
-                    pos[0], pos[1])
+                    pos[0], pos[1],
+                    update_vis=False) # do not change gaze highlight if puppet saw this bait
         if name == 'init':
             for box in range(self.boxes):
                 x = box * 2 + 2

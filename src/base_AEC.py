@@ -122,6 +122,11 @@ class MultiGrid:
         return ~overlap_fun(self.grid)
 
     @property
+    def all_treats(self):
+        treats = np.vectorize(lambda k: (
+            self.obj_reg.key_to_obj_map[k].type == 'Goal' if hasattr(self.obj_reg.key_to_obj_map[k], 'type') else False))
+        return treats(self.grid)
+    @property
     def overlapping_pathing(self):
         overlap_fun = np.vectorize(lambda k: (
             self.obj_reg.key_to_obj_map[k].can_overlap_pathing() if hasattr(self.obj_reg.key_to_obj_map[k],
@@ -936,8 +941,9 @@ class para_MultiGridEnv(ParallelEnv):
             grid = gaze_grid.slice(
                 0, 0, agent.view_size, agent.view_size, 0
             )
-
-        return grid.grid
+        ret = grid.grid
+        del gaze_grid
+        return ret
 
     def gen_obs_grid(self, agent):
 
@@ -993,12 +999,18 @@ class para_MultiGridEnv(ParallelEnv):
                 if puppet != self.instance_from_name["player_0"]:
                     if puppet.pos is not None:
                         puppet_mask = occlude_mask(~self.grid.opacity, puppet.pos)  # only reveals one tile?
-                        print('mask', puppet_mask.astype(int) if puppet_mask is not None else "x")
-                        print('grid', self.grid.opacity.astype(int))
+                        if self.only_highlight_treats:
+                            all_goals = self.grid.all_treats
+                            print('goals:', all_goals.astype(int))
+                            puppet_mask = np.logical_and(puppet_mask, all_goals)
+
+                        #print('mask', puppet_mask.astype(int) if puppet_mask is not None else "x")
+                        #print('grid', self.grid.opacity.astype(int))
 
                         if self.persistent_gaze_highlighting is True:
                             self.prev_puppet_mask = np.logical_or(self.prev_puppet_mask, puppet_mask)
                             puppet_mask = self.prev_puppet_mask
+                            #print('mask2', puppet_mask.astype(int) if puppet_mask is not None else "x")
 
                         puppet_mask = self.slice_gaze_grid(agent, puppet_mask) # get relative gaze mask in agent view
         else:
@@ -1028,11 +1040,11 @@ class para_MultiGridEnv(ParallelEnv):
     def __str__(self):
         return self.grid.__str__()
 
-    def put_obj(self, obj, i, j):
+    def put_obj(self, obj, i, j, update_vis=True):
         """
         Put an object at a specific position in the grid. Replace anything that is already there.
         """
-        self.grid.set(i, j, obj, update_vis_mask=self.prev_puppet_mask)
+        self.grid.set(i, j, obj, update_vis_mask=self.prev_puppet_mask if update_vis else None)
         if obj is not None:
             obj.set_position((i, j))
         return True
