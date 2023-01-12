@@ -7,7 +7,7 @@ import functools
 import random
 import traceback
 
-from .objects import Wall, Goal, Lava, GridAgent, COLORS
+from .objects import Wall, Goal, Lava, GridAgent, COLORS, WorldObj
 from gym_minigrid.rendering import downsample
 from gym.utils.seeding import np_random
 from gym.spaces import Discrete, Box
@@ -313,8 +313,10 @@ class MultiGrid:
         ).astype(img1.dtype)
 
     @classmethod
-    def render_tile(cls, obj, tile_size=TILE_PIXELS, subdivs=3, top_agent=None):
-        subdivs = 3
+    def render_tile(cls, obj: WorldObj,
+                    tile_size: int = TILE_PIXELS,
+                    subdivs: int = 3,
+                    top_agent=None):
 
         if obj is None:
             img = cls.cache_render_obj(obj, tile_size, subdivs)
@@ -334,8 +336,9 @@ class MultiGrid:
                     img = cls.blend_tiles(img_agent, img)
 
             # Render the tile border if any of the corners are black.
-            if (img[([0, 0, -1, -1], [0, -1, 0, -1])] == 0).all(axis=-1).any():
-                img = img + cls.cache_render_fun((tile_size, None), cls.empty_tile, tile_size, subdivs)
+            # Removed for speed
+            '''if (img[([0, 0, -1, -1], [0, -1, 0, -1])] == 0).all(axis=-1).any():
+                img = img + cls.cache_render_fun((tile_size, None), cls.empty_tile, tile_size, subdivs)'''
         return img
 
     def render(self, tile_size, highlight_mask=None, visible_mask=None, top_agent=None, gaze_highlight_mask=None):
