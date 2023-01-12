@@ -307,7 +307,6 @@ class StandoffEnv(para_MultiGridEnv):
         if self.hidden and len(self.objs_to_hide) > 0:
             for obj in self.objs_to_hide:
                 pos = obj.pos
-                print('contains', self.persistent_treat_images)
                 self.put_obj(
                     Box("orange", contains=obj, reward=obj.reward, show_contains=self.persistent_treat_images),
                     pos[0], pos[1])
@@ -371,7 +370,7 @@ class StandoffEnv(para_MultiGridEnv):
                         if tile.type == "Goal":
                             # size used to distinguish treats from boxes
                             self.last_seen_reward[agent + str(box)] = tile.reward if isinstance(tile.reward, int) else 0
-                            print('rew update', agent, box, tile.reward)
+                            #print('rew update', agent, box, tile.reward)
                         elif not self.grid.get(x, y) and self.last_seen_reward[agent + str(box)] != 0:
                             self.last_seen_reward[agent + str(box)] = 0
 
