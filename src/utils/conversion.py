@@ -77,7 +77,7 @@ def make_env(envClass, player_config, configName=None, memory=1, threads=1, redu
 
 
 def wrap_env_full(env, reduce_color=False, memory=1, size=32, saveVids=False, vecMonitor=False, path=None,
-                  configName=None, threads=1, rank=0):
+                  configName=None, threads=1, rank=0, recordEvery=1, vecNormalize=False):
     if reduce_color:
         env = ss.color_reduction_v0(env, 'B')
     env = ss.resize_v0(env, x_size=size, y_size=size)
@@ -99,7 +99,7 @@ def wrap_env_full(env, reduce_color=False, memory=1, size=32, saveVids=False, ve
             env = VecMonitor(env, filename=os.path.join(path, f"{configName}-{rank}"), info_keywords=info_keywords)
         else:
             env = VecMonitor(env, filename=f"{configName}-{rank}", info_keywords=info_keywords)
-    if rank == 0 and False:
+    if rank == 0 and vecNormalize:
         # must be after VecMonitor for monitor to show unnormed rewards
         env = VecNormalizeMultiAgent(env, norm_obs=True, norm_reward=True, clip_obs=10.)
     return env
