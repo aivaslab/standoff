@@ -216,11 +216,13 @@ def plotting_evals(self, vids=False, plots=True):
                 os.mkdir(os.path.join(self.savePath, 'videos', name))
             make_pic_video(self.model, env, name,
                            random_policy=False, video_length=350,
+                           image_size=self.image_size,
                            savePath=os.path.join(self.savePath, 'videos', name),
                            vidName='video_' + str(self.timestep) + '-det.mp4', following="player_0",
                            deterministic=True, memory=self.memory)
             make_pic_video(self.model, env, name,
                            random_policy=False, video_length=350,
+                           image_size=self.image_size,
                            savePath=os.path.join(self.savePath, 'videos', name),
                            vidName='video_' + str(self.timestep) + '.mp4', following="player_0",
                            deterministic=False, memory=self.memory)
@@ -232,7 +234,7 @@ class PlottingCallback(BaseCallback):
     """
 
     def __init__(self, verbose=0, savePath='', name='', envs=[], names=[], eval_cbs=[], global_log_path='', log_line=-1,
-                 mid_vids=False, memory=1, eval_df=None, gtr=False):
+                 mid_vids=False, memory=1, eval_df=None, gtr=False, image_size=32):
         super().__init__(verbose)
         self.savePath = savePath
         self.logPath = os.path.join(savePath, 'logs.txt')
@@ -247,6 +249,7 @@ class PlottingCallback(BaseCallback):
         self.memory = memory
         self.eval_df = eval_df
         self.gtr = gtr
+        self.image_size = image_size
 
     def _on_step(self) -> bool:
         update_global_logs(self.global_log_path, self.log_line, {
@@ -271,7 +274,7 @@ class PlottingCallbackStartStop(BaseCallback):
 
     def __init__(self, verbose=0, savePath='', name='', envs=[], names=[], eval_cbs=[], params=[], model=None,
                  global_log_path='', train_name='', log_line=-1,
-                 start_vid=False, end_vid=True, memory=1, eval_df=None, gtr=False):
+                 start_vid=False, end_vid=True, memory=1, eval_df=None, gtr=False, image_size=32):
         super().__init__(verbose)
         self.savePath = savePath
         self.global_log_path = global_log_path
@@ -290,6 +293,7 @@ class PlottingCallbackStartStop(BaseCallback):
         self.eval_df = eval_df
         self.gtr = gtr
         self.end_vid = end_vid
+        self.image_size = image_size
 
     def _on_training_start(self) -> bool:
         super()._on_training_start()
