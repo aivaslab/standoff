@@ -333,7 +333,7 @@ class MultiGrid:
                 img = img + cls.cache_render_fun((tile_size, None), cls.empty_tile, tile_size, subdivs)
         return img
 
-    def render(self, tile_size, highlight_mask=None, visible_mask=None, top_agent=None):
+    def render(self, tile_size, highlight_mask=None, visible_mask=None, top_agent=None, gaze_highlight_mask=None):
         width_px = self.width * tile_size
         height_px = self.height * tile_size
 
@@ -357,6 +357,13 @@ class MultiGrid:
                 xmax = (i + 1) * tile_size
 
                 img[ymin:ymax, xmin:xmax, :] = rotate_grid(tile_img, self.orientation)
+
+                c = COLORS['yellow']
+                if gaze_highlight_mask is not None and gaze_highlight_mask[i, j]:
+                    img[ymin:ymax, xmin, :] = c
+                    img[ymin:ymax, xmax - 1, :] = c
+                    img[ymin, xmin:xmax, :] = c
+                    img[ymax - 1, xmin:xmax, :] = c
 
         if highlight_mask is not None:
             hm = np.kron(highlight_mask.T, np.full((tile_size, tile_size), 255, dtype=np.uint16)
@@ -828,15 +835,15 @@ class para_MultiGridEnv(ParallelEnv):
                                 self.infos[agent_name]["selection"] = box
                                 self.infos[agent_name]["accuracy"] = (box == self.infos[agent_name]["correctSelection"])
                                 self.infos[agent_name]["weakAccuracy"] = (
-                                            box == self.infos[agent_name]["correctSelection"] or box ==
-                                            self.infos[agent_name]["incorrectSelection"])
+                                        box == self.infos[agent_name]["correctSelection"] or box ==
+                                        self.infos[agent_name]["incorrectSelection"])
                                 self.infos[agent_name]["selectedBig"] = (og_rwd == 100)
                                 self.infos[agent_name]["selectedSmall"] = (og_rwd == self.smallReward)
                                 self.infos[agent_name]["selectedNeither"] = (og_rwd < self.smallReward)
                                 self.infos[agent_name]["selectedPrevBig"] = (box in self.big_food_locations)
                                 self.infos[agent_name]["selectedPrevSmall"] = (box in self.small_food_locations)
                                 self.infos[agent_name]["selectedPrevNeither"] = not (
-                                            box in self.big_food_locations) and not (box in self.small_food_locations)
+                                        box in self.big_food_locations) and not (box in self.small_food_locations)
                             else:
                                 agent.active = False
                             agent.reward(rwd)
@@ -913,6 +920,25 @@ class para_MultiGridEnv(ParallelEnv):
 
         return robservations, rrewards, rdones, rinfos
 
+    def slice_gaze_grid(self, agent, gaze_grid):
+
+        # probably horribly inefficient. making a multigrid to use existing slice function
+        gaze_grid = MultiGrid(gaze_grid)
+        #gaze_grid.grid = gaze_grid
+
+        if agent.view_type == 0:
+            # egocentric view
+            topX, topY, botX, botY = agent.get_view_exts()
+            grid = gaze_grid.slice(
+                topX, topY, agent.view_size, agent.view_size, rot_k=agent.dir + 1
+            )
+        else:
+            grid = gaze_grid.slice(
+                0, 0, agent.view_size, agent.view_size, 0
+            )
+
+        return grid.grid
+
     def gen_obs_grid(self, agent):
 
         # print('gen_obs_grid', agent)
@@ -959,29 +985,31 @@ class para_MultiGridEnv(ParallelEnv):
         """
         Generate the agent's view (partially observable, low-resolution encoding)
         """
-        # print('generating agent obs', agent)
-        grid, vis_mask = self.gen_obs_grid(agent)
 
         if self.gaze_highlighting is True:
             # get the puppet's view mask
-            puppet_mask = None # if we don't find a puppet instance? unclear when this happens
+            puppet_mask = None  # if we don't find a puppet instance? unclear when this happens
             for puppet in self.puppet_instances:
                 if puppet != self.instance_from_name["player_0"]:
-                    print(self.grid.grid, puppet.pos)
                     if puppet.pos is not None:
-                        puppet_mask = occlude_mask(self.grid.grid, puppet.pos)
-                        print(puppet_mask)
+                        puppet_mask = occlude_mask(~self.grid.opacity, puppet.pos)  # only reveals one tile?
+                        print('mask', puppet_mask.astype(int) if puppet_mask is not None else "x")
+                        print('grid', self.grid.opacity.astype(int))
 
                         if self.persistent_gaze_highlighting is True:
                             self.prev_puppet_mask = np.logical_or(self.prev_puppet_mask, puppet_mask)
                             puppet_mask = self.prev_puppet_mask
-                        else:
-                            puppet_mask = np.logical_and(vis_mask, puppet_mask)
+
+                        puppet_mask = self.slice_gaze_grid(agent, puppet_mask) # get relative gaze mask in agent view
         else:
             puppet_mask = None
 
-        grid_image = grid.render(tile_size=agent.view_tile_size, visible_mask=vis_mask, top_agent=agent,
-                                 highlight_mask=puppet_mask)
+        # print('generating agent obs', agent)
+        view_grid, vis_mask = self.gen_obs_grid(agent)
+
+
+        grid_image = view_grid.render(tile_size=agent.view_tile_size, visible_mask=vis_mask, top_agent=agent,
+                                      gaze_highlight_mask=puppet_mask)
         if agent.observation_style == 'image':
             return grid_image
         else:
