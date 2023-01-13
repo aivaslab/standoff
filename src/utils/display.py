@@ -251,6 +251,9 @@ def make_pic_video(model, env, name, random_policy=False, video_length=50, saveP
             action = {agent: _env.action_spaces[agent].sample() for agent in _env.agents}
         else:
             obs_used = np.transpose(obs[following], (2, 0, 1))
+            # resize the 2nd 2 dimensions to be obs_size
+            obs_used = cv2.resize(obs_used, dsize=(obs_size, obs_size), interpolation=cv2.INTER_NEAREST)
+
             action = {following: model.predict(obs_used, deterministic=deterministic)[0] if memory <= 1 else
                     model.predict(obs_used, deterministic=deterministic)}
         obs, _, dones, _ = _env.step(action)
