@@ -359,7 +359,8 @@ class MultiGrid:
                 tile_img = MultiGrid.render_tile(
                     obj,
                     tile_size=tile_size,
-                    top_agent=top_agent
+                    top_agent=top_agent,
+                    subdivs=tile_size
                 )
 
                 ymin = j * tile_size
