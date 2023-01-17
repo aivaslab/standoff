@@ -104,6 +104,7 @@ class WorldObj(metaclass=RegisteredObjectType):
         return False
 
     def can_overlap_pathing(self):
+        # change to is_volatile
         return False
 
     def can_pickup(self):

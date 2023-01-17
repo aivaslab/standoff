@@ -419,6 +419,7 @@ class para_MultiGridEnv(ParallelEnv):
             persistent_treat_images=False,
             gaze_highlighting=False,
             persistent_gaze_highlighting=False,
+            observation_style='rich',
     ):
         """
         The init method takes in environment arguments and
@@ -482,13 +483,28 @@ class para_MultiGridEnv(ParallelEnv):
 
         self.minibatch = 0
         self.total_step_count = 0
-
-        self.observation_spaces = {agent: Box(
-            low=0,
-            high=255,
-            shape=(self.agent_view_size, self.agent_view_size, 3),
-            dtype='uint8'
-        ) for agent in self.possible_agents}
+        
+        self.observation_style = observation_style
+        if self.observation_style == 'rich':
+            self.rich_observation_layers = [
+                can_overlap,
+                can_overlap_pathing,
+                get_reward,
+                see_behind,
+                ]
+            self.observation_spaces = {agent: Box(
+                low=0,
+                high=255,
+                shape=(self.agent_view_size, self.agent_view_size, len(self.rich_observation_layers)),
+                dtype='uint8'
+            ) for agent in self.possible_agents}
+        else:
+            self.observation_spaces = {agent: Box(
+                low=0,
+                high=255,
+                shape=(self.agent_view_size, self.agent_view_size, 3),
+                dtype='uint8'
+            ) for agent in self.possible_agents}
 
         # self.action_space = self.action_spaces[self.possible_agents[0]]
         # self.observation_space = self.observation_spaces[self.possible_agents[0]]
@@ -999,6 +1015,8 @@ class para_MultiGridEnv(ParallelEnv):
         Generate the agent's view (partially observable, low-resolution encoding)
         """
 
+        
+            
         if self.gaze_highlighting is True:
             # get the puppet's view mask
             puppet_mask = None  # if we don't find a puppet instance? unclear when this happens
@@ -1019,6 +1037,13 @@ class para_MultiGridEnv(ParallelEnv):
 
         # print('generating agent obs', agent)
         view_grid, vis_mask = self.gen_obs_grid(agent)
+        if self.observation_style == 'rich':
+            # bypass rendering, just do dense function
+            visibility = vis_mask
+            obs = np.zeros(len(self.rich_observation_layers), self.view_size, self.view_size)
+            for i, layer in enumerate(self.rich_observation_layers):
+                obs[i, :, :] = view_grid.layer and visibility if layer is not 'vis' else visibility
+            return obs
 
 
         grid_image = view_grid.render(tile_size=agent.view_tile_size, visible_mask=vis_mask, top_agent=agent,

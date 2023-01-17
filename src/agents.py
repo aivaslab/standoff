@@ -67,16 +67,24 @@ class GridAgentInterface(GridAgent):
         if self.prestige_beta > 1:
             # warnings.warn("prestige_beta must be between 0 and 1. Using default 0.99")
             self.prestige_beta = 0.95
+            
+        if self.observation_style == 'rich':
+            view_tile_size = 1
+            channels = 7 # add one if opponent gaze
+        else:
+            channels = 3
 
         image_space = gym.spaces.Box(
             low=0,
             high=255,
-            shape=(view_tile_size * view_size, view_tile_size * view_size, 3),
+            shape=(view_tile_size * view_size, view_tile_size * view_size, channels),
             dtype="uint8",
         )
         if observation_style == 'image':
             self.observation_space = image_space
-        elif observation_style == 'rich':
+        elif observation_stype == 'rich':
+            self.observation_space = image_space
+        elif observation_style == 'richLegacy':
             obs_space = {
                 'pov': image_space,
             }
