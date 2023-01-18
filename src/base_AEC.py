@@ -125,13 +125,30 @@ class MultiGrid:
     @property
     def all_treats(self):
         treats = np.vectorize(lambda k: (
-            self.obj_reg.key_to_obj_map[k].type == 'Goal' if hasattr(self.obj_reg.key_to_obj_map[k], 'type') else False))
+            self.obj_reg.key_to_obj_map[k].type == 'Goal' if hasattr(self.obj_reg.key_to_obj_map[k],
+                                                                     'type') else False))
         return treats(self.grid)
+
     @property
-    def overlapping_pathing(self):
+    def all_rewards(self):
+        rews = np.vectorize(lambda k: (
+            self.obj_reg.key_to_obj_map[k].reward() if hasattr(self.obj_reg.key_to_obj_map[k],
+                                                               'reward') else 0))
+        return rews(self.grid)
+
+    @property
+    def all_boxes(self):
+        boxes = np.vectorize(lambda k: (
+            self.obj_reg.key_to_obj_map[k].type == 'Box' if hasattr(self.obj_reg.key_to_obj_map[k],
+                                                                    'type') else False))
+        return boxes(self.grid)
+
+    @property
+    def volatile(self):
+        # refers to things which shall be removed from the grid after some time
         overlap_fun = np.vectorize(lambda k: (
-            self.obj_reg.key_to_obj_map[k].can_overlap_pathing() if hasattr(self.obj_reg.key_to_obj_map[k],
-                                                                            'can_overlap_pathing') else True))
+            self.obj_reg.key_to_obj_map[k].volatile() if hasattr(self.obj_reg.key_to_obj_map[k],
+                                                                 'volatile') else True))
         return ~overlap_fun(self.grid)
 
     def __getitem__(self, *args, **kwargs):
@@ -313,7 +330,6 @@ class MultiGrid:
                  ) / max_alpha
         ).astype(img1.dtype)
 
-
     @classmethod
     def render_tile(cls, obj,
                     tile_size: int = TILE_PIXELS,
@@ -347,7 +363,7 @@ class MultiGrid:
         width_px = self.width * tile_size
         height_px = self.height * tile_size
 
-        img = np.zeros(shape=(height_px, width_px, 3), dtype=np.uint8)#[..., None] + COLORS['shadow']
+        img = np.zeros(shape=(height_px, width_px, 3), dtype=np.uint8)  # [..., None] + COLORS['shadow']
         img[:] = COLORS['shadow']
 
         for j in range(0, self.height):
@@ -463,7 +479,7 @@ class para_MultiGridEnv(ParallelEnv):
         self.seed(seed=seed)
         self.agent_spawn_kwargs = agent_spawn_kwargs
         self.ghost_mode = ghost_mode
-        self.agent_view_size = agents[0].view_size * agents[0].view_tile_size #34 magic number fix?
+        self.agent_view_size = agents[0].view_size * agents[0].view_tile_size  # 34 magic number fix?
 
         self.agents = agents
         self.puppets = puppets
@@ -483,21 +499,29 @@ class para_MultiGridEnv(ParallelEnv):
 
         self.minibatch = 0
         self.total_step_count = 0
-        
+
         self.observation_style = observation_style
+
         if self.observation_style == 'rich':
             self.rich_observation_layers = [
-                can_overlap,
-                can_overlap_pathing,
-                get_reward,
-                see_behind,
-                ]
+                lambda k, mapping: (mapping[k].type == 'Agent' if hasattr(mapping[k], 'type') else False),
+                lambda k, mapping: (mapping[k].type == 'Box' if hasattr(mapping[k], 'type') else False),
+                lambda k, mapping: (mapping[k].can_overlap() if hasattr(mapping[k], 'can_overlap') else True),
+                lambda k, mapping: (mapping[k].volatile() if hasattr(mapping[k], 'volatile') else False),
+                lambda k, mapping: (mapping[k].get_reward() if hasattr(mapping[k], 'get_reward') else 0),
+                # we can see hidden rewards this way
+                lambda k, mapping: (mapping[k].see_behind() if hasattr(mapping[k], 'see_behind') else True),
+                'vis'  # show the visibility mask
+            ]
+            if self.gaze_highlighting:
+                self.rich_observation_layers.append('gaze')
             self.observation_spaces = {agent: Box(
                 low=0,
                 high=255,
                 shape=(self.agent_view_size, self.agent_view_size, len(self.rich_observation_layers)),
                 dtype='uint8'
             ) for agent in self.possible_agents}
+
         else:
             self.observation_spaces = {agent: Box(
                 low=0,
@@ -952,7 +976,7 @@ class para_MultiGridEnv(ParallelEnv):
 
         # probably horribly inefficient. making a multigrid to use existing slice function
         gaze_grid = MultiGrid(gaze_grid)
-        #gaze_grid.grid = gaze_grid
+        # gaze_grid.grid = gaze_grid
 
         if agent.view_type == 0:
             # egocentric view
@@ -1015,8 +1039,6 @@ class para_MultiGridEnv(ParallelEnv):
         Generate the agent's view (partially observable, low-resolution encoding)
         """
 
-        
-            
         if self.gaze_highlighting is True:
             # get the puppet's view mask
             puppet_mask = None  # if we don't find a puppet instance? unclear when this happens
@@ -1031,20 +1053,31 @@ class para_MultiGridEnv(ParallelEnv):
                             self.prev_puppet_mask = np.logical_or(self.prev_puppet_mask, puppet_mask)
                             puppet_mask = self.prev_puppet_mask
 
-                        puppet_mask = self.slice_gaze_grid(agent, puppet_mask) # get relative gaze mask in agent view
+                        puppet_mask = self.slice_gaze_grid(agent, puppet_mask)  # get relative gaze mask in agent view
         else:
             puppet_mask = None
 
         # print('generating agent obs', agent)
         view_grid, vis_mask = self.gen_obs_grid(agent)
+
         if self.observation_style == 'rich':
             # bypass rendering, just do dense function
-            visibility = vis_mask
-            obs = np.zeros(len(self.rich_observation_layers), self.view_size, self.view_size)
-            for i, layer in enumerate(self.rich_observation_layers):
-                obs[i, :, :] = view_grid.layer and visibility if layer is not 'vis' else visibility
-            return obs
+            mapping = view_grid.obj_reg.key_to_obj_map
 
+            visibility = vis_mask
+            obs = np.zeros((len(self.rich_observation_layers), agent.view_size, agent.view_size))
+            for i, layer in enumerate(self.rich_observation_layers):
+                if len(mapping) < 2:
+                    continue
+                if isinstance(layer, str):
+                    if layer == 'vis':
+                        obs[i, :, :] = visibility
+                    elif layer == 'gaze':
+                        obs[i, :, :] = puppet_mask
+                else:
+                    obs[i, :, :] = np.multiply(np.vectorize(layer)(view_grid.grid, mapping), visibility)
+            #print(np.sum(obs, axis=0))
+            return obs
 
         grid_image = view_grid.render(tile_size=agent.view_tile_size, visible_mask=vis_mask, top_agent=agent,
                                       gaze_highlight_mask=puppet_mask)

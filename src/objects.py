@@ -103,8 +103,7 @@ class WorldObj(metaclass=RegisteredObjectType):
     def can_overlap(self):
         return False
 
-    def can_overlap_pathing(self):
-        # change to is_volatile
+    def volatile(self):
         return False
 
     def can_pickup(self):
@@ -187,7 +186,7 @@ class GridAgent(WorldObj):
     def can_overlap(self):
         return True
 
-    def can_overlap_pathing(self):
+    def volatile(self):
         return True
 
     def render(self, img):
@@ -216,7 +215,7 @@ class InvisibleObject(WorldObj):
     def can_overlap(self):
         return True
 
-    def can_overlap_pathing(self):
+    def volatile(self):
         return True
 
     def render(self, img):
@@ -249,15 +248,17 @@ class BonusTile(WorldObj):
     def can_overlap(self):
         return True
 
-    def can_overlap_pathing(self):
+    def volatile(self):
         return True
 
     def str_render(self, dir=0):
         return "BB"
 
-    def get_reward(self, agent):
+    def get_reward(self, agent=None):
         # If the agent hasn't hit any bonus tiles, set its bonus state so that
         #  it'll get a reward from hitting this tile.
+        if agent is None:
+            return self.reward
         first_bonus = False
         if agent.bonus_state is None:
             agent.bonus_state = (self.bonus_id - 1) % self.n_bonus
@@ -297,10 +298,10 @@ class Goal(WorldObj):
     def can_overlap(self):
         return True
 
-    def can_overlap_pathing(self):
+    def volatile(self):
         return True
 
-    def get_reward(self, agent):
+    def get_reward(self, agent=None):
         return self.reward
 
     def set_reward(self, reward):
@@ -320,7 +321,7 @@ class SubGoal(WorldObj):
     def can_overlap(self):
         return True
 
-    def can_overlap_pathing(self):
+    def volatile(self):
         return True
 
     def can_pickup(self):
@@ -342,10 +343,12 @@ class TerminalGoal(WorldObj):
     def can_overlap(self):
         return True
 
-    def can_overlap_pathing(self):
+    def volatile(self):
         return True
 
-    def get_reward(self, agent):
+    def get_reward(self, agent=None):
+        if agent is None:
+            return self.reward
         if agent.carrying is not None and isinstance(agent.carrying, SubGoal):
             return self.reward_future
         else:
@@ -362,7 +365,7 @@ class Floor(WorldObj):
     def can_overlap(self):
         return True  # and self.agent is None
 
-    def can_overlap_pathing(self):
+    def volatile(self):
         return True
 
     def str_render(self, dir=0):
@@ -387,7 +390,7 @@ class EmptySpace(WorldObj):
     def can_verlap(self):
         return True
 
-    def can_overlap_pathing(self):
+    def volatile(self):
         return True
 
     def str_render(self, dir=0):
@@ -401,7 +404,7 @@ class Lava(WorldObj):
     def can_overlap(self):
         return True  # and self.agent is None
 
-    def can_overlap_pathing(self):
+    def volatile(self):
         return True
 
     def str_render(self, dir=0):
@@ -442,7 +445,7 @@ class Block(WorldObj):
     def see_behind(self):
         return True
 
-    def can_overlap_pathing(self):
+    def volatile(self):
         return True
 
     def str_render(self, dir=0):
@@ -471,7 +474,7 @@ class Curtain(WorldObj):
     def can_overlap(self):
         return True
 
-    def can_overlap_pathing(self):
+    def volatile(self):
         return True
 
     def see_behind(self):
@@ -514,7 +517,7 @@ class Key(WorldObj):
     def str_render(self, dir=0):
         return "KK"
 
-    def can_overlap_pathing(self):
+    def volatile(self):
         return True
 
     def render(self, img):
@@ -539,7 +542,7 @@ class Ball(WorldObj):
     def str_render(self, dir=0):
         return "AA"
 
-    def can_overlap_pathing(self):
+    def volatile(self):
         return True
 
     def render(self, img):
@@ -551,7 +554,7 @@ class Door(WorldObj):
     def can_overlap(self):
         return self.state == STATES.open  # and self.agent is None  # is open
 
-    def can_overlap_pathing(self):
+    def volatile(self):
         return True
 
     def see_behind(self):
@@ -618,7 +621,7 @@ class Box(WorldObj):
     def can_overlap(self):
         return True
 
-    def can_overlap_pathing(self):
+    def volatile(self):
         return True
 
     def toggle(self, agent, fwd_pos):
@@ -626,7 +629,7 @@ class Box(WorldObj):
         # unused
         pass
 
-    def get_reward(self, agent):
+    def get_reward(self, agent=None):
         return self.reward
 
     # print('toggling')

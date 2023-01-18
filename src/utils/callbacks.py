@@ -97,7 +97,7 @@ def ground_truth_evals(eval_envs, model, repetitions=25, memory=1):
             env.deterministic_seed = k
             env.reset()
 
-            all_paths = env.get_all_paths(env.grid.overlapping_pathing, env.instance_from_name['player_0'].pos)
+            all_paths = env.get_all_paths(env.grid.volatile, env.instance_from_name['player_0'].pos)
 
             # todo: advance paths to point of divergence instead of first chance
 
@@ -148,7 +148,7 @@ def ground_truth_evals(eval_envs, model, repetitions=25, memory=1):
                     taken_path += [env.instance_from_name['player_0'].pos]
                     if dones['player_0']:
                         '''print(t, taken_path[release:])
-                        grid2 = env.grid.overlapping_pathing.astype(int)
+                        grid2 = env.grid.volatile.astype(int)
                         for pos in taken_path[release:]:
                             #print('pos', pos[0], pos[1])
                             grid2[pos[0], pos[1]] += 10
