@@ -129,4 +129,4 @@ dmypy.json
 .pyre/
 *.xml
 *.iml
-human_player.py
+../standoff_models/human_player.py
