@@ -1077,7 +1077,7 @@ class para_MultiGridEnv(ParallelEnv):
                 else:
                     obs[i, :, :] = np.multiply(np.vectorize(layer)(view_grid.grid, mapping), visibility)
             #print(np.sum(obs, axis=0))
-            return obs
+            return np.swapaxes(obs, 0, 2)
 
         grid_image = view_grid.render(tile_size=agent.view_tile_size, visible_mask=vis_mask, top_agent=agent,
                                       gaze_highlight_mask=puppet_mask)
