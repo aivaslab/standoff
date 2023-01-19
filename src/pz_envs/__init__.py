@@ -26,7 +26,8 @@ def register_standoff_env(
         env_class,
         config_name,
         difficulty,
-        reward_decay=True
+        reward_decay=True,
+        observation_style='rich'
 ):
     configs = ScenarioConfigs().standoff
 
@@ -44,7 +45,7 @@ def register_standoff_env(
         "view_size": 17,
         "view_offset": 4,
         "view_tile_size": 3,
-        "observation_style": "image",
+        "observation_style": "rich",
         "see_through_walls": False,
         "color": "prestige",
         "view_type": 0,
@@ -105,4 +106,5 @@ for difficulty in range(3):
                 StandoffEnv,
                 config,
                 difficulty,
+                observation_style='rich'
             )
