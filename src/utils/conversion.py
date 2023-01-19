@@ -84,7 +84,9 @@ def wrap_env_full(env, reduce_color=False, memory=1, size=32, saveVids=False, ve
     env = ss.concat_vec_envs_v1(env, threads, num_cpus=1, base_class='stable_baselines3')
     # num_cpus=1 changed from 2 to avoid csv issues. does it affect speed?
     
-    env = VecTransposeImage(env)
+    if style != 'rich':
+        # this line might be causing issues anyway, should check
+        env = VecTransposeImage(env)
     if memory > 1:
         env = VecFrameStack(env, n_stack=memory, channels_order='first')
         # consider StackedObservations
