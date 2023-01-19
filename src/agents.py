@@ -82,7 +82,7 @@ class GridAgentInterface(GridAgent):
         )
         if observation_style == 'image':
             self.observation_space = image_space
-        elif observation_stype == 'rich':
+        elif observation_style == 'rich':
             self.observation_space = image_space
         elif observation_style == 'richLegacy':
             obs_space = {
