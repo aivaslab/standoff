@@ -1210,7 +1210,7 @@ class para_MultiGridEnv(ParallelEnv):
             X, np.ones((int(rescale_factor), int(rescale_factor), 1))
         )
 
-        if show_agent_views:
+        if show_agent_views and self.observation_style != 'rich':
 
             target_partial_width = int(img.shape[0] * agent_col_width_frac - 2 * agent_col_padding_px)
             target_partial_height = (img.shape[1] - 2 * agent_col_padding_px) // max_agents_per_col
@@ -1242,7 +1242,7 @@ class para_MultiGridEnv(ParallelEnv):
         if mode == "human":
             if not self.window.isopen:
                 self.window.imshow(img)
-                self.window.window.set_caption("Marlgrid")
+                self.window.window.set_caption("Standoff")
             else:
                 self.window.imshow(img)
 
