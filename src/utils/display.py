@@ -237,13 +237,17 @@ def make_pic_video(model, env, name, random_policy=False, video_length=50, saveP
     """
     make a video of the model playing the environment
     """
+    use_global_obs = env.observation_style == 'rich'
     _env = parallel_to_aec(env.unwrapped.vec_envs[0].par_env).unwrapped
     images = []
     obs = _env.reset()
     # reshape obs[following] to be channels, height, width
 
     _env.reset()
-    img = cv2.resize(obs[following], dsize=(image_size, image_size), interpolation=cv2.INTER_NEAREST)
+    if not use_global_obs:
+        img = cv2.resize(obs[following], dsize=(image_size, image_size), interpolation=cv2.INTER_NEAREST)
+    else:
+        img = env.render(mode='rgb_array', width=image_size, height=image_size)
 
     for i in range(video_length):
         images.append(img)
@@ -256,13 +260,20 @@ def make_pic_video(model, env, name, random_policy=False, video_length=50, saveP
             action = {following: model.predict(obs_used, deterministic=deterministic)[0] if memory <= 1 else
                     model.predict(obs_used, deterministic=deterministic)}
         obs, _, dones, _ = _env.step(action)
-        img = cv2.resize(obs[following], dsize=(image_size, image_size), interpolation=cv2.INTER_NEAREST)
+
+        if not use_global_obs:
+            img = cv2.resize(obs[following], dsize=(image_size, image_size), interpolation=cv2.INTER_NEAREST)
+        else:
+            img = env.render(mode='rgb_array', width=image_size, height=image_size)
         cv2.putText(img=img, text=str(action), org=(0, image_size), fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=1,
                     color=(255, 255, 255), thickness=2)
         if dones[following]:
             obs = _env.reset()
             _env.reset()
-            img = cv2.resize(obs[following], dsize=(image_size, image_size), interpolation=cv2.INTER_NEAREST)
+            if not use_global_obs:
+                img = cv2.resize(obs[following], dsize=(image_size, image_size), interpolation=cv2.INTER_NEAREST)
+            else:
+                img = env.render(mode='rgb_array', width=image_size, height=image_size)
             cv2.putText(img=img, text=str(action), org=(0, image_size), fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=1,
                         color=(255, 255, 255), thickness=2)
 
