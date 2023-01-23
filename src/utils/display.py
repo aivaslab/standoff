@@ -222,16 +222,22 @@ def plot_train(log_folder, configName, rank, title='Learning Curve', window=2048
                             values=['valid', 'weakAccuracy', 'accuracy', 'r'],
                             labels=['selected any box', 'selected any treat', 'selected correct treat',
                                     'reward (normalized)'])
+            else:
+                print('could not plot merged_df_f', title)
             if len(merged_df_small_f):
                 # this graph is the same as above, but only taking into account valid samples
                 # avoidcorrect should be identical to weakaccuracy when no opponent is present
                 plot_split(indexer='minibatch', df=merged_df_small_f, mypath=mypath, title=title + '-valid',
                            window=window,
                            values=["accuracy", "weakAccuracy", "avoidCorrect"])
+            else:
+                print('could not plot merged_df_small_f', title)
             if len(merged_df_noname_f):
                 plot_merged(indexer='minibatch', df=merged_df_noname_f, mypath=mypath, title=title, window=window,
                             values=["avoidCorrect"], labels=["avoided correct box"])
                 plot_selection(indexer='minibatch', df=merged_df_noname_f, mypath=mypath, title=title, window=window)
+            else:
+                print('could not plot merged_df_noname_f', title)
 
 
 def make_pic_video(model, env, name, random_policy=False, video_length=50, savePath='', vidName='video.mp4',
