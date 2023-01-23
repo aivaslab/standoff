@@ -86,29 +86,29 @@ class ScenarioConfigs:
             "boxes": [5],
         },
         "informed control": {
-            "events": [[['bait', 'empty'], ['bait', 'empty']]]
+            "events": [[['bait', 'empty'], ['bait', 'empty']]]  # optimal: Small
         },
-        "partially uninformed": {
+        "partially uninformed": {  # optimal: if big bait obscured, Big, else Small
             "events": [[['bait', 'empty'], ['obscure'], ['bait', 'empty']],
                        [['obscure'], ['bait', 'empty'], ['reveal'], ['bait', 'empty']]]
         },
-        "removed informed": {
+        "removed informed": {  # optimal: Neither (minor reward preference over copying dominant's decision)
             "events": [[['bait', 'empty'], ['bait', 'empty'], ['remove', x]] for x in [0, 1]]
         },
-        "removed uninformed": {
+        "removed uninformed": {  # optimal: if Big is removed, Small, else Neither
             "events": [[['bait', 'empty'], ['bait', 'empty'], ['obscure'], ['remove', x]] for x in [0, 1]]
         },
-        "moved": {
+        "moved": {  # optimal: Small
             "events": [[['obscure'], ['bait', 'empty'], ['bait', 'empty'], ['reveal'], ['swap', 1, 'empty'],
                         ['swap', 2, 'empty']]]
         },
-        "replaced": {
+        "replaced": {  # optimal: if first bait is big, Big, else Small
             "events": [[['bait', 'empty'], ['obscure'], ['swap', 0, 'empty'], ['bait', 0]]]
         },
-        "misinformed": {
+        "misinformed": {  # optimal: if big is swapped, Big, else Small
             "events": [[['bait', 'empty'], ['bait', 'empty'], ['obscure'], ['swap', x, 'else']] for x in [0, 1]]
         },
-        "swapped": {
+        "swapped": {  # optimal: Big
             "events": [[['bait', 'empty'], ['bait', 'empty'], ['obscure'], ['swap', 0, 1]]]
         },
         "all": {
