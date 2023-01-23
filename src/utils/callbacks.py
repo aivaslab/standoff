@@ -294,6 +294,7 @@ class PlottingCallbackStartStop(BaseCallback):
         self.gtr = gtr
         self.end_vid = end_vid
         self.image_size = image_size
+        self.timestep = 0
 
     def _on_training_start(self) -> bool:
         super()._on_training_start()
@@ -311,6 +312,10 @@ class PlottingCallbackStartStop(BaseCallback):
 
         plotting_evals(self, vids=self.start_vid, plots=False)
         self.start_time = time.time()
+        return True
+
+    def _on_step(self) -> bool:
+        self.timestep += 1
         return True
 
     def _on_training_end(self) -> bool:
