@@ -53,7 +53,9 @@ def moving_average(values, window):
     return np.convolve(values.astype(float), weights, 'valid')
 
 
-def plot_split(indexer, df, mypath, title, window, values="accuracy"):
+def plot_split(indexer, df, mypath, title, window, values=None):
+    if values is None:
+        values = ["accuracy"]
     new_df = df.pivot(index=indexer, columns="name", values=values)
     fig = plt.figure(title)
     new_df.plot()
@@ -310,17 +312,18 @@ def plot_evals_df(df, savePath, name):
     """
     given dataframe of rollouts, plot things
     """
-    fig, axs = plt.subplots(1)
-    unique_names = df.configName.unique()
-    for cf in unique_names:
-        df2 = df[df['configName'] == cf].groupby('minibatch', as_index=False).mean().sort_values('minibatch')
-        plt.plot(df2.minibatch, df2['accuracy-c'], label=cf, )
-    plt.legend(bbox_to_anchor=(1, 1), loc="upper left")
-    plt.title(name)
-    plt.xlabel('Timestep')
-    plt.ylabel('Accuracy')
-    plt.savefig(os.path.join(savePath, name + '_evals-gtr'), bbox_inches='tight')
-    plt.close(fig)
+    for column in ['accuracy', 'avoidCorrect', 'weakAccuracy']:
+        fig, axs = plt.subplots(1)
+        unique_names = df.configName.unique()
+        for cf in unique_names:
+            df2 = df[df['configName'] == cf].groupby('minibatch', as_index=False).mean().sort_values('minibatch')
+            plt.plot(df2.minibatch, df2[column + '-c'], label=cf, )
+        plt.legend(bbox_to_anchor=(1, 1), loc="upper left")
+        plt.title(name)
+        plt.xlabel('Timestep')
+        plt.ylabel('column')
+        plt.savefig(os.path.join(savePath, name + '_evals-gtr'), bbox_inches='tight')
+        plt.close(fig)
 
 
 def show_state(env, step=0, info=""):
