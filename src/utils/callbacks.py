@@ -168,7 +168,7 @@ def ground_truth_evals(eval_envs, model, repetitions=25, memory=1):
                 infos['normed_likelihood'] = infos['likelihood'] - max_likelihood
                 infos['probability'] = math.exp(infos['normed_likelihood'])
                 infos['accuracy'] = 1 if infos['selection'] == infos['correctSelection'] else 0
-                infos['accuracy'] = 1 if infos['selection'] == infos['correctSelection'] or infos['selection'] == infos['incorrectSelection']else 0
+                infos['weakAccuracy'] = 1 if infos['selection'] == infos['correctSelection'] or infos['selection'] == infos['incorrectSelection']else 0
                 prob_sum += infos['probability']
 
             new_infos = {}
