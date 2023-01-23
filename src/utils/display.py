@@ -237,8 +237,8 @@ def make_pic_video(model, env, name, random_policy=False, video_length=50, saveP
     """
     make a video of the model playing the environment
     """
-    use_global_obs = env.observation_style == 'rich'
     _env = parallel_to_aec(env.unwrapped.vec_envs[0].par_env).unwrapped
+    use_global_obs = _env.observation_style == 'rich'
     images = []
     obs = _env.reset()
     # reshape obs[following] to be channels, height, width
