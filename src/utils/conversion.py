@@ -98,7 +98,7 @@ def wrap_env_full(env, reduce_color=False, memory=1, size=32, saveVids=False, ve
             env = VecMonitor(env, filename=f"{configName}-{rank}", info_keywords=info_keywords)
     if rank == 0 and vecNormalize:
         # must be after VecMonitor for monitor to show unnormed rewards
-        env = VecNormalizeMultiAgent(env, norm_obs=True, norm_reward=True, clip_obs=10.)
+        env = VecNormalizeMultiAgent(env, norm_obs=True, norm_reward=False, clip_obs=10.)
     return env
 
 
