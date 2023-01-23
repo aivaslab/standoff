@@ -310,17 +310,17 @@ def plot_evals_df(df, savePath, name):
     """
     given dataframe of rollouts, plot things
     """
+    fig, axs = plt.subplots(1)
     unique_names = df.configName.unique()
     for cf in unique_names:
-        fig, axs = plt.subplots(1)
         df2 = df[df['configName'] == cf].groupby('minibatch', as_index=False).mean().sort_values('minibatch')
         plt.plot(df2.minibatch, df2['accuracy-c'], label=cf, )
-        plt.legend(bbox_to_anchor=(1, 1), loc="upper left")
-        plt.title(name)
-        plt.xlabel('Timestep')
-        plt.ylabel('Accuracy')
-        plt.savefig(os.path.join(savePath, name + cf + '_evals-gtr'), bbox_inches='tight')
-        plt.close(fig)
+    plt.legend(bbox_to_anchor=(1, 1), loc="upper left")
+    plt.title(name)
+    plt.xlabel('Timestep')
+    plt.ylabel('Accuracy')
+    plt.savefig(os.path.join(savePath, name + '_evals-gtr'), bbox_inches='tight')
+    plt.close(fig)
 
 
 def show_state(env, step=0, info=""):
