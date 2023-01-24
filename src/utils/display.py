@@ -317,7 +317,7 @@ def plot_evals_df(df, savePath, name):
     """
     given dataframe of rollouts, plot things
     """
-    print('plotting evals df', name, df.columns)
+    #print('plotting evals df', name, df.columns)
     for column in ['accuracy', 'avoidCorrect', 'weakAccuracy']:
         fig, axs = plt.subplots(1)
         unique_names = df.configName.unique()
