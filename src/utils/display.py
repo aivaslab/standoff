@@ -103,7 +103,7 @@ def plot_selection(indexer, df, mypath, title, window):
     plt.close()
 
 
-def plot_train(log_folder, configName, rank, title='Learning Curve', window=2048):
+def plot_train(log_folder, fig_folder, configName, rank, title='Learning Curve', window=2048):
     """
     plot the results
     :param log_folder: (str) the save location of the results to plot
@@ -115,11 +115,10 @@ def plot_train(log_folder, configName, rank, title='Learning Curve', window=2048
 
     merged_df = pd.DataFrame()
     merged_df_small = pd.DataFrame()
-    mypath = os.path.join(log_folder, 'figs')
-    if not os.path.exists(mypath):
-        os.mkdir(mypath)
+    mypath = fig_folder
 
     for file_name in monitor_files:
+        print('file', file_name)
         # if file_name != os.path.join(log_folder, configName + "-" + str(rank) + ".monitor.csv"):
         #    continue
         title2 = os.path.basename(file_name).replace('.', '-')[:-12]
@@ -165,7 +164,6 @@ def plot_train(log_folder, configName, rank, title='Learning Curve', window=2048
                 print('small df', file_name, 'had no good samples')
                 continue
 
-            print('file', file_name)
 
             # ValueError: Wrong number of items passed 18, placement implies 1;
             # maybe happens when no good data, so exit if so?
@@ -190,7 +188,7 @@ def plot_train(log_folder, configName, rank, title='Learning Curve', window=2048
             # dr = df.rolling(real_window).mean()
             # drSmall = dfSmall.rolling(real_window).mean()
 
-            plot_selection(indexer='minibatch', df=groupedSmall, mypath=mypath, title=title2, window=window)
+            plot_selection(indexer='minibatch', df=groupedSmall, mypath=fig_folder, title=title2, window=window)
 
     merged_df = merged_df.groupby(['minibatch', 'eval', 'gtr'], as_index=False).mean().sort_values('minibatch')
     merged_df_small = merged_df_small.groupby(['minibatch', 'name', 'eval', 'gtr'], as_index=False).mean().sort_values(
@@ -233,9 +231,9 @@ def plot_train(log_folder, configName, rank, title='Learning Curve', window=2048
             else:
                 print('could not plot merged_df_small_f', title)
             if len(merged_df_noname_f):
-                plot_merged(indexer='minibatch', df=merged_df_noname_f, mypath=mypath, title=title, window=window,
+                plot_merged(indexer='minibatch', df=merged_df_noname_f, mypath=fig_folder, title=title, window=window,
                             values=["avoidCorrect"], labels=["avoided correct box"])
-                plot_selection(indexer='minibatch', df=merged_df_noname_f, mypath=mypath, title=title, window=window)
+                plot_selection(indexer='minibatch', df=merged_df_noname_f, mypath=fig_folder, title=title, window=window)
             else:
                 print('could not plot merged_df_noname_f', title)
 

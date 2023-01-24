@@ -195,7 +195,7 @@ def ground_truth_evals(eval_envs, model, repetitions=25, memory=1):
     return df
 
 
-def plotting_evals(self, vids=False, plots=True):
+def plotting_evals(self, vids=False, plots=True, fig_folder=''):
 
     if not self.gtr:
         plot_evals(self.savePath, self.name, self.names, self.eval_cbs)
@@ -206,7 +206,7 @@ def plotting_evals(self, vids=False, plots=True):
         self.eval_df[temp.columns] = temp
 
         if plots:
-            plot_evals_df(self.eval_df, self.savePath, self.name)
+            plot_evals_df(self.eval_df, fig_folder, self.name)
 
     if not os.path.exists(os.path.join(self.savePath, 'videos')):
         os.mkdir(os.path.join(self.savePath, 'videos'))
@@ -322,6 +322,10 @@ class PlottingCallbackStartStop(BaseCallback):
     def _on_training_end(self) -> bool:
         super()._on_training_end()
 
+        fig_folder = os.path.join(self.savePath, 'figs')
+        if not os.path.exists(fig_folder):
+            os.mkdir(fig_folder)
+
         try:
             with open(self.logPath, 'a') as logfile:
                 logfile.write('end of training! total time:' + str(time.time() - self.start_time) + '\n')
@@ -343,7 +347,7 @@ class PlottingCallbackStartStop(BaseCallback):
         except Exception as e:
             print("Error on line {}".format(sys.exc_info()[-1].tb_lineno), e)
         try:
-            plot_train(self.savePath, self.name, 0, self.train_name + 'train')
+            plot_train(self.savePath, fig_folder, self.name, 0, self.train_name + 'train')
         except Exception as e:
             print("Error on line {}".format(sys.exc_info()[-1].tb_lineno), e)
 
