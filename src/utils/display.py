@@ -319,6 +319,7 @@ def plot_evals_df(df, savePath, name):
     """
     given dataframe of rollouts, plot things
     """
+    print('plotting evals df', name, df.columns)
     for column in ['accuracy', 'avoidCorrect', 'weakAccuracy']:
         fig, axs = plt.subplots(1)
         unique_names = df.configName.unique()
@@ -328,7 +329,7 @@ def plot_evals_df(df, savePath, name):
         plt.legend(bbox_to_anchor=(1, 1), loc="upper left")
         plt.title(name)
         plt.xlabel('Timestep')
-        plt.ylabel('column')
+        plt.ylabel(column)
         plt.savefig(os.path.join(savePath, name + '_evals-gtr'), bbox_inches='tight')
         plt.close(fig)
 
