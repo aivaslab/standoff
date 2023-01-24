@@ -10,6 +10,7 @@ import os
 import pandas as pd
 import torch
 import math
+import sys
 
 
 class TrainUpdateCallback(BaseCallback):
@@ -332,19 +333,19 @@ class PlottingCallbackStartStop(BaseCallback):
                 'finished': True,
             })
         except Exception as e:
-            print('error', e)
+            print("Error on line {}".format(sys.exc_info()[-1].tb_lineno), e)
         try:
             plotting_evals(self, vids=self.end_vid, plots=True)
         except Exception as e:
-            print('error', e)
+            print("Error on line {}".format(sys.exc_info()[-1].tb_lineno), e)
         try:
-            gtr_to_monitor(self.savePath, self.eval_df)
+            gtr_to_monitor(self.savePath, self.eval_df) #works
         except Exception as e:
-            print('error', e)
+            print("Error on line {}".format(sys.exc_info()[-1].tb_lineno), e)
         try:
             plot_train(self.savePath, self.name, 0, self.train_name + 'train')
         except Exception as e:
-            print('error', e)
+            print("Error on line {}".format(sys.exc_info()[-1].tb_lineno), e)
 
         return True
 
