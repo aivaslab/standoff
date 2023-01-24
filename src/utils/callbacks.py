@@ -331,12 +331,20 @@ class PlottingCallbackStartStop(BaseCallback):
                 'length': np.mean(self.eval_cbs[0].evaluations_length[-1]),
                 'finished': True,
             })
-
+        except Exception as e:
+            print('error', e)
+        try:
             plotting_evals(self, vids=self.end_vid, plots=True)
+        except Exception as e:
+            print('error', e)
+        try:
             gtr_to_monitor(self.savePath, self.eval_df)
+        except Exception as e:
+            print('error', e)
+        try:
             plot_train(self.savePath, self.name, 0, self.train_name + 'train')
         except Exception as e:
-            print(e)
+            print('error', e)
 
         return True
 
