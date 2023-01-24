@@ -158,25 +158,18 @@ def ground_truth_evals(eval_envs, model, repetitions=25, memory=1):
                         break
 
                 infos = env.infos['player_0']
+                infos['r'] = rewards['player_0']
                 infos['likelihood'] = total_likelihood
                 infos['configName'] = env.configName
                 all_path_infos.append(infos)
 
             max_likelihood = max(all_path_infos, key=lambda x: x['likelihood'])['likelihood']
 
-            '''
-            df['r'] = ???
-            df["valid"] = df["selection"] != -1
-            dfSmall["avoidedBig"] = dfSmall.apply(lambda row: row["selectedSmall"] or row["selectedNeither"], axis=1)
-            dfSmall["avoidedSmall"] = dfSmall.apply(lambda row: row["selectedBig"] or row["selectedNeither"], axis=1)
-
-            dfSmall["avoidCorrect"] = dfSmall.apply(lambda row: (row["avoidedBig"] == row["shouldAvoidBig"]) or (
-            row["avoidedSmall"] == row["shouldAvoidSmall"]), axis=1)
-            '''
-
             prob_sum = 0
             for infos in all_path_infos:
-                print('keys', infos.keys())
+                infos['avoidedBig'] = infos['selectedSmall'] or infos['selectedNeither']
+                infos['avoidedSmall'] = infos['selectedBig'] or infos['selectedNeither']
+                infos['avoidCorrect'] = (infos['avoidedBig'] == infos['shouldAvoidBig']) or (infos['avoidedSmall'] == infos['shouldAvoidSmall'])
                 infos['normed_likelihood'] = infos['likelihood'] - max_likelihood
                 infos['probability'] = math.exp(infos['normed_likelihood'])
                 infos['accuracy'] = 1 if infos['selection'] == infos['correctSelection'] else 0
