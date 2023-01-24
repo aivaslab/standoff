@@ -339,11 +339,11 @@ class PlottingCallbackStartStop(BaseCallback):
         except Exception as e:
             print("Error on line {}".format(sys.exc_info()[-1].tb_lineno), e)
         try:
-            plotting_evals(self, vids=self.end_vid, plots=True)
+            plotting_evals(self, vids=self.end_vid, plots=True, fig_folder=fig_folder)
         except Exception as e:
             print("Error on line {}".format(sys.exc_info()[-1].tb_lineno), e)
         try:
-            gtr_to_monitor(self.savePath, self.eval_df) #works
+            gtr_to_monitor(self.savePath, self.eval_df)
         except Exception as e:
             print("Error on line {}".format(sys.exc_info()[-1].tb_lineno), e)
         try:
