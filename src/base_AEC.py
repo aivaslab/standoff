@@ -511,9 +511,9 @@ class para_MultiGridEnv(ParallelEnv):
                 lambda k, mapping: (mapping[k].get_reward() if hasattr(mapping[k], 'get_reward') else 0),
                 # we can see hidden rewards this way
                 lambda k, mapping: (mapping[k].see_behind() if hasattr(mapping[k], 'see_behind') else True),
-                'vis'  # show the visibility mask
+                #'vis'  # show the visibility mask (temporarily disabled)
             ]
-            if self.gaze_highlighting:
+            if self.gaze_highlighting and False: #temporarily disabled
                 self.rich_observation_layers.append('gaze')
             self.observation_spaces = {agent: Box(
                 low=0,
