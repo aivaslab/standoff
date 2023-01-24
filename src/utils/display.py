@@ -307,6 +307,7 @@ def gtr_to_monitor(savePath, df):
     for cf in df.configName.unique():
         header = {'n': cf}
         filename = os.path.join(savePath, cf + '-gtr.monitor.csv')
+        print('saving monitor', filename)
 
         new_df = df[df['configName'] == cf]
 
