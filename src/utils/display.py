@@ -62,8 +62,11 @@ def plot_split(indexer, df, mypath, title, window, values=None):
     plt.xlabel('Timestep, (window={})'.format(window))
     plt.ylabel(values)
     plt.xlim(0, plt.xlim()[1])
+    plt.ylim(0, 1)
     plt.title(title + " " + values[0])
-    name = title + "-filtered-" + values[0]
+    plt.legend(loc='center left', bbox_to_anchor=(1, 1))
+    plt.tight_layout()
+    name = title + values[0]
     plt.savefig(os.path.join(mypath, name))
     plt.close()
 
@@ -79,10 +82,11 @@ def plot_merged(indexer, df, mypath, title, window, values=None,
     for value, label in zip(values, labels):
         plt.plot(df[indexer], df[value], label=label)
     plt.xlim(0, plt.xlim()[1])
-    plt.legend(labels)
+    plt.legend(labels, loc='center left', bbox_to_anchor=(1, 1))
     plt.xlabel('Timestep, (window={})'.format(window))
     plt.ylabel('Percent')
     plt.title(title + " " + values[0])
+    plt.tight_layout()
     plt.savefig(os.path.join(mypath, title + "-merged-" + values[0]))
     plt.close()
 
@@ -110,22 +114,28 @@ def plot_train(log_folder, fig_folder, configName, rank, title='Learning Curve',
     :param title: (str) the title of the task to plot
     """
     monitor_files = get_monitor_files(log_folder)
-    if len(monitor_files) == 0:
-        raise LoadMonitorResultsError(f"No monitor files of the form *{Monitor.EXT} found in {log_folder}")
+
+    if not len(monitor_files):
+        print(f"No monitor files found in {log_folder}")
+        pass
 
     merged_df = pd.DataFrame()
     merged_df_small = pd.DataFrame()
-    mypath = fig_folder
+    if not os.path.exists(fig_folder):
+        os.mkdir(fig_folder)
 
     for file_name in monitor_files:
-        print('file', file_name)
+        #print('generating figs from', file_name)
         # if file_name != os.path.join(log_folder, configName + "-" + str(rank) + ".monitor.csv"):
         #    continue
         title2 = os.path.basename(file_name).replace('.', '-')[:-12]
         rank = title2[-1]
+        #print(os.path.basename(file_name), title2, rank)
         with open(file_name) as file_handler:
             first_line = file_handler.readline()
-            assert first_line[0] == "#"
+            assert first_line[0] == "#", print(first_line)
+            metadata = json.loads(first_line[1:].replace('""', ''))
+            rank = metadata['rank'] if 'rank' in metadata.keys() else -1
             header = json.loads(first_line[1:])
             # cols = pandas.read_csv(file_handler, nrows=1).columns
             df = pd.read_csv(file_handler, index_col=None, on_bad_lines='skip')  # , usecols=cols)
@@ -145,6 +155,9 @@ def plot_train(log_folder, fig_folder, configName, rank, title='Learning Curve',
             df["selectedNeither"] = pd.to_numeric(df["selectedNeither"])
 
             df["selection"] = df["selection"].fillna(-1)
+
+            '''
+            # we already have these values for gtr files
             df["accuracy"] = df["selection"] == df["correctSelection"]
             # print(df.columns)
             df["weakAccuracy"] = df.apply(
@@ -153,6 +166,11 @@ def plot_train(log_folder, fig_folder, configName, rank, title='Learning Curve',
             df["valid"] = df["selection"] != -1
             df["accuracy"] = pd.to_numeric(df["accuracy"])
             df["valid"] = pd.to_numeric(df["valid"])
+            '''
+
+            #temp, as gtr should generate this ideally
+            df["valid"] = df["selection"] != -1
+
 
             df.minibatch = df.minibatch.astype(int)
 
@@ -174,14 +192,15 @@ def plot_train(log_folder, fig_folder, configName, rank, title='Learning Curve',
                     row["avoidedSmall"] == row["shouldAvoidSmall"]), axis=1)
 
             grouped = df.groupby('minibatch', as_index=False).mean().sort_values('minibatch')
+            #print(df['accuracy'])
             groupedSmall = dfSmall.groupby('minibatch', as_index=False).mean().sort_values('minibatch')
 
             # small is valid rows
 
             grouped['name'] = title2
             groupedSmall['name'] = title2
-            grouped['eval'] = (rank != '0')
-            groupedSmall['eval'] = (rank != '0')
+            grouped['eval'] = (rank != 0)
+            groupedSmall['eval'] = (rank != 0)
             merged_df = merged_df.append(grouped)
             merged_df_small = merged_df_small.append(groupedSmall)
 
@@ -190,52 +209,74 @@ def plot_train(log_folder, fig_folder, configName, rank, title='Learning Curve',
 
             plot_selection(indexer='minibatch', df=groupedSmall, mypath=fig_folder, title=title2, window=window)
 
+    #print('lenny', len(merged_df), merged_df.columns, len(merged_df_small), merged_df_small.columns)
     merged_df = merged_df.groupby(['minibatch', 'eval', 'gtr'], as_index=False).mean().sort_values('minibatch')
     merged_df_small = merged_df_small.groupby(['minibatch', 'name', 'eval', 'gtr'], as_index=False).mean().sort_values(
         'minibatch')
     merged_df_noname = merged_df_small.groupby(['minibatch', 'eval', 'gtr'], as_index=False).mean().sort_values(
         'minibatch')
+    #print('lenny2', len(merged_df), merged_df.columns, len(merged_df_small), merged_df_small.columns)
+    #print(merged_df_noname.head)
 
     for use_train in [True, False]:
-        title = 'train' if use_train else 'eval'
+        title_base = 'train' if use_train else 'eval'
         for use_gtr in [True, False]:
             if use_train and use_gtr:
                 # gtr is only used for evals
                 continue
-            title = title + ('-gtr' if use_gtr else '-rollout')
+            title = title_base + ('-gtr' if use_gtr else '-rollout')
 
+            #print(merged_df['accuracy'])
             merged_df_f = merged_df[(merged_df['eval'] != use_train) & (merged_df['gtr'] == use_gtr)]
             merged_df_small_f = merged_df_small[
                 (merged_df_small['eval'] != use_train) & (merged_df_small['gtr'] == use_gtr)]
             merged_df_noname_f = merged_df_noname[
                 (merged_df_noname['eval'] != use_train) & (merged_df_noname['gtr'] == use_gtr)]
-            # print(merged_df['eval'])
 
             # normalize r after all the filtering
             merged_df_f["r"] = (merged_df_f["r"] - merged_df_f["r"].min()) / (
                         merged_df_f["r"].max() - merged_df_f["r"].min())
 
+            plotted = ['Plotted']
+            not_plotted = ['Could not plot']
+
             if len(merged_df_f):
-                plot_merged(indexer='minibatch', df=merged_df_f, mypath=mypath, title=title, window=window,
+                title2 = title + '-f'
+                plot_merged(indexer='minibatch', df=merged_df_f, mypath=fig_folder, title=title2, window=window,
                             values=['valid', 'weakAccuracy', 'accuracy', 'r'],
                             labels=['selected any box', 'selected any treat', 'selected correct treat',
                                     'reward (normalized)'])
+                plotted += ['merged_df_f '+ title2]
             else:
-                print('could not plot merged_df_f', title)
+                not_plotted += ['merged_df_f '+ title2]
             if len(merged_df_small_f):
+                title2 = title + '-smf'
                 # this graph is the same as above, but only taking into account valid samples
                 # avoidcorrect should be identical to weakaccuracy when no opponent is present
-                plot_split(indexer='minibatch', df=merged_df_small_f, mypath=mypath, title=title + '-valid',
+                plot_split(indexer='minibatch', df=merged_df_small_f, mypath=fig_folder, title=title2,
                            window=window,
-                           values=["accuracy", "weakAccuracy", "avoidCorrect"])
+                           values=["accuracy",])
+                plot_split(indexer='minibatch', df=merged_df_small_f, mypath=fig_folder, title=title2,
+                           window=window,
+                           values=["weakAccuracy"])
+                plot_split(indexer='minibatch', df=merged_df_small_f, mypath=fig_folder, title=title2,
+                           window=window,
+                           values=["avoidCorrect"])
+                plotted += ['merged_df_small_f '+ title2]
             else:
-                print('could not plot merged_df_small_f', title)
+                not_plotted += ['merged_df_small_f '+ title2]
             if len(merged_df_noname_f):
-                plot_merged(indexer='minibatch', df=merged_df_noname_f, mypath=fig_folder, title=title, window=window,
+                title2 = title + '-nnf'
+                plot_merged(indexer='minibatch', df=merged_df_noname_f, mypath=fig_folder, title=title2, window=window,
                             values=["avoidCorrect"], labels=["avoided correct box"])
-                plot_selection(indexer='minibatch', df=merged_df_noname_f, mypath=fig_folder, title=title, window=window)
+                plot_selection(indexer='minibatch', df=merged_df_noname_f, mypath=fig_folder, title=title2, window=window)
+                plotted += ['merged_df_noname_f '+ title2]
             else:
-                print('could not plot merged_df_noname_f', title)
+                not_plotted += ['merged_df_noname_f '+ title2]
+            '''if len(plotted) > 1:
+                print(' '.join(plotted))
+            if len(not_plotted) > 1:
+                print(' '.join(not_plotted))'''
 
 
 def make_pic_video(model, env, name, random_policy=False, video_length=50, savePath='', vidName='video.mp4',
