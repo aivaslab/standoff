@@ -347,7 +347,7 @@ class PlottingCallbackStartStop(BaseCallback):
         except Exception as e:
             print("Error on line {}".format(sys.exc_info()[-1].tb_lineno), e)
         try:
-            gtr_to_monitor(self.savePath, self.eval_df)
+            gtr_to_monitor(self.savePath, self.eval_df, self.envs)
         except Exception as e:
             print("Error on line {}".format(sys.exc_info()[-1].tb_lineno), e)
         try:

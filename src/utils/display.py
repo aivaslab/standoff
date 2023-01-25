@@ -301,9 +301,16 @@ def plot_evals(savePath, name, names, eval_cbs):
     plt.close(fig)
 
 
-def gtr_to_monitor(savePath, df):
+def gtr_to_monitor(savePath, df, envs):
     for cf in df.configName.unique():
-        header = {'n': cf}
+        #get rank from envs using configName
+        #start by identifying which env has this configName
+        rank = -1
+        for env in envs:
+            if env.configName == cf:
+                rank = env.rank
+                break
+        header = {'n': cf, 'rank': rank}
         filename = os.path.join(savePath, cf + '-gtr.monitor.csv')
         print('saving monitor', filename)
 
