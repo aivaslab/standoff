@@ -93,9 +93,9 @@ def wrap_env_full(env, reduce_color=False, memory=1, size=32, vecMonitor=False,
 
     if vecMonitor:
         if monitor_path != "":
-            env = VecMonitor(env, filename=os.path.join(monitor_path, f"{configName}-{rank}"), info_keywords=info_keywords)
+            env = VecMonitor(env, filename=os.path.join(monitor_path, f"{configName}-{rank}"), info_keywords=env.info_keywords)
         else:
-            env = VecMonitor(env, filename=f"{configName}-{rank}", info_keywords=info_keywords)
+            env = VecMonitor(env, filename=f"{configName}-{rank}", info_keywords=env.info_keywords)
     if rank == 0 and vecNormalize:
         # must be after VecMonitor for monitor to show unnormed rewards
         env = VecNormalizeMultiAgent(env, norm_obs=True, norm_reward=False, clip_obs=10.)
