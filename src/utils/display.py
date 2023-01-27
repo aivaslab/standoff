@@ -350,7 +350,7 @@ def gtr_to_monitor(savePath, df, envs):
         for env in envs:
             _env = env.unwrapped.vec_envs[0].par_env.unwrapped
             if _env.configName == cf:
-                rank = _env.rank
+                rank = env.rank
                 break
         header = {'n': cf, 'rank': rank}
         filename = os.path.join(savePath, cf + '-gtr.monitor.csv')
