@@ -43,6 +43,7 @@ def make_env(envClass, player_config, configName=None, memory=1, threads=1, redu
 
     env = env_from_config(env_config)
     env.agent_view_size = player_config["view_size"] * player_config["view_tile_size"]
+    env.rank = rank
 
     configName = random.choice(list(env.configs.keys())) if configName is None else configName
     env.hard_reset(env.configs[configName])
