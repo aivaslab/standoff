@@ -13,15 +13,15 @@ import math
 import sys
 
 
-def make_callbacks(save_path, env, batch_size, configName, eval_envs, n_steps, record_every):
-    train_cb = TrainUpdateCallback(envs=eval_envs + [env, ] if eval_envs[0] is not None else [env, ],
-                                   batch_size=batch_size)
+def make_callbacks(save_path, env, batch_size, n_steps, record_every):
+    #train_cb = TrainUpdateCallback(envs=eval_envs + [env, ] if eval_envs[0] is not None else [env, ], batch_size=batch_size)
     # this cb updates the minibatch variable in the environment
+    train_cb = TrainUpdateCallback(envs= [env, ], batch_size=batch_size)
 
     tqdm_cb = EveryNTimesteps(n_steps=n_steps, callback=TqdmCallback(record_every=n_steps))
 
     checkpoints = CheckpointCallback(save_freq=record_every, save_path=os.path.join(save_path, 'checkpoints'),
-                                     name_prefix=configName)
+                                     name_prefix='model')
 
     return CallbackList(tqdm_cb, train_cb, checkpoints)
 def make_callbacks_legacy(savePath3, name, configName, eval_envs, eval_params, n_steps, size, frames, recordEvery, global_log_path, log_line, vids=False):
@@ -46,17 +46,30 @@ def make_callbacks_legacy(savePath3, name, configName, eval_envs, eval_params, n
     return CallbackList([CallbackList(eval_cbs), plot_cb, plot_cb_extra, tqdm_cb, train_cb])
 class TrainUpdateCallback(BaseCallback):
 
-    def __init__(self, envs, batch_size):
+    def __init__(self, envs, batch_size, logpath, params, model):
         super().__init__()
         self.envs = envs
         self.batch_size = batch_size
         self.minibatch = 0
+        self.logPath = logpath
+        self.params = params
+        self.model = model
 
+    def _on_training_start(self):
+        with open(self.logPath, 'a') as logfile:
+            logfile.write(self.params)
+            logfile.write("\n")
+            logfile.write(str(self.model.policy))
     def _on_rollout_end(self):
+        # triggered before updating the policy
         self.minibatch += self.batch_size
         for env in self.envs:
             _env = parallel_to_aec(env.unwrapped.vec_envs[0].par_env).unwrapped
             _env.minibatch = self.minibatch
+
+    def _on_training_end(self):
+        with open(self.logPath, 'a') as logfile:
+            logfile.write('finished training')
 
     def _on_step(self):
         return True
@@ -288,11 +301,6 @@ class PlottingCallback(BaseCallback):
         self.image_size = image_size
 
     def _on_step(self) -> bool:
-        update_global_logs(self.global_log_path, self.log_line, {
-            'timesteps': np.mean(self.eval_cbs[0].evaluations_timesteps[-1]),
-            'results': np.mean(self.eval_cbs[0].evaluations_results[-1]),
-            'length': np.mean(self.eval_cbs[0].evaluations_length[-1]),
-        })
 
         with open(self.logPath, 'a') as logfile:
             logfile.write(f'ts: {self.eval_cbs[0].evaluations_timesteps[-1]}\n')
@@ -341,10 +349,6 @@ class PlottingCallbackStartStop(BaseCallback):
             'length': 0,
         })
 
-        with open(self.logPath, 'a') as logfile:
-            logfile.write(self.params)
-            logfile.write("\n")
-            logfile.write(str(self.model.policy))
 
         plotting_evals(self, vids=self.start_vid, plots=False)
         self.start_time = time.time()
