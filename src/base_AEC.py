@@ -512,19 +512,19 @@ class para_MultiGridEnv(ParallelEnv):
                 # 'vis'  # show the visibility mask (temporarily disabled)
             ]
             if self.observation_density == 0:
-                self.rich_observation_layers.append([
+                self.rich_observation_layers.extend([
                     lambda k, mapping: (mapping[k].can_overlap() if hasattr(mapping[k], 'can_overlap') else True),
                     lambda k, mapping: (mapping[k].volatile() if hasattr(mapping[k], 'volatile') else False),
                     lambda k, mapping: (mapping[k].see_behind() if hasattr(mapping[k], 'see_behind') else True),
                 ])
             else:
-                self.rich_observation_layers.append([
+                self.rich_observation_layers.append(
                     lambda k, mapping: (
                             4*(mapping[k].can_overlap() if hasattr(mapping[k], 'can_overlap') else 1) +
                             2*(mapping[k].see_behind() if hasattr(mapping[k], 'see_behind') else 1) +
                             1*(mapping[k].volatile() if hasattr(mapping[k], 'volatile') else 0)
                             ),
-                ])
+                )
             if self.gaze_highlighting and False:  # temporarily disabled
                 self.rich_observation_layers.append('gaze')
 
