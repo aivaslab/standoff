@@ -109,9 +109,11 @@ def plot_selection(indexer, df, mypath, title, window):
 
 def plot_train(log_folder, fig_folder, configName, rank, title='Learning Curve', window=2048):
     """
-    plot the results
+    plot the results of training on one environment and evaluating on others
     :param log_folder: (str) the save location of the results to plot
     :param title: (str) the title of the task to plot
+    :param window: (int) the window size for the moving average
+    :return: (data for one row of a transfer matrix)
     """
     monitor_files = get_monitor_files(log_folder)
 
@@ -153,7 +155,6 @@ def plot_train(log_folder, fig_folder, configName, rank, title='Learning Curve',
             df["selectedBig"] = pd.to_numeric(df["selectedBig"])
             df["selectedSmall"] = pd.to_numeric(df["selectedSmall"])
             df["selectedNeither"] = pd.to_numeric(df["selectedNeither"])
-
             df["selection"] = df["selection"].fillna(-1)
 
             '''
@@ -171,48 +172,53 @@ def plot_train(log_folder, fig_folder, configName, rank, title='Learning Curve',
             #temp, as gtr should generate this ideally
             df["valid"] = df["selection"] != -1
 
-
             df.minibatch = df.minibatch.astype(int)
 
-            filter = df["selection"].notnull()
-            filter2 = df["selectedBig"].notnull()
-            dfSmall = df[filter2]
+            # TODO: why use this instead of valid? perhaps catches additional null values? needs testing
+            nonull_filter = df["selectedBig"].notnull()
+            df_valid_selection = df[nonull_filter]
 
-            if not len(dfSmall):
+            if not len(df_valid_selection):
                 print('small df', file_name, 'had no good samples')
                 continue
 
+            df_valid_selection["avoidedBig"] = df_valid_selection.apply(
+                lambda row: row["selectedSmall"] or row["selectedNeither"],
+                axis=1)
+            df_valid_selection["avoidedSmall"] = df_valid_selection.apply(
+                lambda row: row["selectedBig"] or row["selectedNeither"],
+                axis=1)
+            df_valid_selection["avoidCorrect"] = df_valid_selection.apply(
+                lambda row: (row["avoidedBig"] == row["shouldAvoidBig"]) or
+                            (row["avoidedSmall"] == row["shouldAvoidSmall"]),
+                axis=1)
 
-            # ValueError: Wrong number of items passed 18, placement implies 1;
-            # maybe happens when no good data, so exit if so?
-            dfSmall["avoidedBig"] = dfSmall.apply(lambda row: row["selectedSmall"] or row["selectedNeither"], axis=1)
-            dfSmall["avoidedSmall"] = dfSmall.apply(lambda row: row["selectedBig"] or row["selectedNeither"], axis=1)
-
-            dfSmall["avoidCorrect"] = dfSmall.apply(lambda row: (row["avoidedBig"] == row["shouldAvoidBig"]) or (
-                    row["avoidedSmall"] == row["shouldAvoidSmall"]), axis=1)
-
-            grouped = df.groupby('minibatch', as_index=False).mean().sort_values('minibatch')
-            #print(df['accuracy'])
-            groupedSmall = dfSmall.groupby('minibatch', as_index=False).mean().sort_values('minibatch')
+            # we will group by minibatch later, so let's not do this here so we don't mean means improperly
+            #grouped = df.groupby('minibatch', as_index=False).mean().sort_values('minibatch')
+            #groupedSmall = df_valid_selection.groupby('minibatch', as_index=False).mean().sort_values('minibatch')
 
             # small is valid rows
 
-            grouped['name'] = title2
-            groupedSmall['name'] = title2
-            grouped['eval'] = (rank != 0)
-            groupedSmall['eval'] = (rank != 0)
-            merged_df = merged_df.append(grouped)
-            merged_df_small = merged_df_small.append(groupedSmall)
+            df['name'] = title2
+            df_valid_selection['name'] = title2
+            df['eval'] = (rank != 0)
+            df_valid_selection['eval'] = (rank != 0)
+
+            merged_df = merged_df.append(df)
+            merged_df_small = merged_df_small.append(df_valid_selection)
 
             # dr = df.rolling(real_window).mean()
-            # drSmall = dfSmall.rolling(real_window).mean()
+            # drSmall = df_valid_selection.rolling(real_window).mean()
 
-            plot_selection(indexer='minibatch', df=groupedSmall, mypath=fig_folder, title=title2, window=window)
+            # plot_selection(indexer='minibatch', df=groupedSmall, mypath=fig_folder, title=title2, window=window)
+            # unclear why this line is here when also below.
 
     #print('lenny', len(merged_df), merged_df.columns, len(merged_df_small), merged_df_small.columns)
     merged_df = merged_df.groupby(['minibatch', 'eval', 'gtr'], as_index=False).mean().sort_values('minibatch')
+    # merged_df has all data, grouped by minibatch.
     merged_df_small = merged_df_small.groupby(['minibatch', 'name', 'eval', 'gtr'], as_index=False).mean().sort_values(
         'minibatch')
+    # merged_df_small has all data, grouped by minibatch, but also by name (rank)
     merged_df_noname = merged_df_small.groupby(['minibatch', 'eval', 'gtr'], as_index=False).mean().sort_values(
         'minibatch')
     #print('lenny2', len(merged_df), merged_df.columns, len(merged_df_small), merged_df_small.columns)
