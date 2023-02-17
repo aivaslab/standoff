@@ -51,7 +51,7 @@ class TrainUpdateCallback(BaseCallback):
         self.envs = envs
         self.batch_size = batch_size
         self.minibatch = 0
-        self.logPath = logpath
+        self.logPath = os.path.join(logpath, 'logs.txt')
         self.params = params
         self.model = model
 
