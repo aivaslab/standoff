@@ -501,20 +501,33 @@ class para_MultiGridEnv(ParallelEnv):
         self.total_step_count = 0
 
         self.observation_style = observation_style
+        self.observation_density = 1
 
         if self.observation_style == 'rich':
             self.rich_observation_layers = [
                 lambda k, mapping: (mapping[k].type == 'Agent' if hasattr(mapping[k], 'type') else False),
                 lambda k, mapping: (mapping[k].type == 'Box' if hasattr(mapping[k], 'type') else False),
-                lambda k, mapping: (mapping[k].can_overlap() if hasattr(mapping[k], 'can_overlap') else True),
-                lambda k, mapping: (mapping[k].volatile() if hasattr(mapping[k], 'volatile') else False),
                 lambda k, mapping: (mapping[k].get_reward() if hasattr(mapping[k], 'get_reward') else 0),
                 # we can see hidden rewards this way
-                lambda k, mapping: (mapping[k].see_behind() if hasattr(mapping[k], 'see_behind') else True),
-                #'vis'  # show the visibility mask (temporarily disabled)
+                # 'vis'  # show the visibility mask (temporarily disabled)
             ]
-            if self.gaze_highlighting and False: #temporarily disabled
+            if self.observation_density == 0:
+                self.rich_observation_layers.append([
+                    lambda k, mapping: (mapping[k].can_overlap() if hasattr(mapping[k], 'can_overlap') else True),
+                    lambda k, mapping: (mapping[k].volatile() if hasattr(mapping[k], 'volatile') else False),
+                    lambda k, mapping: (mapping[k].see_behind() if hasattr(mapping[k], 'see_behind') else True),
+                ])
+            else:
+                self.rich_observation_layers.append([
+                    lambda k, mapping: (
+                            4*(mapping[k].can_overlap() if hasattr(mapping[k], 'can_overlap') else 1) +
+                            2*(mapping[k].see_behind() if hasattr(mapping[k], 'see_behind') else 1) +
+                            1*(mapping[k].volatile() if hasattr(mapping[k], 'volatile') else 0)
+                            ),
+                ])
+            if self.gaze_highlighting and False:  # temporarily disabled
                 self.rich_observation_layers.append('gaze')
+
             self.observation_spaces = {agent: Box(
                 low=0,
                 high=255,
@@ -1076,7 +1089,7 @@ class para_MultiGridEnv(ParallelEnv):
                         obs[i, :, :] = puppet_mask
                 else:
                     obs[i, :, :] = np.multiply(np.vectorize(layer)(view_grid.grid, mapping), visibility)
-            #print(np.sum(obs, axis=0))
+            # print(np.sum(obs, axis=0))
             return np.swapaxes(obs, 0, 2)
 
         grid_image = view_grid.render(tile_size=agent.view_tile_size, visible_mask=vis_mask, top_agent=agent,
