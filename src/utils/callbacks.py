@@ -13,6 +13,37 @@ import math
 import sys
 
 
+def make_callbacks(save_path, env, batch_size, configName, eval_envs, n_steps, record_every):
+    train_cb = TrainUpdateCallback(envs=eval_envs + [env, ] if eval_envs[0] is not None else [env, ],
+                                   batch_size=batch_size)
+    # this cb updates the minibatch variable in the environment
+
+    tqdm_cb = EveryNTimesteps(n_steps=n_steps, callback=TqdmCallback(record_every=n_steps))
+
+    checkpoints = CheckpointCallback(save_freq=record_every, save_path=os.path.join(save_path, configName),
+                                     name_prefix=configName)
+
+    return CallbackList(tqdm_cb, train_cb, checkpoints)
+def make_callbacks_legacy(savePath3, name, configName, eval_envs, eval_params, n_steps, size, frames, recordEvery, global_log_path, log_line, vids=False):
+    eval_df = pd.DataFrame()
+    eval_cbs = [EvalCallback(eval_env, best_model_save_path=os.path.join(savePath3, 'logs', 'best_model'),
+                log_path=os.path.join(savePath3, 'logs'), eval_freq=recordEvery,
+                n_eval_episodes=eval_eps,
+                deterministic=True, render=False, verbose=0) for eval_env in eval_envs]
+    tqdm_cb = EveryNTimesteps(n_steps=n_steps, callback=TqdmCallback(record_every=n_steps))
+    plot_cb = EveryNTimesteps(n_steps=recordEvery, callback=
+       PlottingCallback(savePath=savePath3, name=name, envs=eval_envs,
+                names=eval_params, eval_cbs=eval_cbs, verbose=0, log_line=log_line,
+                global_log_path=global_log_path, memory=frames, eval_df=eval_df, gtr=True,
+                mid_vids=False, image_size=size))
+    plot_cb_extra = PlottingCallbackStartStop(savePath=savePath3, name=name,
+                envs=eval_envs, names=eval_params, eval_cbs=eval_cbs, verbose=0,
+                params=str(locals()), model=model, global_log_path=global_log_path,
+                train_name=configName, log_line=log_line, memory=frames, eval_df=eval_df,
+                gtr=True, start_vid=False, end_vid=vids, image_size=size)
+    train_cb = TrainUpdateCallback(envs=eval_envs + [env, ] if eval_envs[0] is not None else [env, ], batch_size=batch_size)
+
+    return CallbackList([CallbackList(eval_cbs), plot_cb, plot_cb_extra, tqdm_cb, train_cb])
 class TrainUpdateCallback(BaseCallback):
 
     def __init__(self, envs, batch_size):
