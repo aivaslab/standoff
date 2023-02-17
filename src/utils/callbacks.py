@@ -20,7 +20,7 @@ def make_callbacks(save_path, env, batch_size, configName, eval_envs, n_steps, r
 
     tqdm_cb = EveryNTimesteps(n_steps=n_steps, callback=TqdmCallback(record_every=n_steps))
 
-    checkpoints = CheckpointCallback(save_freq=record_every, save_path=os.path.join(save_path, configName),
+    checkpoints = CheckpointCallback(save_freq=record_every, save_path=os.path.join(save_path, 'checkpoints'),
                                      name_prefix=configName)
 
     return CallbackList(tqdm_cb, train_cb, checkpoints)
