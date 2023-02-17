@@ -23,7 +23,7 @@ def make_callbacks(save_path, env, batch_size, n_steps, record_every, model):
     checkpoints = CheckpointCallback(save_freq=record_every, save_path=os.path.join(save_path, 'checkpoints'),
                                      name_prefix='model')
 
-    return CallbackList(tqdm_cb, train_cb, checkpoints)
+    return CallbackList([tqdm_cb, train_cb, checkpoints])
 def make_callbacks_legacy(savePath3, name, configName, eval_envs, eval_params, n_steps, size, frames, recordEvery, global_log_path, log_line, vids=False):
     eval_df = pd.DataFrame()
     eval_cbs = [EvalCallback(eval_env, best_model_save_path=os.path.join(savePath3, 'logs', 'best_model'),
