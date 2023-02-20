@@ -1,6 +1,6 @@
 import random
 
-#from pettingzoo.utils.conversions import aec_to_parallel, parallel_to_aec
+# from pettingzoo.utils.conversions import aec_to_parallel, parallel_to_aec
 import supersuit as ss
 from pettingzoo.utils import wrappers
 from ..agents import GridAgentInterface
@@ -9,6 +9,23 @@ from stable_baselines3.common.vec_env import VecMonitor, VecFrameStack, VecVideo
 from ..utils.vec_normalize import VecNormalizeMultiAgent
 from ..pz_envs.scenario_configs import ScenarioConfigs
 import os
+import gym
+
+
+def make_env_comp(env_name, model_class, frames=1, vecNormalize=False, size=32, style='rich', monitor_path='dir',
+                  rank=-1):
+    # if model_class != RecurrentPPO and frames > 1:
+    #    env = gym.make(env_name)
+    #    env = wrap_env_full(env.env, memory=frames, size=size, saveVids=saveVids,
+    #                        path=video_path, vecNormalize=vecNormalize, recordEvery=1, style='rich')
+    # else:
+    env = gym.make(env_name)
+    env = wrap_env_full(env.env, memory=frames, size=size,
+                        vecNormalize=vecNormalize,
+                        style=style, monitor_path=monitor_path, rank=rank)
+    env = VecMonitor(env, os.path.join(monitor_path, f'{env_name}-{rank}'))
+    env.rank = rank
+    return env
 
 
 def make_env(envClass, player_config, configName=None, memory=1, threads=1, reduce_color=False, size=64,
@@ -37,8 +54,8 @@ def make_env(envClass, player_config, configName=None, memory=1, threads=1, redu
 
     env_config['agents'] = [GridAgentInterface(**player_config) for _ in range(reset_configs['num_agents'])]
     env_config['puppets'] = [GridAgentInterface(**player_config) for _ in range(reset_configs['num_puppets'])]
-    #env_config['num_agents'] = reset_configs['num_agents']
-    #env_config['num_puppets'] = reset_configs['num_puppets']
+    # env_config['num_agents'] = reset_configs['num_agents']
+    # env_config['num_puppets'] = reset_configs['num_puppets']
     env_config['config_name'] = configName
 
     env = env_from_config(env_config)
@@ -83,7 +100,7 @@ def wrap_env_full(env, reduce_color=False, memory=1, size=32, vecMonitor=False,
     env = ss.pettingzoo_env_to_vec_env_v1(env)
     env = ss.concat_vec_envs_v1(env, threads, num_cpus=1, base_class='stable_baselines3')
     # num_cpus=1 changed from 2 to avoid csv issues. does it affect speed?
-    
+
     if style != 'rich':
         # this line might be causing issues anyway, should check
         env = VecTransposeImage(env)
@@ -93,7 +110,8 @@ def wrap_env_full(env, reduce_color=False, memory=1, size=32, vecMonitor=False,
 
     if vecMonitor:
         if monitor_path != "":
-            env = VecMonitor(env, filename=os.path.join(monitor_path, f"{configName}-{rank}"), info_keywords=env.info_keywords)
+            env = VecMonitor(env, filename=os.path.join(monitor_path, f"{configName}-{rank}"),
+                             info_keywords=env.info_keywords)
         else:
             env = VecMonitor(env, filename=f"{configName}-{rank}", info_keywords=env.info_keywords)
     if rank == 0 and vecNormalize:
