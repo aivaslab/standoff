@@ -158,6 +158,8 @@ def ground_truth_evals(eval_envs, model, repetitions=25, memory=1):
 
             for path in all_paths:
                 total_likelihood = 0
+                env.deterministic = True
+                env.deterministic_seed = k
                 obs = env.reset()
 
                 lstm_states = None
@@ -172,8 +174,6 @@ def ground_truth_evals(eval_envs, model, repetitions=25, memory=1):
                 remembered_obs = torch.zeros(obs_shape)
                 for t in range(50):
 
-                    env.deterministic = True
-                    env.deterministic_seed = k
                     act = get_relative_direction(a, path)
 
                     obs = torch.from_numpy(obs['player_0']).swapdims(0, 2).unsqueeze(0)
