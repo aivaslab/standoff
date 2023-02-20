@@ -14,9 +14,10 @@ import sys
 
 
 def make_callbacks(save_path, env, batch_size, n_steps, record_every, model):
-    #train_cb = TrainUpdateCallback(envs=eval_envs + [env, ] if eval_envs[0] is not None else [env, ], batch_size=batch_size)
+    # train_cb = TrainUpdateCallback(envs=eval_envs + [env, ] if eval_envs[0] is not None else [env, ], batch_size=batch_size)
     # this cb updates the minibatch variable in the environment
-    train_cb = TrainUpdateCallback(envs= [env, ], batch_size=batch_size, logpath=save_path, params=str(locals()), model=model)
+    train_cb = TrainUpdateCallback(envs=[env, ], batch_size=batch_size, logpath=save_path, params=str(locals()),
+                                   model=model)
 
     tqdm_cb = EveryNTimesteps(n_steps=n_steps, callback=TqdmCallback(record_every=n_steps))
 
@@ -24,26 +25,32 @@ def make_callbacks(save_path, env, batch_size, n_steps, record_every, model):
                                      name_prefix='model')
 
     return CallbackList([tqdm_cb, train_cb, checkpoints])
-def make_callbacks_legacy(savePath3, name, configName, eval_envs, eval_params, n_steps, size, frames, recordEvery, global_log_path, log_line, vids=False):
+
+
+def make_callbacks_legacy(savePath3, name, configName, eval_envs, eval_params, n_steps, size, frames, recordEvery,
+                          global_log_path, log_line, vids=False):
     eval_df = pd.DataFrame()
     eval_cbs = [EvalCallback(eval_env, best_model_save_path=os.path.join(savePath3, 'logs', 'best_model'),
-                log_path=os.path.join(savePath3, 'logs'), eval_freq=recordEvery,
-                n_eval_episodes=eval_eps,
-                deterministic=True, render=False, verbose=0) for eval_env in eval_envs]
+                             log_path=os.path.join(savePath3, 'logs'), eval_freq=recordEvery,
+                             n_eval_episodes=eval_eps,
+                             deterministic=True, render=False, verbose=0) for eval_env in eval_envs]
     tqdm_cb = EveryNTimesteps(n_steps=n_steps, callback=TqdmCallback(record_every=n_steps))
     plot_cb = EveryNTimesteps(n_steps=recordEvery, callback=
-       PlottingCallback(savePath=savePath3, name=name, envs=eval_envs,
-                names=eval_params, eval_cbs=eval_cbs, verbose=0, log_line=log_line,
-                global_log_path=global_log_path, memory=frames, eval_df=eval_df, gtr=True,
-                mid_vids=False, image_size=size))
+    PlottingCallback(savePath=savePath3, name=name, envs=eval_envs,
+                     names=eval_params, eval_cbs=eval_cbs, verbose=0, log_line=log_line,
+                     global_log_path=global_log_path, memory=frames, eval_df=eval_df, gtr=True,
+                     mid_vids=False, image_size=size))
     plot_cb_extra = PlottingCallbackStartStop(savePath=savePath3, name=name,
-                envs=eval_envs, names=eval_params, eval_cbs=eval_cbs, verbose=0,
-                params=str(locals()), model=model, global_log_path=global_log_path,
-                train_name=configName, log_line=log_line, memory=frames, eval_df=eval_df,
-                gtr=True, start_vid=False, end_vid=vids, image_size=size)
-    train_cb = TrainUpdateCallback(envs=eval_envs + [env, ] if eval_envs[0] is not None else [env, ], batch_size=batch_size)
+                                              envs=eval_envs, names=eval_params, eval_cbs=eval_cbs, verbose=0,
+                                              params=str(locals()), model=model, global_log_path=global_log_path,
+                                              train_name=configName, log_line=log_line, memory=frames, eval_df=eval_df,
+                                              gtr=True, start_vid=False, end_vid=vids, image_size=size)
+    train_cb = TrainUpdateCallback(envs=eval_envs + [env, ] if eval_envs[0] is not None else [env, ],
+                                   batch_size=batch_size)
 
     return CallbackList([CallbackList(eval_cbs), plot_cb, plot_cb_extra, tqdm_cb, train_cb])
+
+
 class TrainUpdateCallback(BaseCallback):
 
     def __init__(self, envs, batch_size, logpath, params, model):
@@ -60,6 +67,7 @@ class TrainUpdateCallback(BaseCallback):
             logfile.write(self.params)
             logfile.write("\n")
             logfile.write(str(self.model.policy))
+
     def _on_rollout_end(self):
         # triggered before updating the policy
         self.minibatch += self.batch_size
@@ -132,6 +140,67 @@ def get_key(my_dict, val):
     return "key doesn't exist"
 
 
+def collect_rollouts(env, model, model_episode, episodes=100, memory=1, deterministic=False):
+    df = pd.DataFrame()
+    env = env.unwrapped.vec_envs[0].par_env.unwrapped
+    # print(env.configName)
+    all_infos = []
+    for episode in range(episodes):
+        env.deterministic = deterministic
+        env.deterministic_seed = episode
+        obs = env.reset()
+
+        lstm_states = None
+        episode_starts = torch.from_numpy(np.ones((1,), dtype=int))
+        a = env.instance_from_name['player_0']
+
+        obs_shape = list(torch.from_numpy(obs['player_0']).swapdims(0, 2).unsqueeze(0).shape)
+        channels = obs_shape[1]
+        obs_shape[1] = channels * memory
+        remembered_obs = torch.zeros(obs_shape)
+
+        for t in range(50):
+
+            obs = torch.from_numpy(obs['player_0']).swapdims(0, 2).unsqueeze(0)
+            remembered_obs = torch.cat([obs, remembered_obs], dim=1)
+            cur_obs = remembered_obs[:, -memory * channels:, :, :]
+
+            cur_obs = np.array(cur_obs)
+
+            # todo: update episode starts?
+            if hasattr(model, '_last_lstm_states'):
+                action, _states = model.predict(cur_obs, deterministic=deterministic,
+                                                lstm_states=model._last_lstm_states,
+                                                episode_starts=episode_starts)
+            else:
+                action, _states = model.predict(cur_obs, deterministic=deterministic)
+
+            obs, rewards, dones, info = env.step({'player_0': action})
+            #accumulate reward here?
+            
+            if dones['player_0']:
+                break
+        infos = env.infos['player_0']
+        infos['r'] = rewards['player_0']
+        infos['configName'] = env.configName
+        infos['eval_ep'] = episode
+        infos['model_ep'] = model_episode
+        all_infos.append(infos)
+        # print('appended, episode', episode)
+
+    for infos in all_infos:
+        infos['avoidedBig'] = infos['selectedSmall'] or infos['selectedNeither']
+        infos['avoidedSmall'] = infos['selectedBig'] or infos['selectedNeither']
+        infos['avoidCorrect'] = (infos['avoidedBig'] == infos['shouldAvoidBig']) or (
+                    infos['avoidedSmall'] == infos['shouldAvoidSmall'])
+        infos['accuracy'] = 1 if infos['selection'] == infos['correctSelection'] else 0
+        infos['weakAccuracy'] = 1 if infos['selection'] == infos['correctSelection'] or infos['selection'] == infos[
+            'incorrectSelection'] else 0
+
+    df = pd.DataFrame(all_infos, index=np.arange(len(all_infos)))
+    return df
+
+
 def ground_truth_evals(eval_envs, model, repetitions=25, memory=1):
     df = pd.DataFrame()
     for env in eval_envs:
@@ -168,7 +237,7 @@ def ground_truth_evals(eval_envs, model, repetitions=25, memory=1):
 
                 taken_path = []
                 obs_shape = list(torch.from_numpy(obs['player_0']).swapdims(0, 2).unsqueeze(0).shape)
-                #obs shape 1,3,51,51
+                # obs shape 1,3,51,51
                 channels = obs_shape[1]
                 obs_shape[1] = channels * memory
                 remembered_obs = torch.zeros(obs_shape)
@@ -178,7 +247,7 @@ def ground_truth_evals(eval_envs, model, repetitions=25, memory=1):
 
                     obs = torch.from_numpy(obs['player_0']).swapdims(0, 2).unsqueeze(0)
                     remembered_obs = torch.cat([obs, remembered_obs], dim=1)
-                    cur_obs = remembered_obs[:, -memory*channels:, :, :]
+                    cur_obs = remembered_obs[:, -memory * channels:, :, :]
 
                     # todo: update episode starts?
                     if hasattr(model, '_last_lstm_states'):
@@ -213,11 +282,13 @@ def ground_truth_evals(eval_envs, model, repetitions=25, memory=1):
             for infos in all_path_infos:
                 infos['avoidedBig'] = infos['selectedSmall'] or infos['selectedNeither']
                 infos['avoidedSmall'] = infos['selectedBig'] or infos['selectedNeither']
-                infos['avoidCorrect'] = (infos['avoidedBig'] == infos['shouldAvoidBig']) or (infos['avoidedSmall'] == infos['shouldAvoidSmall'])
+                infos['avoidCorrect'] = (infos['avoidedBig'] == infos['shouldAvoidBig']) or (
+                            infos['avoidedSmall'] == infos['shouldAvoidSmall'])
                 infos['normed_likelihood'] = infos['likelihood'] - max_likelihood
                 infos['probability'] = math.exp(infos['normed_likelihood'])
                 infos['accuracy'] = 1 if infos['selection'] == infos['correctSelection'] else 0
-                infos['weakAccuracy'] = 1 if infos['selection'] == infos['correctSelection'] or infos['selection'] == infos['incorrectSelection'] else 0
+                infos['weakAccuracy'] = 1 if infos['selection'] == infos['correctSelection'] or infos['selection'] == \
+                                             infos['incorrectSelection'] else 0
                 prob_sum += infos['probability']
 
             new_infos = {}
@@ -239,17 +310,17 @@ def ground_truth_evals(eval_envs, model, repetitions=25, memory=1):
 
             df = df.append(new_infos, ignore_index=True)
 
-    #print('gtr', df.head()) #does work
+    # print('gtr', df.head()) #does work
     return df
 
 
 def plotting_evals(self, vids=False, plots=True, fig_folder=''):
-
     if not self.gtr:
         plot_evals(self.savePath, self.name, self.names, self.eval_cbs)
     else:
         # inplace concat
-        temp = pd.concat([self.eval_df, ground_truth_evals(self.envs, self.model, memory=self.memory)], ignore_index=True)
+        temp = pd.concat([self.eval_df, ground_truth_evals(self.envs, self.model, memory=self.memory)],
+                         ignore_index=True)
         self.eval_df.drop(self.eval_df.index[0:], inplace=True)
         self.eval_df[temp.columns] = temp
 
@@ -301,7 +372,6 @@ class PlottingCallback(BaseCallback):
         self.image_size = image_size
 
     def _on_step(self) -> bool:
-
         with open(self.logPath, 'a') as logfile:
             logfile.write(f'ts: {self.eval_cbs[0].evaluations_timesteps[-1]}\n')
             # logfile.write(f'ts: {self.eval_cbs[0].evaluations_timesteps[-1]}\tkl: {self.model.approxkl}\n')
@@ -348,7 +418,6 @@ class PlottingCallbackStartStop(BaseCallback):
             'finished': False,
             'length': 0,
         })
-
 
         plotting_evals(self, vids=self.start_vid, plots=False)
         self.start_time = time.time()
