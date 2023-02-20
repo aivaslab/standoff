@@ -285,7 +285,7 @@ def plot_train(log_folder, fig_folder, configName, rank, title='Learning Curve',
                 print(' '.join(not_plotted))'''
 
 
-def make_pic_video(model, env, name, random_policy=False, video_length=50, savePath='', vidName='video.mp4',
+def make_pic_video(model, env, random_policy=False, video_length=50, savePath='', vidName='video.mp4',
                    following="player_0", image_size=320, deterministic=False, memory=1, obs_size=32):
     """
     make a video of the model playing the environment
