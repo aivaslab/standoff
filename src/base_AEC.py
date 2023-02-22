@@ -436,6 +436,7 @@ class para_MultiGridEnv(ParallelEnv):
             gaze_highlighting=False,
             persistent_gaze_highlighting=False,
             observation_style='rich',
+            observation_density=1
     ):
         """
         The init method takes in environment arguments and
@@ -501,7 +502,7 @@ class para_MultiGridEnv(ParallelEnv):
         self.total_step_count = 0
 
         self.observation_style = observation_style
-        self.observation_density = 1
+        self.observation_density = observation_density
 
         if self.observation_style == 'rich':
             self.rich_observation_layers = [
