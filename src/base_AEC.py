@@ -447,6 +447,7 @@ class para_MultiGridEnv(ParallelEnv):
 
         These attributes should not be changed after initialization.
         """
+        self.only_highlight_treats = False
         self.gaze_highlighting = gaze_highlighting
         self.persistent_gaze_highlighting = persistent_gaze_highlighting
         self.prev_puppet_mask = None  # used for persistent gaze
@@ -526,7 +527,7 @@ class para_MultiGridEnv(ParallelEnv):
                             1*(mapping[k].volatile() if hasattr(mapping[k], 'volatile') else 0)
                             ),
                 )
-            if self.gaze_highlighting and False:  # temporarily disabled
+            if self.gaze_highlighting:  # temporarily disabled
                 self.rich_observation_layers.append('gaze')
 
             self.observation_spaces = {agent: Box(
