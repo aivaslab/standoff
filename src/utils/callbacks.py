@@ -140,13 +140,13 @@ def get_key(my_dict, val):
     return "key doesn't exist"
 
 
-def collect_rollouts(env, model, model_episode, episodes=100, memory=1, deterministic=False):
+def collect_rollouts(env, model, model_episode, episodes=100, memory=1, deterministic_env=False, deterministic_model=False):
     df = pd.DataFrame()
     env = env.unwrapped.vec_envs[0].par_env.unwrapped
     # print(env.configName)
     all_infos = []
     for episode in range(episodes):
-        env.deterministic = deterministic
+        env.deterministic = deterministic_env
         env.deterministic_seed = episode
         obs = env.reset()
 
@@ -169,11 +169,11 @@ def collect_rollouts(env, model, model_episode, episodes=100, memory=1, determin
 
             # todo: update episode starts?
             if hasattr(model, '_last_lstm_states'):
-                action, _states = model.predict(cur_obs, deterministic=deterministic,
+                action, _states = model.predict(cur_obs, deterministic=deterministic_model,
                                                 lstm_states=model._last_lstm_states,
                                                 episode_starts=episode_starts)
             else:
-                action, _states = model.predict(cur_obs, deterministic=deterministic)
+                action, _states = model.predict(cur_obs, deterministic=deterministic_model)
 
             obs, rewards, dones, info = env.step({'player_0': action})
             if dones['player_0']:
