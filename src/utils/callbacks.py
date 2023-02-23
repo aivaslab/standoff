@@ -176,8 +176,6 @@ def collect_rollouts(env, model, model_episode, episodes=100, memory=1, determin
                 action, _states = model.predict(cur_obs, deterministic=deterministic)
 
             obs, rewards, dones, info = env.step({'player_0': action})
-            #accumulate reward here?
-            
             if dones['player_0']:
                 break
         infos = env.infos['player_0']
@@ -196,6 +194,11 @@ def collect_rollouts(env, model, model_episode, episodes=100, memory=1, determin
         infos['accuracy'] = 1 if infos['selection'] == infos['correctSelection'] else 0
         infos['weakAccuracy'] = 1 if infos['selection'] == infos['correctSelection'] or infos['selection'] == infos[
             'incorrectSelection'] else 0
+        infos['sel0'] = 1 if infos['selection'] == 0 else 0
+        infos['sel1'] = 1 if infos['selection'] == 1 else 0
+        infos['sel2'] = 1 if infos['selection'] == 2 else 0
+        infos['sel3'] = 1 if infos['selection'] == 3 else 0
+        infos['sel4'] = 1 if infos['selection'] == 4 else 0
 
     df = pd.DataFrame(all_infos, index=np.arange(len(all_infos)))
     return df
@@ -283,12 +286,17 @@ def ground_truth_evals(eval_envs, model, repetitions=25, memory=1):
                 infos['avoidedBig'] = infos['selectedSmall'] or infos['selectedNeither']
                 infos['avoidedSmall'] = infos['selectedBig'] or infos['selectedNeither']
                 infos['avoidCorrect'] = (infos['avoidedBig'] == infos['shouldAvoidBig']) or (
-                            infos['avoidedSmall'] == infos['shouldAvoidSmall'])
+                        infos['avoidedSmall'] == infos['shouldAvoidSmall'])
                 infos['normed_likelihood'] = infos['likelihood'] - max_likelihood
                 infos['probability'] = math.exp(infos['normed_likelihood'])
                 infos['accuracy'] = 1 if infos['selection'] == infos['correctSelection'] else 0
                 infos['weakAccuracy'] = 1 if infos['selection'] == infos['correctSelection'] or infos['selection'] == \
                                              infos['incorrectSelection'] else 0
+                infos['sel0'] = 1 if infos['selection'] == 0 else 0
+                infos['sel1'] = 1 if infos['selection'] == 1 else 0
+                infos['sel2'] = 1 if infos['selection'] == 2 else 0
+                infos['sel3'] = 1 if infos['selection'] == 3 else 0
+                infos['sel4'] = 1 if infos['selection'] == 4 else 0
                 prob_sum += infos['probability']
 
             new_infos = {}
