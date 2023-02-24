@@ -168,7 +168,7 @@ def collect_rollouts(env, model, model_episode, episodes=100, memory=1, determin
             cur_obs = np.array(cur_obs)'''
 
             # instead of making torch tensor, leave as numpy but still swap dims
-            obs = np.array(obs['player_0']).swapaxes(0, 2).expand_dims(0)
+            obs = np.expand_dims(np.array(obs['player_0']).swapaxes(0, 2), 0)
             remembered_obs = np.concatenate([obs, remembered_obs], axis=1)
             cur_obs = remembered_obs[:, -memory * channels:, :, :]
 
