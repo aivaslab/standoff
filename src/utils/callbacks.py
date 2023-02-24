@@ -183,6 +183,7 @@ def collect_rollouts(env, model, model_episode, episodes=100, memory=1, determin
         infos['configName'] = env.configName
         infos['eval_ep'] = episode
         infos['model_ep'] = model_episode
+        infos['episode_timesteps'] = t
         all_infos.append(infos)
         # print('appended, episode', episode)
 
