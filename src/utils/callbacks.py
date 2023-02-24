@@ -161,11 +161,16 @@ def collect_rollouts(env, model, model_episode, episodes=100, memory=1, determin
 
         for t in range(50):
 
-            obs = torch.from_numpy(obs['player_0']).swapdims(0, 2).unsqueeze(0)
+            '''obs = torch.from_numpy(obs['player_0']).swapdims(0, 2).unsqueeze(0)
             remembered_obs = torch.cat([obs, remembered_obs], dim=1)
             cur_obs = remembered_obs[:, -memory * channels:, :, :]
 
-            cur_obs = np.array(cur_obs)
+            cur_obs = np.array(cur_obs)'''
+
+            # instead of making torch tensor, leave as numpy but still swap dims
+            obs = np.array(obs['player_0']).swapaxes(0, 2).expand_dims(0)
+            remembered_obs = np.concatenate([obs, remembered_obs], axis=1)
+            cur_obs = remembered_obs[:, -memory * channels:, :, :]
 
             # todo: update episode starts?
             if hasattr(model, '_last_lstm_states'):
