@@ -283,6 +283,7 @@ def ground_truth_evals(eval_envs, model, repetitions=25, memory=1):
                 infos['r'] = rewards['player_0']
                 infos['likelihood'] = total_likelihood
                 infos['configName'] = env.configName
+                infos['episode_timesteps'] = t
                 all_path_infos.append(infos)
 
             max_likelihood = max(all_path_infos, key=lambda x: x['likelihood'])['likelihood']
