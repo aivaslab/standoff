@@ -160,7 +160,7 @@ def collect_rollouts(env, train_env, model, model_episode, episodes=100, memory=
         a = env.instance_from_name['player_0']
 
         #obs_shape = list(torch.from_numpy(obs['player_0']).swapdims(0, 2).unsqueeze(0).shape)
-        obs_shape = obs['player_0'].shape
+        obs_shape = list(obs['player_0'].shape)
         channels = obs_shape[1]
         obs_shape[1] = channels * memory
         remembered_obs = torch.zeros(obs_shape)
