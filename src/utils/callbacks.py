@@ -176,11 +176,14 @@ def collect_rollouts(env, train_env, model, model_episode, episodes=100, memory=
 
             # swap dims, add batch dim... unclear if dim swap has parity with wrapped env
             obs = np.expand_dims(np.array(obs['player_0']).swapaxes(0, 2), 0)
-            #print('obs2', obs.shape)
+            #print('obs2', obs.shape) # (1, 5, 17, 17)
             #remembered_obs = np.concatenate([obs, remembered_obs], axis=1)
             #cur_obs = remembered_obs[:, -memory * channels:, :, :]
             #print('cur_obs', cur_obs.shape)
             cur_obs = obs
+
+            # print a condensed version of cur_obs, summed along 2nd axis
+            print('cur_obs', np.sum(cur_obs, axis=1).squeeze().astype(int))
 
             # todo: update episode starts?
             if hasattr(model, '_last_lstm_states'):
