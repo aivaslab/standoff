@@ -527,7 +527,7 @@ class para_MultiGridEnv(ParallelEnv):
                             1*(mapping[k].volatile() if hasattr(mapping[k], 'volatile') else 0)
                             ),
                 )
-            if self.gaze_highlighting:  # temporarily disabled
+            if self.gaze_highlighting:
                 self.rich_observation_layers.append('gaze')
 
             self.observation_spaces = {agent: Box(
@@ -1057,18 +1057,22 @@ class para_MultiGridEnv(ParallelEnv):
         if self.gaze_highlighting is True:
             # get the puppet's view mask
             puppet_mask = None  # if we don't find a puppet instance? unclear when this happens
-            for puppet in self.puppet_instances:
-                if puppet != self.instance_from_name["player_0"]:
-                    if puppet.pos is not None:
-                        puppet_mask = occlude_mask(~self.grid.opacity, puppet.pos)  # only reveals one tile?
-                        if self.only_highlight_treats:
-                            puppet_mask = np.logical_and(puppet_mask, self.grid.all_treats)
+            if len(self.puppet_instances) > 0:
+                for puppet in self.puppet_instances:
+                    if puppet != self.instance_from_name["player_0"]:
+                        if puppet.pos is not None:
+                            puppet_mask = occlude_mask(~self.grid.opacity, puppet.pos)  # only reveals one tile?
+                            if self.only_highlight_treats:
+                                puppet_mask = np.logical_and(puppet_mask, self.grid.all_treats)
 
-                        if self.persistent_gaze_highlighting is True:
-                            self.prev_puppet_mask = np.logical_or(self.prev_puppet_mask, puppet_mask)
-                            puppet_mask = self.prev_puppet_mask
+                            if self.persistent_gaze_highlighting is True:
+                                self.prev_puppet_mask = np.logical_or(self.prev_puppet_mask, puppet_mask)
+                                puppet_mask = self.prev_puppet_mask
 
-                        puppet_mask = self.slice_gaze_grid(agent, puppet_mask)  # get relative gaze mask in agent view
+                            puppet_mask = self.slice_gaze_grid(agent, puppet_mask)  # get relative gaze mask in agent view
+            else:
+                # otherwise puppet mask is just 0s
+                puppet_mask = np.zeros((agent.view_size, agent.view_size), dtype="uint8")
         else:
             puppet_mask = None
 
