@@ -183,7 +183,7 @@ def collect_rollouts(env, train_env, model, model_episode, episodes=100, memory=
             cur_obs = obs
 
             # print a condensed version of cur_obs, summed along 2nd axis
-            print('cur_obs', np.sum(cur_obs, axis=1).squeeze().astype(int))
+            #print('cur_obs', np.sum(cur_obs, axis=1).squeeze().astype(int))
 
             # todo: update episode starts?
             if hasattr(model, '_last_lstm_states'):
