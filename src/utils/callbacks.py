@@ -140,7 +140,7 @@ def get_key(my_dict, val):
     return "key doesn't exist"
 
 
-def collect_rollouts(env, model, model_episode, episodes=100, memory=1, deterministic_env=False, deterministic_model=False):
+def collect_rollouts(env, train_env, model, model_episode, episodes=100, memory=1, deterministic_env=False, deterministic_model=False):
     df = pd.DataFrame()
     env = env.unwrapped.vec_envs[0].par_env.unwrapped
     # print(env.configName)
@@ -150,14 +150,21 @@ def collect_rollouts(env, model, model_episode, episodes=100, memory=1, determin
         env.deterministic_seed = episode
         obs = env.reset()
 
+
+        print('obs_shape (eval)', obs.shape)
+        train_obs = train_env.reset()
+        print('obs_shape (train)', train_obs.shape)
+
         lstm_states = None
         episode_starts = torch.from_numpy(np.ones((1,), dtype=int))
         a = env.instance_from_name['player_0']
 
-        obs_shape = list(torch.from_numpy(obs['player_0']).swapdims(0, 2).unsqueeze(0).shape)
+        #obs_shape = list(torch.from_numpy(obs['player_0']).swapdims(0, 2).unsqueeze(0).shape)
+        obs_shape = obs.shape
         channels = obs_shape[1]
         obs_shape[1] = channels * memory
         remembered_obs = torch.zeros(obs_shape)
+
 
         for t in range(50):
 
@@ -167,10 +174,11 @@ def collect_rollouts(env, model, model_episode, episodes=100, memory=1, determin
 
             cur_obs = np.array(cur_obs)'''
 
-            # instead of making torch tensor, leave as numpy but still swap dims
-            obs = np.expand_dims(np.array(obs['player_0']).swapaxes(0, 2), 0)
+            # swap dims, add batch dim... unclear if dim swap has parity with wrapped env
+            '''obs = np.expand_dims(np.array(obs['player_0']).swapaxes(0, 2), 0)
             remembered_obs = np.concatenate([obs, remembered_obs], axis=1)
-            cur_obs = remembered_obs[:, -memory * channels:, :, :]
+            cur_obs = remembered_obs[:, -memory * channels:, :, :]'''
+            cur_obs = np.expand_dims(obs, 0)
 
             # todo: update episode starts?
             if hasattr(model, '_last_lstm_states'):
