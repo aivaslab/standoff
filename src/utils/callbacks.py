@@ -153,7 +153,7 @@ def collect_rollouts(env, train_env, model, model_episode, episodes=100, memory=
 
         print('obs_shape (eval)', obs['player_0'].shape)
         train_obs = train_env.reset()
-        print('obs_shape (train)', train_obs['player_0'].shape)
+        print('obs_shape (train)', train_obs.shape)
 
         lstm_states = None
         episode_starts = torch.from_numpy(np.ones((1,), dtype=int))
