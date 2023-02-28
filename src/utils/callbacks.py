@@ -160,7 +160,7 @@ def collect_rollouts(env, train_env, model, model_episode, episodes=100, memory=
         a = env.instance_from_name['player_0']
 
         #obs_shape = list(torch.from_numpy(obs['player_0']).swapdims(0, 2).unsqueeze(0).shape)
-        obs_shape = obs.shape
+        obs_shape = obs['player_0'].shape
         channels = obs_shape[1]
         obs_shape[1] = channels * memory
         remembered_obs = torch.zeros(obs_shape)
@@ -175,10 +175,12 @@ def collect_rollouts(env, train_env, model, model_episode, episodes=100, memory=
             cur_obs = np.array(cur_obs)'''
 
             # swap dims, add batch dim... unclear if dim swap has parity with wrapped env
-            '''obs = np.expand_dims(np.array(obs['player_0']).swapaxes(0, 2), 0)
+            obs = np.expand_dims(np.array(obs['player_0']).swapaxes(0, 2), 0)
+            print('obs2', obs.shape)
             remembered_obs = np.concatenate([obs, remembered_obs], axis=1)
-            cur_obs = remembered_obs[:, -memory * channels:, :, :]'''
+            cur_obs = remembered_obs[:, -memory * channels:, :, :]
             cur_obs = np.expand_dims(obs, 0)
+            print('cur_obs', cur_obs.shape)
 
             # todo: update episode starts?
             if hasattr(model, '_last_lstm_states'):
