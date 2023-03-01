@@ -151,7 +151,7 @@ def collect_rollouts(env, train_env, model, model_episode, episodes=100, memory=
         obs = env.reset()
 
         train_obs = train_env.reset()
-        print('obs_shape (eval vs train)', obs['player_0'].shape, train_obs.shape)
+        #print('obs_shape (eval vs train)', obs['player_0'].shape, train_obs.shape)
 
         lstm_states = None
         episode_starts = torch.from_numpy(np.ones((1,), dtype=int))
@@ -173,7 +173,7 @@ def collect_rollouts(env, train_env, model, model_episode, episodes=100, memory=
             cur_obs = np.array(cur_obs)'''
 
             # swap dims, add batch dim... unclear if dim swap has parity with wrapped env
-            obs = np.expand_dims(np.array(obs['player_0']).swapaxes(0, 2), 0)
+            obs = np.expand_dims(np.array(obs['player_0']).swapaxes(0, 1), 0)
             #print('obs2', obs.shape) # (1, 5, 17, 17)
             #remembered_obs = np.concatenate([obs, remembered_obs], axis=1)
             #cur_obs = remembered_obs[:, -memory * channels:, :, :]
@@ -256,7 +256,7 @@ def ground_truth_evals(eval_envs, model, repetitions=25, memory=1):
                 a = env.instance_from_name['player_0']
 
                 taken_path = []
-                obs_shape = list(torch.from_numpy(obs['player_0']).swapdims(0, 2).unsqueeze(0).shape)
+                obs_shape = list(torch.from_numpy(obs['player_0']).swapdims(0, 1).unsqueeze(0).shape)
                 # obs shape 1,3,51,51
                 channels = obs_shape[1]
                 obs_shape[1] = channels * memory
@@ -265,9 +265,10 @@ def ground_truth_evals(eval_envs, model, repetitions=25, memory=1):
 
                     act = get_relative_direction(a, path)
 
-                    obs = torch.from_numpy(obs['player_0']).swapdims(0, 2).unsqueeze(0)
-                    remembered_obs = torch.cat([obs, remembered_obs], dim=1)
-                    cur_obs = remembered_obs[:, -memory * channels:, :, :]
+                    obs = torch.from_numpy(obs['player_0']).swapdims(0, 1).unsqueeze(0)
+                    #remembered_obs = torch.cat([obs, remembered_obs], dim=1)
+                    #cur_obs = remembered_obs[:, -memory * channels:, :, :]
+                    cur_obs = obs
 
                     # todo: update episode starts?
                     if hasattr(model, '_last_lstm_states'):
