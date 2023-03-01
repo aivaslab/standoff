@@ -481,7 +481,8 @@ class para_MultiGridEnv(ParallelEnv):
         self.seed(seed=seed)
         self.agent_spawn_kwargs = agent_spawn_kwargs
         self.ghost_mode = ghost_mode
-        self.agent_view_size = agents[0].view_size * agents[0].view_tile_size  # 34 magic number fix?
+        self.agent_view_size_x = agents[0].view_size_x * agents[0].view_tile_size  # 34 magic number fix?
+        self.agent_view_size_y = agents[0].view_size_y * agents[0].view_tile_size  # 34 magic number fix?
 
         self.agents = agents
         self.puppets = puppets
@@ -533,7 +534,7 @@ class para_MultiGridEnv(ParallelEnv):
             self.observation_spaces = {agent: Box(
                 low=0,
                 high=255,
-                shape=(self.agent_view_size, self.agent_view_size, len(self.rich_observation_layers)),
+                shape=(self.agent_view_size_x, self.agent_view_size_y, len(self.rich_observation_layers)),
                 dtype='uint8'
             ) for agent in self.possible_agents}
 
@@ -541,7 +542,7 @@ class para_MultiGridEnv(ParallelEnv):
             self.observation_spaces = {agent: Box(
                 low=0,
                 high=255,
-                shape=(self.agent_view_size, self.agent_view_size, 3),
+                shape=(self.agent_view_size_x, self.agent_view_size_y, 3),
                 dtype='uint8'
             ) for agent in self.possible_agents}
 
