@@ -30,8 +30,7 @@ def register_standoff_env(
         observation_style='rich',
         observation_density=1,
         view_tile_size=1,
-        view_size_x=15,
-        view_size_y=15,
+        view_size=15,
         view_offset=4,
 ):
     configs = ScenarioConfigs().standoff
@@ -48,8 +47,7 @@ def register_standoff_env(
 
 
     player_config = {
-        "view_size_x": view_size_x,
-        "view_size_y": view_size_y,
+        "view_size": view_size,
         "view_offset": view_offset,
         "view_tile_size": view_tile_size,
         "observation_style": observation_style,
@@ -119,7 +117,6 @@ for observation_style in 'rich', 'image':
                         observation_style=observation_style,
                         observation_density=1,
                         view_tile_size=1,
-                        view_size_x=view_size,
-                        view_size_y=view_size+2,
+                        view_size=view_size,
                         view_offset=4,
                     )
