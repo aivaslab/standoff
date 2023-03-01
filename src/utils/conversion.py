@@ -37,7 +37,7 @@ def make_env_comp(env_name, frames=1, vecNormalize=False, size=32, style='rich',
     env = wrap_env_full(env.env, memory=frames, size=size,
                         vecNormalize=vecNormalize,
                         style=style, monitor_path=monitor_path, rank=rank)
-    env = VecMonitor(env, os.path.join(monitor_path, f'{env_name}-{rank}'), info_keywords=env.info_keywords)
+    env = VecMonitor(env, os.path.join(monitor_path, f'{env_name}-{rank}')) # should get info keywords here for train monitoring, eg accuracy
     env.rank = rank
     return env
 
