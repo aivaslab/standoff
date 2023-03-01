@@ -53,17 +53,18 @@ def moving_average(values, window):
     return np.convolve(values.astype(float), weights, 'valid')
 
 
-def plot_split(indexer, df, mypath, title, window, values=None):
+def plot_split(indexer, df, mypath, title, window, values=None, use_std=True):
     if values is None:
         values = ["accuracy"]
-    new_df = df.pivot(index=indexer, columns="name", values=values)
+    new_df = df.pivot(index=indexer, columns="configName", values=[x+"_mean" for x in values] if use_std else values)
     fig = plt.figure(title)
     new_df.plot()
-    plt.xlabel('Timestep, (window={})'.format(window))
+    plt.xlabel('Timestep')
     plt.ylabel(values)
     plt.xlim(0, plt.xlim()[1])
     plt.ylim(0, 1)
     plt.title(title + " " + values[0])
+    plt.rcParams["figure.figsize"] = (10,5)
     plt.legend(loc='center left', bbox_to_anchor=(1, 1))
     plt.tight_layout()
     name = title + values[0]
@@ -72,7 +73,9 @@ def plot_split(indexer, df, mypath, title, window, values=None):
 
 
 def plot_merged(indexer, df, mypath, title, window, values=None,
-                labels=None, range=[0, 1]):
+                    labels=None, range=None, use_std=True):
+    if range is None:
+        range = [0, 1]
     if labels is None:
         labels = ["selected any box", "selected best box"]
     if values is None:
@@ -80,30 +83,37 @@ def plot_merged(indexer, df, mypath, title, window, values=None,
     fig = plt.figure(title)
     plt.ylim(range[0], range[1])
     for value, label in zip(values, labels):
-        plt.plot(df[indexer], df[value], label=label)
+        if use_std:
+            plt.plot(df[indexer], df[value+"_mean"], label=label)
+            plt.fill_between(df[indexer], df[value+"_mean"]-df[value+"_std"], df[value+"_mean"]+df[value+"_std"], alpha=.1)
+        else:
+            plt.plot(df[indexer], df[value], label=label)
     plt.xlim(0, plt.xlim()[1])
     plt.legend(labels, loc='center left', bbox_to_anchor=(1, 1))
-    plt.xlabel('Timestep, (window={})'.format(window))
+    plt.xlabel('Timestep')
     plt.ylabel('Percent')
     plt.title(title + " " + values[0])
+    plt.rcParams["figure.figsize"] = (10,5)
     plt.tight_layout()
-    plt.savefig(os.path.join(mypath, title + "-merged-" + values[0]))
+    plt.savefig(os.path.join(mypath, title + "-merged-" + values[0] + '.png'))
     plt.close()
 
 
 def plot_selection(indexer, df, mypath, title, window):
     fig = plt.figure(title)
-    plt.xlabel('Timestep, (window={})'.format(window))
+    plt.xlabel('Timestep')
     plt.ylabel('Reward Type')
     plt.plot([], [], label='SelectedBig', color='green')
     plt.plot([], [], label='SelectedSmall', color='blue')
     plt.plot([], [], label='SelectedNeither', color='orange')
-    plt.stackplot(df[indexer], df["selectedBig"], df["selectedSmall"], df["selectedNeither"],
-                  colors=['green', 'blue', 'orange', ])
+    plt.stackplot(df[indexer], df["selectedBig_mean"], df["selectedSmall_mean"], df["selectedNeither_mean"], colors=['green', 'blue', 'orange', ])
+    #plt.scatter(x=df[indexer], y=df["selectedBig_mean"])
     plt.xlim(0, plt.xlim()[1])
     plt.legend(['Big', 'Small', 'Neither'])
+    plt.rcParams["figure.figsize"] = (10,5)
     plt.title(title + "-" + str('Reward Type'))
-    plt.savefig(os.path.join(mypath, title + "-" + 'reward-type'))
+    plt.tight_layout()
+    plt.savefig(os.path.join(mypath, title + "-" + 'reward-type' + '.png'))
     plt.close()
 
 
