@@ -555,8 +555,6 @@ class para_MultiGridEnv(ParallelEnv):
                                    zip(self.possible_agents + self.possible_puppets, agents + puppets)}
         self.loadingPickle = False
         self.allRooms = []
-        print('init_env', 'view_size', self.agent_view_size, 'obs_style', self.observation_style, 'obs_density',
-              self.observation_density)
 
     @functools.lru_cache(maxsize=None)
     def action_space(self, agent):
