@@ -265,7 +265,7 @@ def ground_truth_evals(eval_envs, model, repetitions=25, memory=1):
 
                     act = get_relative_direction(a, path)
 
-                    obs = torch.from_numpy(obs['player_0']).swapdims(0, 1).unsqueeze(0)
+                    obs = torch.from_numpy(obs['player_0']).swapdims(0, 2).unsqueeze(0).swapdims(2, 3)
                     #remembered_obs = torch.cat([obs, remembered_obs], dim=1)
                     #cur_obs = remembered_obs[:, -memory * channels:, :, :]
                     cur_obs = obs
