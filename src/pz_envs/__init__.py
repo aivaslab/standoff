@@ -55,7 +55,6 @@ def register_standoff_env(
         "view_type": 0,
         "move_type": 0
     }
-    print('registered player config', player_config["view_size"])
 
     reset_configs = {**configs["defaults"], **configs[config_name]}
 
