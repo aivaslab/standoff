@@ -13,6 +13,7 @@ import gym
 
 
 def make_env_comp(env_name, model_class, frames=1, vecNormalize=False, size=32, style='rich', monitor_path='dir',
+def make_env_comp(env_name, frames=1, vecNormalize=False, size=32, style='rich', monitor_path='dir',
                   rank=-1):
     # if model_class != RecurrentPPO and frames > 1:
     #    env = gym.make(env_name)
