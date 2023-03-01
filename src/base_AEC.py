@@ -997,11 +997,11 @@ class para_MultiGridEnv(ParallelEnv):
             # egocentric view
             topX, topY, botX, botY = agent.get_view_exts()
             grid = gaze_grid.slice(
-                topX, topY, agent.view_size, agent.view_size, rot_k=agent.dir + 1
+                topX, topY, agent.view_size_x, agent.view_size_y, rot_k=agent.dir + 1
             )
         else:
             grid = gaze_grid.slice(
-                0, 0, agent.view_size, agent.view_size, 0
+                0, 0, agent.view_size_x, agent.view_size_y, 0
             )
         ret = grid.grid
         del gaze_grid
@@ -1014,19 +1014,19 @@ class para_MultiGridEnv(ParallelEnv):
         if not agent.active:
             # below, not sure orientation is correct but as of 6/27/2020 that doesn't matter because
             # agent views are usually square and this grid won't be used for anything.
-            grid = MultiGrid((agent.view_size, agent.view_size), orientation=agent.dir + 1)
-            vis_mask = np.zeros((agent.view_size, agent.view_size), dtype="uint8")  # was np.bool
+            grid = MultiGrid((agent.view_size_x, agent.view_size_y), orientation=agent.dir + 1)
+            vis_mask = np.zeros((agent.view_size_x, agent.view_size_y), dtype="uint8")  # was np.bool
             return grid, vis_mask
 
         if agent.view_type == 0:
             # egocentric view
             topX, topY, botX, botY = agent.get_view_exts()
             grid = self.grid.slice(
-                topX, topY, agent.view_size, agent.view_size, rot_k=agent.dir + 1
+                topX, topY, agent.view_size_x, agent.view_size_y, rot_k=agent.dir + 1
             )
         else:
             grid = self.grid.slice(
-                0, 0, agent.view_size, agent.view_size, 0
+                0, 0, agent.view_size_x, agent.view_size_y, 0
             )
 
         # Process occluders and visibility
@@ -1072,7 +1072,7 @@ class para_MultiGridEnv(ParallelEnv):
                             puppet_mask = self.slice_gaze_grid(agent, puppet_mask)  # get relative gaze mask in agent view
             else:
                 # otherwise puppet mask is just 0s
-                puppet_mask = np.zeros((agent.view_size, agent.view_size), dtype="uint8")
+                puppet_mask = np.zeros((agent.view_size_x, agent.view_size_y), dtype="uint8")
         else:
             puppet_mask = None
 
@@ -1084,7 +1084,7 @@ class para_MultiGridEnv(ParallelEnv):
             mapping = view_grid.obj_reg.key_to_obj_map
 
             visibility = vis_mask
-            obs = np.zeros((len(self.rich_observation_layers), agent.view_size, agent.view_size))
+            obs = np.zeros((len(self.rich_observation_layers), agent.view_size_x, agent.view_size_y))
             for i, layer in enumerate(self.rich_observation_layers):
                 if len(mapping) < 2:
                     continue
