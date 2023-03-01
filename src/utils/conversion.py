@@ -20,10 +20,16 @@ def make_env_comp(env_name, model_class, frames=1, vecNormalize=False, size=32, 
     #                        path=video_path, vecNormalize=vecNormalize, recordEvery=1, style='rich')
     # else:
     env = gym.make(env_name)
+
+    env.observational_style = style
+    env.size = size
+    env.rank = rank
+
     env = wrap_env_full(env.env, memory=frames, size=size,
                         vecNormalize=vecNormalize,
                         style=style, monitor_path=monitor_path, rank=rank)
     env = VecMonitor(env, os.path.join(monitor_path, f'{env_name}-{rank}'))
+    env = VecMonitor(env, os.path.join(monitor_path, f'{env_name}-{rank}'), info_keywords=env.info_keywords)
     env.rank = rank
     return env
 
