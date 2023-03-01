@@ -11,8 +11,20 @@ from ..pz_envs.scenario_configs import ScenarioConfigs
 import os
 import gym
 
+'''def group_dataframe(cur_df, groupby_list):
+    ret_df = cur_df.groupby(groupby_list, as_index=False).agg(agg_dict(cur_df))
+    # cols are tuples either [(name, mean) (name, std)] or (name, first)
+    grouped_df.columns = grouped_df.columns.map("_".join).str.replace('_first', '')
+    grouped_df = grouped_df.sort_values('model_ep')
+    return grouped_df
 
-def make_env_comp(env_name, model_class, frames=1, vecNormalize=False, size=32, style='rich', monitor_path='dir',
+    grouped_df = group_dataframe(df, ['model_ep', 'configName'])
+    grouped_df_noname = df_small.groupby(['model_ep'], as_index=False).agg(agg_dict(df_small)).sort_values('model_ep')
+    grouped_df_noname.columns = (grouped_df_noname.columns - ignored_columns).map("_".join)
+    grouped_df_small = df_small.groupby(['model_ep', 'configName'], as_index=False).agg(agg_dict(df_small)).sort_values('model_ep')
+    grouped_df_small.columns = (grouped_df_small.columns - ignored_columns).map("_".join)'''
+
+
 def make_env_comp(env_name, frames=1, vecNormalize=False, size=32, style='rich', monitor_path='dir',
                   rank=-1):
     # if model_class != RecurrentPPO and frames > 1:
@@ -22,17 +34,9 @@ def make_env_comp(env_name, frames=1, vecNormalize=False, size=32, style='rich',
     # else:
     env = gym.make(env_name)
 
-    env.observational_style = style
-    env.size = size
-    env.agent_view_size = size
-    env.rank = rank
-
-    print('reset env size', env.agent_view_size)
-
     env = wrap_env_full(env.env, memory=frames, size=size,
                         vecNormalize=vecNormalize,
                         style=style, monitor_path=monitor_path, rank=rank)
-    env = VecMonitor(env, os.path.join(monitor_path, f'{env_name}-{rank}'))
     env = VecMonitor(env, os.path.join(monitor_path, f'{env_name}-{rank}'), info_keywords=env.info_keywords)
     env.rank = rank
     return env
