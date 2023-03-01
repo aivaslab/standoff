@@ -28,7 +28,9 @@ def register_standoff_env(
         difficulty,
         reward_decay=True,
         observation_style='rich',
-        view_tile_size=1
+        view_tile_size=1,
+        view_size=15,
+        view_offset=4,
 ):
     configs = ScenarioConfigs().standoff
 
@@ -42,16 +44,18 @@ def register_standoff_env(
         "config_name": config_name,
     }
 
+
     player_config = {
-        "view_size": 17,
-        "view_offset": 4,
+        "view_size": view_size,
+        "view_offset": view_offset,
         "view_tile_size": view_tile_size,
-        "observation_style": "rich",
+        "observation_style": observation_style,
         "see_through_walls": False,
         "color": "prestige",
         "view_type": 0,
         "move_type": 0
     }
+    print('registered player config', player_config["view_size"])
 
     reset_configs = {**configs["defaults"], **configs[config_name]}
 
@@ -98,14 +102,19 @@ def env_from_config(env_config, randomize_seed=True):
     return env_class(**env_kwargs)
 
 
-for difficulty in range(3):
-    for stage in range(3):
-        for config in ScenarioConfigs.stageNames[stage+1]:
-            configName = difficulty if stage < 2 else config.replace(" ", "") + "-" + str(difficulty)
-            register_standoff_env(
-                "Standoff-S{0}-{1}-v0".format(stage+1, configName),
-                StandoffEnv,
-                config,
-                difficulty,
-                observation_style='rich'
-            )
+for observation_style in 'rich', 'image':
+    for view_size in [13, 15, 17, 19]:
+        for difficulty in range(3):
+            for stage in range(3):
+                for config in ScenarioConfigs.stageNames[stage+1]:
+                    configName = difficulty if stage < 2 else config.replace(" ", "") + "-" + str(difficulty)
+                    register_standoff_env(
+                        "Standoff-S{0}-{1}-{2}-{3}".format(stage+1, configName, view_size, observation_style),
+                        StandoffEnv,
+                        config,
+                        difficulty,
+                        observation_style=observation_style,
+                        view_tile_size=1,
+                        view_size=view_size,
+                        view_offset=4,
+                    )
