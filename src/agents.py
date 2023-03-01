@@ -18,10 +18,12 @@ class GridAgentInterface(GridAgent):
 
     def __init__(
             self,
-            view_size=9,
+            view_size_x=9,
+            view_size_y=9,
             view_tile_size=5,
             view_offset=0,
             observation_style='image',
+            observation_density=1,
             observe_rewards=False,
             observe_position=False,
             observe_orientation=False,
@@ -43,10 +45,12 @@ class GridAgentInterface(GridAgent):
         self.view_type = view_type
         self.move_type = move_type
 
-        self.view_size = view_size
+        self.view_size_x = view_size_x
+        self.view_size_y = view_size_y
         self.view_tile_size = view_tile_size
         self.view_offset = view_offset
         self.observation_style = observation_style
+        self.observation_density = observation_density
         self.observe_rewards = observe_rewards
         self.observe_position = observe_position
         self.observe_orientation = observe_orientation
@@ -70,14 +74,16 @@ class GridAgentInterface(GridAgent):
             
         if self.observation_style == 'rich':
             view_tile_size = 1
-            channels = 7 # add one if opponent gaze
+            channels = 7
+            if self.observation_density > 0:
+                channels = 5
         else:
             channels = 3
 
         image_space = gym.spaces.Box(
             low=0,
             high=255,
-            shape=(view_tile_size * view_size, view_tile_size * view_size, channels),
+            shape=(view_tile_size * view_size_x, view_tile_size * view_size_y, channels),
             dtype="uint8",
         )
         if observation_style == 'image':
@@ -105,7 +111,7 @@ class GridAgentInterface(GridAgent):
 
         self.metadata = {
             **self.metadata,
-            'view_size': view_size,
+            'view_size': view_size_x,
             'view_tile_size': view_tile_size,
         }
         self.reset(new_episode=True)
@@ -141,10 +147,12 @@ class GridAgentInterface(GridAgent):
 
     def clone(self):
         ret = self.__class__(
-            view_size=self.view_size,
+            view_size_x=self.view_size_x,
+            view_size_y=self.view_size_y,
             view_offset=self.view_offset,
             view_tile_size=self.view_tile_size,
             observation_style=self.observation_style,
+            observation_density=self.observation_density,
             observe_rewards=self.observe_rewards,
             observe_position=self.observe_position,
             observe_orientation=self.observe_orientation,
@@ -274,8 +282,8 @@ class GridAgentInterface(GridAgent):
         ay -= 2 * self.view_offset * dy
 
         # Compute the absolute coordinates of the top-left view corner
-        sz = self.view_size
-        hs = self.view_size // 2
+        sz = self.view_size_x
+        hs = self.view_size_y // 2
         tx = ax + (dx * (sz - 1)) - (rx * hs)
         ty = ay + (dy * (sz - 1)) - (ry * hs)
 
@@ -291,7 +299,7 @@ class GridAgentInterface(GridAgent):
 
     def get_view_pos(self):
         if self.view_type == 0:
-            return (self.view_size // 2, self.view_size - 1 - self.view_offset)
+            return (self.view_size_x // 2, self.view_size_y - 1 - self.view_offset)
         return self.pos
 
     def get_view_exts(self):
@@ -304,24 +312,24 @@ class GridAgentInterface(GridAgent):
         # Facing right
         if dir == 0:  # 1
             topX = self.pos[0] - self.view_offset
-            topY = self.pos[1] - self.view_size // 2
+            topY = self.pos[1] - self.view_size_y // 2
         # Facing down
         elif dir == 1:  # 0
-            topX = self.pos[0] - self.view_size // 2
+            topX = self.pos[0] - self.view_size_x // 2
             topY = self.pos[1] - self.view_offset
         # Facing left
         elif dir == 2:  # 3
-            topX = self.pos[0] - self.view_size + 1 + self.view_offset
-            topY = self.pos[1] - self.view_size // 2
+            topX = self.pos[0] - self.view_size_x + 1 + self.view_offset
+            topY = self.pos[1] - self.view_size_y // 2
         # Facing up
         elif dir == 3:  # 2
-            topX = self.pos[0] - self.view_size // 2
-            topY = self.pos[1] - self.view_size + 1 + self.view_offset
+            topX = self.pos[0] - self.view_size_x // 2
+            topY = self.pos[1] - self.view_size_y + 1 + self.view_offset
         else:
             assert False, "invalid agent direction"
 
-        botX = topX + self.view_size
-        botY = topY + self.view_size
+        botX = topX + self.view_size_x
+        botY = topY + self.view_size_y
 
         return (topX, topY, botX, botY)
 
@@ -332,7 +340,7 @@ class GridAgentInterface(GridAgent):
 
         vx, vy = self.get_view_coords(x, y)
 
-        if vx < 0 or vy < 0 or vx >= self.view_size or vy >= self.view_size:
+        if vx < 0 or vy < 0 or vx >= self.view_size_x or vy >= self.view_size_y:
             return None
 
         return vx, vy
