@@ -116,8 +116,40 @@ def plot_selection(indexer, df, mypath, title, window):
     plt.savefig(os.path.join(mypath, title + "-" + 'reward-type' + '.png'))
     plt.close()
 
+def plot_train(log_folder, window=1000):
+    monitor_files = get_monitor_files(log_folder)
+    print(monitor_files)
 
-def plot_train(log_folder, fig_folder, configName, rank, title='Learning Curve', window=2048):
+    for file_name in monitor_files:
+        with open(file_name) as file_handler:
+            first_line = file_handler.readline()
+            assert first_line[0] == "#", print(first_line)
+            metadata = json.loads(first_line[1:].replace('""', ''))
+            rank = metadata['rank'] if 'rank' in metadata.keys() else -1
+            header = json.loads(first_line[1:])
+            df = pd.read_csv(file_handler, index_col=None, on_bad_lines='skip')  # , usecols=cols)
+            if len(df):
+                print('plotting train curve', file_name)
+                df['index_col'] = df.index
+                title = os.path.basename(file_name).replace('.', '-')[:-12]
+
+                x = df.index
+                y = df.r
+                plt.scatter(x, y, marker='.', alpha=0.3, label='episodes')
+                df['yrolling'] = df['r'].rolling(window=window).mean()
+                plt.plot(x, df.yrolling, color='red', label='moving average, window=' + str(window))
+
+                plt.rcParams["figure.figsize"] = (10, 5)
+                plt.xlabel('Episode')
+                plt.ylabel('Reward')
+                plt.title(title + "-" + str('Learning curve'))
+                plt.tight_layout()
+                plt.legend()
+                if not os.path.exists(os.path.join(log_folder, 'figures')):
+                    os.mkdir(os.path.join(log_folder, 'figures'))
+                plt.savefig(os.path.join(log_folder, 'figures', title + "-" + 'lcurve' + '.png'))
+                plt.figure()
+def plot_train_legacy(log_folder, fig_folder, configName, rank, title='Learning Curve', window=2048):
     """
     plot the results of training on one environment and evaluating on others
     :param log_folder: (str) the save location of the results to plot
