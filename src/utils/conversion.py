@@ -23,7 +23,10 @@ def make_env_comp(env_name, model_class, frames=1, vecNormalize=False, size=32, 
 
     env.observational_style = style
     env.size = size
+    env.agent_view_size = size
     env.rank = rank
+
+    print('reset env size', env.agent_view_size)
 
     env = wrap_env_full(env.env, memory=frames, size=size,
                         vecNormalize=vecNormalize,
