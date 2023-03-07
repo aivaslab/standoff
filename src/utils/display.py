@@ -85,10 +85,12 @@ def plot_merged(indexer, df, mypath, title, window, values=None,
 
     colors = ['green', 'blue', 'orange', 'red', 'purple', 'brown', 'pink', 'gray', 'olive', 'cyan']
     if stacked_bar:
+        xlen = len(df[indexer])
+        bar_width = xlen/(2*len(values)+1)
         bottom = np.zeros(len(df[indexer]))
         for i, (value, label) in enumerate(zip(values, labels)):
             color = colors[i % len(colors)]
-            plt.bar(df[indexer], df[value + "_mean"], bottom=bottom, label=label, width=1, color=color)
+            plt.bar(df[indexer], df[value + "_mean"], bottom=bottom, label=label, width=bar_width, color=color)
             plt.scatter(x=df[indexer], y=df[value + "_mean"], label=label, color=color)
             bottom += df[value + "_mean"]
             print('bottom', bottom)
