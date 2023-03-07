@@ -84,14 +84,10 @@ def plot_merged(indexer, df, mypath, title, window, values=None,
     plt.ylim(range[0], range[1])
 
     if stacked_bar:
-        value, label = values[0], labels[0]
-        plt.bar(df[indexer], df[value+"_mean"], label=label, width=1)
-        print(df[value+"_mean"])
-        prev_value = value
-        # loop through all value, label pairs and make a stacked bar plot, using previous as bottom
-        for value, label in zip(values[1:], labels[1:]):
-            plt.bar(df[indexer], df[value+"_mean"], bottom=df[prev_value+"_mean"], label=label, width=1)
-            prev_value = value
+        bottom = np.zeros(len(df[indexer]))
+        for value, label in zip(values, labels):
+            plt.bar(df[indexer], df[value + "_mean"], bottom=bottom, label=label, width=1)
+            bottom += df[value + "_mean"]
     else:
         for value, label in zip(values, labels):
             if use_std:
