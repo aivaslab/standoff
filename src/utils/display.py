@@ -73,26 +73,25 @@ def plot_split(indexer, df, mypath, title, window, values=None, use_std=True):
 
 
 def plot_merged(indexer, df, mypath, title, window, values=None,
-                    labels=None, range=None, use_std=True, scatter_dots=True, stacked_bar=False):
-    if range is None:
-        range = [0, 1]
+                labels=None, _range=None, use_std=True, scatter_dots=True, stacked_bar=False):
+    if _range is None:
+        _range = [0, 1]
     if labels is None:
         labels = ["selected any box", "selected best box"]
     if values is None:
         values = ["valid", "accuracy"]
     fig = plt.figure(title)
-    plt.ylim(range[0], range[1])
+    plt.ylim(_range[0], _range[1])
 
     colors = ['green', 'blue', 'orange', 'red', 'purple', 'brown', 'pink', 'gray', 'olive', 'cyan']
     if stacked_bar:
         xlen = len(df[indexer])
-        bar_width = xlen/(2*len(values)+1)
+        bar_width = xlen / (2 * len(values) + 1)
         values_mean = [df[value + "_mean"] for value in values]
         plt.bar(df[indexer], values_mean[0], label=labels[0], width=bar_width, color=colors[0])
         for i in range(1, len(values)):
-            plt.bar(df[indexer], values_mean[i], bottom=np.sum(values_mean[:i], axis=0), label=labels[i],
+            plt.bar(df[indexer], values_mean[i], bottom=sum(values_mean[:i]), label=labels[i],
                     width=bar_width, color=colors[i % len(colors)])
-
     else:
         for i, (value, label) in enumerate(zip(values, labels)):
             color = colors[i % len(colors)]
