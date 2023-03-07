@@ -101,7 +101,7 @@ def plot_merged(indexer, df, mypath, title, window, values=None,
             else:
                 plt.plot(df[indexer], df[value], label=label)
                 if scatter_dots:
-                    plt.scatter(x=df[indexer], y=df[value])
+                    plt.scatter(x=df[indexer], y=df[value], label=label)
     plt.xlim(0, plt.xlim()[1])
     plt.legend(labels, loc='center left', bbox_to_anchor=(1, 1))
     plt.xlabel('Timestep')
