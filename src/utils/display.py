@@ -124,7 +124,7 @@ def plot_selection(indexer, df, mypath, title, window, bars=False):
     plt.plot([], [], label='SelectedNeither', color='orange')
     if bars:
         # make stacked bar plot, where bar width is a proportion of the total width
-        bar_width = 1.0 / (len(df[indexer])*2 + 1)
+        bar_width = max(df[indexer]) / (3*2 + 1)
         plt.bar(df[indexer], df["selectedBig_mean"], color='green', width=bar_width)
         plt.bar(df[indexer], df["selectedSmall_mean"], bottom=df["selectedBig_mean"], color='blue', width=bar_width)
         plt.bar(df[indexer], df["selectedNeither_mean"], bottom=df["selectedBig_mean"]+df["selectedSmall_mean"], color='orange', width=bar_width)
