@@ -91,7 +91,7 @@ def plot_merged(indexer, df, mypath, title, window, values=None,
         for i, (value, label) in enumerate(zip(values, labels)):
             color = colors[i % len(colors)]
             plt.bar(df[indexer], df[value + "_mean"], bottom=bottom, label=label, width=bar_width, color=color)
-            plt.scatter(x=df[indexer], y=df[value + "_mean"], label=label, color=color)
+            #plt.scatter(x=df[indexer], y=df[value + "_mean"], label=label, color=color)
             bottom += df[value + "_mean"]
     else:
         for i, (value, label) in enumerate(zip(values, labels)):
