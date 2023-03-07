@@ -87,7 +87,7 @@ def plot_merged(indexer, df, mypath, title, window, values=None,
         bottom = np.zeros(len(df[indexer]))
         for i, (value, label) in enumerate(zip(values, labels)):
             plt.bar(df[indexer], df[value + "_mean"], bottom=bottom, label=label, width=1)
-            bottom[i] += df[value + "_mean"]
+            bottom += df[value + "_mean"]
             print('bottom', bottom)
     else:
         colors = ['green', 'blue', 'orange', 'red', 'purple', 'brown', 'pink', 'gray', 'olive', 'cyan']
