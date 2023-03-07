@@ -91,17 +91,17 @@ def plot_merged(indexer, df, mypath, title, window, values=None,
         for value, label in zip(values[1:], labels[1:]):
             plt.bar(df[indexer], df[value+"_mean"], bottom=df[prev_value+"_mean"], label=label)
             prev_value = value
-
-    for value, label in zip(values, labels):
-        if use_std:
-            plt.plot(df[indexer], df[value+"_mean"], label=label)
-            if scatter_dots:
-                plt.scatter(x=df[indexer], y=df[value+"_mean"])
-            plt.fill_between(df[indexer], df[value+"_mean"]-df[value+"_std"], df[value+"_mean"]+df[value+"_std"], alpha=.1)
-        else:
-            plt.plot(df[indexer], df[value], label=label)
-            if scatter_dots:
-                plt.scatter(x=df[indexer], y=df[value])
+    else:
+        for value, label in zip(values, labels):
+            if use_std:
+                plt.plot(df[indexer], df[value+"_mean"], label=label)
+                if scatter_dots:
+                    plt.scatter(x=df[indexer], y=df[value+"_mean"])
+                plt.fill_between(df[indexer], df[value+"_mean"]-df[value+"_std"], df[value+"_mean"]+df[value+"_std"], alpha=.1)
+            else:
+                plt.plot(df[indexer], df[value], label=label)
+                if scatter_dots:
+                    plt.scatter(x=df[indexer], y=df[value])
     plt.xlim(0, plt.xlim()[1])
     plt.legend(labels, loc='center left', bbox_to_anchor=(1, 1))
     plt.xlabel('Timestep')
