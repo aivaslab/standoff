@@ -173,7 +173,7 @@ def collect_rollouts(env, train_env, model, model_episode, episodes=100, memory=
             cur_obs = np.array(cur_obs)'''
 
             # swap dims, add batch dim... unclear if dim swap has parity with wrapped env
-            obs = np.expand_dims(np.array(obs['player_0']).swapaxes(0, 1), 0).swapaxes(2, 3)
+            obs = np.expand_dims(np.array(obs['player_0']).swapaxes(0, 1), 0).swapaxes(3, 4)
             #print('obs2', obs.shape) # (1, 5, 17, 17)
             #remembered_obs = np.concatenate([obs, remembered_obs], axis=1)
             #cur_obs = remembered_obs[:, -memory * channels:, :, :]
