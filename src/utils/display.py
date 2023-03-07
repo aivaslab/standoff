@@ -85,18 +85,18 @@ def plot_merged(indexer, df, mypath, title, window, values=None,
 
     if stacked_bar:
         value, label = values[0], labels[0]
-        plt.bar(df[indexer], df[value+"_mean"], label=label)
+        plt.bar(df[indexer], df[value+"_mean"], label=label, width=1)
         prev_value = value
         # loop through all value, label pairs and make a stacked bar plot, using previous as bottom
         for value, label in zip(values[1:], labels[1:]):
-            plt.bar(df[indexer], df[value+"_mean"], bottom=df[prev_value+"_mean"], label=label)
+            plt.bar(df[indexer], df[value+"_mean"], bottom=df[prev_value+"_mean"], label=label, width=1)
             prev_value = value
     else:
         for value, label in zip(values, labels):
             if use_std:
                 plt.plot(df[indexer], df[value+"_mean"], label=label)
                 if scatter_dots:
-                    plt.scatter(x=df[indexer], y=df[value+"_mean"])
+                    plt.scatter(x=df[indexer], y=df[value+"_mean"], label=label)
                 plt.fill_between(df[indexer], df[value+"_mean"]-df[value+"_std"], df[value+"_mean"]+df[value+"_std"], alpha=.1)
             else:
                 plt.plot(df[indexer], df[value], label=label)
