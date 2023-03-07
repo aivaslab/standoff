@@ -93,7 +93,6 @@ def plot_merged(indexer, df, mypath, title, window, values=None,
             plt.bar(df[indexer], df[value + "_mean"], bottom=bottom, label=label, width=bar_width, color=color)
             plt.scatter(x=df[indexer], y=df[value + "_mean"], label=label, color=color)
             bottom += df[value + "_mean"]
-            print('bottom', bottom)
     else:
         for i, (value, label) in enumerate(zip(values, labels)):
             color = colors[i % len(colors)]
@@ -126,10 +125,11 @@ def plot_selection(indexer, df, mypath, title, window, bars=False):
     plt.plot([], [], label='SelectedSmall', color='blue')
     plt.plot([], [], label='SelectedNeither', color='orange')
     if bars:
-        # make stacked bar plot
-        plt.bar(df[indexer], df["selectedBig_mean"], color='green')
-        plt.bar(df[indexer], df["selectedSmall_mean"], bottom=df["selectedBig_mean"], color='blue')
-        plt.bar(df[indexer], df["selectedNeither_mean"], bottom=df["selectedBig_mean"]+df["selectedSmall_mean"], color='orange')
+        # make stacked bar plot, where bar width is a proportion of the total width
+        bar_width = 1.0 / (len(df[indexer])*2 + 1)
+        plt.bar(df[indexer], df["selectedBig_mean"], color='green', width=bar_width)
+        plt.bar(df[indexer], df["selectedSmall_mean"], bottom=df["selectedBig_mean"], color='blue', width=bar_width)
+        plt.bar(df[indexer], df["selectedNeither_mean"], bottom=df["selectedBig_mean"]+df["selectedSmall_mean"], color='orange', width=bar_width)
     else:
         plt.stackplot(df[indexer], df["selectedBig_mean"], df["selectedSmall_mean"], df["selectedNeither_mean"], colors=['green', 'blue', 'orange', ])
     #plt.scatter(x=df[indexer], y=df["selectedBig_mean"])
