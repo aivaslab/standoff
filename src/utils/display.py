@@ -73,7 +73,7 @@ def plot_split(indexer, df, mypath, title, window, values=None, use_std=True):
 
 
 def plot_merged(indexer, df, mypath, title, window, values=None,
-                    labels=None, range=None, use_std=True):
+                    labels=None, range=None, use_std=True, scatter_dots=True, stacked_bar=False):
     if range is None:
         range = [0, 1]
     if labels is None:
@@ -82,12 +82,26 @@ def plot_merged(indexer, df, mypath, title, window, values=None,
         values = ["valid", "accuracy"]
     fig = plt.figure(title)
     plt.ylim(range[0], range[1])
+
+    if stacked_bar:
+        value, label = values[0], labels[0]
+        plt.bar(df[indexer], df[value+"_mean"], label=label)
+        prev_value = value
+        # loop through all value, label pairs and make a stacked bar plot, using previous as bottom
+        for value, label in zip(values[1:], labels[1:]):
+            plt.bar(df[indexer], df[value+"_mean"], bottom=df[prev_value+"_mean"], label=label)
+            prev_value = value
+
     for value, label in zip(values, labels):
         if use_std:
             plt.plot(df[indexer], df[value+"_mean"], label=label)
+            if scatter_dots:
+                plt.scatter(x=df[indexer], y=df[value+"_mean"])
             plt.fill_between(df[indexer], df[value+"_mean"]-df[value+"_std"], df[value+"_mean"]+df[value+"_std"], alpha=.1)
         else:
             plt.plot(df[indexer], df[value], label=label)
+            if scatter_dots:
+                plt.scatter(x=df[indexer], y=df[value])
     plt.xlim(0, plt.xlim()[1])
     plt.legend(labels, loc='center left', bbox_to_anchor=(1, 1))
     plt.xlabel('Timestep')
@@ -99,14 +113,21 @@ def plot_merged(indexer, df, mypath, title, window, values=None,
     plt.close()
 
 
-def plot_selection(indexer, df, mypath, title, window):
+
+def plot_selection(indexer, df, mypath, title, window, bars=False):
     fig = plt.figure(title)
     plt.xlabel('Timestep')
     plt.ylabel('Reward Type')
     plt.plot([], [], label='SelectedBig', color='green')
     plt.plot([], [], label='SelectedSmall', color='blue')
     plt.plot([], [], label='SelectedNeither', color='orange')
-    plt.stackplot(df[indexer], df["selectedBig_mean"], df["selectedSmall_mean"], df["selectedNeither_mean"], colors=['green', 'blue', 'orange', ])
+    if bars:
+        # make stacked bar plot
+        plt.bar(df[indexer], df["selectedBig_mean"], color='green')
+        plt.bar(df[indexer], df["selectedSmall_mean"], bottom=df["selectedBig_mean"], color='blue')
+        plt.bar(df[indexer], df["selectedNeither_mean"], bottom=df["selectedBig_mean"]+df["selectedSmall_mean"], color='orange')
+    else:
+        plt.stackplot(df[indexer], df["selectedBig_mean"], df["selectedSmall_mean"], df["selectedNeither_mean"], colors=['green', 'blue', 'orange', ])
     #plt.scatter(x=df[indexer], y=df["selectedBig_mean"])
     plt.xlim(0, plt.xlim()[1])
     plt.legend(['Big', 'Small', 'Neither'])
