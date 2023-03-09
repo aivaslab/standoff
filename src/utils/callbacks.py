@@ -163,6 +163,8 @@ def collect_rollouts(env, train_env, model, model_episode, episodes=100, memory=
         obs_shape[1] = channels * memory
         remembered_obs = torch.zeros(obs_shape)
 
+        lstm_states = None
+
 
         for t in range(50):
 
@@ -187,9 +189,9 @@ def collect_rollouts(env, train_env, model, model_episode, episodes=100, memory=
 
             # todo: update episode starts?
             if hasattr(model, '_last_lstm_states'):
-                action, _states = model.predict(cur_obs, deterministic=deterministic_model,
-                                                lstm_states=model._last_lstm_states,
-                                                episode_starts=episode_starts)
+                action, lstm_states = model.predict(cur_obs, deterministic=deterministic_model,
+                                                state=lstm_states,
+                                                episode_start=episode_starts)
             else:
                 action, _states = model.predict(cur_obs, deterministic=deterministic_model)
 
@@ -263,6 +265,7 @@ def ground_truth_evals(eval_envs, model, repetitions=25, memory=1):
                 channels = obs_shape[1]
                 obs_shape[1] = channels * memory
                 remembered_obs = torch.zeros(obs_shape)
+                lstm_states= None
                 for t in range(50):
 
                     act = get_relative_direction(a, path)
@@ -275,7 +278,7 @@ def ground_truth_evals(eval_envs, model, repetitions=25, memory=1):
                     # todo: update episode starts?
                     if hasattr(model, '_last_lstm_states'):
                         value, log, entropy = model.policy.evaluate_actions(cur_obs, actions=torch.tensor(act),
-                                                                            lstm_states=model._last_lstm_states,
+                                                                            lstm_states=lstm_states,
                                                                             episode_starts=episode_starts)
                     else:
                         value, log, entropy = model.policy.evaluate_actions(cur_obs, actions=torch.tensor(act))
