@@ -90,7 +90,7 @@ def get_key(my_dict, val):
     return "key doesn't exist"
 
 
-def ground_truth_evals(eval_env, model, repetitions=25, memory=1):
+def ground_truth_evals(eval_env, model, repetitions=25, memory=1, skip_to_release=True):
     df = pd.DataFrame()
     env = eval_env.unwrapped.vec_envs[0].par_env.unwrapped
     for k in range(repetitions):
@@ -119,15 +119,15 @@ def ground_truth_evals(eval_env, model, repetitions=25, memory=1):
             a = env.instance_from_name['player_0']
 
             taken_path = []
-            obs_shape = list(torch.from_numpy(obs['player_0']).swapdims(0, 1).unsqueeze(0).shape)
-            channels = obs_shape[1]
-            obs_shape[1] = channels * memory
             lstm_states = None
             for t in range(50):
 
+                if t < release and skip_to_release:
+                    obs, rewards, dones, info = env.step({'player_0': 2})
+                    continue
+
                 act = get_relative_direction(a, path)
-                obs = torch.from_numpy(obs['player_0']).swapdims(0, 2).unsqueeze(0).swapdims(2, 3)
-                cur_obs = obs
+                cur_obs = torch.from_numpy(obs['player_0']).swapdims(0, 2).unsqueeze(0).swapdims(2, 3)
 
                 # todo: update episode starts?
                 if hasattr(model, '_last_lstm_states'):
