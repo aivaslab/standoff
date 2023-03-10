@@ -4,6 +4,46 @@ import math
 import numpy as np
 from typing import Dict, Any, List
 
+
+def _process_infos(all_infos: List[Dict[str, Any]]) -> pd.DataFrame:
+    for infos in all_infos:
+        infos['avoidedBig'] = infos['selectedSmall'] or infos['selectedNeither']
+        infos['avoidedSmall'] = infos['selectedBig'] or infos['selectedNeither']
+        infos['avoidCorrect'] = (infos['avoidedBig'] == infos['shouldAvoidBig']) or (
+                infos['avoidedSmall'] == infos['shouldAvoidSmall'])
+        infos['accuracy'] = 1 if infos['selection'] == infos['correctSelection'] else 0
+        infos['weakAccuracy'] = 1 if infos['selection'] == infos['correctSelection'] or infos['selection'] == infos[
+            'incorrectSelection'] else 0
+        for i in range(5):
+            infos[f'sel' + str(i)] = 1 if infos['selection'] == i else 0
+
+        return pd.DataFrame(all_infos, index=np.arange(len(all_infos)))
+
+
+def get_relative_direction(agent, path):
+    sname = str(tuple(agent.pos))
+    if sname in path.keys():
+        direction = path[sname]
+    else:
+        print('unknown', sname, path.keys())
+        direction = agent.dir  # random.choice([0, 1, 2, 3])
+    relative_dir = (agent.dir - direction) % 4
+    if relative_dir == 3 or relative_dir == 2:
+        return 1
+    elif relative_dir == 1:
+        return 0
+    elif relative_dir == 0:
+        return 2
+
+
+def get_key(my_dict, val):
+    for key, value in my_dict.items():
+        if val == value:
+            return key
+
+    return "key doesn't exist"
+
+
 def collect_rollouts(env, model, model_episode,
                      episodes: int = 100,
                      memory: int = 1,
@@ -51,43 +91,6 @@ def collect_rollouts(env, model, model_episode,
         all_infos.append(infos)
 
     return _process_infos(all_infos)
-
-def _process_infos(all_infos: List[Dict[str, Any]]) -> pd.DataFrame:
-    for infos in all_infos:
-        infos['avoidedBig'] = infos['selectedSmall'] or infos['selectedNeither']
-        infos['avoidedSmall'] = infos['selectedBig'] or infos['selectedNeither']
-        infos['avoidCorrect'] = (infos['avoidedBig'] == infos['shouldAvoidBig']) or (
-                    infos['avoidedSmall'] == infos['shouldAvoidSmall'])
-        infos['accuracy'] = 1 if infos['selection'] == infos['correctSelection'] else 0
-        infos['weakAccuracy'] = 1 if infos['selection'] == infos['correctSelection'] or infos['selection'] == infos[
-            'incorrectSelection'] else 0
-        for i in range(5):
-            infos[f'sel' + str(i)] = 1 if infos['selection'] == i else 0
-
-        return pd.DataFrame(all_infos, index=np.arange(len(all_infos)))
-
-
-def get_relative_direction(agent, path):
-    sname = str(tuple(agent.pos))
-    if sname in path.keys():
-        direction = path[sname]
-    else:
-        print('unknown', sname, path.keys())
-        direction = agent.dir  # random.choice([0, 1, 2, 3])
-    relative_dir = (agent.dir - direction) % 4
-    if relative_dir == 3 or relative_dir == 2:
-        return 1
-    elif relative_dir == 1:
-        return 0
-    elif relative_dir == 0:
-        return 2
-
-def get_key(my_dict, val):
-    for key, value in my_dict.items():
-        if val == value:
-            return key
-
-    return "key doesn't exist"
 
 
 def ground_truth_evals(eval_env, model, repetitions=25, memory=1, skip_to_release=True):
@@ -166,7 +169,7 @@ def ground_truth_evals(eval_env, model, repetitions=25, memory=1, skip_to_releas
                                          infos['incorrectSelection'] else 0
 
             for i in range(5):
-                infos['sel'+str(i)] = 1 if infos['selection'] == i else 0
+                infos['sel' + str(i)] = 1 if infos['selection'] == i else 0
             prob_sum += infos['probability']
 
         new_infos = {}
