@@ -53,25 +53,6 @@ def moving_average(values, window):
     return np.convolve(values.astype(float), weights, 'valid')
 
 
-def plot_split(indexer, df, mypath, title, window, values=None, use_std=True):
-    if values is None:
-        values = ["accuracy"]
-    new_df = df.pivot(index=indexer, columns="configName", values=[x + "_mean" for x in values] if use_std else values)
-    fig = plt.figure(title)
-    new_df.plot()
-    plt.xlabel('Timestep')
-    plt.ylabel(values)
-    plt.xlim(0, plt.xlim()[1])
-    plt.ylim(0, 1)
-    plt.title(title + " " + values[0])
-    plt.rcParams["figure.figsize"] = (10, 5)
-    plt.legend(loc='center left', bbox_to_anchor=(1, 1))
-    plt.tight_layout()
-    name = title + values[0]
-    plt.savefig(os.path.join(mypath, name))
-    plt.close()
-
-
 def agg_dict(frame):
     ignored_columns = ['configName', 'minibatch', 'model_ep']
     return {col: ['mean', 'std'] if col not in ignored_columns else 'first' for col in frame.columns}
@@ -149,8 +130,6 @@ def get_transfer_matrix_row(path):
     return return_matrix
 
 
-
-
 def make_pic_video(model, env, random_policy=False, video_length=50, savePath='', vidName='video.mp4',
                    following="player_0", image_size=320, deterministic=False, memory=1, obs_size=32):
     """
@@ -199,8 +178,6 @@ def make_pic_video(model, env, random_policy=False, video_length=50, savePath=''
     imageio.mimsave(os.path.join(savePath, vidName), [img for i, img in enumerate(images)], fps=10)
 
 
-
-
 def gtr_to_monitor(savePath, df, envs):
     for cf in df.configName.unique():
         # get rank from envs using configName
@@ -219,7 +196,6 @@ def gtr_to_monitor(savePath, df, envs):
 
         with open(filename, "w") as f:
             f.write(f"#{json.dumps(header)}\n" + new_df.to_csv())
-
 
 
 def show_state(env, step=0, info=""):

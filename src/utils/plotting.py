@@ -36,6 +36,25 @@ def plot_results(log_folder, title='Learning Curve'):
     plt.show()
 
 
+def plot_split(indexer, df, mypath, title, window, values=None, use_std=True):
+    if values is None:
+        values = ["accuracy"]
+    new_df = df.pivot(index=indexer, columns="configName", values=[x + "_mean" for x in values] if use_std else values)
+    fig = plt.figure(title)
+    new_df.plot()
+    plt.xlabel('Timestep')
+    plt.ylabel(values)
+    plt.xlim(0, plt.xlim()[1])
+    plt.ylim(0, 1)
+    plt.title(title + " " + values[0])
+    plt.rcParams["figure.figsize"] = (10, 5)
+    plt.legend(loc='center left', bbox_to_anchor=(1, 1))
+    plt.tight_layout()
+    name = title + values[0]
+    plt.savefig(os.path.join(mypath, name))
+    plt.close()
+
+
 def plot_merged(indexer, df, mypath, title, window, values=None,
                 labels=None, _range=None, use_std=True, scatter_dots=True, stacked_bar=False):
     if _range is None:
