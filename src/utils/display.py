@@ -56,7 +56,7 @@ def moving_average(values, window):
 def plot_split(indexer, df, mypath, title, window, values=None, use_std=True):
     if values is None:
         values = ["accuracy"]
-    new_df = df.pivot(index=indexer, columns="configName", values=[x+"_mean" for x in values] if use_std else values)
+    new_df = df.pivot(index=indexer, columns="configName", values=[x + "_mean" for x in values] if use_std else values)
     fig = plt.figure(title)
     new_df.plot()
     plt.xlabel('Timestep')
@@ -64,12 +64,89 @@ def plot_split(indexer, df, mypath, title, window, values=None, use_std=True):
     plt.xlim(0, plt.xlim()[1])
     plt.ylim(0, 1)
     plt.title(title + " " + values[0])
-    plt.rcParams["figure.figsize"] = (10,5)
+    plt.rcParams["figure.figsize"] = (10, 5)
     plt.legend(loc='center left', bbox_to_anchor=(1, 1))
     plt.tight_layout()
     name = title + values[0]
     plt.savefig(os.path.join(mypath, name))
     plt.close()
+
+
+def agg_dict(frame):
+    ignored_columns = ['configName', 'minibatch', 'model_ep']
+    return {col: ['mean', 'std'] if col not in ignored_columns else 'first' for col in frame.columns}
+
+
+def group_dataframe(cur_df, groupby_list):
+    ret_df = cur_df.groupby(groupby_list, as_index=False).agg(agg_dict(cur_df))
+    ret_df.columns = ret_df.columns.map("_".join).str.replace('_first', '')
+    ret_df = ret_df.sort_values('model_ep')
+    return ret_df
+
+
+def process_csv(path, prefix):
+    with open(path) as file_handler:
+        df = pd.read_csv(file_handler, index_col=None, on_bad_lines='skip')
+        df['index_col'] = df.index
+        if prefix == 'gtr':
+            for key_name in ['shouldAvoidBig',
+                             'shouldAvoidSmall',
+                             'selection',
+                             'selectedBig',
+                             'selectedSmall',
+                             'selectedNeither',
+                             'r',
+                             'accuracy',
+                             'weakAccuracy',
+                             'episode_timesteps',
+                             'sel0',
+                             'sel1',
+                             'sel2',
+                             'sel3',
+                             'sel4',
+                             ]:
+                df[key_name] = df[key_name + '-c']
+
+        df["selectedBig"] = pd.to_numeric(df["selectedBig"])
+        df["selectedSmall"] = pd.to_numeric(df["selectedSmall"])
+        df["selectedNeither"] = pd.to_numeric(df["selectedNeither"])
+        df["selection"] = df["selection"].fillna(-1)
+
+        df["valid"] = df["selection"] != -1
+
+        df_small = df[df["selectedBig"].notnull()]
+        # df_small is the set of episodes with valid outcomes
+        if not len(df_small):
+            print('small df had no good samples... using big in lieu')
+            df_small = df
+
+        df_small["avoidedBig"] = df_small.apply(lambda row: row["selectedSmall"] or row["selectedNeither"], axis=1)
+        df_small["avoidedSmall"] = df_small.apply(lambda row: row["selectedBig"] or row["selectedNeither"], axis=1)
+
+        df_small["avoidCorrect"] = df_small.apply(lambda row: (row["avoidedBig"] == row["shouldAvoidBig"]) or (
+                row["avoidedSmall"] == row["shouldAvoidSmall"]), axis=1)
+
+        grouped_df = group_dataframe(df, ['model_ep',
+                                          'configName'])  # the mean and std at each evaluation... for each configname
+        grouped_df_small = group_dataframe(df_small, ['model_ep', 'configName'])
+        grouped_df_noname_abs = group_dataframe(df, ['model_ep'])
+        grouped_df_noname = group_dataframe(df_small, ['model_ep'])
+
+        return grouped_df, grouped_df_small, grouped_df_noname_abs, grouped_df_noname
+
+
+def get_transfer_matrix_row(path):
+    grouped_df, _, _, _ = process_csv(path, prefix)
+    return_matrix = pd.DataFrame()
+
+    # for return matrix, we use the set of rows of the final model from each environment
+    # each configName is an evaluation configuration
+    for uname in grouped_df.configName.unique():
+        rows = grouped_df[grouped_df['configName'] == uname]
+        rows2 = rows[rows['model_ep'] == rows['model_ep'].max()]
+        return_matrix = return_matrix.append(rows2, ignore_index=True)
+
+    return return_matrix
 
 
 def plot_merged(indexer, df, mypath, title, window, values=None,
@@ -95,10 +172,11 @@ def plot_merged(indexer, df, mypath, title, window, values=None,
         for i, (value, label) in enumerate(zip(values, labels)):
             color = colors[i % len(colors)]
             if use_std:
-                plt.plot(df[indexer], df[value+"_mean"], label=label, color=color)
+                plt.plot(df[indexer], df[value + "_mean"], label=label, color=color)
                 if scatter_dots:
-                    plt.scatter(x=df[indexer], y=df[value+"_mean"], label=label, color=color)
-                plt.fill_between(df[indexer], df[value+"_mean"]-df[value+"_std"], df[value+"_mean"]+df[value+"_std"], alpha=.1, color=color)
+                    plt.scatter(x=df[indexer], y=df[value + "_mean"], label=label, color=color)
+                plt.fill_between(df[indexer], df[value + "_mean"] - df[value + "_std"],
+                                 df[value + "_mean"] + df[value + "_std"], alpha=.1, color=color)
             else:
                 plt.plot(df[indexer], df[value], label=label, color=color)
                 if scatter_dots:
@@ -108,11 +186,10 @@ def plot_merged(indexer, df, mypath, title, window, values=None,
     plt.xlabel('Timestep')
     plt.ylabel('Percent')
     plt.title(title + " " + values[0])
-    plt.rcParams["figure.figsize"] = (10,5)
+    plt.rcParams["figure.figsize"] = (10, 5)
     plt.tight_layout()
     plt.savefig(os.path.join(mypath, title + "-merged-" + values[0] + '.png'))
     plt.close()
-
 
 
 def plot_selection(indexer, df, mypath, title, window, bars=False):
@@ -124,20 +201,23 @@ def plot_selection(indexer, df, mypath, title, window, bars=False):
     plt.plot([], [], label='SelectedNeither', color='orange')
     if bars:
         # make stacked bar plot, where bar width is a proportion of the total width
-        bar_width = max(df[indexer]) / (len(df['selectedBig_mean'])*2 + 1)
+        bar_width = max(df[indexer]) / (len(df['selectedBig_mean']) * 2 + 1)
         plt.bar(df[indexer], df["selectedBig_mean"], color='green', width=bar_width)
         plt.bar(df[indexer], df["selectedSmall_mean"], bottom=df["selectedBig_mean"], color='blue', width=bar_width)
-        plt.bar(df[indexer], df["selectedNeither_mean"], bottom=df["selectedBig_mean"]+df["selectedSmall_mean"], color='orange', width=bar_width)
+        plt.bar(df[indexer], df["selectedNeither_mean"], bottom=df["selectedBig_mean"] + df["selectedSmall_mean"],
+                color='orange', width=bar_width)
     else:
-        plt.stackplot(df[indexer], df["selectedBig_mean"], df["selectedSmall_mean"], df["selectedNeither_mean"], colors=['green', 'blue', 'orange', ])
-    #plt.scatter(x=df[indexer], y=df["selectedBig_mean"])
+        plt.stackplot(df[indexer], df["selectedBig_mean"], df["selectedSmall_mean"], df["selectedNeither_mean"],
+                      colors=['green', 'blue', 'orange', ])
+    # plt.scatter(x=df[indexer], y=df["selectedBig_mean"])
     plt.xlim(0, plt.xlim()[1])
     plt.legend(['Big', 'Small', 'Neither'])
-    plt.rcParams["figure.figsize"] = (10,5)
+    plt.rcParams["figure.figsize"] = (10, 5)
     plt.title(title + "-" + str('Reward Type'))
     plt.tight_layout()
     plt.savefig(os.path.join(mypath, title + "-" + 'reward-type' + '.png'))
     plt.close()
+
 
 def plot_train(log_folder, window=1000):
     monitor_files = get_monitor_files(log_folder)
@@ -172,6 +252,8 @@ def plot_train(log_folder, window=1000):
                     os.mkdir(os.path.join(log_folder, 'figures'))
                 plt.savefig(os.path.join(log_folder, 'figures', title + "-" + 'lcurve' + '.png'))
                 plt.figure()
+
+
 def plot_train_legacy(log_folder, fig_folder, configName, rank, title='Learning Curve', window=2048):
     """
     plot the results of training on one environment and evaluating on others
@@ -192,12 +274,12 @@ def plot_train_legacy(log_folder, fig_folder, configName, rank, title='Learning 
         os.mkdir(fig_folder)
 
     for file_name in monitor_files:
-        #print('generating figs from', file_name)
+        # print('generating figs from', file_name)
         # if file_name != os.path.join(log_folder, configName + "-" + str(rank) + ".monitor.csv"):
         #    continue
         title2 = os.path.basename(file_name).replace('.', '-')[:-12]
         rank = title2[-1]
-        #print(os.path.basename(file_name), title2, rank)
+        # print(os.path.basename(file_name), title2, rank)
         with open(file_name) as file_handler:
             first_line = file_handler.readline()
             assert first_line[0] == "#", print(first_line)
@@ -234,7 +316,7 @@ def plot_train_legacy(log_folder, fig_folder, configName, rank, title='Learning 
             df["valid"] = pd.to_numeric(df["valid"])
             '''
 
-            #temp, as gtr should generate this ideally
+            # temp, as gtr should generate this ideally
             df["valid"] = df["selection"] != -1
 
             df.minibatch = df.minibatch.astype(int)
@@ -259,8 +341,8 @@ def plot_train_legacy(log_folder, fig_folder, configName, rank, title='Learning 
                 axis=1)
 
             # we will group by minibatch later, so let's not do this here so we don't mean means improperly
-            #grouped = df.groupby('minibatch', as_index=False).mean().sort_values('minibatch')
-            #groupedSmall = df_valid_selection.groupby('minibatch', as_index=False).mean().sort_values('minibatch')
+            # grouped = df.groupby('minibatch', as_index=False).mean().sort_values('minibatch')
+            # groupedSmall = df_valid_selection.groupby('minibatch', as_index=False).mean().sort_values('minibatch')
 
             # small is valid rows
 
@@ -278,7 +360,7 @@ def plot_train_legacy(log_folder, fig_folder, configName, rank, title='Learning 
             # plot_selection(indexer='minibatch', df=groupedSmall, mypath=fig_folder, title=title2, window=window)
             # unclear why this line is here when also below.
 
-    #print('lenny', len(merged_df), merged_df.columns, len(merged_df_small), merged_df_small.columns)
+    # print('lenny', len(merged_df), merged_df.columns, len(merged_df_small), merged_df_small.columns)
     merged_df = merged_df.groupby(['minibatch', 'eval', 'gtr'], as_index=False).mean().sort_values('minibatch')
     # merged_df has all data, grouped by minibatch.
     merged_df_small = merged_df_small.groupby(['minibatch', 'name', 'eval', 'gtr'], as_index=False).mean().sort_values(
@@ -286,8 +368,8 @@ def plot_train_legacy(log_folder, fig_folder, configName, rank, title='Learning 
     # merged_df_small has all data, grouped by minibatch, but also by name (rank)
     merged_df_noname = merged_df_small.groupby(['minibatch', 'eval', 'gtr'], as_index=False).mean().sort_values(
         'minibatch')
-    #print('lenny2', len(merged_df), merged_df.columns, len(merged_df_small), merged_df_small.columns)
-    #print(merged_df_noname.head)
+    # print('lenny2', len(merged_df), merged_df.columns, len(merged_df_small), merged_df_small.columns)
+    # print(merged_df_noname.head)
 
     for use_train in [True, False]:
         title_base = 'train' if use_train else 'eval'
@@ -297,7 +379,7 @@ def plot_train_legacy(log_folder, fig_folder, configName, rank, title='Learning 
                 continue
             title = title_base + ('-gtr' if use_gtr else '-rollout')
 
-            #print(merged_df['accuracy'])
+            # print(merged_df['accuracy'])
             merged_df_f = merged_df[(merged_df['eval'] != use_train) & (merged_df['gtr'] == use_gtr)]
             merged_df_small_f = merged_df_small[
                 (merged_df_small['eval'] != use_train) & (merged_df_small['gtr'] == use_gtr)]
@@ -306,7 +388,7 @@ def plot_train_legacy(log_folder, fig_folder, configName, rank, title='Learning 
 
             # normalize r after all the filtering
             merged_df_f["r"] = (merged_df_f["r"] - merged_df_f["r"].min()) / (
-                        merged_df_f["r"].max() - merged_df_f["r"].min())
+                    merged_df_f["r"].max() - merged_df_f["r"].min())
 
             plotted = ['Plotted']
             not_plotted = ['Could not plot']
@@ -317,33 +399,34 @@ def plot_train_legacy(log_folder, fig_folder, configName, rank, title='Learning 
                             values=['valid', 'weakAccuracy', 'accuracy', 'r'],
                             labels=['selected any box', 'selected any treat', 'selected correct treat',
                                     'reward (normalized)'])
-                plotted += ['merged_df_f '+ title2]
+                plotted += ['merged_df_f ' + title2]
             else:
-                not_plotted += ['merged_df_f '+ title2]
+                not_plotted += ['merged_df_f ' + title2]
             if len(merged_df_small_f):
                 title2 = title + '-smf'
                 # this graph is the same as above, but only taking into account valid samples
                 # avoidcorrect should be identical to weakaccuracy when no opponent is present
                 plot_split(indexer='minibatch', df=merged_df_small_f, mypath=fig_folder, title=title2,
                            window=window,
-                           values=["accuracy",])
+                           values=["accuracy", ])
                 plot_split(indexer='minibatch', df=merged_df_small_f, mypath=fig_folder, title=title2,
                            window=window,
                            values=["weakAccuracy"])
                 plot_split(indexer='minibatch', df=merged_df_small_f, mypath=fig_folder, title=title2,
                            window=window,
                            values=["avoidCorrect"])
-                plotted += ['merged_df_small_f '+ title2]
+                plotted += ['merged_df_small_f ' + title2]
             else:
-                not_plotted += ['merged_df_small_f '+ title2]
+                not_plotted += ['merged_df_small_f ' + title2]
             if len(merged_df_noname_f):
                 title2 = title + '-nnf'
                 plot_merged(indexer='minibatch', df=merged_df_noname_f, mypath=fig_folder, title=title2, window=window,
                             values=["avoidCorrect"], labels=["avoided correct box"])
-                plot_selection(indexer='minibatch', df=merged_df_noname_f, mypath=fig_folder, title=title2, window=window)
-                plotted += ['merged_df_noname_f '+ title2]
+                plot_selection(indexer='minibatch', df=merged_df_noname_f, mypath=fig_folder, title=title2,
+                               window=window)
+                plotted += ['merged_df_noname_f ' + title2]
             else:
-                not_plotted += ['merged_df_noname_f '+ title2]
+                not_plotted += ['merged_df_noname_f ' + title2]
             '''if len(plotted) > 1:
                 print(' '.join(plotted))
             if len(not_plotted) > 1:
@@ -376,7 +459,7 @@ def make_pic_video(model, env, random_policy=False, video_length=50, savePath=''
             obs_used = np.transpose(obs_used, (2, 0, 1))
 
             action = {following: model.predict(obs_used, deterministic=deterministic)[0] if memory <= 1 else
-                    model.predict(obs_used, deterministic=deterministic)}
+            model.predict(obs_used, deterministic=deterministic)}
         obs, _, dones, _ = _env.step(action)
 
         if not use_global_obs:
@@ -415,8 +498,8 @@ def plot_evals(savePath, name, names, eval_cbs):
 
 def gtr_to_monitor(savePath, df, envs):
     for cf in df.configName.unique():
-        #get rank from envs using configName
-        #start by identifying which env has this configName
+        # get rank from envs using configName
+        # start by identifying which env has this configName
         rank = -1
         for env in envs:
             _env = env.unwrapped.vec_envs[0].par_env.unwrapped
@@ -437,7 +520,7 @@ def plot_evals_df(df, savePath, name):
     """
     given dataframe of rollouts, plot things
     """
-    #print('plotting evals df', name, df.columns)
+    # print('plotting evals df', name, df.columns)
     for column in ['accuracy', 'avoidCorrect', 'weakAccuracy', 'r']:
         fig, axs = plt.subplots(1)
         unique_names = df.configName.unique()
