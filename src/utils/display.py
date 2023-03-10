@@ -481,19 +481,6 @@ def make_pic_video(model, env, random_policy=False, video_length=50, savePath=''
     imageio.mimsave(os.path.join(savePath, vidName), [img for i, img in enumerate(images)], fps=10)
 
 
-def plot_evals(savePath, name, names, eval_cbs):
-    """
-    plot the results of the evaluations of the model on the environments
-    """
-    fig, axs = plt.subplots(1)
-    for env_name, cb in zip(names, eval_cbs):
-        plt.plot(cb.evaluations_timesteps, [np.mean(x) for x in cb.evaluations_results], label=env_name, )
-    plt.legend(bbox_to_anchor=(1, 1), loc="upper left")
-    plt.title(name)
-    plt.xlabel('Timestep')
-    plt.ylabel('Reward')
-    plt.savefig(os.path.join(savePath, name + '_evals'), bbox_inches='tight')
-    plt.close(fig)
 
 
 def gtr_to_monitor(savePath, df, envs):
@@ -515,24 +502,6 @@ def gtr_to_monitor(savePath, df, envs):
         with open(filename, "w") as f:
             f.write(f"#{json.dumps(header)}\n" + new_df.to_csv())
 
-
-def plot_evals_df(df, savePath, name):
-    """
-    given dataframe of rollouts, plot things
-    """
-    # print('plotting evals df', name, df.columns)
-    for column in ['accuracy', 'avoidCorrect', 'weakAccuracy', 'r']:
-        fig, axs = plt.subplots(1)
-        unique_names = df.configName.unique()
-        for cf in unique_names:
-            df2 = df[df['configName'] == cf].groupby('minibatch', as_index=False).mean().sort_values('minibatch')
-            plt.plot(df2.minibatch, df2[column + '-c'], label=cf, )
-        plt.legend(bbox_to_anchor=(1, 1), loc="upper left")
-        plt.title(name)
-        plt.xlabel('Timestep')
-        plt.ylabel(column)
-        plt.savefig(os.path.join(savePath, name + '_evals-gtr'), bbox_inches='tight')
-        plt.close(fig)
 
 
 def show_state(env, step=0, info=""):
