@@ -10,8 +10,7 @@ def make_eval_figures(path, figures_path, window=1, prefix=''):
     """
     plot the results found in one csv file.
     """
-    merged_df = pd.DataFrame()
-    merged_df_small = pd.DataFrame()
+
     if not os.path.exists(figures_path):
         os.mkdir(figures_path)
     figures_path_combined = os.path.join(figures_path, 'combined')
