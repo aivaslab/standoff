@@ -62,6 +62,9 @@ def group_dataframe(cur_df, groupby_list):
     ret_df = cur_df.groupby(groupby_list, as_index=False).agg(agg_dict(cur_df))
     ret_df.columns = ret_df.columns.map("_".join).str.replace('_first', '')
     ret_df = ret_df.sort_values('model_ep')
+
+    # get the number of episodes that are aggregated todo: verify that this works as intended
+    ret_df['num_episodes_grouped'] = ret_df.groupby(groupby_list)['model_ep'].transform('count')
     return ret_df
 
 
@@ -112,6 +115,12 @@ def process_csv(path, prefix):
         grouped_df_small = group_dataframe(df_small, ['model_ep', 'configName'])
         grouped_df_noname_abs = group_dataframe(df, ['model_ep'])
         grouped_df_noname = group_dataframe(df_small, ['model_ep'])
+
+        # save json file containing the maximum model_ep value and num_episodes_grouped:
+        max_model_ep = grouped_df_noname['model_ep'].max()
+        num_episodes_grouped = grouped_df_noname['num_episodes_grouped'].max()
+        with open(os.path.join(os.path.dirname(path), 'max_model_ep.json'), 'w') as f:
+            json.dump({'max_model_ep': max_model_ep, 'num_episodes_grouped': num_episodes_grouped}, f)
 
         return grouped_df, grouped_df_small, grouped_df_noname_abs, grouped_df_noname
 
