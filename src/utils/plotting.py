@@ -4,6 +4,7 @@ from stable_baselines3.common.results_plotter import load_results, ts2xy
 import os
 import pandas as pd
 import json
+from stable_baselines3.common.monitor import get_monitor_files
 
 def moving_average(values, window):
     """
