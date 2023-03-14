@@ -52,9 +52,9 @@ def evaluate_models(eval_envs, models, model_timesteps, det_env, det_model, use_
     if not os.path.exists(evalPath):
         os.mkdir(evalPath)
 
-    path = os.path.join(evalPath, prefix + '_data.csv')
+    pathy = os.path.join(evalPath, prefix + '_data.csv')
     with open(path, 'wb'):
-        eval_data.to_csv(path, index=False)
+        eval_data.to_csv(pathy, index=False)
 
 
 def get_json_params(path):
@@ -90,7 +90,7 @@ if __name__ == '__main__':
     renamed_envs = False
     for train_dir in train_dirs:
         model_class, size, style, frames, vecNormalize = get_json_params(os.path.join(train_dir, 'json_data.json'))
-        models, model_timesteps = load_checkpoint_models(train_dir, model_class)
+        models, model_timesteps, repetition_names = load_checkpoint_models(train_dir, model_class)
 
         if not renamed_envs:
             for k, env_name in enumerate(env_names):

@@ -15,12 +15,22 @@ def load_last_checkpoint_model(path, model_class):
     full_path = os.path.join(path, 'checkpoints')
     best_model = None
     best_length = 0
-    for checkpoint_path in os.scandir(full_path):
-        if int(checkpoint_path.path[
-               checkpoint_path.path.find("model_") + 6:checkpoint_path.path.find("_steps")]) > best_length:
-            best_length = int(
-                checkpoint_path.path[checkpoint_path.path.find("model_") + 6:checkpoint_path.path.find("_steps")])
-            best_model = model_class.load(checkpoint_path.path)
+    paths = os.scandir(full_path)
+    if any([pathx.name.startswith('rep_') for pathx in paths]):
+        for new_path in os.scandir(full_path):
+            for checkpoint_path in os.scandir(new_path.path):
+                if int(checkpoint_path.path[
+                       checkpoint_path.path.find("model_") + 6:checkpoint_path.path.find("_steps")]) > best_length:
+                    best_length = int(
+                        checkpoint_path.path[checkpoint_path.path.find("model_") + 6:checkpoint_path.path.find("_steps")])
+                    best_model = model_class.load(checkpoint_path.path)
+    else:
+        for checkpoint_path in os.scandir(full_path):
+            if int(checkpoint_path.path[
+                   checkpoint_path.path.find("model_") + 6:checkpoint_path.path.find("_steps")]) > best_length:
+                best_length = int(
+                    checkpoint_path.path[checkpoint_path.path.find("model_") + 6:checkpoint_path.path.find("_steps")])
+                best_model = model_class.load(checkpoint_path.path)
 
     return best_model, best_length
 
@@ -87,7 +97,7 @@ if __name__ == '__main__':
                     model = model_class(policy, env=env, verbose=0, learning_rate=rate,
                                         # batch_size=batch_size, #a2c has no batch size
                                         policy_kwargs=policy_kwargs)
-                callback = make_callbacks(savePath3, env, batch_size, n_steps, recordEvery, model)
+                callback = make_callbacks(savePath3, env, batch_size, n_steps, recordEvery, model, repetition=repetition)
 
                 print(env_name, model_class, name, savePath3, str(timedelta(seconds=time.time() - start)))
                 model.learn(total_timesteps=timesteps, callback=callback)
