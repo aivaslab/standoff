@@ -14,6 +14,9 @@ def make_eval_figures(path, figures_path, window=1, prefix=''):
     merged_df_small = pd.DataFrame()
     if not os.path.exists(figures_path):
         os.mkdir(figures_path)
+    figures_path_combined = os.path.join(figures_path, 'combined')
+    if not os.path.exists(figures_path_combined):
+        os.mkdir(figures_path_combined)
 
     # load csv, process data
     grouped_df, grouped_df_small, grouped_df_noname_abs, grouped_df_noname = process_csv(path, prefix)
@@ -96,7 +99,7 @@ def make_eval_figures(path, figures_path, window=1, prefix=''):
 
     if len(grouped_df_noname_abs):
         title2 = title + '-big'
-        plot_merged(indexer='model_ep', df=grouped_df_noname_abs, mypath=figures_path,
+        plot_merged(indexer='model_ep', df=grouped_df_noname_abs, mypath=figures_path_combined,
                     title=title2 + 'absoluteAccuracy', window=window,
                     values=['weakAccuracy', 'accuracy', 'normed_r', 'valid'],
                     labels=['selected any treat', 'selected correct treat',
@@ -105,36 +108,26 @@ def make_eval_figures(path, figures_path, window=1, prefix=''):
         title2 = title + '-small'
         # this graph is the same as above, but only taking into account valid samples
         # avoidcorrect should be identical to weakaccuracy when no opponent is present
-        plot_split(indexer='model_ep', df=grouped_df_small, mypath=figures_path, title=title2,
-                   window=window,
-                   values=["accuracy", ])
-        plot_split(indexer='model_ep', df=grouped_df_small, mypath=figures_path, title=title2,
-                   window=window,
-                   values=["weakAccuracy"])
-        plot_split(indexer='model_ep', df=grouped_df_small, mypath=figures_path, title=title2,
-                   window=window,
-                   values=["normed_r"])
-        plot_split(indexer='model_ep', df=grouped_df_small, mypath=figures_path, title=title2,
-                   window=window,
-                   values=["avoidCorrect"])
-        plot_split(indexer='model_ep', df=grouped_df_small, mypath=figures_path, title=title2,
-                   window=window,
-                   values=["episode_timesteps"])
+
+        for value in ['accuracy', 'weakAccuracy', 'normed_r', 'avoidCorrect']:
+            plot_split(indexer='model_ep', df=grouped_df_small, mypath=figures_path_combined, title=title2,
+                       window=window,
+                       values=[value])
         plotted += ['grouped_df_small ' + title2]
     else:
         not_plotted += ['grouped_df_small ' + title2]
 
     if len(grouped_df_noname):
         title2 = title + '-mixed'
-        plot_merged(indexer='model_ep', df=grouped_df_noname, mypath=figures_path, title=title2 + 'ac', window=window, \
+        plot_merged(indexer='model_ep', df=grouped_df_noname, mypath=figures_path_combined, title=title2 + 'ac', window=window, \
                     values=["avoidCorrect"], labels=["avoided correct box"])
-        plot_selection(indexer='model_ep', df=grouped_df_noname, mypath=figures_path, title=title2, window=window)
-        plot_merged(indexer='model_ep', df=grouped_df_noname, mypath=figures_path, title=title2 + 'validAccuracy',
+        plot_selection(indexer='model_ep', df=grouped_df_noname, mypath=figures_path_combined, title=title2, window=window)
+        plot_merged(indexer='model_ep', df=grouped_df_noname, mypath=figures_path_combined, title=title2 + 'validAccuracy',
                     window=window, \
                     values=['weakAccuracy', 'accuracy', 'normed_r'], \
                     labels=['selected any treat', 'selected correct treat', \
                             'reward (normalized)'])
-        plot_merged(indexer='model_ep', df=grouped_df_noname, mypath=figures_path, title=title + 'absoluteLocation',
+        plot_merged(indexer='model_ep', df=grouped_df_noname, mypath=figures_path_combined, title=title + 'absoluteLocation',
                     window=window, \
                     values=['sel0', 'sel1', 'sel2', 'sel3', 'sel4'], \
                     labels=['box 1', 'box 2', 'box 3', 'box 4', 'box 5'])
