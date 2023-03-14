@@ -7,7 +7,7 @@ from tqdm import tqdm
 from evaluation import load_checkpoint_models
 from src.pz_envs import ScenarioConfigs
 from src.utils.conversion import make_env_comp
-from src.utils.evalutation import collect_rollouts, ground_truth_evals
+from src.utils.evaluation import collect_rollouts, ground_truth_evals
 from stable_baselines3 import PPO, A2C
 from sb3_contrib import TRPO, RecurrentPPO
 
