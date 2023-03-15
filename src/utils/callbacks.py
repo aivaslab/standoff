@@ -6,7 +6,7 @@ from pettingzoo.utils.conversions import aec_to_parallel, parallel_to_aec
 import os
 import pandas as pd
 
-def make_callbacks(save_path, env, batch_size, n_steps, record_every, model, repetition=0):
+def make_callbacks(save_path, env, batch_size, n_steps, record_every, model, repetition=0, starting_timesteps=0):
     # train_cb = TrainUpdateCallback(envs=eval_envs + [env, ] if eval_envs[0] is not None else [env, ], batch_size=batch_size)
     # this cb updates the minibatch variable in the environment
     train_cb = TrainUpdateCallback(envs=[env, ], batch_size=batch_size, logpath=save_path, params=str(locals()),
@@ -14,8 +14,13 @@ def make_callbacks(save_path, env, batch_size, n_steps, record_every, model, rep
 
     tqdm_cb = EveryNTimesteps(n_steps=n_steps, callback=TqdmCallback(record_every=n_steps))
 
-    checkpoints = CheckpointCallback(save_freq=record_every, save_path=os.path.join(save_path, 'checkpoints', 'rep_' + str(repetition)),
-                                     name_prefix='model')
+    if repetition > 0:
+        save_path_2 = os.path.join(save_path, 'checkpoints', 'rep_' + str(repetition))
+    else:
+        save_path_2 = os.path.join(save_path, 'checkpoints')
+
+    checkpoints = CheckpointCallback(save_freq=record_every, save_path=save_path_2, name_prefix='model')
+    checkpoints.num_timesteps = starting_timesteps
 
     return CallbackList([tqdm_cb, train_cb, checkpoints])
 
