@@ -6,10 +6,8 @@ from datetime import timedelta
 from .pz_envs import ScenarioConfigs
 from .utils.callbacks import make_callbacks
 from standoff_models.train import init_dirs, init_policy, start_global_logs, linear_schedule
-from utils.conversion import make_env, make_env_comp
-import logging
+from .utils.conversion import make_env_comp
 from stable_baselines3 import TD3, PPO, A2C
-from sb3_contrib import RecurrentPPO, TRPO
 
 def load_last_checkpoint_model(path, model_class):
     full_path = os.path.join(path, 'checkpoints')
