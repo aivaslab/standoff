@@ -21,6 +21,10 @@ def make_callbacks(save_path, env, batch_size, n_steps, record_every, model, rep
 
     checkpoints = CheckpointCallback(save_freq=record_every, save_path=save_path_2, name_prefix='model')
     checkpoints.num_timesteps = starting_timesteps
+    # the above line doesn't make it start counting at the right number
+    # we should update model num_timesteps instead since basecallback uses that
+    model.num_timesteps = starting_timesteps
+
 
     return CallbackList([tqdm_cb, train_cb, checkpoints])
 
