@@ -3,9 +3,9 @@ import os
 import time
 from datetime import timedelta
 
-from src.pz_envs import ScenarioConfigs
-from src.utils.callbacks import make_callbacks
-from train import init_dirs, init_policy, start_global_logs, linear_schedule
+from .src.pz_envs import ScenarioConfigs
+from .src.utils.callbacks import make_callbacks
+from standoff_models.train import init_dirs, init_policy, start_global_logs, linear_schedule
 from utils.conversion import make_env, make_env_comp
 import logging
 from stable_baselines3 import TD3, PPO, A2C
