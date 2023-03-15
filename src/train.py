@@ -14,9 +14,10 @@ def load_last_checkpoint_model(path, model_class):
     best_model = None
     best_length = 0
     paths = os.scandir(full_path)
-    if any([pathx.name.startswith('rep_') for pathx in paths]):
-        for new_path in os.scandir(full_path):
-            for checkpoint_path in os.scandir(new_path.path):
+    rep_folders = [pathx for pathx in paths if pathx.is_dir() and pathx.name.startswith('rep_')]
+    if rep_folders:
+        for rep_folder in rep_folders:
+            for checkpoint_path in os.scandir(rep_folder.path):
                 if int(checkpoint_path.path[
                        checkpoint_path.path.find("model_") + 6:checkpoint_path.path.find("_steps")]) > best_length:
                     best_length = int(
