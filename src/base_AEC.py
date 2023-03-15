@@ -504,6 +504,7 @@ class para_MultiGridEnv(ParallelEnv):
 
         self.observation_style = observation_style
         self.observation_density = observation_density
+        self.channels = 3
 
         if self.observation_style == 'rich':
             self.rich_observation_layers = [
@@ -529,21 +530,14 @@ class para_MultiGridEnv(ParallelEnv):
                 )
             if self.gaze_highlighting:
                 self.rich_observation_layers.append('gaze')
+            self.channels = len(self.rich_observation_layers)
 
-            self.observation_spaces = {agent: Box(
-                low=0,
-                high=255,
-                shape=(self.agent_view_size, self.agent_view_size, len(self.rich_observation_layers)),
-                dtype='uint8'
-            ) for agent in self.possible_agents}
-
-        else:
-            self.observation_spaces = {agent: Box(
-                low=0,
-                high=255,
-                shape=(self.agent_view_size, self.agent_view_size, 3),
-                dtype='uint8'
-            ) for agent in self.possible_agents}
+        self.observation_spaces = {agent: Box(
+            low=0,
+            high=255,
+            shape=(self.agent_view_size, self.agent_view_size, self.channels),
+            dtype='uint8'
+        ) for agent in self.possible_agents}
 
         # self.action_space = self.action_spaces[self.possible_agents[0]]
         # self.observation_space = self.observation_spaces[self.possible_agents[0]]

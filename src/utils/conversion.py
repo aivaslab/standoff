@@ -53,7 +53,7 @@ def make_env_comp(env_name, frames=1, vecNormalize=False, size=32, style='rich',
 
     env = wrap_env_full(env.env, memory=frames, size=size,
                         vecNormalize=vecNormalize,
-                        style=style, monitor_path=monitor_path, rank=rank)
+                        style=style, monitor_path=monitor_path, rank=rank, channels=env.channels)
     print('monitor path:', os.path.join(monitor_path, f'{env_name}-{rank}'))
     env = VecMonitor(env, os.path.join(monitor_path, f'{env_name}-{rank}')) # should get info keywords here for train monitoring, eg accuracy
     env.rank = rank
@@ -122,7 +122,8 @@ def make_env(envClass, player_config, configName=None, memory=1, threads=1, redu
 
 
 def wrap_env_full(env, reduce_color=False, memory=1, size=32, vecMonitor=False,
-                  configName=None, threads=1, rank=0, vecNormalize=False, style='rich', monitor_path=None):
+                  configName=None, threads=1, rank=0, vecNormalize=False, style='rich', monitor_path=None,
+                  channels=5):
     if reduce_color:
         env = ss.color_reduction_v0(env, 'B')
     if style != 'rich' and False:
@@ -137,6 +138,7 @@ def wrap_env_full(env, reduce_color=False, memory=1, size=32, vecMonitor=False,
     if memory > 1:
         env = VecFrameStack(env, n_stack=memory, channels_order='first')
         # consider StackedObservations
+    env = ss.reshape_v0(env, (channels, size, size))
 
     if vecMonitor:
         if monitor_path != "":
