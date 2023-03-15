@@ -15,14 +15,6 @@ from stable_baselines3 import TD3, PPO, A2C
 from sb3_contrib import TRPO, RecurrentPPO
 
 class_dict = {'PPO': PPO, 'A2C': A2C, 'TRPO': TRPO, 'RecurrentPPO': RecurrentPPO}
-if continuing:
-    model_class, size, style, frames, vecNormalize = get_json_params(os.path.join(savePath3, 'json_data.json'))
-else:
-with open(os.path.join(savePath3, 'json_data.json'), 'w') as json_file:
-    json.dump({'model_class': model_class.__name__, 'size': size, 'frames': frames, 'style': style,
-               'vecNormalize': vecNormalize}, json_file)
-print('model_class: ', model_class.__name__, 'size: ', size, 'style: ', style, 'frames: ', frames,
-      'vecNormalize: ', vecNormalize)
 
 def get_json_params(path):
     with open(path) as json_data:
