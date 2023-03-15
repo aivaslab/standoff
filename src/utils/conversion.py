@@ -130,6 +130,7 @@ def wrap_env_full(env, reduce_color=False, memory=1, size=32, vecMonitor=False,
         env = ss.resize_v0(env, x_size=size, y_size=size)
     if reduce_color:
         env = ss.reshape_v0(env, (size, size, 1))
+    env = ss.reshape_v0(env, (channels, size, size))
     env = ss.pettingzoo_env_to_vec_env_v1(env)
     env = ss.concat_vec_envs_v1(env, threads, num_cpus=1, base_class='stable_baselines3')
     # num_cpus=1 changed from 2 to avoid csv issues. does it affect speed?
