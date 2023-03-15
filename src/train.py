@@ -6,7 +6,7 @@ from datetime import timedelta
 from .pz_envs import ScenarioConfigs
 from .utils.callbacks import make_callbacks
 from standoff_models.train import init_dirs, init_policy, start_global_logs, linear_schedule
-from .utils.conversion import make_env_comp
+from .utils.conversion import make_env_comp, get_json_params
 from stable_baselines3 import TD3, PPO, A2C
 
 def load_last_checkpoint_model(path, model_class):
@@ -74,9 +74,14 @@ if __name__ == '__main__':
             if not os.path.exists(savePath3):
                 os.mkdir(savePath3)
 
-            with open(os.path.join(savePath3, 'json_data.json'), 'w') as json_file:
-                json.dump({'model_class': model_class.__name__, 'size': size, 'frames': frames, 'style': style,
-                           'vecNormalize': vecNormalize}, json_file)
+            if continuing:
+                model_class, size, style, frames, vecNormalize = get_json_params(os.path.join(savePath3, 'json_data.json'))
+            else:
+                with open(os.path.join(savePath3, 'json_data.json'), 'w') as json_file:
+                    json.dump({'model_class': model_class.__name__, 'size': size, 'frames': frames, 'style': style,
+                               'vecNormalize': vecNormalize}, json_file)
+            print('model_class: ', model_class.__name__, 'size: ', size, 'style: ', style, 'frames: ', frames,
+                  'vecNormalize: ', vecNormalize)
 
             short_name = experimentName
             configName = name
@@ -91,6 +96,7 @@ if __name__ == '__main__':
                                     vecNormalize=vecNormalize)
                 if continuing:
                     model, model_timesteps = load_last_checkpoint_model(savePath3, model_class)
+                    model.set_env(env)
                 else:
                     model = model_class(policy, env=env, verbose=0, learning_rate=rate,
                                         # batch_size=batch_size, #a2c has no batch size

@@ -10,6 +10,31 @@ from ..utils.vec_normalize import VecNormalizeMultiAgent
 from ..pz_envs.scenario_configs import ScenarioConfigs
 import os
 import gym
+import json
+from stable_baselines3 import TD3, PPO, A2C
+from sb3_contrib import TRPO, RecurrentPPO
+
+class_dict = {'PPO': PPO, 'A2C': A2C, 'TRPO': TRPO, 'RecurrentPPO': RecurrentPPO}
+if continuing:
+    model_class, size, style, frames, vecNormalize = get_json_params(os.path.join(savePath3, 'json_data.json'))
+else:
+with open(os.path.join(savePath3, 'json_data.json'), 'w') as json_file:
+    json.dump({'model_class': model_class.__name__, 'size': size, 'frames': frames, 'style': style,
+               'vecNormalize': vecNormalize}, json_file)
+print('model_class: ', model_class.__name__, 'size: ', size, 'style: ', style, 'frames: ', frames,
+      'vecNormalize: ', vecNormalize)
+
+def get_json_params(path):
+    with open(path) as json_data:
+        data = json.load(json_data)
+        model_class = data['model_class']
+        if model_class in class_dict.keys():
+            model_class = class_dict[model_class]
+        size = data['size']
+        style = data['style']
+        frames = data['frames']
+        vecNormalize = data['vecNormalize'] if 'vecNormalize' in data.keys() else True
+    return model_class, size, style, frames, vecNormalize
 
 '''def group_dataframe(cur_df, groupby_list):
     ret_df = cur_df.groupby(groupby_list, as_index=False).agg(agg_dict(cur_df))
