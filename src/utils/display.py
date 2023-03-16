@@ -120,7 +120,7 @@ def process_csv(path, prefix):
         max_model_ep = grouped_df_noname['model_ep'].max()
         num_episodes_grouped = grouped_df_noname['num_episodes_grouped'].max()
         with open(os.path.join(os.path.dirname(path), 'max_model_ep.json'), 'w') as f:
-            json.dump({'max_model_ep': max_model_ep, 'num_episodes_grouped': num_episodes_grouped}, f)
+            json.dump({'max_model_ep': int(max_model_ep), 'num_episodes_grouped': int(num_episodes_grouped)}, f)
 
         return grouped_df, grouped_df_small, grouped_df_noname_abs, grouped_df_noname
 
