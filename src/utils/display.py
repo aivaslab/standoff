@@ -134,6 +134,7 @@ def get_transfer_matrix_row(path, prefix):
     for uname in grouped_df.configName.unique():
         rows = grouped_df[grouped_df['configName'] == uname]
         rows2 = rows[rows['model_ep'] == rows['model_ep'].max()]
+        rows2['nn'] = uname
         return_matrix = return_matrix.append(rows2, ignore_index=True)
 
     return return_matrix
