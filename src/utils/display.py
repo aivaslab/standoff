@@ -125,7 +125,7 @@ def process_csv(path, prefix):
         return grouped_df, grouped_df_small, grouped_df_noname_abs, grouped_df_noname
 
 
-def get_transfer_matrix_row(path):
+def get_transfer_matrix_row(path, prefix):
     grouped_df, _, _, _ = process_csv(path, prefix)
     return_matrix = pd.DataFrame()
 
