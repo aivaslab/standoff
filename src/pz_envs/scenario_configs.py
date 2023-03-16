@@ -60,8 +60,19 @@ class ScenarioConfigs:
                       "replaced",
                       "misinformed",
                       "swapped",
-                      "all"
-                      ]}
+                      ],
+                  4: ["stage_1",
+                      "stage_2",
+                      "informed control",
+                      "partially uninformed",
+                      "removed informed",
+                      "removed uninformed",
+                      "moved",
+                      "replaced",
+                      "misinformed",
+                      "swapped",
+                      ],
+                  }
 
     standoff = {
         "defaults": {
@@ -127,26 +138,15 @@ class ScenarioConfigs:
                        [['bait', 'empty'], ['bait', 'empty'], ['obscure'], ['swap', 0, 1]]]
         }
     }
-
-
-class AllParams():
-    params = {"standoffEnv": {
-        "adversarial": [True, False],
-        "hidden": [True, False],
-        "rational": [True, False],
-        "share_rewards": [True, False],
-        "firstBig": [True, False],  # whether we place big first
-        "boxes": [2, 3, 4, 5],
-        "num_puppets": [0, 1, 2],
-        "followDistance": [0, 1],  # 0 = d first, 1=sub first
-        "lava_height": [2],
-        "baits": [1, 2],
-        "baitSize": [1, 2],
-        "informed": ['informed', 'uninformed', 'fake', 'half1', 'half2'],
-        "swapType": ['swap', 'replace', 'remove', 'move', 'mis'],
-        "visibility": ['full', 'curtains'],  # keys, invisibility potion
-        "cause": ['blocks', 'direction', 'accident', 'inability'],
-        "lava": ['lava', 'block'],
-        "num_agents": [1, 2],
-    }
+    standoff_optimal_policies = {
+        "stage_1": 'big',
+        "swapped": 'big',
+        "partially uninformed": 'b-s',
+        "replaced": 'b-s',
+        "misinformed": 'b-s',
+        "stage_2": 'small',
+        "informed control": 'small',
+        "moved": 'small',
+        "removed uninformed": 's-n',
+        "removed informed": 'none',
     }
