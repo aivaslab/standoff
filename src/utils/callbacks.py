@@ -1,7 +1,7 @@
 
 from stable_baselines3.common.callbacks import CallbackList, CheckpointCallback, EvalCallback, EveryNTimesteps, \
     BaseCallback
-from tqdm.notebook import tqdm
+from tqdm import tqdm
 from pettingzoo.utils.conversions import aec_to_parallel, parallel_to_aec
 import os
 import pandas as pd

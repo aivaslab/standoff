@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 # %matplotlib inline
-from IPython import display
+#from IPython import display
 import os
 from pettingzoo.utils.conversions import aec_to_parallel, parallel_to_aec
 from stable_baselines3.common.results_plotter import load_results, ts2xy
@@ -70,6 +70,8 @@ def group_dataframe(cur_df, groupby_list):
 
 def process_csv(path, prefix):
     with open(path) as file_handler:
+        print('opened', path, file_handler)
+        
         df = pd.read_csv(file_handler, index_col=None, on_bad_lines='skip')
         df['index_col'] = df.index
         if prefix == 'gtr':
@@ -110,6 +112,7 @@ def process_csv(path, prefix):
         df_small["avoidCorrect"] = df_small.apply(lambda row: (row["avoidedBig"] == row["shouldAvoidBig"]) or (
                 row["avoidedSmall"] == row["shouldAvoidSmall"]), axis=1)
 
+        # todo: issue where dataframe has nans, strings apparently being concatted with ints
         grouped_df = group_dataframe(df, ['model_ep',
                                           'configName'])  # the mean and std at each evaluation... for each configname
         grouped_df_small = group_dataframe(df_small, ['model_ep', 'configName'])
@@ -207,7 +210,7 @@ def gtr_to_monitor(savePath, df, envs):
         with open(filename, "w") as f:
             f.write(f"#{json.dumps(header)}\n" + new_df.to_csv())
 
-
+'''
 def show_state(env, step=0, info=""):
     plt.figure(3)
     display.display(plt.clf())
@@ -216,4 +219,4 @@ def show_state(env, step=0, info=""):
     plt.axis('off')
 
     display.clear_output(wait=True)
-    display.display(plt.gcf())
+    display.display(plt.gcf())'''

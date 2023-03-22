@@ -82,7 +82,7 @@ def collect_rollouts(env, model, model_episode,
             obs, rewards, dones, info = env.step({'player_0': action})
             if dones['player_0']:
                 break
-            episode_starts = dones['player_0'].astype(int)
+            episode_starts = int(dones['player_0'])
 
         infos = env.infos['player_0']
         infos['r'] = rewards['player_0']
