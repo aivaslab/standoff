@@ -1,5 +1,6 @@
 import argparse
 import os
+import sys
 import pandas as pd
 
 from src.utils.display import process_csv, get_transfer_matrix_row
@@ -139,38 +140,41 @@ def make_eval_figures(path, figures_path, window=1, prefix=''):
     if len(not_plotted) > 1:
         print(' '.join(not_plotted))
 
+def main(args):
+    parser = argparse.ArgumentParser(description='Train and evaluate models.')
+    parser.add_argument('--path', type=str, default='drive/MyDrive/springExperiments/recurrent-real',
+                        help='Path to training data directory.')
+    parser.add_argument('--window', type=int, default=1000,
+                        help='Size of evaluation window.')
+    parser.add_argument('--plotting', action='store_true', default=False,
+                        help='Enable plotting of evaluation data.')
+    parser.add_argument('--env_rand', type=str, choices=['rand', 'det'], default='rand', help='environment randomness')
+    parser.add_argument('--model_rand', type=str, choices=['rand', 'det'], default='rand', help='model randomness')
+    parser.add_argument('--gtr', action='store_true', help='whether to plot gtr')
+    parser.add_argument('--matrix', action='store_true', help='whether to plot transfer matrix')
+    args = parser.parse_args(args)
 
-parser = argparse.ArgumentParser(description='Train and evaluate models.')
-parser.add_argument('--path', type=str, default='drive/MyDrive/springExperiments/recurrent-real',
-                    help='Path to training data directory.')
-parser.add_argument('--window', type=int, default=1000,
-                    help='Size of evaluation window.')
-parser.add_argument('--plotting', action='store_true', default=False,
-                    help='Enable plotting of evaluation data.')
-parser.add_argument('--env_rand', type=str, choices=['rand', 'det'], default='rand', help='environment randomness')
-parser.add_argument('--model_rand', type=str, choices=['rand', 'det'], default='rand', help='model randomness')
-parser.add_argument('--gtr', action='store_true', help='whether to plot gtr')
-parser.add_argument('--matrix', action='store_true', help='whether to plot transfer matrix')
-args = parser.parse_args()
+    matrix_data = {}
+    for env_rand in [args.env_rand]:
+        for model_rand in [args.model_rand]:
+            matrix_data[env_rand + "_" + model_rand] = []
+    matrix_data['gtr'] = []
 
-matrix_data = {}
-for env_rand in [args.env_rand]:
-    for model_rand in [args.model_rand]:
-        matrix_data[env_rand + "_" + model_rand] = []
-matrix_data['gtr'] = []
+    train_paths = [ os.path.join(f.path) for f in os.scandir(args.path) if f.is_dir() ]
 
-train_paths = [ os.path.join(f.path) for f in os.scandir(args.path) if f.is_dir() ]
+    for k, train_path in enumerate(train_paths):
 
-for k, train_path in enumerate(train_paths):
+        plot_train(train_path)
 
-    plot_train(train_path)
+        train_path = os.path.join(train_path, 'evaluations')
 
-    train_path = os.path.join(train_path, 'evaluations')
-
-    prefix = 'gtr' if args.gtr else args.env_rand + "_" + args.model_rand
-    if args.matrix:
-        this_matrix_data = get_transfer_matrix_row(os.path.join(train_path, prefix+'_data.csv'))
-        this_matrix_data['start'] = train_path
-        matrix_data[prefix] += [ this_matrix_data, ]
-    else:
-        make_eval_figures(os.path.join(train_path, prefix+'_data.csv'), os.path.abspath(os.path.join(train_path, '..', 'figures')), window=args.window, prefix=prefix)
+        prefix = 'gtr' if args.gtr else args.env_rand + "_" + args.model_rand
+        if args.matrix:
+            this_matrix_data = get_transfer_matrix_row(os.path.join(train_path, prefix+'_data.csv'))
+            this_matrix_data['start'] = train_path
+            matrix_data[prefix] += [ this_matrix_data, ]
+        else:
+            make_eval_figures(os.path.join(train_path, prefix+'_data.csv'), os.path.abspath(os.path.join(train_path, '..', 'figures')), window=args.window, prefix=prefix)
+            
+if __name__ == 'main':
+    main(sys.argv[1:])
