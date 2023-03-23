@@ -44,27 +44,28 @@ def load_last_checkpoint_model(path, model_class):
 def main(args):
     parser = argparse.ArgumentParser(description='Experiment Configuration')
     parser.add_argument('--experiment_name', type=str, default='test', help='Name of experiment')
-    parser.add_argument('--model_class', type=str, default='PPO', help='Model class to use')
-    parser.add_argument('--continuing', type=bool, default=False, help='Whether to continue training')
-    parser.add_argument('--overwrite', type=str, default=False, help='Whether to overwrite folder')
-    parser.add_argument('--env_group', type=int, default=3, help='Environment group to use')
-    parser.add_argument('--repetitions', type=int, default=1, help='Number of experiment repetitions')
-    parser.add_argument('--conv_mult', type=int, default=1, help='Number of first level kernels')
-    parser.add_argument('--frames', type=int, default=1, help='Number of frames')
-    parser.add_argument('--timesteps', type=float, default=3e5, help='Number of timesteps')
-    parser.add_argument('--hidden_size', type=int, default=64, help='LSTM size (unused)')
-    parser.add_argument('--width', type=int, default=32, help='MLP features')
-    parser.add_argument('--size', type=int, default=19, help='Board size')
-    parser.add_argument('--lr', type=float, default=1e-3, help='Learning rate')
-    parser.add_argument('--batch_size', type=int, default=128, help='Batch size')
-    parser.add_argument('--checkpoints', type=int, default=20, help='Number of checkpoints to save')
-    parser.add_argument('--schedule', type=str, default='linear', help='Learning rate schedule')
-    parser.add_argument('--style', type=str, default='rich', help='Evaluation output style')
-    parser.add_argument('--n_steps', type=int, default=256, help='Number of steps')
-    parser.add_argument('--vecNormalize', type=bool, default=True, help='Whether to normalize the vectors')
-    parser.add_argument('--experimentName', type=str, default='direct-p2', help='Experiment name')
     parser.add_argument('--log_dir', type=str, default='/monitor', help='Logging directory')
     parser.add_argument('--savePath', type=str, default='drive/MyDrive/springExperiments/', help='Save path')
+    parser.add_argument('--continuing', type=bool, default=False, help='Whether to continue training')
+    parser.add_argument('--overwrite', type=str, default=False, help='Whether to overwrite folder')
+    parser.add_argument('--repetitions', type=int, default=1, help='Number of experiment repetitions')
+    parser.add_argument('--timesteps', type=float, default=3e5, help='Number of timesteps')
+    parser.add_argument('--checkpoints', type=int, default=20, help='Number of checkpoints to save')
+
+    parser.add_argument('--env_group', type=int, default=3, help='Environment group to use')
+    parser.add_argument('--style', type=str, default='rich', help='Evaluation output style')
+    parser.add_argument('--size', type=int, default=19, help='View size')
+    parser.add_argument('--frames', type=int, default=1, help='Number of frames to stack')
+
+    parser.add_argument('--model_class', type=str, default='PPO', help='Model class to use')
+    parser.add_argument('--conv_mult', type=int, default=1, help='Number of first level kernels')
+    parser.add_argument('--hidden_size', type=int, default=64, help='LSTM size (unused)')
+    parser.add_argument('--width', type=int, default=32, help='MLP features')
+    parser.add_argument('--lr', type=float, default=1e-3, help='Learning rate')
+    parser.add_argument('--batch_size', type=int, default=128, help='Batch size')
+    parser.add_argument('--schedule', type=str, default='linear', help='Learning rate schedule')
+    parser.add_argument('--tqdm_steps', type=int, default=256, help='Number of steps between tqdm updates')
+    parser.add_argument('--vecNormalize', type=bool, default=True, help='Whether to normalize the observations')
     parser.add_argument('--variable', type=str, nargs='+', default='',
                         help='Variable to override with multiple values, eg "batch_norm=[True,False]", "lr=[0.001,0.0001]" ')
 
@@ -109,7 +110,7 @@ def main(args):
                 rate = linear_schedule(args.lr) if args.schedule == 'linear' else args.lr
                 batch_size = args.batch_size
                 style = args.style
-                n_steps = args.n_steps
+                tqdm_steps = args.tqdm_steps
                 vecNormalize = args.vecNormalize
                 model_class = class_dict[args.model_class]
 
@@ -154,7 +155,7 @@ def main(args):
                             model = model_class(policy, env=env, verbose=0, learning_rate=rate,
                                                 batch_size=batch_size,
                                                 policy_kwargs=policy_kwargs)
-                    callback = make_callbacks(savePath3, env, batch_size, n_steps, recordEvery, model,
+                    callback = make_callbacks(savePath3, env, batch_size, tqdm_steps, recordEvery, model,
                                               repetition=repetition)
 
                     print(env_name, model_class, name, savePath3, str(timedelta(seconds=time.time() - start)))
