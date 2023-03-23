@@ -50,7 +50,8 @@ class ScenarioConfigs:
         # ...
     }
 
-    env_groups = {1: ["stage_1"],
+    env_groups = {0: ["stage_1", "stage_2"],
+                  1: ["stage_1"],
                   2: ["stage_2"],
                   3: ["informed control",
                       "partially uninformed",
