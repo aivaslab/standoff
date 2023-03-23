@@ -6,11 +6,11 @@ from pettingzoo.utils.conversions import aec_to_parallel, parallel_to_aec
 import os
 import pandas as pd
 
-def make_callbacks(save_path, env, batch_size, tqdm_steps, record_every, model, repetition=0, starting_timesteps=0):
+def make_callbacks(save_path, env, batch_size, tqdm_steps, record_every, model, repetition=0, starting_timesteps=0, threads=1):
     # train_cb = TrainUpdateCallback(envs=eval_envs + [env, ] if eval_envs[0] is not None else [env, ], batch_size=batch_size)
     # this cb updates the minibatch variable in the environment
     train_cb = TrainUpdateCallback(envs=[env, ], batch_size=batch_size, logpath=save_path, params=str(locals()),
-                                   model=model)
+                                   model=model, num_vec_envs=threads)
 
     tqdm_cb = EveryNTimesteps(n_steps=tqdm_steps, callback=TqdmCallback(record_every=tqdm_steps))
 
@@ -31,7 +31,7 @@ def make_callbacks(save_path, env, batch_size, tqdm_steps, record_every, model, 
 
 class TrainUpdateCallback(BaseCallback):
 
-    def __init__(self, envs, batch_size, logpath, params, model):
+    def __init__(self, envs, batch_size, logpath, params, model, num_vec_envs=1):
         super().__init__()
         self.envs = envs
         self.batch_size = batch_size
@@ -39,6 +39,7 @@ class TrainUpdateCallback(BaseCallback):
         self.logPath = os.path.join(logpath, 'logs.txt')
         self.params = params
         self.model = model
+        self.num_vec_envs = num_vec_envs
 
     def _on_training_start(self):
         with open(self.logPath, 'a') as logfile:
@@ -49,9 +50,17 @@ class TrainUpdateCallback(BaseCallback):
     def _on_rollout_end(self):
         # triggered before updating the policy
         self.minibatch += self.batch_size
-        for env in self.envs:
-            _env = parallel_to_aec(env.unwrapped.vec_envs[0].par_env).unwrapped
-            _env.minibatch = self.minibatch
+        for env in self.envs: #different envs, not vec envs
+            if self.num_vec_envs > 1:
+                for i in range(self.num_vec_envs):
+                    pass
+                    #pipes and procs do not allow accessing vec env variables maybe?
+                    #at least this is async so they should update independently
+                    #unused for collect rollouts but is used for gtr, so meh
+                    
+            else:
+                _env = parallel_to_aec(env.unwrapped.vec_envs[0].par_env).unwrapped
+                _env.minibatch = self.minibatch
 
     def _on_training_end(self):
         with open(self.logPath, 'a') as logfile:

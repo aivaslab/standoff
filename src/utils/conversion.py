@@ -31,12 +31,12 @@ def get_json_params(path):
 
 
 def make_env_comp(env_name, frames=1, vecNormalize=False, size=32, style='rich', monitor_path='dir',
-                  rank=-1):
+                  rank=-1, threads=1):
     env = gym.make(env_name)
 
     env = wrap_env_full(env.env, memory=frames, size=size,
                         vecNormalize=vecNormalize,
-                        style=style, monitor_path=monitor_path, rank=rank, channels=env.channels)
+                        style=style, monitor_path=monitor_path, rank=rank, channels=env.channels, threads=threads)
     print('monitor path:', os.path.join(monitor_path, f'{env_name}-{rank}'))
     env = VecMonitor(env, os.path.join(monitor_path,
                                        f'{env_name}-{rank}'))  # should get info keywords here for train monitoring, eg accuracy
@@ -47,6 +47,7 @@ def make_env_comp(env_name, frames=1, vecNormalize=False, size=32, style='rich',
 def wrap_env_full(env, reduce_color=False, memory=1, size=32, vecMonitor=False,
                   configName=None, threads=1, rank=0, vecNormalize=False, style='rich', monitor_path=None,
                   channels=5, num_cpus=1):
+    num_cpus = threads #silly line
     if reduce_color:
         env = ss.color_reduction_v0(env, 'B')
     if style != 'rich' and False:
