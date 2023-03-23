@@ -79,7 +79,7 @@ def main(args):
     args = parser.parse_args(args)
 
     envs = []
-    for name in ScenarioConfigs.stageNames[args.env_group]:
+    for name in ScenarioConfigs.env_groups[args.env_group]:
         if 'stage' in name:
             envs.append('Standoff-S' + name[name.index('_')+1:] + '-0')
         else:

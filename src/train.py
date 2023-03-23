@@ -76,7 +76,7 @@ def main(args):
     na_names = [str(var_name) + str(var_value) for var_value in var_values]
 
     envs = []
-    for name in ScenarioConfigs.stageNames[args.env_group]:
+    for name in ScenarioConfigs.env_groups[args.env_group]:
         if 'stage' in name:
             envs.append('Standoff-S' + name[name.index('_')+1:] + '-0')
         else:
