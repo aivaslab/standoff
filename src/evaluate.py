@@ -65,8 +65,9 @@ def get_json_params(path):
         size = data['size']
         style = data['style']
         frames = data['frames']
+        difficulty = data['difficulty']
         vecNormalize = data['vecNormalize'] if 'vecNormalize' in data.keys() else True
-    return model_class, size, style, frames, vecNormalize
+    return model_class, size, style, frames, vecNormalize, difficulty
 
 def main(args):
     parser = argparse.ArgumentParser(description='Evaluate models on environments.')
@@ -81,9 +82,9 @@ def main(args):
     envs = []
     for name in ScenarioConfigs.env_groups[args.env_group]:
         if 'stage' in name:
-            envs.append('Standoff-S' + name[name.index('_')+1:] + '-0')
+            envs.append('Standoff-S' + name[name.index('_')+1:] + '-')
         else:
-            envs.append('Standoff-S3-' + name.replace(" ", "") + '-0')
+            envs.append('Standoff-S3-' + name.replace(" ", "") + '-')
     env_names = envs
     path = args.path
     train_dirs = [f.path for f in os.scandir(path) if f.is_dir()]
@@ -91,12 +92,12 @@ def main(args):
 
     renamed_envs = False
     for train_dir in train_dirs:
-        model_class, size, style, frames, vecNormalize = get_json_params(os.path.join(train_dir, 'json_data.json'))
+        model_class, size, style, frames, vecNormalize, difficulty = get_json_params(os.path.join(train_dir, 'json_data.json'))
         models, model_timesteps, repetition_names = load_checkpoint_models(train_dir, model_class)
 
         if not renamed_envs:
             for k, env_name in enumerate(env_names):
-                env_names[k] = env_name + '-' + str(size) + '-' + style + '-v0'
+                env_names[k] = env_name + str(difficulty) + '-' + str(size) + '-' + style + '-v0'
             renamed_envs = True
 
         # generate eval envs with proper vecmonitors
