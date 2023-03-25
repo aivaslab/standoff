@@ -118,5 +118,5 @@ for observation_style in 'rich', 'image':
                         observation_density=1,
                         view_tile_size=1,
                         view_size=view_size,
-                        view_offset=view_size//2,
+                        view_offset=1,
                     )
