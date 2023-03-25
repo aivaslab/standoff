@@ -436,7 +436,7 @@ class para_MultiGridEnv(ParallelEnv):
             gaze_highlighting=False,
             persistent_gaze_highlighting=False,
             observation_style='rich',
-            observation_density=1
+            observation_density=1,
     ):
         """
         The init method takes in environment arguments and
@@ -1072,6 +1072,7 @@ class para_MultiGridEnv(ParallelEnv):
 
         # print('generating agent obs', agent)
         view_grid, vis_mask = self.gen_obs_grid(agent)
+        #print('view grid', view_grid)
 
         if self.observation_style == 'rich':
             # bypass rendering, just do dense function
@@ -1089,8 +1090,7 @@ class para_MultiGridEnv(ParallelEnv):
                         obs[i, :, :] = puppet_mask
                 else:
                     obs[i, :, :] = np.multiply(np.vectorize(layer)(view_grid.grid, mapping), visibility)
-            # print(np.sum(obs, axis=0))
-            return np.swapaxes(obs, 0, 2)
+            return obs
 
         grid_image = view_grid.render(tile_size=agent.view_tile_size, visible_mask=vis_mask, top_agent=agent,
                                       gaze_highlight_mask=puppet_mask)

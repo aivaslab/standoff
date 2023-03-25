@@ -48,15 +48,16 @@ def main(args):
     parser.add_argument('--experiment_name', type=str, default='test', help='Name of experiment')
     parser.add_argument('--log_dir', type=str, default='/monitor', help='Logging directory')
     parser.add_argument('--savePath', type=str, default='drive/MyDrive/springExperiments/', help='Save path')
-    parser.add_argument('--continuing', type=bool, default=False, help='Whether to continue training')
-    parser.add_argument('--overwrite', type=str, default=False, help='Whether to overwrite folder')
+    parser.add_argument('--continuing', action='store_true', default=False, help='Whether to continue training')
+    parser.add_argument('--overwrite', action='store_true', help='Whether to overwrite folder')
     parser.add_argument('--repetitions', type=int, default=1, help='Number of experiment repetitions')
     parser.add_argument('--timesteps', type=float, default=3e5, help='Number of timesteps per thread')
     parser.add_argument('--checkpoints', type=int, default=20, help='Number of checkpoints to save')
 
     parser.add_argument('--env_group', type=int, default=3, help='Environment group to use')
     parser.add_argument('--style', type=str, default='rich', help='Evaluation output style')
-    parser.add_argument('--size', type=int, default=19, help='View size')
+    parser.add_argument('--size', type=int, default=19, help='View size in tiles')
+    parser.add_argument('--tile_size', type=int, default=1, help='Size of each tile in pixels') #not implemented since needs registered env
     parser.add_argument('--frames', type=int, default=1, help='Number of frames to stack')
     parser.add_argument('--threads', type=int, default=1, help='Number of cpu threads to use')
     parser.add_argument('--difficulty', type=int, default=3, help='Difficulty 0-4, lower numbers enable cheats')
@@ -69,7 +70,8 @@ def main(args):
     parser.add_argument('--batch_size', type=int, default=128, help='Batch size')
     parser.add_argument('--schedule', type=str, default='linear', help='Learning rate schedule')
     parser.add_argument('--tqdm_steps', type=int, default=256, help='Number of steps between tqdm updates')
-    parser.add_argument('--vecNormalize', type=bool, default=True, help='Whether to normalize the observations')
+    parser.add_argument('--n_steps', type=int, default=2048, help='Number of steps per thread between weight updates')
+    parser.add_argument('--vecNormalize', action='store_true', help='Whether to normalize the observations')
     parser.add_argument('--variable', type=str, default='',
                         help='Variable to override with multiple values, eg "batch_norm=[True,False]", "lr=[0.001,0.0001]" ')
 
@@ -118,9 +120,11 @@ def main(args):
                 size = args.size
                 rate = linear_schedule(args.lr) if args.schedule == 'linear' else args.lr
                 batch_size = args.batch_size
+                n_steps = args.n_steps
                 style = args.style
                 tqdm_steps = args.tqdm_steps
                 vecNormalize = args.vecNormalize
+                print('vn', vecNormalize)
                 model_class = class_dict[args.model_class]
                 threads = args.threads
                 difficulty = args.difficulty
@@ -163,7 +167,9 @@ def main(args):
                             model = model_class(policy, env=env, verbose=0, learning_rate=rate,
                                                 policy_kwargs=policy_kwargs)
                         else:
-                            model = model_class(policy, env=env, verbose=0, learning_rate=rate,
+                            model = model_class(policy, env=env, verbose=0, 
+                                                learning_rate=rate,
+                                                n_steps=n_steps,
                                                 batch_size=batch_size,
                                                 policy_kwargs=policy_kwargs)
                     callback = make_callbacks(savePath3, env, batch_size, tqdm_steps, recordEvery, model,

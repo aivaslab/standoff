@@ -74,9 +74,9 @@ def main(args):
     parser.add_argument('--env_group', type=int, help='Environment group name')
     parser.add_argument('--path', type=str, help='Path to experiment')
     parser.add_argument('--episodes', type=int, default=20, help='Number of episodes to run per environment')
-    parser.add_argument('--det_env', type=bool, default=False, help='Deterministic environment')
-    parser.add_argument('--det_model', type=bool, default=False, help='Deterministic model')
-    parser.add_argument('--use_gtr', type=bool, default=False, help='Ground truth rollouts')
+    parser.add_argument('--det_env', action='store_true', help='Deterministic environment')
+    parser.add_argument('--det_model', action='store_true', help='Deterministic model')
+    parser.add_argument('--use_gtr', action='store_true', help='Ground truth rollouts')
     args = parser.parse_args(args)
 
     envs = []
@@ -101,7 +101,7 @@ def main(args):
             renamed_envs = True
 
         # generate eval envs with proper vecmonitors
-        eval_envs = [make_env_comp(env_name, frames=frames, size=size, style='rich', monitor_path=train_dir, rank=k + 1,
+        eval_envs = [make_env_comp(env_name, frames=frames, size=size, style=style, monitor_path=train_dir, rank=k + 1,
                                    vecNormalize=vecNormalize) for k, env_name in enumerate(env_names)]
 
         evaluate_models(eval_envs, models, model_timesteps, det_env=args.det_env, det_model=args.det_model, use_gtr=args.use_gtr,

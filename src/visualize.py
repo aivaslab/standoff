@@ -47,20 +47,16 @@ def make_eval_figures(path, figures_path, window=1, prefix=''):
             if not os.path.exists(extended_path):
                 os.mkdir(extended_path)
 
-            # normalize r after all the filtering
-            for rows in [rows_big, rows_small]:
-                rows["normed_r_unique_mean"] = (rows["r_mean"] - rows["r_mean"].min()) / ( \
-                            rows["r_mean"].max() - rows["r_mean"].min())
-                rows["normed_r_unique_std"] = (rows["r_std"]) / ( \
-                            rows["r_mean"].max() - rows["r_mean"].min())
-
-            for rows in [rows_big, rows_small]:
-                rows["normed_episode_timesteps_mean"] = (rows["episode_timesteps_mean"] - rows[
-                    "episode_timesteps_mean"].min()) / (
-                                                                rows["episode_timesteps_mean"].max() - rows[
-                                                            "episode_timesteps_mean"].min())
-                rows["normed_episode_timesteps_std"] = (rows["episode_timesteps_std"]) / (
-                        rows["episode_timesteps_mean"].max() - rows["episode_timesteps_mean"].min())
+            # normalize certain values after all the filtering
+            
+            for val in ['r', 'episode_timesteps']:
+                for rows in [rows_big, rows_small]:
+                    rows.loc[:, f"normed_{val}_mean"] = \
+                        (rows[f"{val}_mean"] - rows[f"{val}_mean"].min()) \
+                        / (rows[f"{val}_mean"].max() - rows[f"{val}_mean"].min())
+                    rows.loc[:, f"normed_{val}_std"] = \
+                        (rows[f"{val}_std"]) / \
+                        (rows[f"{val}_mean"].max() - rows[f"{val}_mean"].min())
 
             plot_merged(indexer='model_ep', df=rows_small, mypath=extended_path, title=title + 'validAccuracy',
                         window=window,
