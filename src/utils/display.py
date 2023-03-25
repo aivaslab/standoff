@@ -106,13 +106,17 @@ def process_csv(path, prefix):
             print('small df had no good samples... using big in lieu')
             df_small = df
 
-        df_small["avoidedBig"] = df_small.apply(lambda row: row["selectedSmall"] or row["selectedNeither"], axis=1)
-        df_small["avoidedSmall"] = df_small.apply(lambda row: row["selectedBig"] or row["selectedNeither"], axis=1)
+        df_small.loc[:, "avoidedBig"] = (df_small["selectedSmall"].astype(bool) | \
+                df_small["selectedNeither"].astype(bool))
+        df_small.loc[:, "avoidedSmall"] = (df_small["selectedBig"].astype(bool) | \
+                        df_small["selectedNeither"].astype(bool))
+        df_small.loc[:, "avoidCorrect"] = ((df_small["avoidedBig"] ==  \
+                        df_small["shouldAvoidBig"].astype(bool)) | \
+                        (df_small["avoidedSmall"] == df_small["shouldAvoidSmall"].astype(bool)))
 
-        df_small["avoidCorrect"] = df_small.apply(lambda row: (row["avoidedBig"] == row["shouldAvoidBig"]) or (
-                row["avoidedSmall"] == row["shouldAvoidSmall"]), axis=1)
 
-        # todo: issue where dataframe has nans, strings apparently being concatted with ints
+
+
         grouped_df = group_dataframe(df, ['model_ep',
                                           'configName'])  # the mean and std at each evaluation... for each configname
         grouped_df_small = group_dataframe(df_small, ['model_ep', 'configName'])

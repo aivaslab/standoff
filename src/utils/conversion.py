@@ -58,7 +58,7 @@ def wrap_env_full(env, reduce_color=False, memory=1, size=32, vecMonitor=False,
     env = ss.pettingzoo_env_to_vec_env_v1(env)
     env = ss.concat_vec_envs_v1(env, threads, num_cpus=num_cpus, base_class='stable_baselines3')
 
-    # env = VecTransposeImage(env) # todo: double check evals are correct for rich obs
+    #env = VecTransposeImage(env) # todo: double check evals are correct for rich obs
     if memory > 1:
         env = VecFrameStack(env, n_stack=memory, channels_order='first')
 

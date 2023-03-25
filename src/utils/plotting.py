@@ -69,7 +69,7 @@ def plot_merged(indexer, df, mypath, title, window, values=None,
 
     colors = ['green', 'blue', 'orange', 'red', 'purple', 'brown', 'pink', 'gray', 'olive', 'cyan']
     if stacked_bar:
-        bar_width = max(df[indexer]) / (2 * len(values) + 1)
+        bar_width = (max(df[indexer]) - min(df[indexer])) / (2 * len(df['selectedBig_mean']) + 1) #(len(df['selectedBig_mean']) * 2 + 1
         values_mean = [df[value + "_mean"] for value in values]
         plt.bar(df[indexer], values_mean[0], label=labels[0], width=bar_width, color=colors[0])
         for i in range(1, len(values)):

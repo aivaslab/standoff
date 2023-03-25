@@ -7,7 +7,6 @@ import os
 import pandas as pd
 
 def make_callbacks(save_path, env, batch_size, tqdm_steps, record_every, model, repetition=0, starting_timesteps=0, threads=1):
-    # train_cb = TrainUpdateCallback(envs=eval_envs + [env, ] if eval_envs[0] is not None else [env, ], batch_size=batch_size)
     # this cb updates the minibatch variable in the environment
     train_cb = TrainUpdateCallback(envs=[env, ], batch_size=batch_size, logpath=save_path, params=str(locals()),
                                    model=model, num_vec_envs=threads)
@@ -49,6 +48,7 @@ class TrainUpdateCallback(BaseCallback):
 
     def _on_rollout_end(self):
         # triggered before updating the policy
+        #print('rollout', self.minibatch)
         self.minibatch += self.batch_size
         for env in self.envs: #different envs, not vec envs
             if self.num_vec_envs > 1:
@@ -71,7 +71,7 @@ class TrainUpdateCallback(BaseCallback):
 
 
 class TqdmCallback(BaseCallback):
-    def __init__(self, threads=1, record_every=1, batch_size=2048):
+    def __init__(self, threads=1, record_every=1):
         super().__init__()
         self.progress_bar = None
         self.iteration_size = threads * record_every
