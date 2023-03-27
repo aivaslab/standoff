@@ -118,7 +118,7 @@ class ScenarioConfigs:
             "events": [[['bait', 'empty'], ['obscure'], ['swap', 0, 'empty'], ['bait', 0]]]
         },
         "misinformed": {  # optimal: if big is swapped, Big, else Small
-            "events": [[['bait', 'empty'], ['bait', 'empty'], ['obscure'], ['swap', x, 'else']] for x in [0, 1]]
+            "events": [[['bait', 'empty'], ['bait', 'empty'], ['obscure'], ['swap', x, 'else'], ['swap', 3, x]] for x in [0, 1]]
         },
         "swapped": {  # optimal: Big
             "events": [[['bait', 'empty'], ['bait', 'empty'], ['obscure'], ['swap', 0, 1]]]
