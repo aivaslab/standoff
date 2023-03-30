@@ -8,7 +8,7 @@ from datetime import timedelta
 
 from .pz_envs import ScenarioConfigs
 from .utils.callbacks import make_callbacks
-from standoff_models.train import init_dirs, init_policy, start_global_logs, linear_schedule
+from .utils.train_utils import init_dirs, init_policy, start_global_logs, linear_schedule, load_last_checkpoint_model
 from .utils.conversion import make_env_comp, get_json_params
 from stable_baselines3 import TD3, PPO, A2C
 from sb3_contrib import TRPO, RecurrentPPO
@@ -16,31 +16,6 @@ import torch as th
 
 #import multiprocessing
 #multiprocessing.set_start_method("fork")
-
-def load_last_checkpoint_model(path, model_class):
-    full_path = os.path.join(path, 'checkpoints')
-    best_model = None
-    best_length = 0
-    paths = os.scandir(full_path)
-    rep_folders = [pathx for pathx in paths if pathx.is_dir() and pathx.name.startswith('rep_')]
-    if rep_folders:
-        for rep_folder in rep_folders:
-            for checkpoint_path in os.scandir(rep_folder.path):
-                if int(checkpoint_path.path[
-                       checkpoint_path.path.find("model_") + 6:checkpoint_path.path.find("_steps")]) > best_length:
-                    best_length = int(
-                        checkpoint_path.path[
-                        checkpoint_path.path.find("model_") + 6:checkpoint_path.path.find("_steps")])
-                    best_model = model_class.load(checkpoint_path.path)
-    else:
-        for checkpoint_path in os.scandir(full_path):
-            if int(checkpoint_path.path[
-                   checkpoint_path.path.find("model_") + 6:checkpoint_path.path.find("_steps")]) > best_length:
-                best_length = int(
-                    checkpoint_path.path[checkpoint_path.path.find("model_") + 6:checkpoint_path.path.find("_steps")])
-                best_model = model_class.load(checkpoint_path.path)
-
-    return best_model, best_length
 
 
 def main(args):
