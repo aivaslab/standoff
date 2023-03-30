@@ -48,9 +48,9 @@ The different tasks are referenced in src/pz_envs/scenario_configs.py. Also in t
 
 ```
 For stages 1 and 2:
-  "Standoff-S{0}-{1}-{2}-{3}-v0".format(stage, difficulty, view_size, observation_style)
+  "Standoff-S{stage}-{difficulty}-{view_size}-{observation_style}-v0"
 For stage 3:
-  "Standoff-S{0}-{1}-{2}-{3}-{4}-v0".format(stage, task_name, difficulty, view_size, observation_style)
+  "Standoff-S{stage}-{task_name}-{difficulty}-{view_size}-{observation_style}-v0"
   
 "stage" is in [1-3]
 "task_name" should have spaces removed.
