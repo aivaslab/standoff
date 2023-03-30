@@ -478,6 +478,7 @@ class para_MultiGridEnv(ParallelEnv):
         self.reward_decay = reward_decay
         self.step_reward = step_reward
         self.done_reward = done_reward
+        self.penalize_done_distance = 5 # increase done penalty based on distance to goals
         self.seed(seed=seed)
         self.agent_spawn_kwargs = agent_spawn_kwargs
         self.ghost_mode = ghost_mode
@@ -657,7 +658,6 @@ class para_MultiGridEnv(ParallelEnv):
         self.step_count = 0
         self.env_done = False
 
-
         for name, agent in zip(self.agents + self.puppets, list(self.agent_and_puppet_instances())):
             agent.agents = []
             agent.name = name
@@ -668,11 +668,13 @@ class para_MultiGridEnv(ParallelEnv):
 
         if self.loadingPickle:
             self.grid = random.choice(self.allRooms)
+            last_timer = 40
         else:
             valid_params = ['sub_valence', 'dom_valence', 'num_puppets', 'subject_is_dominant', 'lava_height', 'events',
                             'hidden', 'boxes']
             params2 = {x: self.params[x] for x in valid_params}
-            self._gen_grid(**params2)
+            last_timer = self._gen_grid(**params2)
+            # gen_grid also generates timers
             self.prev_puppet_mask = np.zeros((self.grid.height, self.grid.width))
             '''flag = 0
             while flag < 100:
@@ -685,6 +687,7 @@ class para_MultiGridEnv(ParallelEnv):
                         print('exception', e)
                         traceback.print_exc()
                     pass'''
+        self.max_steps_real = min(self.max_steps, last_timer + 6)
 
         for k, agent in enumerate(self.agent_and_puppet_instances()):
             if agent.spawn_delay == 0:
@@ -882,7 +885,7 @@ class para_MultiGridEnv(ParallelEnv):
                             fwd_cell.set_reward(0)
 
                             if bool(self.reward_decay):
-                                rwd = og_rwd * (1.0 - 0.9 * (self.step_count / self.max_steps))
+                                rwd = og_rwd * (1.0 - 0.9 * (self.step_count / self.max_steps_real))
                             else:
                                 rwd = og_rwd
 
@@ -952,7 +955,7 @@ class para_MultiGridEnv(ParallelEnv):
         # rewards for all agents are placed in the .rewards dictionary
 
         self.step_count += 1
-        if self.step_count >= self.max_steps:
+        if self.step_count >= self.max_steps_real:
             self.env_done = True
 
         # observe the current state
@@ -964,8 +967,13 @@ class para_MultiGridEnv(ParallelEnv):
                 self.dones[agent_name] = True
             elif self.env_done:
                 if not self.has_reached_goal[agent_name]:
-                    self.rewards[agent_name] += self.done_reward
-                    agent.reward(self.done_reward)
+                    dr = self.done_reward
+                    if self.penalize_done_distance > 0:
+                        done_distance = math.abs((self.height // 2) - agent.pos[1])
+                        # the vertical spaces agent pos differs from goal pos
+                        dr += self.penalize_done_distance * done_distance
+                    self.rewards[agent_name] += dr
+                    agent.reward(dr)
 
         # Adds .rewards to ._cumulative_rewards
         self._cumulative_rewards = {agent: self._cumulative_rewards[agent] + self.rewards[agent] for agent in

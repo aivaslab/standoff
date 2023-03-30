@@ -279,6 +279,9 @@ class StandoffEnv(para_MultiGridEnv):
         self.add_timer(["release"], curTime + sub_release, arg=1)
         self.add_timer(["release"], curTime + release_gap + dom_release, arg=2)
         self.add_timer(["release"], curTime + release_gap + sub_release, arg=3)
+        
+        # returns the final timer, the release of the sub, could be made dynamic so just max of timers
+        return curTime + release_gap + sub_release
 
     def append_food_locs(self, obj, loc):
         if hasattr(obj, "reward") and obj.reward == 100:
