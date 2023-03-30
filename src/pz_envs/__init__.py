@@ -60,17 +60,15 @@ def register_standoff_env(
 
     reset_configs = {**configs["defaults"], **configs[config_name]}
 
-    if isinstance(reset_configs["num_agents"], list):
-        reset_configs["num_agents"] = reset_configs["num_agents"][0]
-    if isinstance(reset_configs["num_puppets"], list):
-        reset_configs["num_puppets"] = reset_configs["num_puppets"][0]
 
     env_config['config_name'] = config_name
     env_config['agents'] = [GridAgentInterface(**player_config) for _ in range(reset_configs['num_agents'])]
-    env_config['puppets'] = [GridAgentInterface(**player_config) for _ in range(reset_configs['num_puppets'])]
+    env_config['puppets'] = [GridAgentInterface(**player_config) for _ in 
+        range(max(reset_configs['num_puppets']) if isinstance(reset_configs['num_puppets'], list) 
+        else reset_configs['num_puppets'])]
 
-    # env_config['num_agents'] = reset_configs['num_agents']
-    # env_config['num_puppets'] = reset_configs['num_puppets']
+    # num_puppets contains lists, not maxima
+    #env_config['num_puppets'] = reset_configs['num_puppets']
 
     class RegEnv(env_class):
         def __new__(cls):
@@ -81,7 +79,8 @@ def register_standoff_env(
                 subject_visible_decs=(difficulty < 3),
                 gaze_highlighting=(difficulty < 3),
                 persistent_gaze_highlighting=(difficulty < 2),
-                **env_config)
+                **env_config,
+                )
 
             return env
 
@@ -107,7 +106,7 @@ for observation_style in 'rich', 'image':
     for view_size in [13, 15, 17, 19]:
         for difficulty in range(4):
             for stage in range(3):
-                for config in ScenarioConfigs.env_groups[stage + 1]:
+                for config in ScenarioConfigs.standoff.keys():
                     configName = difficulty if stage < 2 else config.replace(" ", "") + "-" + str(difficulty)
                     register_standoff_env(
                         "Standoff-S{0}-{1}-{2}-{3}-v0".format(stage+1, configName, view_size, observation_style),

@@ -106,8 +106,7 @@ class StandoffEnv(para_MultiGridEnv):
                     newParams[k] = defaults[k]
         self.params = copy.deepcopy(newParams)
 
-        # special since max_puppets is weird
-        # maybe delete this
+        # deal with num_puppets being lower than maximum
         self.possible_puppets = [f"player_{x + len(self.agents)}" for x in range(self.params["num_puppets"])]
 
     def reset_vision(self):

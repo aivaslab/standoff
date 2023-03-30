@@ -64,6 +64,7 @@ class ScenarioConfigs:
                       ],
                   4: ["stage_1",
                       "stage_2",
+                      "s2b",
                       "informed control",
                       "partially uninformed",
                       "removed informed",
@@ -73,6 +74,7 @@ class ScenarioConfigs:
                       "misinformed",
                       "swapped",
                       ],
+                  5: ["s2b"]
                   }
 
     standoff = {
@@ -97,6 +99,9 @@ class ScenarioConfigs:
             "num_puppets": [1],
             "boxes": [5],
         },
+        "s2b": {
+            "num_puppets": [1, 0],
+        },
         "informed control": {
             "events": [[['bait', 'empty'], ['bait', 'empty']]]  # optimal: Small
         },
@@ -118,7 +123,7 @@ class ScenarioConfigs:
             "events": [[['bait', 'empty'], ['obscure'], ['swap', 0, 'empty'], ['bait', 0]]]
         },
         "misinformed": {  # optimal: if big is swapped, Big, else Small
-            "events": [[['bait', 'empty'], ['bait', 'empty'], ['obscure'], ['swap', x, 'else'], ['swap', 3, x]] for x in [0, 1]]
+            "events": [[['bait', 'empty'], ['bait', 'empty'], ['obscure'], ['swap', x, 'else']] for x in [0, 1]]
         },
         "swapped": {  # optimal: Big
             "events": [[['bait', 'empty'], ['bait', 'empty'], ['obscure'], ['swap', 0, 1]]]
