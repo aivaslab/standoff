@@ -162,7 +162,7 @@ def make_pic_video(model, env, random_policy=False, video_length=50, savePath=''
     if not use_global_obs:
         img = cv2.resize(obs[following], dsize=(image_size, image_size), interpolation=cv2.INTER_NEAREST)
     else:
-        img = env.render(mode='rgb')
+        img = env.render(mode='rgb_array')
 
     for i in range(video_length):
         images.append(img)
@@ -179,7 +179,7 @@ def make_pic_video(model, env, random_policy=False, video_length=50, savePath=''
         if not use_global_obs:
             img = cv2.resize(obs[following], dsize=(image_size, image_size), interpolation=cv2.INTER_NEAREST)
         else:
-            img = env.render(mode='rgb')
+            img = env.render(mode='rgb_array')
         cv2.putText(img=img, text=str(action), org=(0, image_size), fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=1,
                     color=(255, 255, 255), thickness=2)
         if dones[following]:
@@ -188,7 +188,7 @@ def make_pic_video(model, env, random_policy=False, video_length=50, savePath=''
             if not use_global_obs:
                 img = cv2.resize(obs[following], dsize=(image_size, image_size), interpolation=cv2.INTER_NEAREST)
             else:
-                img = env.render(mode='rgb')
+                img = env.render(mode='rgb_array')
             cv2.putText(img=img, text=str(action), org=(0, image_size), fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=1,
                         color=(255, 255, 255), thickness=2)
 
