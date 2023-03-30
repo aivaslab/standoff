@@ -488,6 +488,7 @@ class para_MultiGridEnv(ParallelEnv):
         self.grid = MultiGrid(shape=(width, height))  # added this, not sure where grid comes from in og
 
         self.possible_agents = [f"player_{r}" for r in range(num_agents)]
+        #print('num_puppets at mg init', num_puppets)
         if num_puppets > 0:
             self.possible_puppets = [f"player_{r + num_agents}" for r in range(num_puppets)]
         else:
@@ -613,7 +614,7 @@ class para_MultiGridEnv(ParallelEnv):
         """
         For legacy agent functions to also work with puppets
         """
-        return self.agent_instances + self.puppet_instances
+        return self.agent_instances + self.puppet_instances[:self.params['num_puppets']]
 
     def reset(self):
         """
@@ -629,6 +630,14 @@ class para_MultiGridEnv(ParallelEnv):
 
         Here it sets up the state dictionary which is used by step() and the observations dictionary which is used by step() and observe()
         """
+        
+        if hasattr(self, "hard_reset"):
+            # print(self.config_name)
+            self.hard_reset(self.configs[self.config_name])
+        else:
+            print("No hard reset function found")
+            
+        #print('numpuppets at reset', len(self.possible_puppets), self.params['num_puppets'], len(self.puppet_instances))
         self.agents = self.possible_agents[:]
         self.puppets = self.possible_puppets[:]
         self.rewards = {agent: 0 for agent in self.agents_and_puppets()}
@@ -648,11 +657,6 @@ class para_MultiGridEnv(ParallelEnv):
         self.step_count = 0
         self.env_done = False
 
-        if hasattr(self, "hard_reset"):
-            # print(self.config_name)
-            self.hard_reset(self.configs[self.config_name])
-        else:
-            print("No hard reset function found")
 
         for name, agent in zip(self.agents + self.puppets, list(self.agent_and_puppet_instances())):
             agent.agents = []
@@ -1051,8 +1055,8 @@ class para_MultiGridEnv(ParallelEnv):
         if self.gaze_highlighting is True:
             # get the puppet's view mask
             puppet_mask = None  # if we don't find a puppet instance? unclear when this happens
-            if len(self.puppet_instances) > 0:
-                for puppet in self.puppet_instances:
+            if len(self.params['num_puppets']) > 0:
+                for puppet in self.puppet_instances[:self.params['num_puppets']]:
                     if puppet != self.instance_from_name["player_0"]:
                         if puppet.pos is not None:
                             puppet_mask = occlude_mask(~self.grid.opacity, puppet.pos)  # only reveals one tile?

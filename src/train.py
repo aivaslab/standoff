@@ -64,7 +64,7 @@ def main(args):
 
     parser.add_argument('--model_class', type=str, default='PPO', help='Model class to use')
     parser.add_argument('--conv_mult', type=int, default=1, help='Number of first level kernels')
-    parser.add_argument('--hidden_size', type=int, default=64, help='LSTM size (unused)')
+    parser.add_argument('--hidden_size', type=int, default=64, help='LSTM hidden layer size')
     parser.add_argument('--width', type=int, default=32, help='MLP features')
     parser.add_argument('--lr', type=float, default=1e-3, help='Learning rate')
     parser.add_argument('--batch_size', type=int, default=128, help='Batch size')

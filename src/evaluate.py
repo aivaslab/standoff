@@ -6,6 +6,7 @@ from tqdm import tqdm
 
 from src.pz_envs import ScenarioConfigs
 from src.utils.conversion import make_env_comp
+from src.utils.display import make_pic_video
 from src.utils.evaluation import collect_rollouts, ground_truth_evals, load_checkpoint_models
 from stable_baselines3 import PPO, A2C
 from sb3_contrib import TRPO, RecurrentPPO
@@ -22,9 +23,11 @@ def make_videos(train_dir, eval_envs, env_names, model, model_timestep, size):
         vidPath2 = os.path.join(vidPath, env_name)
         if not os.path.exists(vidPath2):
             os.mkdir(vidPath2)
+        eval_env.reset()
 
         # make_pic_video(model, eval_env, random_policy=False, savePath=vidPath2, deterministic=False, vidName='rand_'+str(model_timestep)+'.mp4', obs_size=size )
-        # make_pic_video(model, eval_env, random_policy=False, savePath=vidPath2, deterministic=True, vidName='det_'+str(model_timestep)+'.mp4', obs_size=size)
+        print('vid', vidPath2)
+        make_pic_video(model, eval_env, random_policy=True, savePath=vidPath2, deterministic=True, vidName='det_'+str(model_timestep)+'.gif', obs_size=size)
 
 
 def evaluate_models(eval_envs, models, model_timesteps, det_env, det_model, use_gtr, frames, episodes, train_dir):
@@ -77,6 +80,7 @@ def main(args):
     parser.add_argument('--det_env', action='store_true', help='Deterministic environment')
     parser.add_argument('--det_model', action='store_true', help='Deterministic model')
     parser.add_argument('--use_gtr', action='store_true', help='Ground truth rollouts')
+    parser.add_argument('--make_vids', action='store_true', help='Make vids')
     args = parser.parse_args(args)
 
     envs = []
@@ -99,13 +103,16 @@ def main(args):
             for k, env_name in enumerate(env_names):
                 env_names[k] = env_name + str(difficulty) + '-' + str(size) + '-' + style + '-v0'
             renamed_envs = True
-
+        
         # generate eval envs with proper vecmonitors
         eval_envs = [make_env_comp(env_name, frames=frames, size=size, style=style, monitor_path=train_dir, rank=k + 1,
                                    vecNormalize=vecNormalize) for k, env_name in enumerate(env_names)]
 
-        evaluate_models(eval_envs, models, model_timesteps, det_env=args.det_env, det_model=args.det_model, use_gtr=args.use_gtr,
-                        frames=frames, episodes=episodes, train_dir=train_dir)
+        if not args.make_vids:
+            evaluate_models(eval_envs, models, model_timesteps, det_env=args.det_env, det_model=args.det_model, use_gtr=args.use_gtr,
+                            frames=frames, episodes=episodes, train_dir=train_dir)
+        else:
+            make_videos(train_dir, eval_envs, env_names, models[-1], model_timesteps[-1], size)
                         
 
 if __name__ == '__main__':

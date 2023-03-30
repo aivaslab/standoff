@@ -2,10 +2,116 @@ import argparse
 import os
 import sys
 import pandas as pd
+from sklearn.manifold import TSNE
 
 from src.utils.display import process_csv, get_transfer_matrix_row
 from src.utils.plotting import plot_merged, plot_selection, plot_split, plot_train
 
+from matplotlib import pyplot as plt
+
+
+def make_transfer_matrix(path, prefix):
+    train_paths = [ os.path.join(f.path) for f in os.scandir(path) if f.is_dir() ]
+    print(train_paths)
+
+    matrix_data = {}
+    for env_rand in ['rand', 'det']:
+        for model_rand in ['rand', 'det']:
+            matrix_data[env_rand + "_" + model_rand] = []
+    matrix_data['gtr'] = []
+
+    for k, train_path in enumerate(train_paths):
+
+
+        train_path = os.path.join(train_path, 'evaluations')
+
+        #prefix = 'gtr'
+        if os.path.exists(os.path.join(train_path, prefix+'_data.csv')):
+            this_matrix_data = get_transfer_matrix_row(os.path.join(train_path, prefix+'_data.csv'), prefix)
+            this_matrix_data['start'] = train_path
+            matrix_data[prefix]+= [ this_matrix_data , ]
+
+        '''for env_rand in ['rand', 'det']:
+            for model_rand in ['rand', 'det']:
+                prefix = env_rand + "_" + model_rand
+                try:
+                    this_matrix_data = get_transfer_matrix_row(os.path.join(train_path, prefix+'_data.csv'), prefix)
+                    this_matrix_data['start'] = train_path
+                    matrix_data[prefix]+= [ this_matrix_data , ]
+                except BaseException as e:
+                    print(e)'''
+    good_ordering = ['swapped', 'misinformed', 'partiallyuninformed', 'replaced', 'informedcontrol', 'moved', 'removeduninformed', 'removedinformed']
+
+    for env_rand in ['rand']:
+        for model_rand in ['rand']:
+            prefix = env_rand + "_" + model_rand
+            good_matrix = {}
+            extra_matrix = {}
+            extra_names = []
+            for x in good_ordering:
+                good_matrix[x] = [0 for _ in good_ordering]
+
+            #print(prefix)
+            trix = matrix_data[prefix]
+            #print(trix)
+            #eval_names = [x.replace(" ", "") for x in trix[0].configName.unique()] # let's use this order for train names too
+            train_names = []
+            plt.figure()
+            fig, ax = plt.subplots()
+
+            for conf_type in ['accuracy_mean']:
+                eval_names = [x.replace(" ", "") for x in trix[0]['nn']]
+       
+                print(eval_names)
+                #reordering = [eval_names.index(x) for x in good_ordering]
+                for k, line in enumerate(trix):
+                    #print('line', line[conf_type], line['nn'])
+                    string = line['start'].unique()[0]
+                    print('string', string)
+                    if 'S3' in string:
+                        string = string[string.index('S3')+3:string.index('-3-')]
+                    elif 'S2' in string:
+                        string = 'S2'
+                    elif 'S1' in string:
+                        string = 'S1'
+                    temp = line[conf_type]
+                    train_names.append(string)
+                    if string not in good_ordering:
+                        extra_names.append(string)
+                        extra_matrix[string] = [0 for _ in good_ordering]
+                        for j, eval_name in enumerate(good_ordering):
+                            extra_matrix[string][j] = temp[eval_names.index(eval_name)]
+                        print(string, extra_matrix[string])
+                    else:
+                        for j, eval_name in enumerate(good_ordering):
+                            good_matrix[string][j] = temp[eval_names.index(eval_name)]
+                        print(string, good_matrix[string])
+
+                lm = []
+                print('extras', extra_names)
+                for x in good_ordering:
+                    lm += [good_matrix[x], ]
+                for x in extra_names:
+                    lm += [extra_matrix[x], ]
+
+                row_names = [''] + good_ordering + extra_names
+                ax.set_xticks(range(8))
+                ax.set_xticklabels([''] + good_ordering)
+                ax.set_yticks(range(len(row_names)))
+                ax.set_yticklabels(row_names)
+
+                plt.tick_params(axis='x', rotation=90)
+                ax.matshow(lm, cmap=plt.cm.Blues)
+                
+
+                print(len(good_ordering), len(train_names), eval_names, train_names)
+
+                for i in range(len(good_ordering)+len(extra_names)):
+                    for j in range(len(good_ordering)):
+                        ax.text(j, i, str(round(lm[i][j]*100)/100), va='center', ha='center')
+                        
+                plt.tight_layout()
+                plt.savefig(os.path.join(path, 'matrix.png'))
 
 def make_eval_figures(path, figures_path, window=1, prefix=''):
     """
@@ -149,27 +255,21 @@ def main(args):
     parser.add_argument('--gtr', action='store_true', help='whether to plot gtr')
     parser.add_argument('--matrix', action='store_true', help='whether to plot transfer matrix')
     args = parser.parse_args(args)
+    
+    prefix = 'gtr' if args.gtr else args.env_rand + "_" + args.model_rand
 
-    matrix_data = {}
-    for env_rand in [args.env_rand]:
-        for model_rand in [args.model_rand]:
-            matrix_data[env_rand + "_" + model_rand] = []
-    matrix_data['gtr'] = []
+    if args.matrix:
+        make_transfer_matrix(args.path, prefix)
+    else:
 
-    train_paths = [ os.path.join(f.path) for f in os.scandir(args.path) if f.is_dir() ]
+        train_paths = [ os.path.join(f.path) for f in os.scandir(args.path) if f.is_dir() ]
 
-    for k, train_path in enumerate(train_paths):
+        for k, train_path in enumerate(train_paths):
 
-        plot_train(train_path)
+            plot_train(train_path)
 
-        train_path = os.path.join(train_path, 'evaluations')
+            train_path = os.path.join(train_path, 'evaluations')
 
-        prefix = 'gtr' if args.gtr else args.env_rand + "_" + args.model_rand
-        if args.matrix:
-            this_matrix_data = get_transfer_matrix_row(os.path.join(train_path, prefix+'_data.csv'))
-            this_matrix_data['start'] = train_path
-            matrix_data[prefix] += [ this_matrix_data, ]
-        else:
             make_eval_figures(os.path.join(train_path, prefix+'_data.csv'), os.path.abspath(os.path.join(train_path, '..', 'figures')), window=args.window, prefix=prefix)
             
 if __name__ == 'main':
