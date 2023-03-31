@@ -7,11 +7,15 @@ from stable_baselines3.common.results_plotter import load_results, ts2xy
 from stable_baselines3.common.monitor import get_monitor_files
 import numpy as np
 import pandas as pd
+from scipy.stats import entropy
 import json
 import imageio
 import cv2
 import copy
 
+def entropy_func(x):
+    value_counts = x.value_counts(normalize=True)
+    return entropy(value_counts)
 
 def load_results_tempfix(path: str) -> pd.DataFrame:
     # something causes broken csvs, here we ignore extra data
@@ -52,10 +56,13 @@ def moving_average(values, window):
         values[_position] = _new_value
     return np.convolve(values.astype(float), weights, 'valid')
 
+def entropy_multi_cols(x, y, z):
+    return entropy([x, y, z])
 
 def agg_dict(frame):
     ignored_columns = ['configName', 'minibatch', 'model_ep']
-    return {col: ['mean', 'std'] if col not in ignored_columns else 'first' for col in frame.columns}
+    return {col: (['mean', 'std'] if col != 'selection' else ['mean', 'std', entropy_func]) if col not in ignored_columns else 'first' for col in frame.columns}
+
 
 
 def group_dataframe(cur_df, groupby_list):
@@ -65,6 +72,9 @@ def group_dataframe(cur_df, groupby_list):
 
     # get the number of episodes that are aggregated todo: verify that this works as intended
     ret_df['num_episodes_grouped'] = ret_df.groupby(groupby_list)['model_ep'].transform('count')
+    
+    ret_df['treat_entropy'] = ret_df.apply(lambda row: entropy_multi_cols(row['selectedBig_mean'], row['selectedSmall_mean'], row['selectedNeither_mean']), axis=1)
+    
     return ret_df
 
 
@@ -119,6 +129,7 @@ def process_csv(path, prefix):
 
         grouped_df = group_dataframe(df, ['model_ep',
                                           'configName'])  # the mean and std at each evaluation... for each configname
+        #print('cols', grouped_df.columns)
         grouped_df_small = group_dataframe(df_small, ['model_ep', 'configName'])
         grouped_df_noname_abs = group_dataframe(df, ['model_ep'])
         grouped_df_noname = group_dataframe(df_small, ['model_ep'])
@@ -132,7 +143,7 @@ def process_csv(path, prefix):
         return grouped_df, grouped_df_small, grouped_df_noname_abs, grouped_df_noname
 
 
-def get_transfer_matrix_row(path, prefix):
+def get_transfer_matrix_row(path, prefix, ):
     grouped_df, _, _, _ = process_csv(path, prefix)
     return_matrix = pd.DataFrame()
 

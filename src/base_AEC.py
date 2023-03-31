@@ -478,7 +478,7 @@ class para_MultiGridEnv(ParallelEnv):
         self.reward_decay = reward_decay
         self.step_reward = step_reward
         self.done_reward = done_reward
-        self.penalize_done_distance = 5 # increase done penalty based on distance to goals
+        self.penalize_done_distance = 0 # increase done penalty based on distance to goals
         self.seed(seed=seed)
         self.agent_spawn_kwargs = agent_spawn_kwargs
         self.ghost_mode = ghost_mode
@@ -687,7 +687,7 @@ class para_MultiGridEnv(ParallelEnv):
                         print('exception', e)
                         traceback.print_exc()
                     pass'''
-        self.max_steps_real = min(self.max_steps, last_timer + 6)
+        self.max_steps_real = min(self.max_steps, last_timer + 16)
 
         for k, agent in enumerate(self.agent_and_puppet_instances()):
             if agent.spawn_delay == 0:
@@ -971,7 +971,7 @@ class para_MultiGridEnv(ParallelEnv):
                     if self.penalize_done_distance > 0:
                         done_distance = math.abs((self.height // 2) - agent.pos[1])
                         # the vertical spaces agent pos differs from goal pos
-                        dr += self.penalize_done_distance * done_distance
+                        dr -= self.penalize_done_distance * done_distance
                     self.rewards[agent_name] += dr
                     agent.reward(dr)
 
