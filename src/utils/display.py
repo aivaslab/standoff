@@ -78,13 +78,13 @@ def group_dataframe(cur_df, groupby_list):
     return ret_df
 
 
-def process_csv(path, prefix):
+def process_csv(path, gtr=False):
     with open(path) as file_handler:
         print('opened', path, file_handler)
         
         df = pd.read_csv(file_handler, index_col=None, on_bad_lines='skip')
         df['index_col'] = df.index
-        if prefix == 'gtr':
+        if gtr:
             for key_name in ['shouldAvoidBig',
                              'shouldAvoidSmall',
                              'selection',
@@ -142,20 +142,51 @@ def process_csv(path, prefix):
 
         return grouped_df, grouped_df_small, grouped_df_noname_abs, grouped_df_noname
 
+def get_transfer_matrix_row(path, column, config_names, only_last=False):
+    grouped_df, _, _, _ = process_csv(path, gtr=False)
 
-def get_transfer_matrix_row(path, prefix, ):
-    grouped_df, _, _, _ = process_csv(path, prefix)
+    if only_last:
+        grouped_df = grouped_df.loc[grouped_df.groupby('configName')['model_ep'].idxmax()]
+
+    #if config_names is not None:
+    filtered_df = grouped_df[grouped_df['configName'].isin(config_names)]
+    #else:
+    #    filtered_df = grouped_df
+
+    pivot_table = pd.pivot_table(filtered_df, values=column, index='model_ep', columns='configName', aggfunc='first')
+    return_matrix = pivot_table.reset_index().fillna(0)
+    timesteps = return_matrix['model_ep'].tolist()
+    return_matrix = return_matrix.drop(columns=['model_ep'])
+
+    return return_matrix, timesteps
+    
+def get_transfer_matrix_row_legacy(path, column, only_last=False):
+    grouped_df, _, _, _ = process_csv(path, gtr=False)
     return_matrix = pd.DataFrame()
 
-    # for return matrix, we use the set of rows of the final model from each environment
+    # for return matrix, we use the set of rows of the final (or all) model from each environment
     # each configName is an evaluation configuration
+    
+    labels = []
+    timesteps = []
     for uname in grouped_df.configName.unique():
         rows = grouped_df[grouped_df['configName'] == uname]
-        rows2 = rows[rows['model_ep'] == rows['model_ep'].max()]
-        rows2['nn'] = uname
-        return_matrix = return_matrix.append(rows2, ignore_index=True)
-
-    return return_matrix
+        print('rows', uname, rows)
+        if only_last:
+            rows2 = rows[rows['model_ep'] == rows['model_ep'].max()][column]
+            labels.append(uname)
+            timesteps.append(rows['model_ep'].max())
+            return_matrix = return_matrix.append(rows2, ignore_index=True)
+        else:
+            print('unique', len(rows.model_ep.unique()))
+            for model_ep in rows.model_ep.unique():
+                rows2 = rows[rows['model_ep'] == model_ep][column]
+                print('rows2', model_ep, rows2)
+                labels.append(uname)
+                timesteps.append(model_ep)
+                return_matrix = return_matrix.append(rows2, ignore_index=True)
+                
+    return return_matrix, labels, timesteps
 
 
 def make_pic_video(model, env, random_policy=False, video_length=50, savePath='', vidName='video.mp4',

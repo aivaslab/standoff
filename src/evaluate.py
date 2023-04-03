@@ -99,7 +99,7 @@ def main(args):
 
         if not renamed_envs:
             for k, env_name in enumerate(env_names):
-                env_names[k] = env_name + '-' + str(size) + '-' + style + str(difficulty) + '-v0'
+                env_names[k] = env_name + str(size) + '-' + style + '-' + str(difficulty) + '-v0'
             renamed_envs = True
         
         # generate eval envs with proper vecmonitors

@@ -105,7 +105,7 @@ class ScenarioConfigs:
         "informedControl": {
             "events": [[['bait', 'empty'], ['bait', 'empty']]]  # optimal: Small
         },
-        "partiallUninformed": {  # optimal: if big bait obscured, Big, else Small
+        "partiallyUninformed": {  # optimal: if big bait obscured, Big, else Small
             "events": [[['bait', 'empty'], ['obscure'], ['bait', 'empty']],
                        [['obscure'], ['bait', 'empty'], ['reveal'], ['bait', 'empty']]]
         },

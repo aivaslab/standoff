@@ -27,16 +27,13 @@ def plot_transfer_matrix(matrix_data, row_names, col_names, output_file):
     plt.tight_layout()
     plt.savefig(output_file)
     
-def plot_tsne(tsne_results, tsne_results_s, labels, labels_s, output_file):
+def plot_tsne(tsne_results, labels, output_file):
     plt.figure()
     plt.scatter(tsne_results[:, 0], tsne_results[:, 1], c='blue', marker='o', label='bigs2')
-    plt.scatter(tsne_results_s[:, 0], tsne_results_s[:, 1], c='red', marker='x', label='big')
     plt.legend()
 
     for i, name in enumerate(labels):
-        plt.annotate(name, (tsne_results[i, 0], tsne_results[i, 1]), textcoords="offset points", xytext=(-10, 5), ha='center')
-    for i, name in enumerate(labels_s):
-        plt.annotate(name, (tsne_results_s[i, 0], tsne_results_s[i, 1]), textcoords="offset points", xytext=(-10, 5), ha='center')
+        plt.annotate(name, (tsne_results[i, 0], tsne_results[i, 1]), textcoords="offset points", xytext=(-10, 5), ha='center') 
 
     plt.xlabel('t-SNE 1')
     plt.ylabel('t-SNE 2')
@@ -133,61 +130,62 @@ def plot_matrices_and_tsne(all_matrices, path, make_tsne, good_ordering):
         output_file = os.path.join(path, 'accuracy_mean' + 'tsne_plot.png')
         plot_tsne(tsne_results_list, all_labels, output_file)
         
-def get_matrix_data(paths, only_last=False, metric='accuracy_mean'):
+def get_matrix_data(paths, only_last=False, metric='accuracy_mean', prefix='rand_rand', ordering=None):
     train_paths_list = [[os.path.join(f.path) for f in os.scandir(path) if f.is_dir()] for path in paths]
     matrix_data = []
     for train_paths, dir_name in zip(train_paths_list, paths):
         for train_path in train_paths:
             train_path = os.path.join(train_path, 'evaluations')
-            print('train_path', train_path)
             if os.path.exists(os.path.join(train_path, prefix+'_data.csv')):
-                train_name = train_path
-                timesteps, matrix_rows = get_transfer_matrix_row(os.path.join(train_path, prefix+'_data.csv'), prefix, only_last=only_last)
-                for timestep, matrix_row in zip(timesteps, matrix_rows):
-                    matrix_data.append({'dir': dir_name, 'train': train_name, 'timestep': timestep, 'vec': matrix_row[metric], 'uname': dir_name+train_name+str(timestep)})
+                path_components = train_path.split(os.sep)
+                this_dir = path_components[-3]
+                print(path_components)
+                train_name = path_components[-2].split('-')[1]
+                matrix_rows, timesteps = get_transfer_matrix_row(os.path.join(train_path, prefix+'_data.csv'), metric, ordering, only_last=only_last)
+                for index, timestep in enumerate(timesteps):
+                    row_data = {
+                        "this_dir": dir_name,
+                        "train_name": train_name,
+                        "timestep": timestep,
+                        "values": matrix_rows.iloc[index].tolist()
+                    }
+                    matrix_data.append(row_data)
+    return matrix_data
         
-def make_transfer_matrix_new(paths, prefix, make_matrix=False, make_tsne=False):
-    eval_ordering = ['swapped', 'misinformed', 'partiallyuninformed', 'replaced', 'informedcontrol', 'moved', 'removeduninformed', 'removedinformed']
+def make_transfer_matrix_new(paths, save_path, prefix, make_matrix=False, make_tsne=False, metric='accuracy_mean'):
+    eval_ordering = ['swapped', 'misinformed', 'partiallyUninformed', 'replaced', 'informedControl', 'moved', 'removedUninformed', 'removedInformed']
     
     if make_matrix:
-        matrix_data = get_matrix_data(paths, only_last=True, metric='accuracy_mean')
-        # make_matrix(matrix_data)
-        new_matrix_dict = {}
-        for row in matrix_data:
-            train_string = row['train']
-            new_matrix_dict[row['train']] = row['vec']
-        
-        new_matrix_rows = []
-        new_matrix_labels = []
-        # first we use our eval names, then we use all other train names
-        for row in eval_ordering:
-            if new_matrix_dict[row]:
-                new_matrix_labels.append(row)
-                new_matrix_rows.append(new_matrix_dict[row])
-                new_matrix_dict[row] = None
-        for row in new_matrix_dict.keys():
-            if new_matrix_dict[row]:
-                new_matrix_labels.append(row)
-                new_matrix_rows.append(new_matrix_dict[row])
-                new_matrix_dict[row] = None
-                
-        plot_transfer_matrix(matrix_data=new_matrix_rows, 
-                             row_names=new_matrix_labels, 
+        matrix_data = get_matrix_data(
+                [paths[0]], 
+                only_last=True, 
+                metric=metric, 
+                ordering=eval_ordering,
+                prefix='rand_rand')
+        matrix_data_sorted = sorted(matrix_data, key=lambda x: eval_ordering.index(x["train_name"]) if x["train_name"] in eval_ordering else float('inf'))
+        lines = [x["values"] for x in matrix_data_sorted]
+        row_names = [x["train_name"] for x in matrix_data]
+        print(lines)
+        plot_transfer_matrix(matrix_data=lines, 
+                             row_names=row_names, 
                              col_names=eval_ordering, 
-                             output_file=os.path.join(path, conf_type + 'matrix.png'))
+                             output_file=os.path.join(save_path, metric + 'matrix.png'))
             
     if make_tsne:
-        matrix_data = get_matrix_data(paths, only_last=False, metric='accuracy_mean')
+        matrix_data = get_matrix_data(paths, only_last=False, metric=metric, prefix='rand_rand', ordering=eval_ordering)
         
-        combined_data = np.vstack([row['vec'] for row in matrix_data])
-        tsne = TSNE(n_components=2, random_state=43, perplexity=min(30, combined_data.shape[0] - 1))
+        lines = np.vstack([np.array(x["values"]) for x in matrix_data])
+        print(lines)
+        row_names = [x["train_name"] for x in matrix_data]
         
-        tsne_results = tsne.fit_transform(combined_data)
+        tsne = TSNE(n_components=2, random_state=43, perplexity=min(30, lines.shape[0] - 1))
         
-        labels = [row['uname'] for row in matrix_data]
-        dirs = [row['dir'] for row in matrix_data]
-        agents = [row['train'] for row in matrix_data]
-        output_file = os.path.join(path, conf_type + 'tsne_plot.png')
+        tsne_results = tsne.fit_transform(lines)
+        
+        labels = row_names
+        #dirs = [row['dir'] for row in matrix_data]
+        #agents = [row['train'] for row in matrix_data]
+        output_file = os.path.join(save_path, metric + 'tsne_plot.png')
         plot_tsne(tsne_results, labels, output_file)
                     
     
@@ -458,7 +456,12 @@ def main(args):
     prefix = 'gtr' if args.gtr else args.env_rand + "_" + args.model_rand
 
     if args.matrix or args.tsne:
-        make_transfer_matrix_new([args.path, 'save_dir/big'], prefix, make_tsne=args.tsne)
+        make_transfer_matrix_new(
+            [args.path,],
+            args.path,
+            prefix, 
+            make_tsne=args.tsne, 
+            make_matrix=args.matrix)
     else:
 
         train_paths = [ os.path.join(f.path) for f in os.scandir(args.path) if f.is_dir() ]
