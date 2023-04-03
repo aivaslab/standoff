@@ -15,7 +15,7 @@ class StandoffEnv(para_MultiGridEnv):
                      'shouldAvoidBig', 'shouldAvoidSmall', 'correctSelection', 'selection',
                     'selectedBig', 'selectedSmall', 'selectedNeither',
                     'selectedPrevBig', 'selectedPrevSmall', 'selectedPrevNeither', 'incorrectSelection',
-                    'selectedSame')
+                    'selectedSame', 'firstBaitReward', 'eventVisibility')
 
     def __init__(
             self,
@@ -166,6 +166,10 @@ class StandoffEnv(para_MultiGridEnv):
 
         self.agent_spawn_pos = {}
         self.agent_door_pos = {}
+        
+        self.has_baited = False
+        self.visible_event_list = []
+        self.currently_visible = True
 
         all_door_poses = []
 
@@ -328,6 +332,9 @@ class StandoffEnv(para_MultiGridEnv):
         elif name == 'bait':
             x = event[1] * 2 + 2
             obj = Goal(reward=arg, size=arg * 0.01, color='green', hide=self.hidden)
+            if not self.has_baited:
+                self.has_baited = True
+                self.infos['player_0']['firstBaitReward'] = arg
             self.put_obj(obj, x, y)
             self.objs_to_hide.append(obj)
         elif name == "remove":
@@ -338,9 +345,11 @@ class StandoffEnv(para_MultiGridEnv):
             if name == "obscure":
                 b.state = 1
                 b.see_behind = lambda: False
+                self.currently_visible = False
             elif name == "reveal":
                 b.state = 0
                 b.see_behind = lambda: True
+                self.currently_visible = True
             for box in range(self.boxes):
                 self.can_see[arg + str(box)] = False if "obscure" in name else True
         elif name == "swap":
@@ -355,8 +364,12 @@ class StandoffEnv(para_MultiGridEnv):
             self.objs_to_hide.append(obj1)
             self.objs_to_hide.append(obj2)
         elif name == "release":
+            self.infos['player_0']['eventVisibility'] = ''.join(['1' if x else '0' for x in self.visible_event_list])
             for x, y in self.released_tiles[arg]:
                 self.del_obj(x, y)
+                
+        # create visible event list info
+        self.visible_event_list.append(self.currently_visible)
 
         # track where the big and small foods have been
         for box in range(self.boxes):
