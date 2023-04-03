@@ -478,7 +478,8 @@ class para_MultiGridEnv(ParallelEnv):
         self.reward_decay = reward_decay
         self.step_reward = step_reward
         self.done_reward = done_reward
-        self.penalize_done_distance = 0 # increase done penalty based on distance to goals
+        self.penalize_done_distance = -0.5 # increase done penalty based on distance to goals
+        self.penalize_same_selection = -5.0 # penalty for selecting the same box as the opponent
         self.seed(seed=seed)
         self.agent_spawn_kwargs = agent_spawn_kwargs
         self.ghost_mode = ghost_mode
@@ -657,6 +658,7 @@ class para_MultiGridEnv(ParallelEnv):
         self.total_step_count += self.step_count
         self.step_count = 0
         self.env_done = False
+        self.previously_selected_boxes = []
 
         for name, agent in zip(self.agents + self.puppets, list(self.agent_and_puppet_instances())):
             agent.agents = []
@@ -687,7 +689,7 @@ class para_MultiGridEnv(ParallelEnv):
                         print('exception', e)
                         traceback.print_exc()
                     pass'''
-        self.max_steps_real = min(self.max_steps, last_timer + 16)
+        self.max_steps_real = min(self.max_steps, last_timer + 6)
 
         for k, agent in enumerate(self.agent_and_puppet_instances()):
             if agent.spawn_delay == 0:
@@ -882,7 +884,12 @@ class para_MultiGridEnv(ParallelEnv):
                             og_rwd = fwd_cell.get_reward(agent)
 
                             # self.grid.set(*fwd_cell.pos, None) # don't remove box
-                            fwd_cell.set_reward(0)
+                            fwd_cell.set_reward(self.penalize_same_selection)
+                            if fwd_cell in self.previously_selected_boxes:
+                                same_selection = True
+                            else:
+                                same_selection = False
+                                self.previously_selected_boxes.append(fwd_cell)
 
                             if bool(self.reward_decay):
                                 rwd = og_rwd * (1.0 - 0.9 * (self.step_count / self.max_steps_real))
@@ -901,7 +908,7 @@ class para_MultiGridEnv(ParallelEnv):
                                 # handle infos
                                 box = (agent.pos[0] - 2) / 2
                                 self.infos[agent_name]["selection"] = box
-                                self.infos[agent_name]["accuracy"] = (box == self.infos[agent_name]["correctSelection"])
+                                self.infos[agent_name]["accuracy"] = (box == self.infos[agent_name]["correctSelection"] or self.infos[agent_name]["correctSelection"] == -1)
                                 self.infos[agent_name]["weakAccuracy"] = (
                                         box == self.infos[agent_name]["correctSelection"] or box ==
                                         self.infos[agent_name]["incorrectSelection"])
@@ -912,6 +919,7 @@ class para_MultiGridEnv(ParallelEnv):
                                 self.infos[agent_name]["selectedPrevSmall"] = (box in self.small_food_locations)
                                 self.infos[agent_name]["selectedPrevNeither"] = not (
                                         box in self.big_food_locations) and not (box in self.small_food_locations)
+                                self.infos[agent_name]["selectedSame"] = same_selection # selected same box as a previous agent
                             else:
                                 agent.active = False
                             agent.reward(rwd)
@@ -968,10 +976,10 @@ class para_MultiGridEnv(ParallelEnv):
             elif self.env_done:
                 if not self.has_reached_goal[agent_name]:
                     dr = self.done_reward
-                    if self.penalize_done_distance > 0:
+                    if self.penalize_done_distance != 0:
                         done_distance = math.abs((self.height // 2) - agent.pos[1])
                         # the vertical spaces agent pos differs from goal pos
-                        dr -= self.penalize_done_distance * done_distance
+                        dr += self.penalize_done_distance * done_distance
                     self.rewards[agent_name] += dr
                     agent.reward(dr)
 

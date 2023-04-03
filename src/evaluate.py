@@ -81,14 +81,12 @@ def main(args):
     parser.add_argument('--det_model', action='store_true', help='Deterministic model')
     parser.add_argument('--use_gtr', action='store_true', help='Ground truth rollouts')
     parser.add_argument('--make_vids', action='store_true', help='Make vids')
+    parser.add_argument('--make_evals', action='store_true', help='Make eval csvs')
     args = parser.parse_args(args)
 
     envs = []
     for name in ScenarioConfigs.env_groups[args.env_group]:
-        if 'stage' in name:
-            envs.append('Standoff-S' + name[name.index('_')+1:] + '-')
-        else:
-            envs.append('Standoff-S3-' + name.replace(" ", "") + '-')
+        envs.append(f'Standoff-{name}-')
     env_names = envs
     path = args.path
     train_dirs = [f.path for f in os.scandir(path) if f.is_dir()]
@@ -101,17 +99,17 @@ def main(args):
 
         if not renamed_envs:
             for k, env_name in enumerate(env_names):
-                env_names[k] = env_name + str(difficulty) + '-' + str(size) + '-' + style + '-v0'
+                env_names[k] = env_name + '-' + str(size) + '-' + style + str(difficulty) + '-v0'
             renamed_envs = True
         
         # generate eval envs with proper vecmonitors
         eval_envs = [make_env_comp(env_name, frames=frames, size=size, style=style, monitor_path=train_dir, rank=k + 1,
                                    vecNormalize=vecNormalize) for k, env_name in enumerate(env_names)]
 
-        if not args.make_vids:
+        if args.make_evals:
             evaluate_models(eval_envs, models, model_timesteps, det_env=args.det_env, det_model=args.det_model, use_gtr=args.use_gtr,
                             frames=frames, episodes=episodes, train_dir=train_dir)
-        else:
+        if args.make_vids:
             make_videos(train_dir, eval_envs, env_names, models[-1], model_timesteps[-1], size)
                         
 

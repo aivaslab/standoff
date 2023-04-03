@@ -53,10 +53,10 @@ class ScenarioConfigs:
     env_groups = {0: ["stage_1", "stage_2"],
                   1: ["stage_1"],
                   2: ["stage_2"],
-                  3: ["informed control",
-                      "partially uninformed",
-                      "removed informed",
-                      "removed uninformed",
+                  3: ["informedControl",
+                      "partiallyUninformed",
+                      "removedInformed",
+                      "removedUninformed",
                       "moved",
                       "replaced",
                       "misinformed",
@@ -65,10 +65,10 @@ class ScenarioConfigs:
                   4: ["stage_1",
                       "stage_2",
                       "s2b",
-                      "informed control",
-                      "partially uninformed",
-                      "removed informed",
-                      "removed uninformed",
+                      "informedControl",
+                      "partiallyUninformed",
+                      "removedInformed",
+                      "removedUninformed",
                       "moved",
                       "replaced",
                       "misinformed",
@@ -102,17 +102,17 @@ class ScenarioConfigs:
         "s2b": {
             "num_puppets": [1, 0],
         },
-        "informed control": {
+        "informedControl": {
             "events": [[['bait', 'empty'], ['bait', 'empty']]]  # optimal: Small
         },
-        "partially uninformed": {  # optimal: if big bait obscured, Big, else Small
+        "partiallUninformed": {  # optimal: if big bait obscured, Big, else Small
             "events": [[['bait', 'empty'], ['obscure'], ['bait', 'empty']],
                        [['obscure'], ['bait', 'empty'], ['reveal'], ['bait', 'empty']]]
         },
-        "removed informed": {  # optimal: Neither (minor reward preference over copying dominant's decision)
+        "removedInformed": {  # optimal: Neither (minor reward preference over copying dominant's decision)
             "events": [[['bait', 'empty'], ['bait', 'empty'], ['remove', x]] for x in [0, 1]]
         },
-        "removed uninformed": {  # optimal: if Big is removed, Small, else Neither
+        "removedUninformed": {  # optimal: if Big is removed, Small, else Neither
             "events": [[['bait', 'empty'], ['bait', 'empty'], ['obscure'], ['remove', x]] for x in [0, 1]]
         },
         "moved": {  # optimal: Small
@@ -147,12 +147,12 @@ class ScenarioConfigs:
     standoff_optimal_policies = {
         "stage_1": 'big',
         "swapped": 'big',
-        "partially uninformed": 'b-s',
+        "partiallyUninformed": 'b-s',
         "replaced": 'b-s',
         "misinformed": 'b-s',
         "stage_2": 'small',
-        "informed control": 'small',
+        "informedControl": 'small',
         "moved": 'small',
-        "removed uninformed": 's-n',
-        "removed informed": 'none',
+        "removedUninformed": 's-n',
+        "removedInformed": 'none',
     }

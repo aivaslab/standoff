@@ -107,9 +107,9 @@ for observation_style in 'rich', 'image':
         for difficulty in range(4):
             for stage in range(3):
                 for config in ScenarioConfigs.standoff.keys():
-                    configName = difficulty if stage < 2 else config.replace(" ", "") + "-" + str(difficulty)
+                    configName = 'S'+str(stage) if stage < 2 else config.replace(" ", "")
                     register_standoff_env(
-                        "Standoff-S{0}-{1}-{2}-{3}-v0".format(stage+1, configName, view_size, observation_style),
+                        f"Standoff-{configName}-{view_size}-{observation_style}-{difficulty}-v0".format(stage+1, configName, view_size, observation_style),
                         StandoffEnv,
                         config,
                         difficulty,

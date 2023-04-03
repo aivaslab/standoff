@@ -47,27 +47,23 @@ visualize.py produces various figures using the csv files produced by evaluate.p
 The different tasks are referenced in src/pz_envs/scenario_configs.py. Also in that file are env_groups, which are a convenience for referencing multiple tasks (e.g. all the different Stage-3 tasks). Task names are as follows:
 
 ```
-For stages 1 and 2:
-  "Standoff-S{stage}-{difficulty}-{view_size}-{observation_style}-v0"
-For stage 3:
-  "Standoff-S{stage}-{task_name}-{difficulty}-{view_size}-{observation_style}-v0"
+"Standoff-{task_name}-{view_size}-{observation_style}-{difficulty}-v0"
   
-"stage" is in [1-3]
-"task_name" should have spaces removed.
-"difficulty" is in [0-3] (see difficulty levels below)
-"view_sizes" are currently in [13, 15, 17, 19]
+"task_name" is either stage_1, stage_2, or a stage-3 task (e.g. "partiallyUninformed")
+"view_size" is in [13, 15, 17, 19]
 "observation_style" is in ['rich', 'image']
+"difficulty" is in [0-3] (see difficulty levels below), 3 for the standard challenge
 ```
 
 To make a raw environment, you may run any of:
 
 ```
-gym.make("Standoff-s1-0-17-rich-v0")
-gym.make("Standoff-s2-2-19-image-v0")
-gym.make("Standoff-s3-removeduninformed-1-15-rich-v0")
+gym.make("Standoff-stage_1-17-rich-0-v0")
+gym.make("Standoff-stage_2-19-image-2-v0")
+gym.make("Standoff-removedUninformed-15-rich-3-v0")
 ```
 
-This repo vectorizes environments using supersuit, using make_env_comp() in src/utils/conversion.py.
+This repo vectorizes environments using supersuit, typically using the pipeline defined in make_env_comp() in src/utils/conversion.py.
 
 
 ## Difficulty levels
@@ -82,3 +78,4 @@ The Competitive Feeding paradigm is extremely difficult for RL agents, so we pre
 | 3 |          -         |            -            |          -         |          -          |
 
 "Subject decisions" and "opponent decisions" prevent certain tiles from obscuring movement of the subject and opponent, respectively. "Persistent treat images" allows the subject to view the contents of boxes. "Gaze as 4th Channel" highlights tiles which the opponent sees. If it is persistent, these tiles remain highlighted until they change, even if the opponent stops seeing them.
+

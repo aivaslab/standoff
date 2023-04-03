@@ -14,7 +14,8 @@ class StandoffEnv(para_MultiGridEnv):
     info_keywords = ('minibatch', 'timestep',
                      'shouldAvoidBig', 'shouldAvoidSmall', 'correctSelection', 'selection',
                     'selectedBig', 'selectedSmall', 'selectedNeither',
-                    'selectedPrevBig', 'selectedPrevSmall', 'selectedPrevNeither', 'incorrectSelection')
+                    'selectedPrevBig', 'selectedPrevSmall', 'selectedPrevNeither', 'incorrectSelection',
+                    'selectedSame')
 
     def __init__(
             self,
@@ -409,3 +410,18 @@ class StandoffEnv(para_MultiGridEnv):
             else:
                 self.infos['player_0']['correctSelection'] = self.big_food_locations[-1]
                 self.infos['player_0']['incorrectSelection'] = self.small_food_locations[-1]
+        elif len(self.small_food_locations) > 0:
+            if not self.infos['player_0']['shouldAvoidSmall']:
+                self.infos['player_0']['correctSelection'] = self.small_food_locations[-1]
+                self.infos['player_0']['incorrectSelection'] = -1
+            else:
+                self.infos['player_0']['correctSelection'] = -1
+                self.infos['player_0']['incorrectSelection'] = self.small_food_locations[-1]
+        elif len(self.big_food_locations) > 0:
+            if not self.infos['player_0']['shouldAvoidBig']:
+                self.infos['player_0']['correctSelection'] = self.big_food_locations[-1]
+                self.infos['player_0']['incorrectSelection'] = -1
+            else:
+                self.infos['player_0']['correctSelection'] = -1
+                self.infos['player_0']['incorrectSelection'] = self.big_food_locations[-1]
+            
