@@ -142,7 +142,7 @@ def process_csv(path, gtr=False):
 
         return grouped_df, grouped_df_small, grouped_df_noname_abs, grouped_df_noname
 
-def get_transfer_matrix_row(path, column, config_names, only_last=False):
+def get_transfer_matrix_row(path, column, config_names, config_names_old, only_last=False):
     grouped_df, _, _, _ = process_csv(path, gtr=False)
 
     if only_last:
@@ -150,6 +150,13 @@ def get_transfer_matrix_row(path, column, config_names, only_last=False):
 
     #if config_names is not None:
     filtered_df = grouped_df[grouped_df['configName'].isin(config_names)]
+    filtered_df_2 = grouped_df[grouped_df['configName'].isin(config_names_old)]
+    
+    print(len(filtered_df), len(filtered_df_2))
+    if len(filtered_df) >= len(filtered_df_2):
+        pass
+    else:
+        filtered_df = filtered_df_2
     #else:
     #    filtered_df = grouped_df
 
