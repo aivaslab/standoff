@@ -32,7 +32,7 @@ def plot_transfer_matrix(matrix_data, row_names, col_names, output_file):
     
 
     
-def plot_tsne(data, labels, index, output_file):
+def plot_tsne(data, labels, index):
     
     print(index)
     #sorted_indices = sorted(indices, key=lambda i: int(labels[i].replace(train_name, '')))
@@ -112,28 +112,27 @@ def make_transfer_matrix_new(paths, save_path, prefix, make_matrix=False, make_t
         timesteps = [str(x["timestep"]//1000) + 'k' for x in matrix_data]
         
         indices = find_series_indices(labels, matrix_data)
-        
-        reducer = umap.UMAP()
-        #reducer = TSNE(n_components=2, random_state=22, perplexity=min(5, lines.shape[0] - 1))
-        reducer = decomposition.PCA(n_components=2)
-        #tsne_results = reducer.fit_transform(lines) #used for umap and tsne
-        reducer.fit(lines)
-        tsne_results = reducer.transform(lines) #used for pca
-        
-        #dirs = [row['dir'] for row in matrix_data]
-        #agents = [row['train'] for row in matrix_data]
-        output_file = os.path.join(save_path, metric + 'tsne_plot.png')
-        #train_names = sorted(set([row_names.split('0')[0] for label in labels]))
 
-        for index in indices:
-            plot_tsne(tsne_results, timesteps, index, output_file)
-        
-        plt.xlabel('t-SNE 1')
-        plt.ylabel('t-SNE 2')
-        plt.title('t-SNE plot of model performance')
-        plt.legend([x[2] for x in indices])
-        plt.tight_layout()
-        plt.savefig(output_file)
+        for reducer, name in [(umap.UMAP(), 'umap'), (decomposition.PCA(n_components=2), 'pca'), (TSNE(n_components=2, random_state=22, perplexity=min(5, lines.shape[0] - 1)), 'tsne')]:
+            if name == 'pca':
+                reducer.fit(lines)
+                tsne_results = reducer.transform(lines)
+            else:
+                tsne_results = reducer.fit_transform(lines)
+
+
+            output_file = os.path.join(save_path, metric + '_' + name + '_plot.png')
+
+            plt.figure()
+            for index in indices:
+                plot_tsne(tsne_results, timesteps, index)
+
+            plt.xlabel('t-SNE 1')
+            plt.ylabel('t-SNE 2')
+            plt.title('t-SNE plot of model performance')
+            plt.legend([x[2] for x in indices])
+            plt.tight_layout()
+            plt.savefig(output_file)
               
 def make_eval_figures(path, figures_path, window=1, prefix=''):
     """
