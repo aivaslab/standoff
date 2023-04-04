@@ -146,7 +146,7 @@ def make_eval_figures(path, figures_path, window=1, prefix=''):
         os.mkdir(figures_path_combined)
 
     # load csv, process data
-    grouped_df, grouped_df_small, grouped_df_noname_abs, grouped_df_noname = process_csv(path, prefix)
+    grouped_df, grouped_df_small, grouped_df_noname_abs, grouped_df_noname = process_csv(path, prefix=='gtr')
 
     title = prefix + '-' + path[path.find('S3-') + 3: path[path.find('S3-') + 3:].find('/')]
 
