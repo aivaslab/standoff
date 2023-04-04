@@ -1071,7 +1071,7 @@ class para_MultiGridEnv(ParallelEnv):
         if self.gaze_highlighting is True:
             # get the puppet's view mask
             puppet_mask = None  # if we don't find a puppet instance? unclear when this happens
-            if len(self.params['num_puppets']) > 0:
+            if self.params['num_puppets'] > 0:
                 for puppet in self.puppet_instances[:self.params['num_puppets']]:
                     if puppet != self.instance_from_name["player_0"]:
                         if puppet.pos is not None:
