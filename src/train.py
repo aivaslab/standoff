@@ -37,6 +37,7 @@ def main(args):
     parser.add_argument('--threads', type=int, default=1, help='Number of cpu threads to use')
     parser.add_argument('--difficulty', type=int, default=3, help='Difficulty 0-4, lower numbers enable cheats')
     parser.add_argument('--reverse_order', action='store_true', help='Whether to reverse order of train envs')
+    parser.add_argument('--start_at', type=int, default=0, help='Start at a specific environment')
 
     parser.add_argument('--model_class', type=str, default='PPO', help='Model class to use')
     parser.add_argument('--conv_mult', type=int, default=1, help='Number of first level kernels')
@@ -69,7 +70,7 @@ def main(args):
         for name in reversed(ScenarioConfigs.env_groups[args.env_group]):
             envs.append(f"Standoff-{name}")
     else:
-        for name in ScenarioConfigs.env_groups[args.env_group]:
+        for name in ScenarioConfigs.env_groups[args.env_group][args.start_at:]:
             envs.append(f"Standoff-{name}")
     log_dir = args.log_dir
     os.makedirs(log_dir, exist_ok=True)
