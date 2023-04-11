@@ -50,10 +50,13 @@ def collect_rollouts(env, model, model_episode,
                      memory: int = 1,
                      deterministic_env: bool = False,
                      deterministic_model: bool = False,
-                     max_timesteps: int = 50):
+                     max_timesteps: int = 50,
+                     tqdm=None):
+    normalizer_env = env
     env = env.unwrapped.vec_envs[0].par_env.unwrapped
     all_infos = []
     for episode in range(episodes):
+    
         env.deterministic = deterministic_env
         env.deterministic_seed = episode
         obs = env.reset()
@@ -63,9 +66,13 @@ def collect_rollouts(env, model, model_episode,
         obs_shape = list(obs['player_0'].shape)
         channels = obs_shape[1]
         obs_shape[1] = channels * memory
+        
+        #print(episode)
 
         for t in range(max_timesteps):
             cur_obs = np.expand_dims(np.array(obs['player_0']), 0)
+            #print(normalizer_env.venv.venv.__dict__.keys())
+            #cur_obs = normalizer_env.venv.venv.normalize_obs(cur_obs)
             #cur_obs = np.expand_dims(np.einsum('abc->abc', np.array(obs['player_0'])), 0)
             #print(cur_obs.shape)
 
@@ -73,12 +80,15 @@ def collect_rollouts(env, model, model_episode,
             #print('cur_obs', np.sum(cur_obs, axis=1).squeeze().astype(int))
 
             # todo: update episode starts?
+            #print('t', t, 's', lstm_states, episode_starts)
+            #print("cur_obs:", cur_obs)
             if hasattr(model, '_last_lstm_states'):
                 action, lstm_states = model.predict(cur_obs, deterministic=deterministic_model,
                                                     state=lstm_states,
                                                     episode_start=episode_starts)
             else:
                 action, _states = model.predict(cur_obs, deterministic=deterministic_model)
+            #print("action", action)
 
             obs, rewards, dones, info = env.step({'player_0': action})
             if dones['player_0']:
@@ -92,6 +102,7 @@ def collect_rollouts(env, model, model_episode,
         infos['model_ep'] = model_episode
         infos['episode_timesteps'] = t
         all_infos.append(_process_info(infos))
+        tqdm.update(1)
 
     return all_infos
 

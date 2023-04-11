@@ -36,6 +36,7 @@ def main(args):
     parser.add_argument('--frames', type=int, default=1, help='Number of frames to stack')
     parser.add_argument('--threads', type=int, default=1, help='Number of cpu threads to use')
     parser.add_argument('--difficulty', type=int, default=3, help='Difficulty 0-4, lower numbers enable cheats')
+    parser.add_argument('--reverse_order', action='store_true', help='Whether to reverse order of train envs')
 
     parser.add_argument('--model_class', type=str, default='PPO', help='Model class to use')
     parser.add_argument('--conv_mult', type=int, default=1, help='Number of first level kernels')
@@ -64,8 +65,12 @@ def main(args):
     
     envs = []
     # f"Standoff-{configName}-{view_size}-{observation_style}-{difficulty}-v0"
-    for name in ScenarioConfigs.env_groups[args.env_group]:
-        envs.append(f"Standoff-{name}")
+    if args.reverse_order:
+        for name in reversed(ScenarioConfigs.env_groups[args.env_group]):
+            envs.append(f"Standoff-{name}")
+    else:
+        for name in ScenarioConfigs.env_groups[args.env_group]:
+            envs.append(f"Standoff-{name}")
     log_dir = args.log_dir
     os.makedirs(log_dir, exist_ok=True)
     timesteps = args.timesteps
@@ -121,15 +126,25 @@ def main(args):
 
             short_name = args.experiment_name
             configName = name
-            policy, policy_kwargs = init_policy(model_class, width, hidden_size, conv_mult, frames, name='cnn',
-                                                net_arch=[dict(activation_fn=th.nn.ReLU, pi=[width], vf=[width])])
+            
+            net_arch = [dict(activation_fn=th.nn.ReLU, pi=[width], vf=[width])] #prev one
+            '''net_arch = [
+                {'activation_fn': th.nn.ReLU, 'pi': [32, 32, 32, 32], 'vf': [32, 32, 32, 32]},
+                {'lstm': 55},
+                {'activation_fn': th.nn.ReLU, 'pi': [25], 'vf': [25]}
+            ]'''
+            
             for repetition in range(repetitions):
                 start = time.time()
                 print('name: ', name, dir_name)
-                log_line = start_global_logs(global_logs, short_name, dir_name, configName, model_class, policy,
-                                             global_log_path)
                 env = make_env_comp(env_name, frames=frames, size=size, style=style, monitor_path=savePath3, rank=0,
                                     vecNormalize=vecNormalize, threads=threads)
+                
+                policy, policy_kwargs = init_policy(model_class, env.observation_space, env.action_space, rate, 
+                            width, hidden_size=hidden_size, conv_mult=conv_mult, frames=frames, name='cnn', net_arch=net_arch)
+                
+                log_line = start_global_logs(global_logs, short_name, dir_name, configName, model_class, policy,
+                                             global_log_path)
                 if continuing:
                     model, model_timesteps = load_last_checkpoint_model(savePath3, model_class)
                     model.set_env(env)
@@ -146,7 +161,7 @@ def main(args):
                 callback = make_callbacks(savePath3, env, batch_size, tqdm_steps, recordEvery, model,
                                           repetition=repetition, threads=threads)
 
-                print(env_name, model_class, name, savePath3, str(timedelta(seconds=time.time() - start)))
+                print(env_name, model_class, name, savePath3, str(timedelta(seconds=time.time() - start)), policy_kwargs)
                 model.learn(total_timesteps=timesteps*threads, callback=callback)
                 print('finished, time=', str(timedelta(seconds=time.time() - start)))
                 

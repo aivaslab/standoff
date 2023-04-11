@@ -1070,7 +1070,7 @@ class para_MultiGridEnv(ParallelEnv):
 
         if self.gaze_highlighting is True:
             # get the puppet's view mask
-            puppet_mask = None  # if we don't find a puppet instance? unclear when this happens
+            puppet_mask = np.zeros((agent.view_size, agent.view_size), dtype="uint8")  # if we don't find a puppet instance? unclear when this happens
             if self.params['num_puppets'] > 0:
                 for puppet in self.puppet_instances[:self.params['num_puppets']]:
                     if puppet != self.instance_from_name["player_0"]:
@@ -1110,6 +1110,14 @@ class para_MultiGridEnv(ParallelEnv):
                         obs[i, :, :] = puppet_mask
                 else:
                     obs[i, :, :] = np.multiply(np.vectorize(layer)(view_grid.grid, mapping), visibility)
+                    
+            
+            if np.isnan(obs).any():
+                print("Warning: NaN values detected in the observations")
+                # To further debug, print relevant variables or arrays here
+                print("visibility:", visibility)
+                print("layers:", self.rich_observation_layers)
+                print("obs", obs)
             return obs
 
         grid_image = view_grid.render(tile_size=agent.view_tile_size, visible_mask=vis_mask, top_agent=agent,

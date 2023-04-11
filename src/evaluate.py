@@ -37,7 +37,8 @@ def evaluate_models(eval_envs, models, model_timesteps, det_env, det_model, use_
     if not use_gtr:
         prefix += '_det' if det_model else '_rand'
 
-    for model, model_timestep in tqdm(zip(models, model_timesteps), total=len(models)):
+    progress_bar = tqdm(total=len(models)*len(eval_envs)*episodes)
+    for model, model_timestep in zip(models, model_timesteps):
         # collect rollout data
         for eval_env in eval_envs:
             if use_gtr:
@@ -47,7 +48,8 @@ def evaluate_models(eval_envs, models, model_timesteps, det_env, det_model, use_
             else:
                 eval_data = eval_data.append(
                     collect_rollouts(eval_env, model, model_episode=model_timestep, episodes=episodes,
-                                     memory=frames, deterministic_env=det_env, deterministic_model=det_model))
+                                     memory=frames, deterministic_env=det_env, deterministic_model=det_model,
+                                     tqdm=progress_bar))
 
     # save all data
     evalPath = os.path.join(train_dir, 'evaluations')

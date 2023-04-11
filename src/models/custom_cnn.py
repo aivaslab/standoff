@@ -37,7 +37,8 @@ class CustomCNN(BaseFeaturesExtractor):
     def forward(self, observations: th.Tensor) -> th.Tensor:
         obs = self.get_image_obs(observations)
         #return self.linear(self.cnn(obs.permute(0, 3, 1, 2)))
-        return self.linear(self.cnn(obs))
+        obs = self.cnn(obs)
+        return self.linear(obs)
 
     def get_image_obs(self, observations):
         return observations['image'] if type(observations) is dict else observations

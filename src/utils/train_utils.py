@@ -5,19 +5,48 @@ import torch as th
 import shutil
 
 from sb3_contrib import TRPO, RecurrentPPO
+from sb3_contrib.common.recurrent.policies import RecurrentMultiInputActorCriticPolicy, RecurrentActorCriticCnnPolicy, RecurrentActorCriticPolicy
 from ..models.custom_cnn import CustomCNN
 from typing import Callable
+from stable_baselines3.common.preprocessing import preprocess_obs
+from gym.spaces import Box
 
+class CustomRecurrentActorCriticCnnPolicy(RecurrentActorCriticCnnPolicy):
+    def forward(self, obs, hidden_state=None, deterministic=False, use_sde=False, *args, **kwargs):
+        print(self.__dict__.keys())
+        
+        if isinstance(obs, Box):
+            dummy_action = th.zeros((1,) + self.action_space.shape)
+            dummy_value = th.zeros((1, 1))
+            dummy_hidden_state = th.zeros(self.lstm_hidden_state_shape)
+            return dummy_action, dummy_value, dummy_hidden_state
+            
+        obs = preprocess_obs(th.tensor(obs), self.observation_space)
+        if use_sde:
+            raise NotImplementedError("SDE not supported for CustomRecurrentActorCriticPolicy")
+        return super().forward(obs, hidden_state, deterministic, *args, **kwargs)
 
-def init_policy(model_class, width, hidden_size, conv_mult=1, frames=1, net_arch=None, name=''):
+def init_policy(model_class, obs_space, act_space, lr_schedule, width, hidden_size, conv_mult=1, frames=1, net_arch=None, name=''):
     if model_class == RecurrentPPO:
-        policy = 'MultiInputLstmPolicy'
-        policy_kwargs = {'features_extractor_class': CustomCNN,
-                            'net_arch': net_arch,
-                            'lstm_hidden_size': hidden_size,
-                            'features_extractor_kwargs':
-                                {'features_dim': width, 'conv_mult': conv_mult, 'frames': 1},
-                        }
+        '''print('using recurrent policy')
+        net_arch = [
+                {'activation_fn': th.nn.ReLU, 'pi': [32, 32, 32, 32], 'vf': [33, 32, 32, 32]},
+                {'lstm': 55},
+                {'activation_fn': th.nn.ReLU, 'pi': [25], 'vf': [26]}
+            ]'''
+        policy_kwargs = {
+            'net_arch': net_arch,
+            'features_extractor_class': CustomCNN,
+            'lstm_hidden_size': hidden_size,
+            'features_extractor_kwargs': {
+                'features_dim': width,
+                'conv_mult': conv_mult,
+                'frames': 1
+            },
+        }
+        #policy = RecurrentActorCriticCnnPolicy(obs_space, act_space, lr_schedule, **policy_kwargs)
+        #print('policy', policy)
+        policy = RecurrentActorCriticCnnPolicy
     else:
         policy = 'MlpPolicy'
         if name == 'mlp':

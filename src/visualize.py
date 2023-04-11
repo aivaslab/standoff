@@ -6,6 +6,7 @@ import numpy as np
 from sklearn.manifold import TSNE
 from sklearn import decomposition
 import umap
+import matplotlib.pylab as pl
 
 from src.utils.display import process_csv, get_transfer_matrix_row
 from src.utils.plotting import plot_merged, plot_selection, plot_split, plot_train
@@ -32,12 +33,16 @@ def plot_transfer_matrix(matrix_data, row_names, col_names, output_file):
     
 
     
-def plot_tsne(data, labels, index):
+def plot_tsne(data, labels, index, color):
     
     print(index)
     #sorted_indices = sorted(indices, key=lambda i: int(labels[i].replace(train_name, '')))
     #sorted_data = data[sorted_indices]
-    plt.plot(data[index[0]:index[1], 0], data[index[0]:index[1], 1], marker='o', label=index[2])
+    all_sizes = [int(x[:-1]) for x in labels[index[0]:index[1]]]
+    max_size = max(all_sizes)
+    all_sizes  = [50*x/max_size for x in all_sizes]
+    plt.plot(data[index[0]:index[1], 0], data[index[0]:index[1], 1], marker=None, label=index[2], c=color)
+    plt.scatter(data[index[0]:index[1], 0], data[index[0]:index[1], 1], marker='o', label=index[2], s=all_sizes, c=color)
     
     #for i, name in enumerate(labels[index[0]:index[1]]):
     #    plt.annotate(name, (data[i + index[0], 0], data[i + index[0], 1]), textcoords="offset points", xytext=(-10, 5), ha='center')  
@@ -52,10 +57,7 @@ def get_matrix_data(paths, only_last=False, metric='accuracy_mean', prefix='rand
             if os.path.exists(os.path.join(train_path, prefix+'_data.csv')):
                 path_components = train_path.split(os.sep)
                 this_dir = path_components[-3]
-                print(path_components)
-                train_name = path_components[-2].split('-')[2]
-                print(train_name)
-                matrix_rows, timesteps = get_transfer_matrix_row(os.path.join(train_path, prefix+'_data.csv'), metric, ordering, ordering_old, only_last=only_last)
+                matrix_rows, timesteps, train_name = get_transfer_matrix_row(os.path.join(train_path, prefix+'_data.csv'), metric, ordering, ordering_old, only_last=only_last)
                 for index, timestep in enumerate(timesteps):
                     row_data = {
                         "this_dir": dir_name,
@@ -113,7 +115,7 @@ def make_transfer_matrix_new(paths, save_path, prefix, make_matrix=False, make_t
         
         indices = find_series_indices(labels, matrix_data)
 
-        for reducer, name in [(umap.UMAP(), 'umap'), (decomposition.PCA(n_components=2), 'pca'), (TSNE(n_components=2, random_state=22, perplexity=min(5, lines.shape[0] - 1)), 'tsne')]:
+        for reducer, name in [(umap.UMAP(), 'umap'), (decomposition.PCA(n_components=2), 'pca'), (TSNE(n_components=2, random_state=22, perplexity=min(15, lines.shape[0] - 1)), 'tsne')]:
             if name == 'pca':
                 reducer.fit(lines)
                 tsne_results = reducer.transform(lines)
@@ -124,13 +126,15 @@ def make_transfer_matrix_new(paths, save_path, prefix, make_matrix=False, make_t
             output_file = os.path.join(save_path, metric + '_' + name + '_plot.png')
 
             plt.figure()
-            for index in indices:
-                plot_tsne(tsne_results, timesteps, index)
+            
+            colors = pl.cm.jet(np.linspace(0, 1, len(indices)+1))
+            for color, index in zip(colors, indices):
+                plot_tsne(tsne_results, timesteps, index, color)
 
             plt.xlabel('t-SNE 1')
             plt.ylabel('t-SNE 2')
-            plt.title('t-SNE plot of model performance')
-            plt.legend([x[2] for x in indices])
+            plt.title(name + ' plot of model performance')
+            plt.legend([x[2] for x in indices], bbox_to_anchor=(1.04, 1), loc="upper left")
             plt.tight_layout()
             plt.savefig(output_file)
               

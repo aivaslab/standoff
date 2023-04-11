@@ -86,6 +86,7 @@ def register_standoff_env(
 
     env_class_name = f"env_{len(registered_envs)}"
     setattr(this_module, env_class_name, RegEnv)
+    gym.logger.set_level(gym.logger.ERROR)
     registered_envs.append(env_name)
     gym_register(env_name, entry_point=f"standoff.src.pz_envs:{env_class_name}")
 

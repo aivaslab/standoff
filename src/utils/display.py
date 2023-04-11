@@ -152,11 +152,16 @@ def get_transfer_matrix_row(path, column, config_names, config_names_old, only_l
     filtered_df = grouped_df[grouped_df['configName'].isin(config_names)]
     filtered_df_2 = grouped_df[grouped_df['configName'].isin(config_names_old)]
     
-    print(len(filtered_df), len(filtered_df_2))
+    path_components = path.split(os.sep)
     if len(filtered_df) >= len(filtered_df_2):
+        train_name = path_components[-3].split('-')[1]
         pass
     else:
+        # this handles old-style names
         filtered_df = filtered_df_2
+        train_name = path_components[-3].split('-')[2]
+        if len(train_name) < 3:
+            train_name = path_components[-3].split('-')[1]
     #else:
     #    filtered_df = grouped_df
 
@@ -165,7 +170,7 @@ def get_transfer_matrix_row(path, column, config_names, config_names_old, only_l
     timesteps = return_matrix['model_ep'].tolist()
     return_matrix = return_matrix.drop(columns=['model_ep'])
 
-    return return_matrix, timesteps
+    return return_matrix, timesteps, train_name
     
 def get_transfer_matrix_row_legacy(path, column, only_last=False):
     grouped_df, _, _, _ = process_csv(path, gtr=False)
