@@ -150,10 +150,10 @@ def get_transfer_matrix_row(path, column, config_names, config_names_old, only_l
 
     #if config_names is not None:
     filtered_df = grouped_df[grouped_df['configName'].isin(config_names)]
-    filtered_df_2 = grouped_df[grouped_df['configName'].isin(config_names_old)]
+    filtered_df_2 = grouped_df[grouped_df['configName'].isin(config_names_old)] if config_names_old else None
     
     path_components = path.split(os.sep)
-    if len(filtered_df) >= len(filtered_df_2):
+    if not filtered_df_2 or len(filtered_df) >= len(filtered_df_2):
         train_name = path_components[-3].split('-')[1]
         pass
     else:
