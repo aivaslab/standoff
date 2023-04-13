@@ -26,7 +26,7 @@ def register_standoff_env(
         env_class,
         config_name,
         difficulty,
-        reward_decay=True,
+        reward_decay=False,
         observation_style='rich',
         observation_density=1,
         view_tile_size=1,

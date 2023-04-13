@@ -425,7 +425,7 @@ class para_MultiGridEnv(ParallelEnv):
             respawn=False,
             ghost_mode=True,
             step_reward=0,
-            done_without_box_reward=-10,
+            done_without_box_reward=-3,
             agent_spawn_kwargs=None,
             num_agents=1,
             num_puppets=0,
@@ -477,8 +477,8 @@ class para_MultiGridEnv(ParallelEnv):
         self.max_steps = max_steps
         self.reward_decay = reward_decay
         self.step_reward = step_reward #0
-        self.done_without_box_reward = done_without_box_reward #-10
-        self.distance_from_boxes_reward = -0.5 # increase done penalty based on distance to goals
+        self.done_without_box_reward = done_without_box_reward #-3
+        self.distance_from_boxes_reward = -0.1 # increase done penalty based on distance to goals
         self.penalize_same_selection = -5.0 # penalty for selecting the same box as the opponent
         self.seed(seed=seed)
         self.agent_spawn_kwargs = agent_spawn_kwargs
@@ -877,17 +877,19 @@ class para_MultiGridEnv(ParallelEnv):
                             og_rwd = fwd_cell.get_reward(agent)
 
                             # self.grid.set(*fwd_cell.pos, None) # don't remove box
-                            fwd_cell.set_reward(self.penalize_same_selection)
-                            if fwd_cell in self.previously_selected_boxes:
-                                same_selection = True
-                            else:
-                                same_selection = False
-                                self.previously_selected_boxes.append(fwd_cell)
+                            #fwd_cell.set_reward(self.penalize_same_selection)
 
                             if bool(self.reward_decay):
                                 rwd = og_rwd * (1.0 - 0.9 * (self.step_count / self.max_steps_real))
                             else:
                                 rwd = og_rwd
+
+                            if fwd_cell in self.previously_selected_boxes:
+                                same_selection = True
+                                rwd = self.penalize_same_selection
+                            else:
+                                same_selection = False
+                                self.previously_selected_boxes.append(fwd_cell)
 
                             # removed, unclear what for
                             # step_rewards[agent_no] += rwd

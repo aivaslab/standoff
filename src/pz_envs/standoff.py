@@ -30,7 +30,7 @@ class StandoffEnv(para_MultiGridEnv):
             respawn=False,
             ghost_mode=True,
             step_reward=0,
-            done_without_box_reward=-10,
+            done_without_box_reward=-3,
             agent_spawn_kwargs=None,
             config_name="error",
             subject_visible_decs=False,
@@ -84,7 +84,8 @@ class StandoffEnv(para_MultiGridEnv):
         self.only_highlight_treats = True
 
         self.fill_spawn_holes = False
-        self.random_subject_spawn = False
+        self.random_subject_spawn = True
+        self.odd_spawns = True
 
 
     def hard_reset(self, params=None):
@@ -178,8 +179,12 @@ class StandoffEnv(para_MultiGridEnv):
             h = 1 if agent == "player_0" else self.height - 2
             d = 1 if agent == "player_0" else 3
             if self.random_subject_spawn:
-                bb = self.deterministic_seed % self.boxes if self.deterministic else random.choice(range(boxes))
-                xx = 2 * bb + 2
+                if self.odd_spawns:
+                    bb = self.deterministic_seed % (self.boxes-1) if self.deterministic else random.choice(range(boxes-1))
+                    xx = 2 * bb + 3
+                else:
+                    bb = self.deterministic_seed % self.boxes if self.deterministic else random.choice(range(boxes))
+                    xx = 2 * bb + 2
             else:
                 xx = 2 * self.boxes//2 + 1
             self.agent_spawn_pos[agent] = (xx, h, d)
@@ -210,23 +215,25 @@ class StandoffEnv(para_MultiGridEnv):
         for box in range(boxes + 1):
             if box < boxes:
                 self.put_obj(Wall(), box * 2 + 1, startRoom - 1)
+                xx_spawn = box * 2 + 2 + self.odd_spawns
+
 
                 # initial door release, only where door is not in all_door_poses
-                if (box * 2 + 2, startRoom) in all_door_poses:
-                    self.put_obj(Block(init_state=0, color="blue"), box * 2 + 2, startRoom)
+                if (xx_spawn, startRoom) in all_door_poses:
+                    self.put_obj(Block(init_state=0, color="blue"), xx_spawn, startRoom)
                 else:
-                    self.put_obj(Wall(), box * 2 + 2, startRoom)
+                    self.put_obj(Wall(), xx_spawn, startRoom)
 
                 # same as above, for opponent
-                if (box * 2 + 2, self.height - startRoom - 1) in all_door_poses:
-                    self.put_obj(Block(init_state=0, color="blue"), box * 2 + 2, self.height - startRoom - 1)
+                if (xx_spawn, self.height - startRoom - 1) in all_door_poses:
+                    self.put_obj(Block(init_state=0, color="blue"), xx_spawn, self.height - startRoom - 1)
                 else:
-                    self.put_obj(Wall(), box * 2 + 2, self.height - startRoom - 1)
+                    self.put_obj(Wall(), xx_spawn, self.height - startRoom - 1)
 
-                if (box * 2 + 2, startRoom) in all_door_poses:
-                    self.released_tiles[0] += [(box * 2 + 2, startRoom)]
-                if (box * 2 + 2, self.height - startRoom - 1) in all_door_poses:
-                    self.released_tiles[1] += [(box * 2 + 2, self.height - startRoom - 1)]
+                if (xx_spawn, startRoom) in all_door_poses:
+                    self.released_tiles[0] += [(xx_spawn, startRoom)]
+                if (xx_spawn, self.height - startRoom - 1) in all_door_poses:
+                    self.released_tiles[1] += [(xx_spawn, self.height - startRoom - 1)]
 
                 # secondary door release
                 self.put_obj(Wall(), box * 2 + 1, self.height - 2)
@@ -237,9 +244,7 @@ class StandoffEnv(para_MultiGridEnv):
                 self.released_tiles[3] += [(box * 2 + 2, self.height - startRoom - atrium - 1)]
 
             for j in range(lava_height):
-                x = box * 2 + 1
-                y = j + startRoom + atrium + 1
-                self.put_obj(GlassBlock(color="cyan", init_state=1), x, y)
+                self.put_obj(GlassBlock(color="cyan", init_state=1), box * 2 + 1, j + startRoom + atrium + 1)
 
         self.reset_vision()
 
