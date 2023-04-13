@@ -128,9 +128,10 @@ def plot_selection(indexer, df, mypath, title, window, bars=False):
 
 def plot_train(log_folder, window=1000):
     monitor_files = get_monitor_files(log_folder)
-    print(monitor_files)
+    print('plotting train', monitor_files)
 
     for file_name in monitor_files:
+        plt.figure()
         with open(file_name) as file_handler:
             first_line = file_handler.readline()
             assert first_line[0] == "#", print(first_line)
@@ -158,7 +159,6 @@ def plot_train(log_folder, window=1000):
                 if not os.path.exists(os.path.join(log_folder, 'figures')):
                     os.mkdir(os.path.join(log_folder, 'figures'))
                 plt.savefig(os.path.join(log_folder, 'figures', title + "-" + 'lcurve' + '.png'))
-                plt.figure()
 
 def plot_results2(log_folder, policynames, modelnames, repetitions, env_name, title='Learning Curve', window=50):
     """

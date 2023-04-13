@@ -1,1 +1,0 @@
-{"model_class": "RecurrentPPO", "size": 15, "frames": 1, "style": "rich", "vecNormalize": true, "difficulty": 3}
