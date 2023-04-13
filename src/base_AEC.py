@@ -425,7 +425,7 @@ class para_MultiGridEnv(ParallelEnv):
             respawn=False,
             ghost_mode=True,
             step_reward=0,
-            done_reward=-10,
+            done_without_box_reward=-10,
             agent_spawn_kwargs=None,
             num_agents=1,
             num_puppets=0,
@@ -476,9 +476,9 @@ class para_MultiGridEnv(ParallelEnv):
         self.height = height
         self.max_steps = max_steps
         self.reward_decay = reward_decay
-        self.step_reward = step_reward
-        self.done_reward = done_reward
-        self.penalize_done_distance = -0.5 # increase done penalty based on distance to goals
+        self.step_reward = step_reward #0
+        self.done_without_box_reward = done_without_box_reward #-10
+        self.distance_from_boxes_reward = -0.5 # increase done penalty based on distance to goals
         self.penalize_same_selection = -5.0 # penalty for selecting the same box as the opponent
         self.seed(seed=seed)
         self.agent_spawn_kwargs = agent_spawn_kwargs
@@ -971,15 +971,15 @@ class para_MultiGridEnv(ParallelEnv):
             # print('observing', agent_name, agent)
             self.observations[agent_name] = self.gen_agent_obs(agent)
             # self.rewards[agent_name] = agent.rew
-            if not self.dones[agent_name] and self.env_done:
+            if self.env_done:
                 self.dones[agent_name] = True
-            elif self.env_done:
                 if not self.has_reached_goal[agent_name]:
-                    dr = self.done_reward
-                    if self.penalize_done_distance != 0:
-                        done_distance = math.abs((self.height // 2) - agent.pos[1])
+                    dr = self.done_without_box_reward
+                    if self.distance_from_boxes_reward != 0:
+                        done_distance = abs((self.height // 2) - agent.pos[1])
                         # the vertical spaces agent pos differs from goal pos
-                        dr += self.penalize_done_distance * done_distance
+                        dr += self.distance_from_boxes_reward * done_distance
+                    print('rewarding for not reaching goal', dr)
                     self.rewards[agent_name] += dr
                     agent.reward(dr)
 

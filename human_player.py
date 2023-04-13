@@ -6,7 +6,7 @@ import src
 from src.rendering import InteractivePlayerWindow
 from src.agents import GridAgentInterface
 from src.pz_envs import env_from_config, standoff, tutorial, scenario_configs
-from src.pz_envs.scenario_configs import ScenarioConfigs, AllParams
+from src.pz_envs.scenario_configs import ScenarioConfigs
 from src.utils.conversion import wrap_env_full
 import gym
 import src.pz_envs
@@ -44,7 +44,7 @@ env_config =  {
     "max_steps": 50,
     "respawn": True,
     "ghost_mode": False,
-    "reward_decay": False,
+    "reward_decay": True,
     "width": 9,
     "height": 9
 }
@@ -126,8 +126,8 @@ for i in range(5):
     print(env_name, env.gaze_highlighting, env.persistent_gaze_highlighting, env.opponent_visible_decs, env.subject_visible_decs, env.persistent_treat_images)
 
     while True:
-        print(env, "agents", env.agents, "puppets", env.puppets)
-        #env.render(mode="human", show_agent_views=True, tile_size=32)
+        print(env, "agents", env.agents, "puppets", env.puppets, "done_penalties", env.done_without_box_reward, env.distance_from_boxes_reward)
+        #env.render(mode="human", show_agent_views=True, tile_size=4)
         player_action = human.action_step(obs['player_0'])
         #window is showing obs of p0, so those obs are broken!
 

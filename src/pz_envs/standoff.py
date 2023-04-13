@@ -30,7 +30,7 @@ class StandoffEnv(para_MultiGridEnv):
             respawn=False,
             ghost_mode=True,
             step_reward=0,
-            done_reward=-10,
+            done_without_box_reward=-10,
             agent_spawn_kwargs=None,
             config_name="error",
             subject_visible_decs=False,
@@ -50,7 +50,7 @@ class StandoffEnv(para_MultiGridEnv):
                          respawn,
                          ghost_mode,
                          step_reward,
-                         done_reward,
+                         done_without_box_reward,
                          agent_spawn_kwargs,
                          num_agents=len(agents),
                          num_puppets=len(puppets),
@@ -59,7 +59,7 @@ class StandoffEnv(para_MultiGridEnv):
                          opponent_visible_decs=opponent_visible_decs,
                          persistent_treat_images=persistent_treat_images,
                          gaze_highlighting=gaze_highlighting,
-                         persistent_gaze_highlighting=persistent_gaze_highlighting,)
+                         persistent_gaze_highlighting=persistent_gaze_highlighting, )
         self.new_target = None
         if agent_spawn_kwargs is None:
             agent_spawn_kwargs = {'top': (0, 0), 'size': (2, self.width)}
