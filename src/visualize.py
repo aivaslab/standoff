@@ -14,6 +14,7 @@ from src.utils.plotting import plot_merged, plot_selection, plot_split, plot_tra
 from matplotlib import pyplot as plt
 import matplotlib.patches as patches
 
+
 def plot_transfer_matrix(matrix_data, row_names, col_names, output_file):
     fig, ax = plt.subplots()
     ax.set_xticks(range(len(col_names)))
@@ -30,34 +31,35 @@ def plot_transfer_matrix(matrix_data, row_names, col_names, output_file):
 
     plt.tight_layout()
     plt.savefig(output_file)
-    
 
-    
+
 def plot_tsne(data, labels, index, color):
-    
     print(index)
-    #sorted_indices = sorted(indices, key=lambda i: int(labels[i].replace(train_name, '')))
-    #sorted_data = data[sorted_indices]
+    # sorted_indices = sorted(indices, key=lambda i: int(labels[i].replace(train_name, '')))
+    # sorted_data = data[sorted_indices]
     all_sizes = [int(x[:-1]) for x in labels[index[0]:index[1]]]
     max_size = max(all_sizes)
-    all_sizes  = [50*x/max_size for x in all_sizes]
+    all_sizes = [50 * x / max_size for x in all_sizes]
     plt.plot(data[index[0]:index[1], 0], data[index[0]:index[1], 1], marker=None, label=index[2], c=color)
-    plt.scatter(data[index[0]:index[1], 0], data[index[0]:index[1], 1], marker='o', label=index[2], s=all_sizes, c=color)
-    
-    #for i, name in enumerate(labels[index[0]:index[1]]):
+    plt.scatter(data[index[0]:index[1], 0], data[index[0]:index[1], 1], marker='o', label=index[2], s=all_sizes,
+                c=color)
+
+    # for i, name in enumerate(labels[index[0]:index[1]]):
     #    plt.annotate(name, (data[i + index[0], 0], data[i + index[0], 1]), textcoords="offset points", xytext=(-10, 5), ha='center')  
-    
-        
-def get_matrix_data(paths, only_last=False, metric='accuracy_mean', prefix='rand_rand', ordering=None, ordering_old=None):
+
+
+def get_matrix_data(paths, only_last=False, metric='accuracy_mean', prefix='rand_rand', ordering=None,
+                    ordering_old=None):
     train_paths_list = [[os.path.join(f.path) for f in os.scandir(path) if f.is_dir()] for path in paths]
     matrix_data = []
     for train_paths, dir_name in zip(train_paths_list, paths):
         for train_path in train_paths:
             train_path = os.path.join(train_path, 'evaluations')
-            if os.path.exists(os.path.join(train_path, prefix+'_data.csv')):
+            if os.path.exists(os.path.join(train_path, prefix + '_data.csv')):
                 path_components = train_path.split(os.sep)
                 this_dir = path_components[-3]
-                matrix_rows, timesteps, train_name = get_transfer_matrix_row(os.path.join(train_path, prefix+'_data.csv'), metric, ordering, ordering_old, only_last=only_last)
+                matrix_rows, timesteps, train_name = get_transfer_matrix_row(
+                    os.path.join(train_path, prefix + '_data.csv'), metric, ordering, ordering_old, only_last=only_last)
                 for index, timestep in enumerate(timesteps):
                     row_data = {
                         "this_dir": dir_name,
@@ -67,65 +69,71 @@ def get_matrix_data(paths, only_last=False, metric='accuracy_mean', prefix='rand
                     }
                     matrix_data.append(row_data)
     return matrix_data
-    
+
+
 def find_series_indices(labels, matrix_data):
     series_indices = []
     start = 0
-    
+
     for i in range(1, len(labels)):
         current_train_name = labels[i][:labels[i].rfind(str(matrix_data[i]["timestep"]))]
         previous_train_name = labels[start][:labels[start].rfind(str(matrix_data[start]["timestep"]))]
-        
+
         if current_train_name != previous_train_name:
             end = i - 1
             series_indices.append((start, end, previous_train_name))
             start = i
-    
+
     final_train_name = labels[start][:labels[start].rfind(str(matrix_data[start]["timestep"]))]
     series_indices.append((start, len(labels) - 1, final_train_name))
     return series_indices
-        
+
+
 def make_transfer_matrix_new(paths, save_path, prefix, make_matrix=False, make_tsne=False, metric='accuracy_mean'):
-    eval_ordering = ['swapped', 'misinformed', 'partiallyUninformed', 'replaced', 'informedControl', 'moved', 'removedUninformed', 'removedInformed']
+    eval_ordering = ['swapped', 'misinformed', 'partiallyUninformed', 'replaced', 'informedControl', 'moved',
+                     'removedUninformed', 'removedInformed']
     if make_matrix:
         matrix_data = get_matrix_data(
-                [paths[0]], 
-                only_last=True, 
-                metric=metric, 
-                ordering=eval_ordering,
-                prefix='rand_rand')
-        matrix_data_sorted = sorted(matrix_data, key=lambda x: eval_ordering.index(x["train_name"]) if x["train_name"] in eval_ordering else float('inf'))
+            [paths[0]],
+            only_last=True,
+            metric=metric,
+            ordering=eval_ordering,
+            prefix='rand_rand')
+        matrix_data_sorted = sorted(matrix_data, key=lambda x: eval_ordering.index(x["train_name"]) if x[
+                                                                                                           "train_name"] in eval_ordering else float(
+            'inf'))
         lines = [x["values"] for x in matrix_data_sorted]
         row_names = [x["train_name"] for x in matrix_data]
         print(lines)
-        plot_transfer_matrix(matrix_data=lines, 
-                             row_names=row_names, 
-                             col_names=eval_ordering, 
+        plot_transfer_matrix(matrix_data=lines,
+                             row_names=row_names,
+                             col_names=eval_ordering,
                              output_file=os.path.join(save_path, metric + 'matrix.png'))
-            
+
     if make_tsne:
-        matrix_data = get_matrix_data(paths, only_last=False, metric=metric, prefix='rand_rand', ordering=eval_ordering, ordering_old=None)
-        
+        matrix_data = get_matrix_data(paths, only_last=False, metric=metric, prefix='rand_rand', ordering=eval_ordering,
+                                      ordering_old=None)
+
         lines = np.vstack([np.array(x["values"]) for x in matrix_data])
         labels = [x["train_name"] + str(x["timestep"]) for x in matrix_data]
-        
-        timesteps = [str(x["timestep"]//1000) + 'k' for x in matrix_data]
-        
+
+        timesteps = [str(x["timestep"] // 1000) + 'k' for x in matrix_data]
+
         indices = find_series_indices(labels, matrix_data)
 
-        for reducer, name in [(umap.UMAP(), 'umap'), (decomposition.PCA(n_components=2), 'pca'), (TSNE(n_components=2, random_state=22, perplexity=min(15, lines.shape[0] - 1)), 'tsne')]:
+        for reducer, name in [(umap.UMAP(), 'umap'), (decomposition.PCA(n_components=2), 'pca'),
+                              (TSNE(n_components=2, random_state=22, perplexity=min(15, lines.shape[0] - 1)), 'tsne')]:
             if name == 'pca':
                 reducer.fit(lines)
                 tsne_results = reducer.transform(lines)
             else:
                 tsne_results = reducer.fit_transform(lines)
 
-
             output_file = os.path.join(save_path, metric + '_' + name + '_plot.png')
 
             plt.figure()
-            
-            colors = pl.cm.jet(np.linspace(0, 1, len(indices)+1))
+
+            colors = pl.cm.jet(np.linspace(0, 1, len(indices) + 1))
             for color, index in zip(colors, indices):
                 plot_tsne(tsne_results, timesteps, index, color)
 
@@ -135,7 +143,8 @@ def make_transfer_matrix_new(paths, save_path, prefix, make_matrix=False, make_t
             plt.legend([x[2] for x in indices], bbox_to_anchor=(1.04, 1), loc="upper left")
             plt.tight_layout()
             plt.savefig(output_file)
-              
+
+
 def make_eval_figures(path, figures_path, window=1, prefix=''):
     """
     plot the results found in one csv file.
@@ -148,7 +157,7 @@ def make_eval_figures(path, figures_path, window=1, prefix=''):
         os.mkdir(figures_path_combined)
 
     # load csv, process data
-    grouped_df, grouped_df_small, grouped_df_noname_abs, grouped_df_noname = process_csv(path, prefix=='gtr')
+    grouped_df, grouped_df_small, grouped_df_noname_abs, grouped_df_noname = process_csv(path, prefix == 'gtr')
 
     title = prefix + '-' + path[path.find('S3-') + 3: path[path.find('S3-') + 3:].find('/')]
 
@@ -177,7 +186,7 @@ def make_eval_figures(path, figures_path, window=1, prefix=''):
                 os.mkdir(extended_path)
 
             # normalize certain values after all the filtering
-            
+
             for val in ['r', 'episode_timesteps']:
                 for rows in [rows_big, rows_small]:
                     rows.loc[:, f"normed_{val}_mean"] = \
@@ -217,7 +226,7 @@ def make_eval_figures(path, figures_path, window=1, prefix=''):
                         window=window,
                         values=['r', 'episode_timesteps'],
                         labels=['reward', 'timesteps'])
-            plot_merged(indexer='model_ep', df=rows_small, mypath=extended_path, title=title + 'avoid', window=window, \
+            plot_merged(indexer='model_ep', df=rows_small, mypath=extended_path, title=title + 'avoid', window=window,
                         values=["avoidCorrect"], labels=["avoided correct box"])
     else:
         not_plotted += ['grouped_df ' + title2]
@@ -244,17 +253,19 @@ def make_eval_figures(path, figures_path, window=1, prefix=''):
 
     if len(grouped_df_noname):
         title2 = title + '-mixed'
-        plot_merged(indexer='model_ep', df=grouped_df_noname, mypath=figures_path_combined, title=title2 + 'ac', window=window, \
-                    values=["avoidCorrect"], labels=["avoided correct box"])
-        plot_selection(indexer='model_ep', df=grouped_df_noname, mypath=figures_path_combined, title=title2, window=window)
-        plot_merged(indexer='model_ep', df=grouped_df_noname, mypath=figures_path_combined, title=title2 + 'validAccuracy',
-                    window=window, \
-                    values=['weakAccuracy', 'accuracy', 'normed_r'], \
-                    labels=['selected any treat', 'selected correct treat', \
+        plot_merged(indexer='model_ep', df=grouped_df_noname, mypath=figures_path_combined, title=title2 + 'ac',
+                    window=window, values=["avoidCorrect"], labels=["avoided correct box"])
+        plot_selection(indexer='model_ep', df=grouped_df_noname, mypath=figures_path_combined, title=title2,
+                       window=window)
+        plot_merged(indexer='model_ep', df=grouped_df_noname, mypath=figures_path_combined,
+                    title=title2 + 'validAccuracy',
+                    window=window,
+                    values=['weakAccuracy', 'accuracy', 'normed_r'],
+                    labels=['selected any treat', 'selected correct treat',
                             'reward (normalized)'])
-        plot_merged(indexer='model_ep', df=grouped_df_noname, mypath=figures_path_combined, title=title + 'absoluteLocation',
-                    window=window, \
-                    values=['sel0', 'sel1', 'sel2', 'sel3', 'sel4'], \
+        plot_merged(indexer='model_ep', df=grouped_df_noname, mypath=figures_path_combined,
+                    title=title + 'absoluteLocation',
+                    window=window, values=['sel0', 'sel1', 'sel2', 'sel3', 'sel4'],
                     labels=['box 1', 'box 2', 'box 3', 'box 4', 'box 5'])
         plotted += ['grouped_df_noname ' + title2]
 
@@ -264,6 +275,7 @@ def make_eval_figures(path, figures_path, window=1, prefix=''):
         print(' '.join(plotted))
     if len(not_plotted) > 1:
         print(' '.join(not_plotted))
+
 
 def main(args):
     parser = argparse.ArgumentParser(description='Train and evaluate models.')
@@ -279,27 +291,29 @@ def main(args):
     parser.add_argument('--matrix', action='store_true', help='whether to plot transfer matrix')
     parser.add_argument('--tsne', action='store_true', help='whether to plot transfer matrix')
     args = parser.parse_args(args)
-    
+
     prefix = 'gtr' if args.gtr else args.env_rand + "_" + args.model_rand
 
     if args.matrix or args.tsne:
         make_transfer_matrix_new(
-            [args.path, 'save_dir/big'],
+            [args.path],
             args.path,
-            prefix, 
-            make_tsne=args.tsne, 
+            prefix,
+            make_tsne=args.tsne,
             make_matrix=args.matrix)
     else:
 
-        train_paths = [ os.path.join(f.path) for f in os.scandir(args.path) if f.is_dir() ]
+        train_paths = [os.path.join(f.path) for f in os.scandir(args.path) if f.is_dir()]
 
         for k, train_path in enumerate(train_paths):
-
             plot_train(train_path)
 
             train_path = os.path.join(train_path, 'evaluations')
 
-            make_eval_figures(os.path.join(train_path, prefix+'_data.csv'), os.path.abspath(os.path.join(train_path, '..', 'figures')), window=args.window, prefix=prefix)
-            
+            make_eval_figures(os.path.join(train_path, prefix + '_data.csv'),
+                              os.path.abspath(os.path.join(train_path, '..', 'figures')), window=args.window,
+                              prefix=prefix)
+
+
 if __name__ == 'main':
     main(sys.argv[1:])
