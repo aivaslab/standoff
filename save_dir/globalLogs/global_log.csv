@@ -1,0 +1,2 @@
+name,timesteps,long_name,train_conf,agent_type,agent_policy
+rec_dif,0,rec_dif,main=0,<class 'sb3_contrib.ppo_recurrent.ppo_recurrent.RecurrentPPO'>,MultiInputLstmPolicy

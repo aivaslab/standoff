@@ -87,8 +87,6 @@ def find_series_indices(labels, matrix_data):
         
 def make_transfer_matrix_new(paths, save_path, prefix, make_matrix=False, make_tsne=False, metric='accuracy_mean'):
     eval_ordering = ['swapped', 'misinformed', 'partiallyUninformed', 'replaced', 'informedControl', 'moved', 'removedUninformed', 'removedInformed']
-    eval_ordering_old = ['swapped', 'misinformed', 'partially uninformed', 'replaced', 'informed control', 'moved', 'removed uninformed', 'removed informed']
-    
     if make_matrix:
         matrix_data = get_matrix_data(
                 [paths[0]], 
@@ -106,7 +104,7 @@ def make_transfer_matrix_new(paths, save_path, prefix, make_matrix=False, make_t
                              output_file=os.path.join(save_path, metric + 'matrix.png'))
             
     if make_tsne:
-        matrix_data = get_matrix_data(paths, only_last=False, metric=metric, prefix='rand_rand', ordering=eval_ordering, ordering_old=eval_ordering_old)
+        matrix_data = get_matrix_data(paths, only_last=False, metric=metric, prefix='rand_rand', ordering=eval_ordering, ordering_old=None)
         
         lines = np.vstack([np.array(x["values"]) for x in matrix_data])
         labels = [x["train_name"] + str(x["timestep"]) for x in matrix_data]
