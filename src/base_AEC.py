@@ -490,7 +490,6 @@ class para_MultiGridEnv(ParallelEnv):
         self.grid = MultiGrid(shape=(width, height))  # added this, not sure where grid comes from in og
 
         self.possible_agents = [f"player_{r}" for r in range(num_agents)]
-        #print('num_puppets at mg init', num_puppets)
         if num_puppets > 0:
             self.possible_puppets = [f"player_{r + num_agents}" for r in range(num_puppets)]
         else:
@@ -634,12 +633,10 @@ class para_MultiGridEnv(ParallelEnv):
         """
         
         if hasattr(self, "hard_reset"):
-            # print(self.config_name)
             self.hard_reset(self.configs[self.config_name])
         else:
             print("No hard reset function found")
-            
-        #print('numpuppets at reset', len(self.possible_puppets), self.params['num_puppets'], len(self.puppet_instances))
+
         self.agents = self.possible_agents[:]
         self.puppets = self.possible_puppets[:]
         self.rewards = {agent: 0 for agent in self.agents_and_puppets()}
@@ -694,7 +691,6 @@ class para_MultiGridEnv(ParallelEnv):
         for k, agent in enumerate(self.agent_and_puppet_instances()):
             if agent.spawn_delay == 0:
                 try:
-                    # print(agent, agent.name, *self.agent_spawn_pos[agent.name])
                     self.put_obj(agent, self.agent_spawn_pos[agent.name][0],
                                  self.agent_spawn_pos[agent.name][1])  # x,y,dir
                     agent.dir = self.agent_spawn_pos[agent.name][2]
@@ -717,7 +713,6 @@ class para_MultiGridEnv(ParallelEnv):
     def puppet_pathing(self, agent):
         a = self.instance_from_name[agent]
         if self.infos[agent] != {}:
-            # print('received', self.infos[agent])
             if 'act' in self.infos[agent].keys():
                 a.next_actions.append(self.infos[agent]['act'])
             if 'path' in self.infos[agent].keys():
@@ -799,7 +794,6 @@ class para_MultiGridEnv(ParallelEnv):
                 fwd_pos = agent.front_pos[:]
                 fwd_cell = self.grid.get(*fwd_pos)
                 agent_moved = False
-                # print('cell:' , cur_pos, cur_cell, fwd_pos)
 
                 if agent.move_type == 0:
                     # Rotate left
@@ -849,7 +843,6 @@ class para_MultiGridEnv(ParallelEnv):
                             # send signal to override next action
                             if "Arrow" in str(fwd_cell.__class__):
                                 relative_dir = (agent.dir - fwd_cell.dir) % 4
-                                # print(relative_dir)
                                 if relative_dir == 3:
                                     self.infos[agent_name]["act"] = 0
                                 if relative_dir == 1:
@@ -968,7 +961,6 @@ class para_MultiGridEnv(ParallelEnv):
 
         # observe the current state
         for agent_name, agent in zip(self.agents, self.agent_instances):
-            # print('observing', agent_name, agent)
             self.observations[agent_name] = self.gen_agent_obs(agent)
             # self.rewards[agent_name] = agent.rew
             if self.env_done:
@@ -979,7 +971,6 @@ class para_MultiGridEnv(ParallelEnv):
                         done_distance = abs((self.height // 2) - agent.pos[1])
                         # the vertical spaces agent pos differs from goal pos
                         dr += self.distance_from_boxes_reward * done_distance
-                    print('rewarding for not reaching goal', dr)
                     self.rewards[agent_name] += dr
                     agent.reward(dr)
 
@@ -1023,7 +1014,6 @@ class para_MultiGridEnv(ParallelEnv):
 
     def gen_obs_grid(self, agent):
 
-        # print('gen_obs_grid', agent)
         # If the agent is inactive, return an empty grid and a visibility mask that hides everything.
         if not agent.active:
             # below, not sure orientation is correct but as of 6/27/2020 that doesn't matter because
@@ -1090,9 +1080,7 @@ class para_MultiGridEnv(ParallelEnv):
         else:
             puppet_mask = None
 
-        # print('generating agent obs', agent)
         view_grid, vis_mask = self.gen_obs_grid(agent)
-        #print('view grid', view_grid)
 
         if self.observation_style == 'rich':
             # bypass rendering, just do dense function
@@ -1231,7 +1219,6 @@ class para_MultiGridEnv(ParallelEnv):
         # Compute which cells are visible to the agent
         highlight_mask = np.full((self.width, self.height), False, dtype=np.bool)
         for agentname, agent in zip(self.agents, self.agent_instances):
-            # print("base render", agentname)
             if agent.active:
                 xlow, ylow, xhigh, yhigh = agent.get_view_exts()
                 dxlow, dylow = max(0, 0 - xlow), max(0, 0 - ylow)
@@ -1287,5 +1274,4 @@ class para_MultiGridEnv(ParallelEnv):
             else:
                 self.window.imshow(img)
 
-        # print('returning', img)
         return img
