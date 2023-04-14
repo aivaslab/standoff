@@ -425,7 +425,7 @@ class para_MultiGridEnv(ParallelEnv):
             respawn=False,
             ghost_mode=True,
             step_reward=0,
-            done_without_box_reward=-3,
+            done_without_box_reward=-10,
             agent_spawn_kwargs=None,
             num_agents=1,
             num_puppets=0,
@@ -477,8 +477,8 @@ class para_MultiGridEnv(ParallelEnv):
         self.max_steps = max_steps
         self.reward_decay = reward_decay
         self.step_reward = step_reward #0
-        self.done_without_box_reward = done_without_box_reward #-3
-        self.distance_from_boxes_reward = -0.1 # increase done penalty based on distance to goals
+        self.done_without_box_reward = done_without_box_reward #-10
+        self.distance_from_boxes_reward = -0.5 # increase done penalty based on distance to goals
         self.penalize_same_selection = -5.0 # penalty for selecting the same box as the opponent
         self.seed(seed=seed)
         self.agent_spawn_kwargs = agent_spawn_kwargs
