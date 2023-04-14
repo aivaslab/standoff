@@ -86,6 +86,7 @@ def collect_rollouts(env, model, model_episode,
         infos['eval_ep'] = episode
         infos['model_ep'] = model_episode
         infos['episode_timesteps'] = t
+        infos['terminal_observation'] = 0 # overwrite huge thing
         all_infos.append(_process_info(infos))
         tqdm.update(1)
 

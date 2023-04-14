@@ -66,7 +66,6 @@ def agg_dict(frame):
 
 
 def group_dataframe(cur_df, groupby_list):
-    print('grouping part', groupby_list, cur_df.columns, cur_df.shape, cur_df)
     ret_df = cur_df.groupby(groupby_list, as_index=False).agg(agg_dict(cur_df))
     ret_df.columns = ret_df.columns.map("_".join).str.replace('_first', '')
     ret_df = ret_df.sort_values('model_ep')
