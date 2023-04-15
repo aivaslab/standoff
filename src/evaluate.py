@@ -5,7 +5,7 @@ import pandas as pd
 from tqdm import tqdm
 
 from src.pz_envs import ScenarioConfigs
-from src.utils.conversion import make_env_comp
+from src.utils.conversion import make_env_comp, get_json_params
 from src.utils.display import make_pic_video
 from src.utils.evaluation import collect_rollouts, ground_truth_evals, load_checkpoint_models
 from stable_baselines3 import PPO, A2C
@@ -61,19 +61,6 @@ def evaluate_models(eval_envs, models, model_timesteps, det_env, det_model, use_
         eval_data.to_csv(pathy, index=False)
 
 
-def get_json_params(path):
-    with open(path) as json_data:
-        data = json.load(json_data)
-        model_class = data['model_class']
-        if model_class in class_dict.keys():
-            model_class = class_dict[model_class]
-        size = data['size']
-        style = data['style']
-        frames = data['frames']
-        difficulty = data['difficulty']
-        vecNormalize = data['vecNormalize'] if 'vecNormalize' in data.keys() else True
-    return model_class, size, style, frames, vecNormalize, difficulty
-
 def main(args):
     parser = argparse.ArgumentParser(description='Evaluate models on environments.')
     parser.add_argument('--env_group', type=int, help='Environment group name')
@@ -96,7 +83,7 @@ def main(args):
 
     renamed_envs = False
     for train_dir in train_dirs:
-        model_class, size, style, frames, vecNormalize, difficulty = get_json_params(os.path.join(train_dir, 'json_data.json'))
+        model_class, size, style, frames, vecNormalize, difficulty, threads = get_json_params(os.path.join(train_dir, 'json_data.json'))
         models, model_timesteps, repetition_names = load_checkpoint_models(train_dir, model_class)
 
         if not renamed_envs:
@@ -106,7 +93,7 @@ def main(args):
         
         # generate eval envs with proper vecmonitors
         eval_envs = [make_env_comp(env_name, frames=frames, size=size, style=style, monitor_path=train_dir, rank=k + 1,
-                                   vecNormalize=vecNormalize) for k, env_name in enumerate(env_names)]
+                                   vecNormalize=vecNormalize, threads=threads) for k, env_name in enumerate(env_names)]
 
         if args.make_evals:
             evaluate_models(eval_envs, models, model_timesteps, det_env=args.det_env, det_model=args.det_model, use_gtr=args.use_gtr,

@@ -119,8 +119,9 @@ def main(args):
                 os.mkdir(savePath3)
 
             if continuing:
-                model_class, size, style, frames, vecNormalize = get_json_params(
+                model_class, size, style, frames, vecNormalize, difficulty, threads = get_json_params(
                     os.path.join(savePath3, 'json_data.json'))
+                # note that continuing will overwrite these things! It does not implement continuing under different conditions for curriculae
             else:
                 with open(os.path.join(savePath3, 'json_data.json'), 'w') as json_file:
                     json.dump({'model_class': model_class.__name__, 'size': size, 'frames': frames, 'style': style,
