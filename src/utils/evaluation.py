@@ -55,37 +55,56 @@ def collect_rollouts(env, model, model_episode,
     #normalizer_env = env
     #unwrapped_envs = [x.par_env.unwrapped for x in env.unwrapped.vec_envs]
     #configName = #unwrapped_envs[0].configName
+    #print(env.unwrapped.__dict__)
+    #using_pipe = env.unwrapped.pipes
+    num_threads = len(env.unwrapped.pipes)
     all_infos = []
-    for episode in range(episodes):
+    for episode in range(episodes // num_threads):
         # code to change seed here. can't use unwrapped.
+        if deterministic_env:
+            for pipe in env.unwrapped.pipes:
+                pipe.send(("set_attr", "deterministic_seed", episode))
+                pipe.send(("set_attr", "deterministic", True))
+        
+        # deterministic env breaks this for some reason.
         obs = env.reset()
         lstm_states = None
         episode_starts = np.ones((1,))
-
+        episode_timesteps = [0] * num_threads
+        active_envs = set(range(num_threads))
+        
         for t in range(max_timesteps):
+            if not active_envs:
+                break
+                
             if hasattr(model, '_last_lstm_states'):
                 action, lstm_states = model.predict(obs, deterministic=deterministic_model,
                                                     state=lstm_states,
                                                     episode_start=episode_starts)
                 obs, rewards, dones, info = env.step(action)
-                episode_starts = int(dones[0])
+                episode_starts = dones
             else:
-                action, _states = model.predict(obs, deterministic=deterministic_model)
+                action, _ = model.predict(obs, deterministic=deterministic_model)
                 obs, rewards, dones, info = env.step(action)
                 
-            if dones[0]:
-                break
+            completed_envs = []
+            for i in active_envs:
+                if dones[i]:
+                    completed_envs.append(i)
+                    episode_timesteps[i] = t
+            active_envs -= set(completed_envs)
 
-        infos = info[0]
-        infos['r'] = rewards[0]
-        infos['configName'] = configName
-        infos['eval_ep'] = episode
-        infos['model_ep'] = model_episode
-        infos['episode_timesteps'] = t
-        infos['terminal_observation'] = 0 # overwrite huge thing
-        infos['epsisode'] = 0 # is a dict {r, l, t}
-        all_infos.append(_process_info(infos))
-        tqdm.update(1)
+        for thread in range(num_threads):
+            infos = info[thread]
+            infos['r'] = rewards[thread]
+            infos['configName'] = configName
+            infos['eval_ep'] = episode
+            infos['model_ep'] = model_episode
+            infos['episode_timesteps'] = episode_timesteps[thread]
+            infos['terminal_observation'] = 0 # overwrite huge thing
+            infos['epsisode'] = 0 # is a dict {r, l, t}
+            all_infos.append(_process_info(infos))
+        tqdm.update(num_threads)
 
     return all_infos
 
