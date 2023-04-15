@@ -28,8 +28,9 @@ def get_json_params(path):
         frames = data['frames']
         threads = data['threads']
         difficulty = data['difficulty']
+        configName = data['configName']
         vecNormalize = data['vecNormalize'] if 'vecNormalize' in data.keys() else True
-    return model_class, size, style, frames, vecNormalize, difficulty, threads
+    return model_class, size, style, frames, vecNormalize, difficulty, threads, configName
 
 
 def make_env_comp(env_name, frames=1, vecNormalize=False, size=32, style='rich', monitor_path='dir',

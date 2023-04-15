@@ -30,7 +30,7 @@ def make_videos(train_dir, eval_envs, env_names, model, model_timestep, size):
         make_pic_video(model, eval_env, random_policy=True, savePath=vidPath2, deterministic=True, vidName='det_'+str(model_timestep)+'.gif', obs_size=size)
 
 
-def evaluate_models(eval_envs, models, model_timesteps, det_env, det_model, use_gtr, frames, episodes, train_dir):
+def evaluate_models(eval_envs, models, model_timesteps, det_env, det_model, use_gtr, frames, episodes, train_dir, configName):
     eval_data = pd.DataFrame()
 
     prefix = 'gtr' if use_gtr else 'det' if det_env else 'rand'
@@ -49,7 +49,7 @@ def evaluate_models(eval_envs, models, model_timesteps, det_env, det_model, use_
                 eval_data = eval_data.append(
                     collect_rollouts(eval_env, model, model_episode=model_timestep, episodes=episodes,
                                      memory=frames, deterministic_env=det_env, deterministic_model=det_model,
-                                     tqdm=progress_bar))
+                                     tqdm=progress_bar, configName=configName))
 
     # save all data
     evalPath = os.path.join(train_dir, 'evaluations')
@@ -76,28 +76,31 @@ def main(args):
     envs = []
     for name in ScenarioConfigs.env_groups[args.env_group]:
         envs.append(f'Standoff-{name}-')
-    env_names = envs
+    configNames = envs
     path = args.path
     train_dirs = [f.path for f in os.scandir(path) if f.is_dir()]
     episodes = args.episodes
 
     renamed_envs = False
     for train_dir in train_dirs:
-        model_class, size, style, frames, vecNormalize, difficulty, threads = get_json_params(os.path.join(train_dir, 'json_data.json'))
+        model_class, size, style, frames, vecNormalize, difficulty, threads, configName = get_json_params(os.path.join(train_dir, 'json_data.json'))
         models, model_timesteps, repetition_names = load_checkpoint_models(train_dir, model_class)
 
+        env_names = []
         if not renamed_envs:
-            for k, env_name in enumerate(env_names):
-                env_names[k] = env_name + str(size) + '-' + style + '-' + str(difficulty) + '-v0'
+            for k, env_name in enumerate(configNames):
+                env_names.append(env_name + str(size) + '-' + style + '-' + str(difficulty) + '-v0')
             renamed_envs = True
         
         # generate eval envs with proper vecmonitors
+
+        # det env and det seed need to be here
         eval_envs = [make_env_comp(env_name, frames=frames, size=size, style=style, monitor_path=train_dir, rank=k + 1,
                                    vecNormalize=vecNormalize, threads=threads) for k, env_name in enumerate(env_names)]
 
         if args.make_evals:
             evaluate_models(eval_envs, models, model_timesteps, det_env=args.det_env, det_model=args.det_model, use_gtr=args.use_gtr,
-                            frames=frames, episodes=episodes, train_dir=train_dir)
+                            frames=frames, episodes=episodes, train_dir=train_dir, configName=configName)
         if args.make_vids:
             make_videos(train_dir, eval_envs, env_names, models[-1], model_timesteps[-1], size)
                         

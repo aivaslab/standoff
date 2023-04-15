@@ -51,17 +51,13 @@ def collect_rollouts(env, model, model_episode,
                      deterministic_env: bool = False,
                      deterministic_model: bool = False,
                      max_timesteps: int = 50,
-                     tqdm=None):
-    normalizer_env = env
-    unwrapped_envs = [x.par_env.unwrapped for x in env.unwrapped.vec_envs]
-    configName = unwrapped_envs[0].configName
+                     tqdm=None, configName=''):
+    #normalizer_env = env
+    #unwrapped_envs = [x.par_env.unwrapped for x in env.unwrapped.vec_envs]
+    #configName = #unwrapped_envs[0].configName
     all_infos = []
     for episode in range(episodes):
-    
-        for u_e in unwrapped_envs:
-            u_e.deterministic = deterministic_env
-            u_e.deterministic_seed = episode
-            
+        # code to change seed here. can't use unwrapped.
         obs = env.reset()
         lstm_states = None
         episode_starts = np.ones((1,))

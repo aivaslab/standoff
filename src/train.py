@@ -71,10 +71,10 @@ def main(args):
     end_at = min(args.end_at, len(ScenarioConfigs.env_groups[args.env_group]))
     if args.reverse_order:
         for name in reversed(ScenarioConfigs.env_groups[args.env_group]):
-            envs.append(f"Standoff-{name}")
+            envs.append(f"{name}")
     else:
         for name in ScenarioConfigs.env_groups[args.env_group][args.start_at:end_at]:
-            envs.append(f"Standoff-{name}")
+            envs.append(f"{name}")
     log_dir = args.log_dir
     os.makedirs(log_dir, exist_ok=True)
     timesteps = args.timesteps
@@ -113,19 +113,19 @@ def main(args):
             if hasattr(args, var_name):
                 setattr(args, var_name, value)
 
-            env_name = env_name_temp + '-' + str(size) + '-' + style + '-' + str(difficulty) + '-v0'
+            env_name = f"Standoff-{env_name_temp}-{str(size)}-{style}-{str(difficulty)}-v0"
             savePath3 = os.path.join(savePath2, env_name + name)
             if not os.path.exists(savePath3):
                 os.mkdir(savePath3)
 
             if continuing:
-                model_class, size, style, frames, vecNormalize, difficulty, threads = get_json_params(
+                model_class, size, style, frames, vecNormalize, difficulty, threads, _ = get_json_params(
                     os.path.join(savePath3, 'json_data.json'))
                 # note that continuing will overwrite these things! It does not implement continuing under different conditions for curriculae
             else:
                 with open(os.path.join(savePath3, 'json_data.json'), 'w') as json_file:
                     json.dump({'model_class': model_class.__name__, 'size': size, 'frames': frames, 'style': style,
-                               'vecNormalize': vecNormalize, 'difficulty': difficulty, 'threads': threads}, json_file)
+                               'vecNormalize': vecNormalize, 'difficulty': difficulty, 'threads': threads, 'configName': env_name_temp}, json_file)
             print('model_class: ', model_class.__name__, 'size: ', size, 'style: ', style, 'frames: ', frames,
                   'vecNormalize: ', vecNormalize)
 
