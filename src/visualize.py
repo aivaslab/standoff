@@ -285,14 +285,16 @@ def main(args):
                         help='Size of evaluation window.')
     parser.add_argument('--plotting', action='store_true', default=False,
                         help='Enable plotting of evaluation data.')
-    parser.add_argument('--env_rand', type=str, choices=['rand', 'det'], default='rand', help='environment randomness')
-    parser.add_argument('--model_rand', type=str, choices=['rand', 'det'], default='rand', help='model randomness')
+    parser.add_argument('--det_env', action='store_true', help='Deterministic environment')
+    parser.add_argument('--det_model', action='store_true', help='Deterministic model')
     parser.add_argument('--gtr', action='store_true', help='whether to plot gtr')
     parser.add_argument('--matrix', action='store_true', help='whether to plot transfer matrix')
     parser.add_argument('--tsne', action='store_true', help='whether to plot transfer matrix')
     args = parser.parse_args(args)
 
-    prefix = 'gtr' if args.gtr else args.env_rand + "_" + args.model_rand
+    env_rand = 'det' if args.det_env else 'rand'
+    model_rand = 'det' if args.det_model else 'rand'
+    prefix = 'gtr' if args.gtr else env_rand + "_" + model_rand
 
     if args.matrix or args.tsne:
         make_transfer_matrix_new(
