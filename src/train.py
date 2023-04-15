@@ -125,7 +125,7 @@ def main(args):
             else:
                 with open(os.path.join(savePath3, 'json_data.json'), 'w') as json_file:
                     json.dump({'model_class': model_class.__name__, 'size': size, 'frames': frames, 'style': style,
-                               'vecNormalize': vecNormalize, 'difficulty': difficulty}, json_file)
+                               'vecNormalize': vecNormalize, 'difficulty': difficulty, 'threads': threads}, json_file)
             print('model_class: ', model_class.__name__, 'size: ', size, 'style: ', style, 'frames: ', frames,
                   'vecNormalize: ', vecNormalize)
 
