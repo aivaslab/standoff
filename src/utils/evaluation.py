@@ -69,7 +69,7 @@ def collect_rollouts(env, model, model_episode,
         # deterministic env breaks this for some reason.
         obs = env.reset()
         lstm_states = None
-        episode_starts = np.ones((1,))
+        episode_starts = np.ones((num_threads,))
         episode_timesteps = [0] * num_threads
         active_envs = set(range(num_threads))
         
