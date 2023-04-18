@@ -51,14 +51,16 @@ def collect_rollouts(env, model, model_episode,
                      deterministic_env: bool = False,
                      deterministic_model: bool = False,
                      max_timesteps: int = 50,
-                     tqdm=None, configName=''):
+                     tqdm=None, configName: str = ''):
     #normalizer_env = env
     #unwrapped_envs = [x.par_env.unwrapped for x in env.unwrapped.vec_envs]
     #configName = #unwrapped_envs[0].configName
     #print(env.unwrapped.__dict__)
     #using_pipe = env.unwrapped.pipes
+    #env = Log(env)
     num_threads = len(env.unwrapped.pipes)
     all_infos = []
+    #tracemalloc.start()
     for episode in range(episodes // num_threads):
         # code to change seed here. can't use unwrapped.
         if deterministic_env:
@@ -67,6 +69,9 @@ def collect_rollouts(env, model, model_episode,
                 pipe.send(("set_attr", "deterministic", True))
         
         # deterministic env breaks this for some reason.
+        #snapshot = tracemalloc.take_snapshot()
+        #for stat in snapshot.statistics('lineno')[:10]:
+        #    print('x', stat)
         obs = env.reset()
         lstm_states = None
         episode_starts = np.ones((num_threads,))
@@ -102,8 +107,10 @@ def collect_rollouts(env, model, model_episode,
             infos['model_ep'] = model_episode
             infos['episode_timesteps'] = episode_timesteps[thread]
             infos['terminal_observation'] = 0 # overwrite huge thing
-            infos['epsisode'] = 0 # is a dict {r, l, t}
+            infos['episode'] = 0 # is a dict {r, l, t}
             all_infos.append(_process_info(infos))
+            del infos
+        del info
         tqdm.update(num_threads)
 
     return all_infos
