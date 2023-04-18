@@ -35,6 +35,7 @@ def plot_results(log_folder, title='Learning Curve'):
     plt.ylabel('Rewards')
     plt.title(title + " Smoothed")
     plt.show()
+    plt.close()
 
 
 def plot_split(indexer, df, mypath, title, window, values=None, use_std=True):
@@ -159,6 +160,7 @@ def plot_train(log_folder, window=1000):
                 if not os.path.exists(os.path.join(log_folder, 'figures')):
                     os.mkdir(os.path.join(log_folder, 'figures'))
                 plt.savefig(os.path.join(log_folder, 'figures', title + "-" + 'lcurve' + '.png'))
+            plt.close()
 
 def plot_results2(log_folder, policynames, modelnames, repetitions, env_name, title='Learning Curve', window=50):
     """
@@ -196,6 +198,7 @@ def plot_results2(log_folder, policynames, modelnames, repetitions, env_name, ti
     plt.title(title + " Smoothed, mean of " + str(repetitions))
     plt.legend()
     plt.show()
+    plt.close()
 
 
 
