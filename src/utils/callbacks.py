@@ -7,10 +7,10 @@ import os
 import pandas as pd
 import time
 
-def make_callbacks(save_path, env, batch_size, tqdm_steps, record_every, model, repetition=0, starting_timesteps=0, threads=1, learning_rate=1):
+def make_callbacks(save_path, env, batch_size, tqdm_steps, record_every, model, repetition=0, starting_timesteps=0, threads=1, learning_rate=1, args_string=''):
     # this cb updates the minibatch variable in the environment
     train_cb = TrainUpdateCallback(envs=[env, ], batch_size=batch_size, logpath=save_path, params=str(locals()),
-                                   model=model, num_vec_envs=threads)
+                                   model=model, num_vec_envs=threads, args_string=args_string)
 
     tqdm_cb = EveryNTimesteps(n_steps=tqdm_steps, callback=TqdmCallback(record_every=tqdm_steps))
 
@@ -31,7 +31,7 @@ def make_callbacks(save_path, env, batch_size, tqdm_steps, record_every, model, 
 
 class TrainUpdateCallback(BaseCallback):
 
-    def __init__(self, envs, batch_size, logpath, params, model, num_vec_envs=1):
+    def __init__(self, envs, batch_size, logpath, params, model, num_vec_envs=1, args_string=''):
         super().__init__()
         self.envs = envs
         self.batch_size = batch_size
@@ -40,10 +40,13 @@ class TrainUpdateCallback(BaseCallback):
         self.params = params
         self.model = model
         self.num_vec_envs = num_vec_envs
+        self.args_string = args_string
 
     def _on_training_start(self):
         with open(self.logPath, 'a') as logfile:
             logfile.write(self.params)
+            logfile.write("\n")
+            logfile.write(self.args_string)
             logfile.write("\n")
             logfile.write(str(self.model.policy))
             logfile.write("\n")
