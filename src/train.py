@@ -164,7 +164,7 @@ def main(args):
                                             batch_size=batch_size,
                                             policy_kwargs=policy_kwargs)
                 callback = make_callbacks(savePath3, env, batch_size, tqdm_steps, recordEvery, model,
-                                          repetition=repetition, threads=threads)
+                                          repetition=repetition, threads=threads, learning_rate=rate)
 
                 print(env_name, model_class, name, savePath3, str(timedelta(seconds=time.time() - start)), policy_kwargs)
                 model.learn(total_timesteps=timesteps*threads, callback=callback)

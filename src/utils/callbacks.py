@@ -5,8 +5,9 @@ from tqdm import tqdm
 from pettingzoo.utils.conversions import aec_to_parallel, parallel_to_aec
 import os
 import pandas as pd
+import time
 
-def make_callbacks(save_path, env, batch_size, tqdm_steps, record_every, model, repetition=0, starting_timesteps=0, threads=1):
+def make_callbacks(save_path, env, batch_size, tqdm_steps, record_every, model, repetition=0, starting_timesteps=0, threads=1, learning_rate=1):
     # this cb updates the minibatch variable in the environment
     train_cb = TrainUpdateCallback(envs=[env, ], batch_size=batch_size, logpath=save_path, params=str(locals()),
                                    model=model, num_vec_envs=threads)
@@ -45,6 +46,10 @@ class TrainUpdateCallback(BaseCallback):
             logfile.write(self.params)
             logfile.write("\n")
             logfile.write(str(self.model.policy))
+            logfile.write("\n")
+            # start timing
+            self.start_time = time.time()
+            logfile.write('started training at time', self.start_time)
 
     def _on_rollout_end(self):
         # triggered before updating the policy
@@ -64,7 +69,10 @@ class TrainUpdateCallback(BaseCallback):
 
     def _on_training_end(self):
         with open(self.logPath, 'a') as logfile:
-            logfile.write('finished training')
+            self.end_time = time.time()
+            logfile.write('finished training at time', self.end_time, "\n")
+            logfile.write('total time elapsed', self.end_time - self.start_time)
+
 
     def _on_step(self):
         return True
