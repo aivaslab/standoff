@@ -227,18 +227,25 @@ def load_checkpoint_models(path, model_class):
     all_models = []
     all_lengths = []
     repetition_names = []
+    norm_paths = []
     paths = os.scandir(full_path)
     # check if any paths are named 'rep_' followed by a number. if so, index into each and load from each
     if any([pathx.name.startswith('rep_') for pathx in paths]):
         for new_path in os.scandir(full_path):
             for checkpoint_path in os.scandir(new_path.path):
-                all_models.append(model_class.load(checkpoint_path.path))
-                all_lengths.append(int(checkpoint_path.path[checkpoint_path.path.find("model_") + 6:checkpoint_path.path.find("_steps.zip")]))
-                repetition_names.append(new_path.name)
+                if "model" in checkpoint_path.path:
+                    all_models.append(model_class.load(checkpoint_path.path))
+                    all_lengths.append(int(checkpoint_path.path[checkpoint_path.path.find("model_") + 6:checkpoint_path.path.find("_steps.zip")]))
+                    repetition_names.append(new_path.name)
+                elif "norm" in checkpoint_path.path:
+                    norm_paths.append(checkpoint_path.path)
     else:
         # otherwise, just load from the main folder
         for checkpoint_path in os.scandir(full_path):
-            all_models.append( model_class.load(checkpoint_path.path) )
-            all_lengths.append(int(checkpoint_path.path[checkpoint_path.path.find("model_")+6:checkpoint_path.path.find("_steps.zip")]))
-            repetition_names.append('rep_0')
+            if "model" in checkpoint_path.path:
+                all_models.append( model_class.load(checkpoint_path.path) )
+                all_lengths.append(int(checkpoint_path.path[checkpoint_path.path.find("model_")+6:checkpoint_path.path.find("_steps.zip")]))
+                repetition_names.append('rep_0')
+            elif "norm" in checkpoint_path.path:
+                norm_paths.append(checkpoint_path.path)
     return all_models, all_lengths, repetition_names

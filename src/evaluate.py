@@ -15,14 +15,14 @@ from sb3_contrib import TRPO, RecurrentPPO
 class_dict = {'PPO': PPO, 'A2C': A2C, 'TRPO': TRPO, 'RecurrentPPO': RecurrentPPO}
 
 
-def make_videos(train_dir, env_names, short_names, model, model_timestep, size, env_kwargs):
+def make_videos(train_dir, env_names, short_names, model, model_timestep, size, norm_path, env_kwargs):
     vidPath = os.path.join(train_dir, 'videos')
     if not os.path.exists(vidPath):
         os.mkdir(vidPath)
 
     for k, (short_name, env_name) in enumerate(zip(short_names, env_names)):
         env_kwargs["threads"] = 1
-        eval_env = make_env_comp(env_name, rank=k+1, **env_kwargs)
+        eval_env = make_env_comp(env_name, rank=k+1, load_path=norm_path, **env_kwargs)
         vidPath2 = os.path.join(vidPath, env_name)
         if not os.path.exists(vidPath2):
             os.mkdir(vidPath2)
@@ -33,7 +33,7 @@ def make_videos(train_dir, env_names, short_names, model, model_timestep, size, 
         make_pic_video(model, eval_env, random_policy=True, savePath=vidPath2, deterministic=True, vidName='det_'+str(model_timestep)+'.gif', obs_size=size)
 
 
-def evaluate_models(eval_env_names, short_names, models, model_timesteps, det_env, det_model, use_gtr, frames, episodes, train_dir, env_kwargs):
+def evaluate_models(eval_env_names, short_names, models, model_timesteps, det_env, det_model, use_gtr, frames, episodes, train_dir, norm_paths, env_kwargs):
     eval_data = pd.DataFrame()
 
     prefix = 'gtr' if use_gtr else 'det' if det_env else 'rand'
@@ -41,11 +41,11 @@ def evaluate_models(eval_env_names, short_names, models, model_timesteps, det_en
         prefix += '_det' if det_model else '_rand'
 
     progress_bar = tqdm(total=len(models)*len(eval_env_names)*episodes)
-    
-    for k, (short_name, eval_env_name) in enumerate(zip(short_names, eval_env_names)):
 
-        eval_env = make_env_comp(eval_env_name, rank=k+1, **env_kwargs)
-        for model, model_timestep in zip(models, model_timesteps):
+    for model, model_timestep, norm_path in zip(models, model_timesteps, norm_paths):
+        for k, (short_name, eval_env_name) in enumerate(zip(short_names, eval_env_names)):
+
+            eval_env = make_env_comp(eval_env_name, rank=k+1, load_path=norm_path, **env_kwargs)
 
             if use_gtr:
                 eval_data_temp = ground_truth_evals(eval_env, model, memory=frames, repetitions=episodes)
@@ -67,7 +67,7 @@ def evaluate_models(eval_env_names, short_names, models, model_timesteps, det_en
             with open(pathy, 'wb'):
                 eval_data.to_csv(pathy, index=False)
                 
-        del eval_env
+            del eval_env
                 
             
 
@@ -93,12 +93,13 @@ def main(args):
     train_dirs = [f.path for f in os.scandir(path) if f.is_dir()]
     episodes = args.episodes
 
+
     renamed_envs = False
     env_names = []
     for train_dir in train_dirs:
         print('new train_dir', train_dir)
         model_class, size, style, frames, vecNormalize, difficulty, threads, configName = get_json_params(os.path.join(train_dir, 'json_data.json'))
-        models, model_timesteps, repetition_names = load_checkpoint_models(train_dir, model_class)
+        models, model_timesteps, repetition_names, norm_paths = load_checkpoint_models(train_dir, model_class)
 
         if not renamed_envs:
             for k, env_name in enumerate(configNames):
@@ -109,9 +110,9 @@ def main(args):
 
         if args.make_evals:
             evaluate_models(env_names, short_names, models, model_timesteps, det_env=args.det_env, det_model=args.det_model, use_gtr=args.use_gtr,
-                            frames=frames, episodes=episodes, train_dir=train_dir, env_kwargs=env_kwargs)
+                            frames=frames, episodes=episodes, train_dir=train_dir, norm_paths=norm_paths, env_kwargs=env_kwargs)
         if args.make_vids:
-            make_videos(train_dir, env_names, short_names, models[-1], model_timesteps[-1], size, env_kwargs=env_kwargs)
+            make_videos(train_dir, env_names, short_names, models[-1], model_timesteps[-1], size, norm_path=norm_paths[-1], env_kwargs=env_kwargs)
                         
 
 if __name__ == '__main__':
