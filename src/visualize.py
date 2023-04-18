@@ -187,14 +187,20 @@ def make_eval_figures(path, figures_path, window=1, prefix=''):
 
             # normalize certain values after all the filtering
 
+            new_rows_big = rows_big.copy()
+            new_rows_small = rows_small.copy()
+
             for val in ['r', 'episode_timesteps']:
-                for rows in [rows_big, rows_small]:
-                    rows.loc[:, f"normed_{val}_mean"] = \
+                for rows, new_rows in [(rows_big, new_rows_big), (rows_small, new_rows_small)]:
+                    new_rows[f"normed_{val}_mean"] = \
                         (rows[f"{val}_mean"] - rows[f"{val}_mean"].min()) \
                         / (rows[f"{val}_mean"].max() - rows[f"{val}_mean"].min())
-                    rows.loc[:, f"normed_{val}_std"] = \
+                    new_rows[f"normed_{val}_std"] = \
                         (rows[f"{val}_std"]) / \
                         (rows[f"{val}_mean"].max() - rows[f"{val}_mean"].min())
+
+            rows_big = new_rows_big
+            rows_small = new_rows_small
 
             plot_merged(indexer='model_ep', df=rows_small, mypath=extended_path, title=title + 'validAccuracy',
                         window=window,
