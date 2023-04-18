@@ -244,7 +244,8 @@ class StandoffEnv(para_MultiGridEnv):
                 self.released_tiles[3] += [(box * 2 + 2, self.height - startRoom - atrium - 1)]
 
             for j in range(lava_height):
-                self.put_obj(GlassBlock(color="cyan", init_state=1), box * 2 + 1, j + startRoom + atrium + 1)
+                #self.put_obj(GlassBlock(color="cyan", init_state=1), box * 2 + 1, j + startRoom + atrium + 1)
+                self.put_obj(Wall(), box * 2 + 1, j + startRoom + atrium + 1)
 
         self.reset_vision()
 
