@@ -116,14 +116,15 @@ def process_csv(path, gtr=False):
             print('small df had no good samples... using big in lieu')
             df_small = df
 
-        df_small.loc[:, "avoidedBig"] = (df_small["selectedSmall"].astype(bool) | \
-                df_small["selectedNeither"].astype(bool))
-        df_small.loc[:, "avoidedSmall"] = (df_small["selectedBig"].astype(bool) | \
-                        df_small["selectedNeither"].astype(bool))
-        df_small.loc[:, "avoidCorrect"] = ((df_small["avoidedBig"] ==  \
-                        df_small["shouldAvoidBig"].astype(bool)) | \
-                        (df_small["avoidedSmall"] == df_small["shouldAvoidSmall"].astype(bool)))
+        # avoid SettingWithCopy warning
+        new_df = df_small.copy()
 
+        new_df["avoidedBig"] = (new_df["selectedSmall"].astype(bool) | new_df["selectedNeither"].astype(bool))
+        new_df["avoidedSmall"] = (new_df["selectedBig"].astype(bool) | new_df["selectedNeither"].astype(bool))
+        new_df["avoidCorrect"] = ((new_df["avoidedBig"] == new_df["shouldAvoidBig"].astype(bool)) |
+                                  (new_df["avoidedSmall"] == new_df["shouldAvoidSmall"].astype(bool)))
+
+        df_small = new_df
 
 
 
