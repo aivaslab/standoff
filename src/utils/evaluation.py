@@ -248,4 +248,4 @@ def load_checkpoint_models(path, model_class):
                 repetition_names.append('rep_0')
             else:
                 norm_paths.append(checkpoint_path.path)
-    return all_models, all_lengths, repetition_names
+    return all_models, all_lengths, repetition_names, norm_paths
