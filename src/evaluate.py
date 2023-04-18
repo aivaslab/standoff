@@ -15,12 +15,12 @@ from sb3_contrib import TRPO, RecurrentPPO
 class_dict = {'PPO': PPO, 'A2C': A2C, 'TRPO': TRPO, 'RecurrentPPO': RecurrentPPO}
 
 
-def make_videos(train_dir, env_names, model, model_timestep, size, env_kwargs):
+def make_videos(train_dir, env_names, short_names, model, model_timestep, size, env_kwargs):
     vidPath = os.path.join(train_dir, 'videos')
     if not os.path.exists(vidPath):
         os.mkdir(vidPath)
 
-    for k, env_name in enumerate(env_names):
+    for k, (short_name, env_name) in enumerate(zip(short_names, env_names)):
         env_kwargs["threads"] = 1
         eval_env = make_env_comp(env_name, rank=k+1, **env_kwargs)
         vidPath2 = os.path.join(vidPath, env_name)
@@ -33,7 +33,7 @@ def make_videos(train_dir, env_names, model, model_timestep, size, env_kwargs):
         make_pic_video(model, eval_env, random_policy=True, savePath=vidPath2, deterministic=True, vidName='det_'+str(model_timestep)+'.gif', obs_size=size)
 
 
-def evaluate_models(eval_env_names, models, model_timesteps, det_env, det_model, use_gtr, frames, episodes, train_dir, configName, env_kwargs):
+def evaluate_models(eval_env_names, short_names, models, model_timesteps, det_env, det_model, use_gtr, frames, episodes, train_dir, env_kwargs):
     eval_data = pd.DataFrame()
 
     prefix = 'gtr' if use_gtr else 'det' if det_env else 'rand'
@@ -42,7 +42,7 @@ def evaluate_models(eval_env_names, models, model_timesteps, det_env, det_model,
 
     progress_bar = tqdm(total=len(models)*len(eval_env_names)*episodes)
     
-    for k, eval_env_name in enumerate(eval_env_names):
+    for k, (short_name, eval_env_name) in enumerate(zip(short_names, eval_env_names)):
 
         eval_env = make_env_comp(eval_env_name, rank=k+1, **env_kwargs)
         for model, model_timestep in zip(models, model_timesteps):
@@ -55,7 +55,7 @@ def evaluate_models(eval_env_names, models, model_timesteps, det_env, det_model,
                 eval_data = eval_data.append(
                     collect_rollouts(eval_env, model, model_episode=model_timestep, episodes=episodes,
                                      memory=frames, deterministic_env=det_env, deterministic_model=det_model,
-                                     tqdm=progress_bar, configName=configName))
+                                     tqdm=progress_bar, configName=short_name))
             #del model
 
             # save all data
@@ -84,10 +84,11 @@ def main(args):
     parser.add_argument('--make_evals', action='store_true', help='Make eval csvs')
     args = parser.parse_args(args)
 
-    envs = []
+    configNames = []
+    short_names = []
     for name in ScenarioConfigs.env_groups[args.env_group]:
-        envs.append(f'Standoff-{name}-')
-    configNames = envs
+        configNames.append(f'Standoff-{name}-')
+        short_names.append(name)
     path = args.path
     train_dirs = [f.path for f in os.scandir(path) if f.is_dir()]
     episodes = args.episodes
@@ -107,10 +108,10 @@ def main(args):
         env_kwargs = {"size": size, "style": style, "threads": threads, "frames": frames, "monitor_path": train_dir, "vecNormalize": vecNormalize}
 
         if args.make_evals:
-            evaluate_models(env_names, models, model_timesteps, det_env=args.det_env, det_model=args.det_model, use_gtr=args.use_gtr,
-                            frames=frames, episodes=episodes, train_dir=train_dir, configName=configName, env_kwargs=env_kwargs)
+            evaluate_models(env_names, short_names, models, model_timesteps, det_env=args.det_env, det_model=args.det_model, use_gtr=args.use_gtr,
+                            frames=frames, episodes=episodes, train_dir=train_dir, env_kwargs=env_kwargs)
         if args.make_vids:
-            make_videos(train_dir, env_names, models[-1], model_timesteps[-1], size, env_kwargs=env_kwargs)
+            make_videos(train_dir, env_names, short_names, models[-1], model_timesteps[-1], size, env_kwargs=env_kwargs)
                         
 
 if __name__ == '__main__':
