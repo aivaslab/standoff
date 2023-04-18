@@ -77,6 +77,7 @@ def collect_rollouts(env, model, model_episode,
         episode_starts = np.ones((num_threads,))
         episode_timesteps = [0] * num_threads
         active_envs = set(range(num_threads))
+        all_actions = ['' for _ in range(num_threads)]
         
         for t in range(max_timesteps):
             if not active_envs:
@@ -91,6 +92,10 @@ def collect_rollouts(env, model, model_episode,
             else:
                 action, _ = model.predict(obs, deterministic=deterministic_model)
                 obs, rewards, dones, info = env.step(action)
+            # action is a list of actions for each thread
+            # here we append to all_actions
+            for i in range(num_threads):
+                all_actions[i] += str(action[i])
                 
             completed_envs = []
             for i in active_envs:
@@ -102,12 +107,13 @@ def collect_rollouts(env, model, model_episode,
         for thread in range(num_threads):
             infos = info[thread]
             infos['r'] = rewards[thread]
+            infos['all_actions'] = all_actions[thread]
             infos['configName'] = configName
             infos['eval_ep'] = episode
             infos['model_ep'] = model_episode
             infos['episode_timesteps'] = episode_timesteps[thread]
             infos['terminal_observation'] = 0 # overwrite huge thing
-            infos['episode'] = 0 # is a dict {r, l, t}
+            infos['episode'] = 0 # otherwise contains a dict {r, l, t}
             all_infos.append(_process_info(infos))
             del infos
         del info
