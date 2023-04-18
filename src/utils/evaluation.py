@@ -233,19 +233,19 @@ def load_checkpoint_models(path, model_class):
     if any([pathx.name.startswith('rep_') for pathx in paths]):
         for new_path in os.scandir(full_path):
             for checkpoint_path in os.scandir(new_path.path):
-                if "model" in checkpoint_path.path:
+                if "norm" not in checkpoint_path.path:
                     all_models.append(model_class.load(checkpoint_path.path))
                     all_lengths.append(int(checkpoint_path.path[checkpoint_path.path.find("model_") + 6:checkpoint_path.path.find("_steps.zip")]))
                     repetition_names.append(new_path.name)
-                elif "norm" in checkpoint_path.path:
+                else:
                     norm_paths.append(checkpoint_path.path)
     else:
         # otherwise, just load from the main folder
         for checkpoint_path in os.scandir(full_path):
-            if "model" in checkpoint_path.path:
+            if "norm" not in checkpoint_path.path:
                 all_models.append( model_class.load(checkpoint_path.path) )
                 all_lengths.append(int(checkpoint_path.path[checkpoint_path.path.find("model_")+6:checkpoint_path.path.find("_steps.zip")]))
                 repetition_names.append('rep_0')
-            elif "norm" in checkpoint_path.path:
+            else:
                 norm_paths.append(checkpoint_path.path)
     return all_models, all_lengths, repetition_names
