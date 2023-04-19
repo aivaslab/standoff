@@ -96,6 +96,8 @@ def collect_rollouts(env, model, model_episode,
             # here we append to all_actions
             for i in range(num_threads):
                 all_actions[i] += str(action[i])
+
+            #print('obs0', obs[0], 'action0', action[0], 'reward0', rewards[0], 'done0', dones[0], 'info0', info[0])
                 
             completed_envs = []
             for i in active_envs:
@@ -222,7 +224,7 @@ def ground_truth_evals(eval_env, model, repetitions=25, memory=1, skip_to_releas
     return df
 
 
-def load_checkpoint_models(path, model_class):
+def find_checkpoint_models(path, model_class):
     full_path = os.path.join(path, 'checkpoints')
     all_models = []
     all_lengths = []
@@ -234,7 +236,7 @@ def load_checkpoint_models(path, model_class):
         for new_path in os.scandir(full_path):
             for checkpoint_path in os.scandir(new_path.path):
                 if "norm" not in checkpoint_path.path:
-                    all_models.append(model_class.load(checkpoint_path.path))
+                    all_models.append(checkpoint_path.path)
                     all_lengths.append(int(checkpoint_path.path[checkpoint_path.path.find("model_") + 6:checkpoint_path.path.find("_steps.zip")]))
                     repetition_names.append(new_path.name)
                 else:
@@ -243,9 +245,11 @@ def load_checkpoint_models(path, model_class):
         # otherwise, just load from the main folder
         for checkpoint_path in os.scandir(full_path):
             if "norm" not in checkpoint_path.path:
-                all_models.append( model_class.load(checkpoint_path.path) )
+                all_models.append( checkpoint_path.path)
                 all_lengths.append(int(checkpoint_path.path[checkpoint_path.path.find("model_")+6:checkpoint_path.path.find("_steps.zip")]))
                 repetition_names.append('rep_0')
             else:
                 norm_paths.append(checkpoint_path.path)
+
+    print('norm_paths', norm_paths)
     return all_models, all_lengths, repetition_names, norm_paths
