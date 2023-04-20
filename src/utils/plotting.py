@@ -181,6 +181,7 @@ def plot_train_many(train_paths, window=1000, path=None):
                     plt.plot(df.index, df.yrolling, label=os.path.basename(log_folder))
 
     plt.rcParams["figure.figsize"] = (15, 5)
+    plt.gcf().set_size_inches(15, 5)
     plt.xlabel('Episode')
     plt.ylabel('Reward')
     plt.title('Learning curve')
