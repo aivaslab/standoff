@@ -30,6 +30,7 @@ def get_json_params(path):
 def make_env_comp(env_name, frames=1, vecNormalize=False, size=32, style='rich', monitor_path='dir',
                   rank=-1, threads=1, load_path=None, reduce_color=False, skip_vecNorm=False):
     env = gym.make(env_name)
+    channels = env.channels
     num_cpus = min(threads, os.cpu_count())
 
     if reduce_color:
@@ -38,7 +39,7 @@ def make_env_comp(env_name, frames=1, vecNormalize=False, size=32, style='rich',
         env = ss.resize_v0(env, x_size=size, y_size=size)
     if reduce_color:
         env = ss.reshape_v0(env, (size, size, 1))
-    env = ss.reshape_v0(env, (env.channels, size, size))
+    env = ss.reshape_v0(env, (channels, size, size))
     env = ss.pettingzoo_env_to_vec_env_v1(env)
     env = ss.concat_vec_envs_v1(env, threads, num_cpus=num_cpus, base_class='stable_baselines3')
 
