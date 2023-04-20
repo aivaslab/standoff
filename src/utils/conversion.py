@@ -76,6 +76,7 @@ def wrap_env_full(env, reduce_color=False, memory=1, size=32, vecMonitor=False,
             env = VecMonitor(env, filename=f"{configName}-{rank}", info_keywords=env.info_keywords)
     if load_path:
         env = VecNormalize.load(load_path, env)
+        print('loaded vec normalize', load_path)
         env.training = False
         env.norm_reward = False
     else:
