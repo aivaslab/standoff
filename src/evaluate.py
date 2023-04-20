@@ -1,6 +1,5 @@
 import os
 import argparse
-import json
 import pandas as pd
 from tqdm import tqdm
 
@@ -11,6 +10,7 @@ from src.utils.display import make_pic_video
 from src.utils.evaluation import collect_rollouts, ground_truth_evals, find_checkpoint_models
 from stable_baselines3 import PPO, A2C
 from sb3_contrib import TRPO, RecurrentPPO
+from stable_baselines3.common.vec_env import VecNormalize
 
 class_dict = {'PPO': PPO, 'A2C': A2C, 'TRPO': TRPO, 'RecurrentPPO': RecurrentPPO}
 
@@ -45,12 +45,11 @@ def evaluate_models(eval_env_names, short_names, models, model_class, model_time
 
     progress_bar = tqdm(total=len(models)*len(eval_env_names)*episodes)
 
-    for model, model_timestep, norm_path in zip(models, model_timesteps, norm_paths):
-        model = model_class.load(model, env=None)
-        for k, (short_name, eval_env_name) in enumerate(zip(short_names, eval_env_names)):
-
-            eval_env = make_env_comp(eval_env_name, rank=k+1, load_path=norm_path, **env_kwargs)
-            model.set_env(eval_env)
+    for k, (short_name, eval_env_name) in enumerate(zip(short_names, eval_env_names)):
+        env = make_env_comp(eval_env_name, rank=k+1, skip_vecNorm=True, **env_kwargs)
+        for model_name, model_timestep, norm_path in zip(models, model_timesteps, norm_paths):
+            eval_env = VecNormalize.load(norm_path, env)
+            model = model_class.load(model_name, env=eval_env)
 
             if use_gtr:
                 eval_data_temp = ground_truth_evals(eval_env, model, memory=frames, repetitions=episodes)
@@ -72,8 +71,9 @@ def evaluate_models(eval_env_names, short_names, models, model_class, model_time
             with open(pathy, 'wb'):
                 eval_data.to_csv(pathy, index=False)
                 
+            del model
             del eval_env
-        del model
+        del env
                 
             
 
