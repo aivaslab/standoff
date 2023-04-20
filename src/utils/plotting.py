@@ -165,7 +165,7 @@ def plot_train(log_folder, window=1000):
             plt.close()
 
 
-def plot_train_many(train_paths, window=1000):
+def plot_train_many(train_paths, window=1000, path=None):
     plt.figure()
     for log_folder in train_paths:
         monitor_files = get_monitor_files(log_folder)
@@ -186,7 +186,7 @@ def plot_train_many(train_paths, window=1000):
     plt.title('Learning curve')
     plt.tight_layout()
     plt.legend()
-    plt.savefig(os.path.join(train_paths, 'all_trains' + '.png'))
+    plt.savefig(os.path.join(path, 'all_trains' + '.png'))
     plt.close()
 
 
