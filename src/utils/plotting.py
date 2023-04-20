@@ -6,6 +6,7 @@ import pandas as pd
 import json
 from stable_baselines3.common.monitor import get_monitor_files
 
+
 def moving_average(values, window):
     """
     Smooth values by doing a moving average
@@ -70,7 +71,8 @@ def plot_merged(indexer, df, mypath, title, window, values=None,
 
     colors = ['green', 'blue', 'orange', 'red', 'purple', 'brown', 'pink', 'gray', 'olive', 'cyan']
     if stacked_bar:
-        bar_width = (max(df[indexer]) - min(df[indexer])) / (2 * len(df['selectedBig_mean']) + 1) #(len(df['selectedBig_mean']) * 2 + 1
+        bar_width = (max(df[indexer]) - min(df[indexer])) / (
+                    2 * len(df['selectedBig_mean']) + 1)  # (len(df['selectedBig_mean']) * 2 + 1
         values_mean = [df[value + "_mean"] for value in values]
         plt.bar(df[indexer], values_mean[0], label=labels[0], width=bar_width, color=colors[0])
         for i in range(1, len(values)):
@@ -162,6 +164,32 @@ def plot_train(log_folder, window=1000):
                 plt.savefig(os.path.join(log_folder, 'figures', title + "-" + 'lcurve' + '.png'))
             plt.close()
 
+
+def plot_train_many(train_paths, window=1000):
+    plt.figure()
+    for log_folder in train_paths:
+        monitor_files = get_monitor_files(log_folder)
+
+        for file_name in monitor_files:
+            with open(file_name) as file_handler:
+                first_line = file_handler.readline()
+                assert first_line[0] == "#", print(first_line)
+                df = pd.read_csv(file_handler, index_col=None, on_bad_lines='skip')  # , usecols=cols)
+                if len(df):
+                    df['index_col'] = df.index
+                    df['yrolling'] = df['r'].rolling(window=window).mean()
+                    plt.plot(df.index, df.yrolling, label=log_folder)
+
+    plt.rcParams["figure.figsize"] = (10, 5)
+    plt.xlabel('Episode')
+    plt.ylabel('Reward')
+    plt.title('Learning curve')
+    plt.tight_layout()
+    plt.legend()
+    plt.savefig(os.path.join(train_paths, 'all_trains' + '.png'))
+    plt.close()
+
+
 def plot_results2(log_folder, policynames, modelnames, repetitions, env_name, title='Learning Curve', window=50):
     """
     plot the results
@@ -181,18 +209,18 @@ def plot_results2(log_folder, policynames, modelnames, repetitions, env_name, ti
                 y.append(list(y0))
 
             flatx = [item for sub in x for item in sub]
-            maxx = max(flatx) # maxx is a numpy float64, convert to int:
+            maxx = max(flatx)  # maxx is a numpy float64, convert to int:
 
             mean_x_axis = [i for i in range(int(maxx))]
             ys_interp = [np.interp(mean_x_axis, x[i], y[i]) for i in range(len(x))]
             mean_y_axis = np.mean(ys_interp, axis=0)
 
-            #y = np.asarray(y).astype(float)
-            mean_y_axis = moving_average(mean_y_axis, window=window*repetitions)
-            #print('results', x, y)
+            # y = np.asarray(y).astype(float)
+            mean_y_axis = moving_average(mean_y_axis, window=window * repetitions)
+            # print('results', x, y)
             mean_x_axis = mean_x_axis[len(mean_x_axis) - len(mean_y_axis):]
-            plt.plot(mean_x_axis, mean_y_axis, label= str(modelname)[26:29]+str(policyname)[0:5])
-            
+            plt.plot(mean_x_axis, mean_y_axis, label=str(modelname)[26:29] + str(policyname)[0:5])
+
     plt.xlabel('Timesteps (window=' + str(window) + ')')
     plt.ylabel('Rewards')
     plt.title(title + " Smoothed, mean of " + str(repetitions))
@@ -201,4 +229,34 @@ def plot_results2(log_folder, policynames, modelnames, repetitions, env_name, ti
     plt.close()
 
 
+def plot_transfer_matrix(matrix_data, row_names, col_names, output_file):
+    fig, ax = plt.subplots()
+    ax.set_xticks(range(len(col_names)))
+    ax.set_xticklabels(col_names)
+    ax.set_yticks(range(len(row_names)))
+    ax.set_yticklabels(row_names)
 
+    plt.tick_params(axis='x', rotation=90)
+    ax.imshow(matrix_data, cmap=plt.cm.Blues, aspect='auto')
+
+    for i in range(len(row_names)):
+        for j in range(len(col_names)):
+            ax.text(j, i, str(round(matrix_data[i][j] * 100) / 100), va='center', ha='center')
+
+    plt.tight_layout()
+    plt.savefig(output_file)
+
+
+def plot_tsne(data, labels, index, color):
+    print(index)
+    # sorted_indices = sorted(indices, key=lambda i: int(labels[i].replace(train_name, '')))
+    # sorted_data = data[sorted_indices]
+    all_sizes = [int(x[:-1]) for x in labels[index[0]:index[1]]]
+    max_size = max(all_sizes)
+    all_sizes = [50 * x / max_size for x in all_sizes]
+    plt.plot(data[index[0]:index[1], 0], data[index[0]:index[1], 1], marker=None, label=index[2], c=color)
+    plt.scatter(data[index[0]:index[1], 0], data[index[0]:index[1], 1], marker='o', label=index[2], s=all_sizes,
+                c=color)
+
+    # for i, name in enumerate(labels[index[0]:index[1]]):
+    #    plt.annotate(name, (data[i + index[0], 0], data[i + index[0], 1]), textcoords="offset points", xytext=(-10, 5), ha='center')

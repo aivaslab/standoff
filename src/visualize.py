@@ -9,43 +9,12 @@ import umap
 import matplotlib.pylab as pl
 
 from src.utils.display import process_csv, get_transfer_matrix_row
-from src.utils.plotting import plot_merged, plot_selection, plot_split, plot_train
+from src.utils.plotting import plot_merged, plot_selection, plot_split, plot_train, plot_transfer_matrix, plot_tsne, plot_train_many
 
 from matplotlib import pyplot as plt
 import matplotlib.patches as patches
 
 
-def plot_transfer_matrix(matrix_data, row_names, col_names, output_file):
-    fig, ax = plt.subplots()
-    ax.set_xticks(range(len(col_names)))
-    ax.set_xticklabels(col_names)
-    ax.set_yticks(range(len(row_names)))
-    ax.set_yticklabels(row_names)
-
-    plt.tick_params(axis='x', rotation=90)
-    ax.imshow(matrix_data, cmap=plt.cm.Blues, aspect='auto')
-
-    for i in range(len(row_names)):
-        for j in range(len(col_names)):
-            ax.text(j, i, str(round(matrix_data[i][j] * 100) / 100), va='center', ha='center')
-
-    plt.tight_layout()
-    plt.savefig(output_file)
-
-
-def plot_tsne(data, labels, index, color):
-    print(index)
-    # sorted_indices = sorted(indices, key=lambda i: int(labels[i].replace(train_name, '')))
-    # sorted_data = data[sorted_indices]
-    all_sizes = [int(x[:-1]) for x in labels[index[0]:index[1]]]
-    max_size = max(all_sizes)
-    all_sizes = [50 * x / max_size for x in all_sizes]
-    plt.plot(data[index[0]:index[1], 0], data[index[0]:index[1], 1], marker=None, label=index[2], c=color)
-    plt.scatter(data[index[0]:index[1], 0], data[index[0]:index[1], 1], marker='o', label=index[2], s=all_sizes,
-                c=color)
-
-    # for i, name in enumerate(labels[index[0]:index[1]]):
-    #    plt.annotate(name, (data[i + index[0], 0], data[i + index[0], 1]), textcoords="offset points", xytext=(-10, 5), ha='center')  
 
 
 def get_matrix_data(paths, only_last=False, metric='accuracy_mean', prefix='rand_rand', ordering=None,
@@ -312,9 +281,10 @@ def main(args):
     else:
 
         train_paths = [os.path.join(f.path) for f in os.scandir(args.path) if f.is_dir()]
+        plot_train_many(train_paths, window=args.window)
 
         for k, train_path in enumerate(train_paths):
-            plot_train(train_path)
+            plot_train(train_path, window=args.window)
 
             train_path = os.path.join(train_path, 'evaluations')
 
