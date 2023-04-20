@@ -30,7 +30,8 @@ def get_json_params(path):
 def make_env_comp(env_name, frames=1, vecNormalize=False, size=32, style='rich', monitor_path='dir',
                   rank=-1, threads=1, load_path=None, reduce_color=False, skip_vecNorm=False):
     env = gym.make(env_name)
-    print(env.__dict__.keys())
+    #print(env.__dict__.keys()) #yields env, _action_space, _observation_space, _reward_range, _metadata, _has_reset
+    env = env.env #this line feels silly?
     channels = env.channels
     num_cpus = min(threads, os.cpu_count())
 
