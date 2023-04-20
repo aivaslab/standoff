@@ -185,7 +185,7 @@ def plot_train_many(train_paths, window=1000, path=None):
     plt.ylabel('Reward')
     plt.title('Learning curve')
     plt.tight_layout()
-    plt.legend()
+    plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
     plt.savefig(os.path.join(path, 'all_trains' + '.png'))
     plt.close()
 
