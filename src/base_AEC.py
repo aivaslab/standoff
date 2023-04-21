@@ -447,6 +447,7 @@ class para_MultiGridEnv(ParallelEnv):
 
         These attributes should not be changed after initialization.
         """
+        self.max_steps_real = None
         self.only_highlight_treats = False
         self.gaze_highlighting = gaze_highlighting
         self.persistent_gaze_highlighting = persistent_gaze_highlighting
@@ -686,7 +687,7 @@ class para_MultiGridEnv(ParallelEnv):
                         print('exception', e)
                         traceback.print_exc()
                     pass'''
-        self.max_steps_real = min(self.max_steps, last_timer + 6)
+        self.max_steps_real = min(self.max_steps, last_timer + 16)
 
         for k, agent in enumerate(self.agent_and_puppet_instances()):
             if agent.spawn_delay == 0:
