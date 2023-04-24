@@ -218,7 +218,7 @@ class StandoffEnv(para_MultiGridEnv):
         for box in range(boxes + 1):
             if box < boxes:
                 self.put_obj(Wall(), box * 2 + 1, startRoom - 1)
-                xx_spawn = box * 2 + 2 + self.odd_spawns
+                xx_spawn = box * 2 + 2 + real_odd_spawns
 
 
                 # initial door release, only where door is not in all_door_poses
