@@ -224,7 +224,7 @@ def ground_truth_evals(eval_env, model, repetitions=25, memory=1, skip_to_releas
     return df
 
 
-def find_checkpoint_models(path, model_class):
+def find_checkpoint_models(path):
     full_path = os.path.join(path, 'checkpoints')
     all_models = []
     all_lengths = []
@@ -244,12 +244,12 @@ def find_checkpoint_models(path, model_class):
     else:
         # otherwise, just load from the main folder
         for checkpoint_path in os.scandir(full_path):
-            if "norm" not in checkpoint_path.path:
+            # print('loading from ' + checkpoint_path.path)
+            if ".pkl" not in checkpoint_path.path:
                 all_models.append( checkpoint_path.path)
                 all_lengths.append(int(checkpoint_path.path[checkpoint_path.path.find("model_")+6:checkpoint_path.path.find("_steps.zip")]))
                 repetition_names.append('rep_0')
             else:
                 norm_paths.append(checkpoint_path.path)
 
-    print('norm_paths', norm_paths)
     return all_models, all_lengths, repetition_names, norm_paths
