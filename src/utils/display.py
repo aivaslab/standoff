@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 # %matplotlib inline
-#from IPython import display
+# from IPython import display
 import os
 from pettingzoo.utils.conversions import aec_to_parallel, parallel_to_aec
 from stable_baselines3.common.results_plotter import load_results, ts2xy
@@ -13,9 +13,11 @@ import imageio
 import cv2
 import copy
 
+
 def entropy_func(x):
     value_counts = x.value_counts(normalize=True)
     return entropy(value_counts)
+
 
 def load_results_tempfix(path: str) -> pd.DataFrame:
     # something causes broken csvs, here we ignore extra data
@@ -56,13 +58,16 @@ def moving_average(values, window):
         values[_position] = _new_value
     return np.convolve(values.astype(float), weights, 'valid')
 
+
 def entropy_multi_cols(x, y, z):
     return entropy([x, y, z])
 
+
 def agg_dict(frame):
     ignored_columns = ['configName', 'minibatch', 'model_ep']
-    return {col: (['mean', 'std'] if col != 'selection' else ['mean', 'std', entropy_func]) if col not in ignored_columns else 'first' for col in frame.columns}
-
+    return {col: (['mean', 'std'] if col != 'selection' else ['mean', 'std',
+                                                              entropy_func]) if col not in ignored_columns else 'first'
+            for col in frame.columns}
 
 
 def group_dataframe(cur_df, groupby_list):
@@ -72,16 +77,18 @@ def group_dataframe(cur_df, groupby_list):
 
     # get the number of episodes that are aggregated todo: verify that this works as intended
     ret_df['num_episodes_grouped'] = ret_df.groupby(groupby_list)['model_ep'].transform('count')
-    
-    ret_df['treat_entropy'] = ret_df.apply(lambda row: entropy_multi_cols(row['selectedBig_mean'], row['selectedSmall_mean'], row['selectedNeither_mean']), axis=1)
-    
+
+    ret_df['treat_entropy'] = ret_df.apply(
+        lambda row: entropy_multi_cols(row['selectedBig_mean'], row['selectedSmall_mean'], row['selectedNeither_mean']),
+        axis=1)
+
     return ret_df
 
 
 def process_csv(path, gtr=False):
     with open(path) as file_handler:
         print('opened', path, file_handler)
-        
+
         df = pd.read_csv(file_handler, index_col=None, on_bad_lines='skip')
         df['index_col'] = df.index
         if gtr:
@@ -126,11 +133,9 @@ def process_csv(path, gtr=False):
 
         df_small = new_df
 
-
-
         grouped_df = group_dataframe(df, ['model_ep',
                                           'configName'])  # the mean and std at each evaluation... for each configname
-        #print('cols', grouped_df.columns)
+        # print('cols', grouped_df.columns)
         grouped_df_small = group_dataframe(df_small, ['model_ep', 'configName'])
         grouped_df_noname_abs = group_dataframe(df, ['model_ep'])
         grouped_df_noname = group_dataframe(df_small, ['model_ep'])
@@ -143,16 +148,17 @@ def process_csv(path, gtr=False):
 
         return grouped_df, grouped_df_small, grouped_df_noname_abs, grouped_df_noname
 
+
 def get_transfer_matrix_row(path, column, config_names, config_names_old, only_last=False):
     grouped_df, _, _, _ = process_csv(path, gtr=False)
 
     if only_last:
         grouped_df = grouped_df.loc[grouped_df.groupby('configName')['model_ep'].idxmax()]
 
-    #if config_names is not None:
+    # if config_names is not None:
     filtered_df = grouped_df[grouped_df['configName'].isin(config_names)]
     filtered_df_2 = grouped_df[grouped_df['configName'].isin(config_names_old)] if config_names_old else None
-    
+
     path_components = path.split(os.sep)
     if not filtered_df_2 or len(filtered_df) >= len(filtered_df_2):
         train_name = path_components[-3].split('-')[1]
@@ -163,7 +169,7 @@ def get_transfer_matrix_row(path, column, config_names, config_names_old, only_l
         train_name = path_components[-3].split('-')[2]
         if len(train_name) < 3:
             train_name = path_components[-3].split('-')[1]
-    #else:
+    # else:
     #    filtered_df = grouped_df
 
     pivot_table = pd.pivot_table(filtered_df, values=column, index='model_ep', columns='configName', aggfunc='first')
@@ -172,14 +178,15 @@ def get_transfer_matrix_row(path, column, config_names, config_names_old, only_l
     return_matrix = return_matrix.drop(columns=['model_ep'])
 
     return return_matrix, timesteps, train_name
-    
+
+
 def get_transfer_matrix_row_legacy(path, column, only_last=False):
     grouped_df, _, _, _ = process_csv(path, gtr=False)
     return_matrix = pd.DataFrame()
 
     # for return matrix, we use the set of rows of the final (or all) model from each environment
     # each configName is an evaluation configuration
-    
+
     labels = []
     timesteps = []
     for uname in grouped_df.configName.unique():
@@ -198,7 +205,7 @@ def get_transfer_matrix_row_legacy(path, column, only_last=False):
                 labels.append(uname)
                 timesteps.append(model_ep)
                 return_matrix = return_matrix.append(rows2, ignore_index=True)
-                
+
     return return_matrix, labels, timesteps
 
 
@@ -224,11 +231,11 @@ def make_pic_video(model, env, random_policy=False, video_length=50, savePath=''
         if random_policy:
             action = {agent: _env.action_spaces[agent].sample() for agent in _env.agents}
         else:
-            obs_used = cv2.resize(obs[following], dsize=(obs_size, obs_size), interpolation=cv2.INTER_NEAREST)
-            obs_used = np.transpose(obs_used, (2, 0, 1))
+            # obs_used = cv2.resize(obs[following], dsize=(obs_size, obs_size), interpolation=cv2.INTER_NEAREST)
+            # obs_used = np.transpose(obs_used, (2, 0, 1))
 
-            action = {following: model.predict(obs_used, deterministic=deterministic)[0] if memory <= 1 else
-            model.predict(obs_used, deterministic=deterministic)}
+            action = {following: model.predict(obs[following], deterministic=deterministic)[0] if memory <= 1 else
+            model.predict(obs[following], deterministic=deterministic)}
         obs, _, dones, _ = _env.step(action)
 
         if not use_global_obs:
@@ -268,6 +275,7 @@ def gtr_to_monitor(savePath, df, envs):
 
         with open(filename, "w") as f:
             f.write(f"#{json.dumps(header)}\n" + new_df.to_csv())
+
 
 '''
 def show_state(env, step=0, info=""):
