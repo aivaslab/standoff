@@ -179,7 +179,7 @@ def plot_train_many(train_paths, window=1000, path=None):
                     if len(df):
                         #df['index_col'] = df.index
                         df['yrolling'] = df['r'].rolling(window=window).mean()
-                        plt.plot(df['col'], df.yrolling, label=os.path.basename(log_folder))
+                        plt.plot(df[col], df.yrolling, label=os.path.basename(log_folder))
 
         plt.rcParams["figure.figsize"] = (15, 5)
         plt.gcf().set_size_inches(15, 5)
