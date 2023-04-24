@@ -48,7 +48,7 @@ def evaluate_models(eval_env_names, short_names, models, model_class, model_time
     for k, (short_name, eval_env_name) in enumerate(zip(short_names, eval_env_names)):
         env = make_env_comp(eval_env_name, rank=k+1, skip_vecNorm=True, **env_kwargs)
         for model_name, model_timestep, norm_path in zip(models, model_timesteps, norm_paths):
-            eval_env = VecNormalize.load(norm_path, env)
+            eval_env = VecNormalize.load(norm_path, env) if env_kwargs["vecNormalize"] else env
             model = model_class.load(model_name, env=eval_env)
 
             if use_gtr:
