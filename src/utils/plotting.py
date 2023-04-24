@@ -166,7 +166,7 @@ def plot_train(log_folder, window=1000):
 
 
 def plot_train_many(train_paths, window=1000, path=None):
-    for col, name in [("index_col", "Episode"), ("t", "Timestep")]:
+    for col, name in [("index", "Episode"), ("t", "Timestep")]:
         plt.figure()
         for log_folder in train_paths:
             monitor_files = get_monitor_files(log_folder)
