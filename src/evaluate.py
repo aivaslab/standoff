@@ -112,7 +112,7 @@ def main(args):
                 env_names.append(env_name + str(size) + '-' + style + '-' + str(difficulty) + '-v0')
             renamed_envs = True
         
-        env_kwargs = {"size": size, "style": style, "threads": threads, "frames": frames, "monitor_path": train_dir, "vecNormalize": vecNormalize, "norm_rewards": norm_rewards, "difficulty": difficulty}
+        env_kwargs = {"size": size, "style": style, "threads": threads, "frames": frames, "monitor_path": train_dir, "vecNormalize": vecNormalize, "norm_rewards": norm_rewards}
 
         if args.make_evals:
             evaluate_models(env_names, short_names, model_paths, model_class, model_timesteps, det_env=args.det_env, det_model=args.det_model, use_gtr=args.use_gtr,
