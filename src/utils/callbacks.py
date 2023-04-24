@@ -52,7 +52,7 @@ class TrainUpdateCallback(BaseCallback):
             logfile.write("\n")
             # start timing
             self.start_time = time.time()
-            logfile.write('started training at time' + str(self.start_time))
+            logfile.write('started training at time ' + time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(self.start_time)))
 
     def _on_rollout_end(self):
         # triggered before updating the policy
@@ -73,8 +73,8 @@ class TrainUpdateCallback(BaseCallback):
     def _on_training_end(self):
         with open(self.logPath, 'a') as logfile:
             self.end_time = time.time()
-            logfile.write('finished training at time'+str(self.end_time) + "\n")
-            logfile.write('total time elapsed'+str(self.end_time - self.start_time))
+            logfile.write('finished training at time '+time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(self.end_time)) + "\n")
+            logfile.write('total time elapsed '+time.strftime("%H:%M:%S", time.gmtime(self.end_time - self.start_time)))
 
 
     def _on_step(self):
