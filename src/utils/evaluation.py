@@ -105,20 +105,19 @@ def collect_rollouts(env, model, model_episode,
             for i in active_envs:
                 if dones[i]:
                     completed_envs.append(i)
-                    episode_timesteps[i] = t
+                    infos = info[i]
+                    infos['r'] = rewards[i]
+                    infos['all_actions'] = all_actions[i]
+                    infos['configName'] = configName
+                    infos['eval_ep'] = episode
+                    infos['model_ep'] = model_episode
+                    infos['episode_timesteps'] = t
+                    infos['terminal_observation'] = 0 # overwrite huge thing
+                    infos['episode'] = 0 # otherwise contains a dict {r, l, t}
+                    all_infos.append(_process_info(infos))
             active_envs -= set(completed_envs)
 
         for thread in range(num_threads):
-            infos = info[thread]
-            infos['r'] = rewards[thread]
-            infos['all_actions'] = all_actions[thread]
-            infos['configName'] = configName
-            infos['eval_ep'] = episode
-            infos['model_ep'] = model_episode
-            infos['episode_timesteps'] = episode_timesteps[thread]
-            infos['terminal_observation'] = 0 # overwrite huge thing
-            infos['episode'] = 0 # otherwise contains a dict {r, l, t}
-            all_infos.append(_process_info(infos))
             del infos
         del info
         tqdm.update(num_threads)
