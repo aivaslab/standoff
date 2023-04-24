@@ -166,7 +166,7 @@ def plot_train(log_folder, window=1000):
 
 
 def plot_train_many(train_paths, window=1000, path=None):
-    for col, name in [("index", "Episode"), ("t", "Timestep")]:
+    for col, name in [("index", "Episode"), ("t", "realtime")]:
         plt.figure()
         for log_folder in train_paths:
             monitor_files = get_monitor_files(log_folder)
@@ -177,7 +177,9 @@ def plot_train_many(train_paths, window=1000, path=None):
                     assert first_line[0] == "#", print(first_line)
                     df = pd.read_csv(file_handler, index_col=None, on_bad_lines='skip')  # , usecols=cols)
                     if len(df):
-                        #df['index_col'] = df.index
+                        if col == 'index':
+                            df['index_col'] = df.index
+                            col = 'index_col'
                         df['yrolling'] = df['r'].rolling(window=window).mean()
                         plt.plot(df[col], df.yrolling, label=os.path.basename(log_folder))
 
