@@ -80,8 +80,6 @@ def collect_rollouts(env, model, model_episode,
         all_actions = ['' for _ in range(num_threads)]
         
         for t in range(max_timesteps):
-            if not active_envs:
-                break
                 
             if hasattr(model, '_last_lstm_states'):
                 action, lstm_states = model.predict(obs, deterministic=deterministic_model,
@@ -100,6 +98,8 @@ def collect_rollouts(env, model, model_episode,
             #print('obs0', obs[0], 'action0', action[0], 'reward0', rewards[0], 'done0', dones[0], 'info0', info[0])
                 
             completed_envs = []
+            if not active_envs:
+                break
             for i in active_envs:
                 if dones[i]:
                     completed_envs.append(i)
