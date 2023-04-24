@@ -106,7 +106,6 @@ def main(args):
             style = args.style
             tqdm_steps = args.tqdm_steps
             vecNormalize = args.vecNormalize
-            print('vn', vecNormalize)
             model_class = class_dict[args.model_class]
             threads = args.threads
             difficulty = args.difficulty

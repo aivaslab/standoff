@@ -98,10 +98,6 @@ def collect_rollouts(env, model, model_episode,
             #print('obs0', obs[0], 'action0', action[0], 'reward0', rewards[0], 'done0', dones[0], 'info0', info[0])
                 
             completed_envs = []
-            print(info[0])
-            if not active_envs:
-                print('breaking')
-                break
             for i in active_envs:
                 if dones[i]:
                     completed_envs.append(i)
@@ -116,6 +112,8 @@ def collect_rollouts(env, model, model_episode,
                     infos['episode'] = 0 # otherwise contains a dict {r, l, t}
                     all_infos.append(_process_info(infos))
             active_envs -= set(completed_envs)
+            if not active_envs:
+                break
 
         del info
         tqdm.update(num_threads)
