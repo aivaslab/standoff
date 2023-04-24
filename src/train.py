@@ -48,7 +48,7 @@ def main(args):
     parser.add_argument('--batch_size', type=int, default=128, help='Batch size')
     parser.add_argument('--schedule', type=str, default='linear', help='Learning rate schedule')
     parser.add_argument('--tqdm_steps', type=int, default=256, help='Number of steps between tqdm updates')
-    parser.add_argument('--n_steps', type=int, default=2048, help='Number of steps per thread between weight updates')
+    parser.add_argument('--buffer_size', type=int, default=2048, help='Number of steps per thread between weight updates')
     parser.add_argument('--vecNormalize', action='store_true', help='Whether to normalize the observations')
     parser.add_argument('--norm_rewards', action='store_true', help='Whether to normalize the rewards')
     parser.add_argument('--variable', type=str, default='',
@@ -102,7 +102,7 @@ def main(args):
             size = args.size
             rate = linear_schedule(args.lr) if args.schedule == 'linear' else args.lr
             batch_size = args.batch_size
-            n_steps = args.n_steps
+            buffer_size = args.buffer_size
             style = args.style
             tqdm_steps = args.tqdm_steps
             vecNormalize = args.vecNormalize
@@ -159,7 +159,7 @@ def main(args):
                     else:
                         model = model_class(policy, env=env, verbose=0, 
                                             learning_rate=rate,
-                                            n_steps=n_steps,
+                                            n_steps=buffer_size // threads,
                                             batch_size=batch_size,
                                             policy_kwargs=policy_kwargs)
                 callback = make_callbacks(savePath3, env, batch_size, tqdm_steps, recordEvery, model,
