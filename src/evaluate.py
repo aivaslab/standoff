@@ -19,10 +19,10 @@ def make_videos(train_dir, env_names, short_names, model, model_class, model_tim
     vidPath = os.path.join(train_dir, 'videos')
     if not os.path.exists(vidPath):
         os.mkdir(vidPath)
-    model = model_class.load(model)
     for k, (short_name, env_name) in enumerate(zip(short_names, env_names)):
         env_kwargs["threads"] = 1
         eval_env = make_env_comp(env_name, rank=k+1, load_path=norm_path, **env_kwargs)
+        model = model_class.load(model, eval_env)
         model.set_env(eval_env)
         vidPath2 = os.path.join(vidPath, env_name)
         if not os.path.exists(vidPath2):
@@ -33,7 +33,7 @@ def make_videos(train_dir, env_names, short_names, model, model_class, model_tim
         print('vid', vidPath2)
         make_pic_video(model, eval_env, random_policy=True, savePath=vidPath2, deterministic=True, vidName='det_'+str(model_timestep)+'.gif', obs_size=size)
         del eval_env
-    del model
+        del model
 
 
 def evaluate_models(eval_env_names, short_names, models, model_class, model_timesteps, det_env, det_model, use_gtr, frames, episodes, train_dir, norm_paths, env_kwargs):
