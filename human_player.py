@@ -5,9 +5,9 @@ import src
 
 from src.rendering import InteractivePlayerWindow
 from src.agents import GridAgentInterface
-from src.pz_envs import env_from_config, standoff, tutorial, scenario_configs
+from src.pz_envs import env_from_config
 from src.pz_envs.scenario_configs import ScenarioConfigs
-from src.utils.conversion import wrap_env_full
+from src.utils.conversion import make_env_comp
 import gym
 import src.pz_envs
 
@@ -50,17 +50,17 @@ env_config =  {
 }
 
 player_interface_config = {
-    "view_size": 15,
-    "view_offset": 3,
+    "view_size": 13,
+    "view_offset": 1,
     "view_tile_size": 25,
-    "observation_style": "image",
-    "see_through_walls": True,
+    "observation_style": "rich",
+    "see_through_walls": False,
     "color": "yellow",
     "view_type": 0,
     "move_type": 0
 }
 puppet_interface_config = {
-    "view_size": 15,
+    "view_size": 13,
     "view_offset": 3,
     "view_tile_size": 48,
     "observation_style": "image",
@@ -129,6 +129,7 @@ for i in range(5):
         print(env, "agents", env.agents, "puppets", env.puppets, "done_penalties", env.done_without_box_reward, env.distance_from_boxes_reward)
         #env.render(mode="human", show_agent_views=True, tile_size=4)
         player_action = human.action_step(obs['player_0'])
+        print(np.round(obs['player_0']*10).sum(axis=0).astype(int))
         #window is showing obs of p0, so those obs are broken!
 
         agent_actions = {'player_0': player_action}
