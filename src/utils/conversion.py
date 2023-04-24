@@ -24,10 +24,11 @@ def get_json_params(path):
         difficulty = data['difficulty']
         configName = data['configName']
         vecNormalize = data['vecNormalize'] if 'vecNormalize' in data.keys() else True
-    return model_class, size, style, frames, vecNormalize, difficulty, threads, configName
+        norm_rewards = data['norm_rewards'] if 'norm_rewards' in data.keys() else True
+    return model_class, size, style, frames, vecNormalize, norm_rewards, difficulty, threads, configName
 
 
-def make_env_comp(env_name, frames=1, vecNormalize=False, size=32, style='rich', monitor_path='dir',
+def make_env_comp(env_name, frames=1, vecNormalize=False, norm_rewards=False, size=32, style='rich', monitor_path='dir',
                   rank=-1, threads=1, load_path=None, reduce_color=False, skip_vecNorm=False):
     env = gym.make(env_name)
     #print(env.__dict__.keys()) #yields env, _action_space, _observation_space, _reward_range, _metadata, _has_reset
@@ -57,9 +58,9 @@ def make_env_comp(env_name, frames=1, vecNormalize=False, size=32, style='rich',
         if load_path:
             env = VecNormalize.load(load_path, env)
             env.training = False
-            env.norm_reward = False
+            env.norm_reward = norm_rewards
         else:
-            env = VecNormalize(env, norm_obs=vecNormalize, norm_reward=False, clip_obs=1000., clip_reward=1000.,
+            env = VecNormalize(env, norm_obs=vecNormalize, norm_reward=norm_rewards, clip_obs=1000., clip_reward=1000.,
                                training=rank == 0)
 
     env.rank = rank

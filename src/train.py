@@ -50,6 +50,7 @@ def main(args):
     parser.add_argument('--tqdm_steps', type=int, default=256, help='Number of steps between tqdm updates')
     parser.add_argument('--n_steps', type=int, default=2048, help='Number of steps per thread between weight updates')
     parser.add_argument('--vecNormalize', action='store_true', help='Whether to normalize the observations')
+    parser.add_argument('--norm_rewards', action='store_true', help='Whether to normalize the rewards')
     parser.add_argument('--variable', type=str, default='',
                         help='Variable to override with multiple values, eg "batch_norm=[True,False]", "lr=[0.001,0.0001]" ')
 
@@ -109,6 +110,7 @@ def main(args):
             model_class = class_dict[args.model_class]
             threads = args.threads
             difficulty = args.difficulty
+            norm_rewards = args.norm_rewards
 
             # override some variable with our test case
             if hasattr(args, var_name):
@@ -120,31 +122,27 @@ def main(args):
                 os.mkdir(savePath3)
 
             if continuing:
-                model_class, size, style, frames, vecNormalize, difficulty, threads, _ = get_json_params(
+                model_class, size, style, frames, vecNormalize, norm_rewards, difficulty, threads, _ = get_json_params(
                     os.path.join(savePath3, 'json_data.json'))
                 # note that continuing will overwrite these things! It does not implement continuing under different conditions for curriculae
             else:
                 with open(os.path.join(savePath3, 'json_data.json'), 'w') as json_file:
                     json.dump({'model_class': model_class.__name__, 'size': size, 'frames': frames, 'style': style,
-                               'vecNormalize': vecNormalize, 'difficulty': difficulty, 'threads': threads, 'configName': env_name_temp}, json_file)
+                               'vecNormalize': vecNormalize, 'norm_rewards': norm_rewards, 'difficulty': difficulty,
+                               'threads': threads, 'configName': env_name_temp}, json_file)
             print('model_class: ', model_class.__name__, 'size: ', size, 'style: ', style, 'frames: ', frames,
                   'vecNormalize: ', vecNormalize)
 
             short_name = args.experiment_name
             configName = name
             
-            net_arch = [width, width] #prev one
-            '''net_arch = [
-                {'activation_fn': th.nn.ReLU, 'pi': [32, 32, 32, 32], 'vf': [32, 32, 32, 32]},
-                {'lstm': 55},
-                {'activation_fn': th.nn.ReLU, 'pi': [25], 'vf': [25]}
-            ]'''
+            net_arch = [width, width]
             
             for repetition in range(repetitions):
                 start = time.time()
                 print('name: ', name, dir_name)
                 env = make_env_comp(env_name, frames=frames, size=size, style=style, monitor_path=savePath3, rank=0,
-                                    vecNormalize=vecNormalize, threads=threads)
+                                    vecNormalize=vecNormalize, norm_rewards=norm_rewards, threads=threads)
                 
                 policy, policy_kwargs = init_policy(model_class, env.observation_space, env.action_space, rate, 
                             width, hidden_size=hidden_size, conv_mult=conv_mult, frames=frames, name='cnn', net_arch=net_arch)
