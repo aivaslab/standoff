@@ -117,8 +117,6 @@ def collect_rollouts(env, model, model_episode,
                     all_infos.append(_process_info(infos))
             active_envs -= set(completed_envs)
 
-        for thread in range(num_threads):
-            del infos
         del info
         tqdm.update(num_threads)
 
