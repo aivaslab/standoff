@@ -133,7 +133,7 @@ def main(args):
             short_name = args.experiment_name
             configName = name
             
-            net_arch = [dict(activation_fn=th.nn.ReLU, pi=[width], vf=[width])] #prev one
+            net_arch = dict(activation_fn=th.nn.ReLU, pi=[width, width], vf=[width, width]) #prev one
             '''net_arch = [
                 {'activation_fn': th.nn.ReLU, 'pi': [32, 32, 32, 32], 'vf': [32, 32, 32, 32]},
                 {'lstm': 55},
