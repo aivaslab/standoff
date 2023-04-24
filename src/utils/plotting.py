@@ -166,29 +166,30 @@ def plot_train(log_folder, window=1000):
 
 
 def plot_train_many(train_paths, window=1000, path=None):
-    plt.figure()
-    for log_folder in train_paths:
-        monitor_files = get_monitor_files(log_folder)
+    for col, name in [("index_col", "Episode"), ("t", "Timestep")]:
+        plt.figure()
+        for log_folder in train_paths:
+            monitor_files = get_monitor_files(log_folder)
 
-        for file_name in monitor_files:
-            with open(file_name) as file_handler:
-                first_line = file_handler.readline()
-                assert first_line[0] == "#", print(first_line)
-                df = pd.read_csv(file_handler, index_col=None, on_bad_lines='skip')  # , usecols=cols)
-                if len(df):
-                    df['index_col'] = df.index
-                    df['yrolling'] = df['r'].rolling(window=window).mean()
-                    plt.plot(df.index, df.yrolling, label=os.path.basename(log_folder))
+            for file_name in monitor_files:
+                with open(file_name) as file_handler:
+                    first_line = file_handler.readline()
+                    assert first_line[0] == "#", print(first_line)
+                    df = pd.read_csv(file_handler, index_col=None, on_bad_lines='skip')  # , usecols=cols)
+                    if len(df):
+                        #df['index_col'] = df.index
+                        df['yrolling'] = df['r'].rolling(window=window).mean()
+                        plt.plot(col, df.yrolling, label=os.path.basename(log_folder))
 
-    plt.rcParams["figure.figsize"] = (15, 5)
-    plt.gcf().set_size_inches(15, 5)
-    plt.xlabel('Episode')
-    plt.ylabel('Reward')
-    plt.title('Learning curve')
-    plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
-    plt.tight_layout()
-    plt.savefig(os.path.join(path, 'all_trains' + '.png'))
-    plt.close()
+        plt.rcParams["figure.figsize"] = (15, 5)
+        plt.gcf().set_size_inches(15, 5)
+        plt.xlabel(name)
+        plt.ylabel('Reward')
+        plt.title('Learning curve')
+        plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+        plt.tight_layout()
+        plt.savefig(os.path.join(path, 'all_trains_' + name + '.png'))
+        plt.close()
 
 
 def plot_results2(log_folder, policynames, modelnames, repetitions, env_name, title='Learning Curve', window=50):
