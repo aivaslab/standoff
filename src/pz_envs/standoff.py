@@ -86,6 +86,7 @@ class StandoffEnv(para_MultiGridEnv):
         self.fill_spawn_holes = False
         self.random_subject_spawn = True
         self.odd_spawns = True
+        self.random_odd_spawns = True # overrides self.odd_spawns when true
 
 
     def hard_reset(self, params=None):
@@ -174,12 +175,14 @@ class StandoffEnv(para_MultiGridEnv):
 
         all_door_poses = []
 
+        real_odd_spawns = self.odd_spawns if not self.random_odd_spawns else random.choice([True, False])
+
         self.smallReward = int(100/(self.boxes-2))
         for k, agent in enumerate(self.agents_and_puppets()):
             h = 1 if agent == "player_0" else self.height - 2
             d = 1 if agent == "player_0" else 3
             if self.random_subject_spawn:
-                if self.odd_spawns:
+                if real_odd_spawns:
                     bb = self.deterministic_seed % (self.boxes-1) if self.deterministic else random.choice(range(boxes-1))
                     xx = 2 * bb + 3
                 else:
