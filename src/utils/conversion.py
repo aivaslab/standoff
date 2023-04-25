@@ -34,7 +34,8 @@ def make_env_comp(env_name, frames=1, vecNormalize=False, norm_rewards=False, si
     #print(env.__dict__.keys()) #yields env, _action_space, _observation_space, _reward_range, _metadata, _has_reset
     env = env.env #this line feels silly?
     channels = env.channels
-    num_cpus = min(threads, os.cpu_count())
+    #num_cpus = min(threads, os.cpu_count())
+    num_cpus = threads
 
     if reduce_color:
         env = ss.color_reduction_v0(env, 'B')
