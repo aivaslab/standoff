@@ -384,7 +384,7 @@ class StandoffEnv(para_MultiGridEnv):
         for box in range(self.boxes):
             x = box * 2 + 2
             obj = self.grid.get(x, y)
-            self.append_food_locs(obj, box)
+            self.append_food_locs(obj, box)  # appends to self.big_food_locations and self.small_food_locations
 
         # oracle food location memory for puppet ai
         if name == "bait" or name == "swap" or name == "remove" or (self.hidden is True and name == "reveal"):
@@ -417,13 +417,16 @@ class StandoffEnv(para_MultiGridEnv):
                 x = self.agent_goal[self.target_agent] * 2 + 2
                 path = pathfind(self.grid.volatile, a.pos, (x, y), self.cached_paths)
                 self.infos[self.target_agent]["path"] = path
-                tile = self.grid.get(x, y)
-                if hasattr(tile, "reward") and tile.reward == 100:
-                    self.infos['player_0']['shouldAvoidBig'] = not self.subject_is_dominant
-                    self.infos['player_0']['shouldAvoidSmall'] = False
-                else:
-                    self.infos['player_0']['shouldAvoidSmall'] = not self.subject_is_dominant
-                    self.infos['player_0']['shouldAvoidBig'] = False
+                #tile = self.grid.get(x, y)
+                # we cannot track shouldAvoidBig etc here because the treat location might change
+        if name == "release":
+            # if agent's goal of player_1 matches big treat location, then shouldAvoidBig is True
+            if self.agent_goal['player_1'] == self.big_food_locations[-1]:
+                self.infos['player_0']['shouldAvoidBig'] = not self.subject_is_dominant
+                self.infos['player_0']['shouldAvoidSmall'] = False
+            elif self.agent_goal['player_1'] == self.small_food_locations[-1]:
+                self.infos['player_0']['shouldAvoidSmall'] = not self.subject_is_dominant
+                self.infos['player_0']['shouldAvoidBig'] = False
 
         if len(self.big_food_locations) > 0 and len(self.small_food_locations) > 0:
             if 'shouldAvoidBig' in self.infos['player_0'].keys() and self.infos['player_0']['shouldAvoidBig']:
