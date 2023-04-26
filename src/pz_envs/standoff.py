@@ -348,6 +348,13 @@ class StandoffEnv(para_MultiGridEnv):
             self.objs_to_hide.append(obj)
         elif name == "remove":
             x = event[1] * 2 + 2
+            tile = self.grid.get(x, y)
+            if tile is not None:
+                if hasattr(tile, "reward") and tile.reward == 100:
+                    self.big_food_locations.append(-1)
+                elif hasattr(tile, "reward") and tile.reward == self.smallReward:
+                    self.small_food_locations.append(-1)
+
             self.del_obj(x, y)
         elif name == "obscure" or name == "reveal":
             b = self.grid.get(*self.agent_door_pos[arg])
@@ -381,10 +388,10 @@ class StandoffEnv(para_MultiGridEnv):
         self.visible_event_list.append(self.currently_visible)
 
         # track where the big and small foods have been
-        for box in range(self.boxes):
-            x = box * 2 + 2
+        for loc in range(self.boxes):
+            x = loc * 2 + 2
             obj = self.grid.get(x, y)
-            self.append_food_locs(obj, box)  # appends to self.big_food_locations and self.small_food_locations
+            self.append_food_locs(obj, loc)  # appends to self.big_food_locations and self.small_food_locations
 
         # oracle food location memory for puppet ai
         if name == "bait" or name == "swap" or name == "remove" or (self.hidden is True and name == "reveal"):
@@ -428,6 +435,9 @@ class StandoffEnv(para_MultiGridEnv):
                 elif self.agent_goal[self.puppets[-1]] == self.small_food_locations[-1]:
                     self.infos['player_0']['shouldAvoidSmall'] = not self.subject_is_dominant
                     self.infos['player_0']['shouldAvoidBig'] = False
+                else:
+                    self.infos['player_0']['shouldAvoidBig'] = False
+                    self.infos['player_0']['shouldAvoidSmall'] = False
 
         if len(self.big_food_locations) > 0 and len(self.small_food_locations) > 0:
             if 'shouldAvoidBig' in self.infos['player_0'].keys() and self.infos['player_0']['shouldAvoidBig']:
