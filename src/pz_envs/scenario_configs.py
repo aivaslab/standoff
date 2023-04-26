@@ -74,7 +74,8 @@ class ScenarioConfigs:
                       "misinformed",
                       "swapped",
                       ],
-                  5: ["s2b"]
+                  5: ["s2b"],
+                  6: ["all"]
                   }
 
     standoff = {
