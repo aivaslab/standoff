@@ -71,7 +71,7 @@ def make_transfer_matrix_new(save_path, prefix, make_matrix=False, make_tsne=Fal
             "train_name"] in eval_ordering else float(
             'inf'))
         lines = [x["values"] for x in matrix_data_sorted]
-        row_names = [x["train_name"] for x in matrix_data]
+        row_names = [x["train_name"] for x in matrix_data_sorted]
         print(lines)
         plot_transfer_matrix(matrix_data=lines,
                              row_names=row_names,
