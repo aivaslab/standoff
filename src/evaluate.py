@@ -15,14 +15,14 @@ from stable_baselines3.common.vec_env import VecNormalize
 class_dict = {'PPO': PPO, 'A2C': A2C, 'TRPO': TRPO, 'RecurrentPPO': RecurrentPPO}
 
 
-def make_videos(train_dir, env_names, short_names, model, model_class, model_timestep, size, norm_path, env_kwargs):
+def make_videos(train_dir, env_names, short_names, model_path, model_class, model_timestep, size, norm_path, env_kwargs):
     vidPath = os.path.join(train_dir, 'videos')
     if not os.path.exists(vidPath):
         os.mkdir(vidPath)
     for k, (short_name, env_name) in enumerate(zip(short_names, env_names)):
         env_kwargs["threads"] = 1
         eval_env = make_env_comp(env_name, rank=k+1, load_path=norm_path, **env_kwargs)
-        model = model_class.load(model, eval_env)
+        model = model_class.load(model_path, eval_env)
         model.set_env(eval_env)
         vidPath2 = os.path.join(vidPath, env_name)
         if not os.path.exists(vidPath2):
