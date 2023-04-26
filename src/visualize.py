@@ -34,6 +34,7 @@ def get_matrix_data(paths, only_last=False, metric='accuracy_mean', prefix='rand
                         "timestep": timestep,
                         "values": matrix_rows.iloc[index].tolist()
                     }
+                    print('train_name', train_name, "values", matrix_rows.iloc[index].tolist())
                     matrix_data.append(row_data)
     return matrix_data
 
