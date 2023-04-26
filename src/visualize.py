@@ -177,9 +177,9 @@ def make_eval_figures(path, figures_path, window=1, prefix=''):
                         labels=['selected any treat', 'selected correct treat'])
             plot_merged(indexer='model_ep', df=rows_big, mypath=extended_path, title=title + 'absoluteAccuracy',
                         window=window,
-                        values=['weakAccuracy', 'accuracy', 'valid'],
+                        values=['weakAccuracy', 'accuracy', 'valid', 'selectedSame'],
                         labels=['selected any treat', 'selected correct treat',
-                                'selected any box', ])
+                                'selected any box', 'selected same as opponent'])
             plot_merged(indexer='model_ep', df=rows_small, mypath=extended_path, title=title + 'validLocation',
                         window=window,
                         values=['sel0', 'sel1', 'sel2', 'sel3', 'sel4'],
@@ -210,9 +210,9 @@ def make_eval_figures(path, figures_path, window=1, prefix=''):
         title2 = title + '-big'
         plot_merged(indexer='model_ep', df=grouped_df_noname_abs, mypath=figures_path_combined,
                     title=title2 + 'absoluteAccuracy', window=window,
-                    values=['weakAccuracy', 'accuracy', 'normed_r', 'valid'],
+                    values=['weakAccuracy', 'accuracy', 'normed_r', 'valid', 'selectedSame'],
                     labels=['selected any treat', 'selected correct treat',
-                            'reward (normalized)', 'selected any box'])
+                            'reward (normalized)', 'selected any box', 'selected same as opponent'])
     if len(grouped_df_small):
         title2 = title + '-small'
         # this graph is the same as above, but only taking into account valid samples
@@ -235,9 +235,9 @@ def make_eval_figures(path, figures_path, window=1, prefix=''):
         plot_merged(indexer='model_ep', df=grouped_df_noname, mypath=figures_path_combined,
                     title=title2 + 'validAccuracy',
                     window=window,
-                    values=['weakAccuracy', 'accuracy', 'normed_r'],
+                    values=['weakAccuracy', 'accuracy', 'normed_r', 'selectedSame'],
                     labels=['selected any treat', 'selected correct treat',
-                            'reward (normalized)'])
+                            'reward (normalized)', 'selected same as opponent'])
         plot_merged(indexer='model_ep', df=grouped_df_noname, mypath=figures_path_combined,
                     title=title + 'absoluteLocation',
                     window=window, values=['sel0', 'sel1', 'sel2', 'sel3', 'sel4'],
