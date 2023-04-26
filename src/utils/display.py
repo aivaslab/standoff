@@ -173,17 +173,16 @@ def get_transfer_matrix_row(path, column, config_names, config_names_old, only_l
     #    filtered_df = grouped_df
 
     pivot_table = pd.pivot_table(filtered_df, values=column, index='model_ep', columns='configName', aggfunc='first')
+
     return_matrix = pivot_table.reset_index().fillna(0)
     timesteps = return_matrix['model_ep'].tolist()
-    eval_names = return_matrix['configName'].tolist()
     return_matrix = return_matrix.drop(columns=['model_ep'])
 
     # reorder return matrix and eval_names to match config_names
     print('config_names', config_names)
-    print('eval_names', eval_names)
     print('return_matrix', return_matrix)
-    return_matrix = return_matrix[config_names]
-    print('return_matrix', return_matrix)
+    return_matrix = return_matrix[[config_names]]
+    print('return_matrix reordered', return_matrix)
 
 
     return return_matrix, timesteps, train_name
