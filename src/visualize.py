@@ -60,10 +60,9 @@ def make_transfer_matrix_new(save_path, prefix, make_matrix=False, make_tsne=Fal
     eval_ordering = ['swapped', 'misinformed', 'partiallyUninformed', 'replaced', 'informedControl', 'moved',
                      'removedUninformed', 'removedInformed']
 
-    print('save_path', save_path)
     if make_matrix:
         matrix_data = get_matrix_data(
-            [save_path[0]],
+            [save_path],
             only_last=True,
             metric=metric,
             ordering=eval_ordering,
