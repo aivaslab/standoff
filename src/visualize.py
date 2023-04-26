@@ -271,26 +271,24 @@ def main(args):
     model_rand = 'det' if args.det_model else 'rand'
     prefix = 'gtr' if args.gtr else env_rand + "_" + model_rand
 
-    if args.matrix or args.tsne:
-        make_transfer_matrix_new(
-            [args.path],
-            args.path,
-            prefix,
-            make_tsne=args.tsne,
-            make_matrix=args.matrix)
-    else:
+    make_transfer_matrix_new(
+        [args.path],
+        args.path,
+        prefix,
+        make_tsne=args.tsne,
+        make_matrix=args.matrix)
 
-        train_paths = [os.path.join(f.path) for f in os.scandir(args.path) if f.is_dir()]
-        plot_train_many(train_paths, window=args.window, path=args.path)
+    train_paths = [os.path.join(f.path) for f in os.scandir(args.path) if f.is_dir()]
+    plot_train_many(train_paths, window=args.window, path=args.path)
 
-        for k, train_path in enumerate(train_paths):
-            plot_train(train_path, window=args.window)
+    for k, train_path in enumerate(train_paths):
+        plot_train(train_path, window=args.window)
 
-            train_path = os.path.join(train_path, 'evaluations')
+        train_path = os.path.join(train_path, 'evaluations')
 
-            make_eval_figures(os.path.join(train_path, prefix + '_data.csv'),
-                              os.path.abspath(os.path.join(train_path, '..', 'figures')), window=args.window,
-                              prefix=prefix)
+        make_eval_figures(os.path.join(train_path, prefix + '_data.csv'),
+                          os.path.abspath(os.path.join(train_path, '..', 'figures')), window=args.window,
+                          prefix=prefix)
 
 
 if __name__ == 'main':
