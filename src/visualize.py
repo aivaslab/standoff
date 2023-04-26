@@ -23,10 +23,9 @@ def get_matrix_data(paths, only_last=False, metric='accuracy_mean', prefix='rand
         for train_path in train_paths:
             train_path = os.path.join(train_path, 'evaluations')
             if os.path.exists(os.path.join(train_path, prefix + '_data.csv')):
-                path_components = train_path.split(os.sep)
-                this_dir = path_components[-3]
                 matrix_rows, timesteps, train_name = get_transfer_matrix_row(
                     os.path.join(train_path, prefix + '_data.csv'), metric, ordering, ordering_old, only_last=only_last)
+
                 for index, timestep in enumerate(timesteps):
                     row_data = {
                         "this_dir": dir_name,
