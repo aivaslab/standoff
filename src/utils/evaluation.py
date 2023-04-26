@@ -61,7 +61,7 @@ def collect_rollouts(env, model, model_episode,
     num_threads = len(env.unwrapped.pipes)
     all_infos = []
     #tracemalloc.start()
-    for episode in range(episodes // num_threads):
+    for episode in range(max(1, episodes // num_threads)):
         # code to change seed here. can't use unwrapped.
         if deterministic_env:
             for pipe in env.unwrapped.pipes:
