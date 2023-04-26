@@ -63,7 +63,6 @@ class ScenarioConfigs:
                       "swapped",
                       ],
                   4: ["stage_1",
-                      "stage_2",
                       "s2b",
                       "informedControl",
                       "partiallyUninformed",
