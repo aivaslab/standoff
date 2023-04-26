@@ -168,6 +168,10 @@ def main(args):
                 print(env_name, model_class, name, savePath3, str(timedelta(seconds=time.time() - start)), policy_kwargs)
                 model.learn(total_timesteps=timesteps*threads, callback=callback)
                 print('finished, time=', str(timedelta(seconds=time.time() - start)))
+
+                del env
+                del model
+
                 
                 
 if __name__ == 'main':
