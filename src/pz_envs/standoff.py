@@ -421,12 +421,13 @@ class StandoffEnv(para_MultiGridEnv):
                 # we cannot track shouldAvoidBig etc here because the treat location might change
         if name == "release":
             # if agent's goal of player_1 matches big treat location, then shouldAvoidBig is True
-            if self.agent_goal['player_1'] == self.big_food_locations[-1]:
-                self.infos['player_0']['shouldAvoidBig'] = not self.subject_is_dominant
-                self.infos['player_0']['shouldAvoidSmall'] = False
-            elif self.agent_goal['player_1'] == self.small_food_locations[-1]:
-                self.infos['player_0']['shouldAvoidSmall'] = not self.subject_is_dominant
-                self.infos['player_0']['shouldAvoidBig'] = False
+            if len(self.puppets):
+                if self.agent_goal[self.puppets[-1]] == self.big_food_locations[-1]:
+                    self.infos['player_0']['shouldAvoidBig'] = not self.subject_is_dominant
+                    self.infos['player_0']['shouldAvoidSmall'] = False
+                elif self.agent_goal[self.puppets[-1]] == self.small_food_locations[-1]:
+                    self.infos['player_0']['shouldAvoidSmall'] = not self.subject_is_dominant
+                    self.infos['player_0']['shouldAvoidBig'] = False
 
         if len(self.big_food_locations) > 0 and len(self.small_food_locations) > 0:
             if 'shouldAvoidBig' in self.infos['player_0'].keys() and self.infos['player_0']['shouldAvoidBig']:
