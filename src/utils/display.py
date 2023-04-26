@@ -181,7 +181,7 @@ def get_transfer_matrix_row(path, column, config_names, config_names_old, only_l
     # reorder return matrix and eval_names to match config_names
     print('config_names', config_names)
     print('return_matrix', return_matrix)
-    return_matrix = return_matrix[[config_names]]
+    return_matrix = return_matrix[config_names]
     print('return_matrix reordered', return_matrix)
 
 
