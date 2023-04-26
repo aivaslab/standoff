@@ -9,12 +9,10 @@ import umap
 import matplotlib.pylab as pl
 
 from src.utils.display import process_csv, get_transfer_matrix_row
-from src.utils.plotting import plot_merged, plot_selection, plot_split, plot_train, plot_transfer_matrix, plot_tsne, plot_train_many
+from src.utils.plotting import plot_merged, plot_selection, plot_split, plot_train, plot_transfer_matrix, plot_tsne, \
+    plot_train_many
 
 from matplotlib import pyplot as plt
-import matplotlib.patches as patches
-
-
 
 
 def get_matrix_data(paths, only_last=False, metric='accuracy_mean', prefix='rand_rand', ordering=None,
@@ -58,18 +56,20 @@ def find_series_indices(labels, matrix_data):
     return series_indices
 
 
-def make_transfer_matrix_new(paths, save_path, prefix, make_matrix=False, make_tsne=False, metric='accuracy_mean'):
+def make_transfer_matrix_new(save_path, prefix, make_matrix=False, make_tsne=False, metric='accuracy_mean'):
     eval_ordering = ['swapped', 'misinformed', 'partiallyUninformed', 'replaced', 'informedControl', 'moved',
                      'removedUninformed', 'removedInformed']
+
+    print('save_path', save_path)
     if make_matrix:
         matrix_data = get_matrix_data(
-            [paths[0]],
+            [save_path[0]],
             only_last=True,
             metric=metric,
             ordering=eval_ordering,
-            prefix='rand_rand')
+            prefix=prefix)
         matrix_data_sorted = sorted(matrix_data, key=lambda x: eval_ordering.index(x["train_name"]) if x[
-                                                                                                           "train_name"] in eval_ordering else float(
+            "train_name"] in eval_ordering else float(
             'inf'))
         lines = [x["values"] for x in matrix_data_sorted]
         row_names = [x["train_name"] for x in matrix_data]
@@ -80,7 +80,8 @@ def make_transfer_matrix_new(paths, save_path, prefix, make_matrix=False, make_t
                              output_file=os.path.join(save_path, metric + 'matrix.png'))
 
     if make_tsne:
-        matrix_data = get_matrix_data(paths, only_last=False, metric=metric, prefix='rand_rand', ordering=eval_ordering,
+        matrix_data = get_matrix_data([save_path], only_last=False, metric=metric, prefix='rand_rand',
+                                      ordering=eval_ordering,
                                       ordering_old=None)
 
         lines = np.vstack([np.array(x["values"]) for x in matrix_data])
@@ -272,7 +273,6 @@ def main(args):
     prefix = 'gtr' if args.gtr else env_rand + "_" + model_rand
 
     make_transfer_matrix_new(
-        [args.path],
         args.path,
         prefix,
         make_tsne=args.tsne,
