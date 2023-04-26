@@ -106,6 +106,8 @@ def main(args):
         print('evaluating at train_dir', train_dir)
         model_class, size, style, frames, vecNormalize, norm_rewards, difficulty, threads, configName = get_json_params(os.path.join(train_dir, 'json_data.json'))
         model_paths, model_timesteps, repetition_names, norm_paths = find_checkpoint_models(train_dir)
+        if not model_paths:
+            continue
 
         if not renamed_envs:
             for k, env_name in enumerate(configNames):
