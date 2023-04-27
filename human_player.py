@@ -8,6 +8,7 @@ from src.agents import GridAgentInterface
 from src.pz_envs import env_from_config
 from src.pz_envs.scenario_configs import ScenarioConfigs
 from src.utils.conversion import make_env_comp
+import pyglet
 import gym
 import src.pz_envs
 
@@ -15,7 +16,8 @@ import src.pz_envs
 class HumanPlayer:
     def __init__(self):
         self.player_window = InteractivePlayerWindow(
-            caption="interactive standoff"
+            caption="standoff",
+            #display=pyglet.canvas.get_display()
         )
         self.episode_count = 0
 
@@ -50,17 +52,17 @@ env_config =  {
 }
 
 player_interface_config = {
-    "view_size": 13,
+    "view_size": 15,
     "view_offset": 1,
-    "view_tile_size": 25,
-    "observation_style": "rich",
+    "view_tile_size": 15,
+    "observation_style": "image",
     "see_through_walls": False,
     "color": "yellow",
     "view_type": 0,
     "move_type": 0
 }
 puppet_interface_config = {
-    "view_size": 13,
+    "view_size": 15,
     "view_offset": 3,
     "view_tile_size": 48,
     "observation_style": "image",
@@ -85,7 +87,7 @@ env_config['puppets'] = [GridAgentInterface(**puppet_interface_config) for _ in 
 #env_config['num_agents'] = reset_configs['num_agents']
 #env_config['num_puppets'] = reset_configs['num_puppets']
 
-difficulty = 0
+difficulty = 3
 env_config['opponent_visible_decs'] = (difficulty < 1)
 env_config['persistent_treat_images'] = (difficulty < 2)
 env_config['subject_visible_decs'] = (difficulty < 3)
@@ -93,8 +95,6 @@ env_config['gaze_highlighting'] = (difficulty < 3)
 env_config['persistent_gaze_highlighting'] = (difficulty < 2)
 
 env_name = 'Standoff-S3-' + configName.replace(" ", "") + '-' + str(difficulty) + '-v0'
-env_config['gaze_highlighting'] = True #temp
-env_config['persistent_gaze_highlighting'] = True #temp
 
 env = env_from_config(env_config)
 if hasattr(env, "hard_reset"):
@@ -102,23 +102,11 @@ if hasattr(env, "hard_reset"):
 
 human = HumanPlayer()
 human.start_episode()
-done = False
+#env.window = human.player_window
 
-# get_non_empirical_stats
-'''
-eval_envs = ['informed control', 'uninformed']
-for env in eval_envs:
-    for _ in range(5): #repeat some number of times for permutations
-        original_obs = env.reset()
-        original_state = copy.deepcopy(env)
-        all_paths = env.infos['player_0']['all_paths']
-        for path in all_paths:
-            env = copy.deepcopy(original_state)
-            obs = original_obs
-            for action in path:
-                prediction = model.predict(obs)
-                print(prediction)
-                env.step(action)'''
+
+
+done = False
 
 
 for i in range(5):
@@ -126,11 +114,10 @@ for i in range(5):
     print(env_name, env.gaze_highlighting, env.persistent_gaze_highlighting, env.opponent_visible_decs, env.subject_visible_decs, env.persistent_treat_images)
 
     while True:
-        print(env, "agents", env.agents, "puppets", env.puppets, "done_penalties", env.done_without_box_reward, env.distance_from_boxes_reward)
-        #env.render(mode="human", show_agent_views=True, tile_size=4)
+        #print(env, "agents", env.agents, "puppets", env.puppets, "done_penalties", env.done_without_box_reward, env.distance_from_boxes_reward)
+        env.render(mode="human", show_agent_views=True, tile_size=15)
         player_action = human.action_step(obs['player_0'])
-        print(np.round(obs['player_0']*10).sum(axis=0).astype(int))
-        #window is showing obs of p0, so those obs are broken!
+        #print(np.round(obs['player_0']*10).sum(axis=0).astype(int))
 
         agent_actions = {'player_0': player_action}
 
