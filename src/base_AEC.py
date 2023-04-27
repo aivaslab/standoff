@@ -15,7 +15,8 @@ from gym.spaces import Discrete, Box
 from pettingzoo import ParallelEnv
 from .agents import occlude_mask
 
-# from gym.envs.classic_control.rendering import SimpleImageViewer
+from src.rendering import SimpleImageViewer
+#from gym.envs.classic_control.rendering import SimpleImageViewer
 
 TILE_PIXELS = 9
 NUM_ITERS = 100
@@ -1217,8 +1218,8 @@ class para_MultiGridEnv(ParallelEnv):
                 self.window.close()
             return
 
-        # if mode == "human" and not self.window:
-        #    self.window = SimpleImageViewer()
+        if mode == "human" and not self.window:
+           self.window = SimpleImageViewer(caption='standoff')
         # Compute which cells are visible to the agent
         highlight_mask = np.full((self.width, self.height), False, dtype=np.bool)
         for agentname, agent in zip(self.agents, self.agent_instances):
