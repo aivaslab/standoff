@@ -407,6 +407,9 @@ class StandoffEnv(para_MultiGridEnv):
                             #print('rew update', agent, box, tile.reward)
                         elif not self.grid.get(x, y) and self.last_seen_reward[agent + str(box)] != 0:
                             self.last_seen_reward[agent + str(box)] = 0
+                            if self.agent_goal[agent] == box:
+                                self.agent_goal[agent] = -1
+                                self.best_reward[agent] = 0
 
             self.new_target = False
             for box in range(self.boxes):
