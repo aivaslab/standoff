@@ -74,7 +74,7 @@ class ScenarioConfigs:
                       "swapped",
                       ],
                   5: ["s2b"],
-                  6: ["all"],
+                  6: ["all", "s2b", "stage_1"],
                   7: ["removedInformed2",
                       "removedUninformed2",
                       "misinformed"],
