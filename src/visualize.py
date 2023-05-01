@@ -57,8 +57,8 @@ def find_series_indices(labels, matrix_data):
 
 
 def make_transfer_matrix_new(save_path, prefix, make_matrix=False, make_tsne=False, metric='accuracy_mean'):
-    eval_ordering = ['swapped', 'misinformed', 'partiallyUninformed', 'replaced', 'informedControl', 'moved',
-                     'removedUninformed', 'removedInformed']
+    eval_ordering = ['swapped', 'misinformed', 'partiallyUninformed', 'replaced',
+                     'removedUninformed2', 'informedControl', 'removedInformed2', 'moved',]
 
     if make_matrix:
         matrix_data = get_matrix_data(
