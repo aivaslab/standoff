@@ -55,8 +55,8 @@ class ScenarioConfigs:
                   2: ["stage_2"],
                   3: ["informedControl",
                       "partiallyUninformed",
-                      "removedInformed",
-                      "removedUninformed",
+                      "removedInformed2",
+                      "removedUninformed2",
                       "moved",
                       "replaced",
                       "misinformed",
@@ -74,7 +74,10 @@ class ScenarioConfigs:
                       "swapped",
                       ],
                   5: ["s2b"],
-                  6: ["all"]
+                  6: ["all"],
+                  7: ["removedInformed2",
+                      "removedUninformed2",
+                      "misinformed"],
                   }
 
     standoff = {
@@ -109,11 +112,17 @@ class ScenarioConfigs:
             "events": [[['bait', 'empty'], ['obscure'], ['bait', 'empty']],
                        [['obscure'], ['bait', 'empty'], ['reveal'], ['bait', 'empty']]]
         },
-        "removedInformed": {  # optimal: Neither (minor reward preference over copying dominant's decision)
+        "removedInformed1": {  # optimal: Neither (minor reward preference over copying dominant's decision)
             "events": [[['bait', 'empty'], ['bait', 'empty'], ['remove', x]] for x in [0, 1]]
         },
-        "removedUninformed": {  # optimal: if Big is removed, Small, else Neither
+        "removedUninformed1": {  # optimal: if Big is removed, Small, else Neither
             "events": [[['bait', 'empty'], ['bait', 'empty'], ['obscure'], ['remove', x]] for x in [0, 1]]
+        },
+        "removedInformed2": {  # optimal: small
+            "events": [[['bait', 'empty'], ['bait', 'empty'], ['swap', x, 'empty']] for x in [0, 1]]
+        },
+        "removedUninformed2": {  # optimal: if Big is swapped, big, else small
+            "events": [[['bait', 'empty'], ['bait', 'empty'], ['obscure'], ['swap', x, 'empty']] for x in [0, 1]]
         },
         "moved": {  # optimal: Small
             "events": [[['obscure'], ['bait', 'empty'], ['bait', 'empty'], ['reveal'], ['swap', 1, 'empty'],
@@ -122,8 +131,8 @@ class ScenarioConfigs:
         "replaced": {  # optimal: if first bait is big, Big, else Small
             "events": [[['bait', 'empty'], ['obscure'], ['swap', 0, 'empty'], ['bait', 0]]]
         },
-        "misinformed": {  # optimal: if big is swapped, Big, else Small
-            "events": [[['bait', 'empty'], ['bait', 'empty'], ['obscure'], ['swap', x, 'else']] for x in [0, 1]]
+        "misinformed": {  # optimal: if big is swapped with empty, Big. If big swapped with small, also big. If small swapped with empty, small. If small swapped with big, big.
+            "events": [[['bait', 'empty'], ['bait', 'empty'], ['obscure'], ['swap', x, 'else'], ['swap', x, 'empty']] for x in [0, 1]]
         },
         "swapped": {  # optimal: Big
             "events": [[['bait', 'empty'], ['bait', 'empty'], ['obscure'], ['swap', 0, 1]]]

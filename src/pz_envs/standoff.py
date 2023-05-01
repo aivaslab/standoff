@@ -177,7 +177,9 @@ class StandoffEnv(para_MultiGridEnv):
 
         real_odd_spawns = self.odd_spawns if not self.random_odd_spawns else random.choice([True, False])
 
-        self.smallReward = int(100/(self.boxes-2))
+        self.bigReward = 100
+        self.smallReward = int(self.bigReward/(self.boxes-2))
+
         for k, agent in enumerate(self.agents_and_puppets()):
             h = 1 if agent == "player_0" else self.height - 2
             d = 1 if agent == "player_0" else 3
@@ -255,7 +257,7 @@ class StandoffEnv(para_MultiGridEnv):
         ## Bucket location allocation for timers
         empty_buckets = [i for i in range(boxes)]
         event_args = [None for _ in range(len(events))]
-        bait_args = [self.smallReward, 100]
+        bait_args = [self.smallReward, self.bigReward]
         for k, event in enumerate(events):
             type = event[0]
             for x in range(len(event)):
@@ -298,7 +300,7 @@ class StandoffEnv(para_MultiGridEnv):
         return curTime + release_gap + sub_release
 
     def append_food_locs(self, obj, loc):
-        if hasattr(obj, "reward") and obj.reward == 100:
+        if hasattr(obj, "reward") and obj.reward == self.bigReward:
             if len(self.big_food_locations) == 0 or (self.big_food_locations[-1] != loc):
                 self.big_food_locations.append(loc)
         elif hasattr(obj, "reward") and obj.reward == self.smallReward:
@@ -350,10 +352,11 @@ class StandoffEnv(para_MultiGridEnv):
             x = event[1] * 2 + 2
             tile = self.grid.get(x, y)
             if tile is not None:
-                if hasattr(tile, "reward") and tile.reward == 100:
+                if hasattr(tile, "reward") and tile.reward == self.bigReward and self.currently_visible:
                     self.big_food_locations.append(-1)
                 elif hasattr(tile, "reward") and tile.reward == self.smallReward:
                     self.small_food_locations.append(-1)
+                    # this is a special case of removedUninformed1 where there is no correct solution.
 
             self.del_obj(x, y)
         elif name == "obscure" or name == "reveal":
@@ -398,7 +401,7 @@ class StandoffEnv(para_MultiGridEnv):
             for box in range(self.boxes):
                 x = box * 2 + 2
                 for agent in self.agents_and_puppets():
-                    if self.can_see[agent + str(box)]:
+                    if self.can_see[agent + str(box)] and self.currently_visible:
                         tile = self.grid.get(x, y)
                         #if hasattr(tile, "reward") and hasattr(tile, "size"):
                         if tile is not None and tile.type == "Goal":
@@ -409,7 +412,7 @@ class StandoffEnv(para_MultiGridEnv):
                             self.last_seen_reward[agent + str(box)] = 0
                             if self.agent_goal[agent] == box:
                                 self.agent_goal[agent] = -1
-                                self.best_reward[agent] = 0
+                                self.best_reward[agent] = -100
 
             self.new_target = False
             for box in range(self.boxes):
@@ -432,6 +435,7 @@ class StandoffEnv(para_MultiGridEnv):
         if name == "release":
             # if agent's goal of player_1 matches big treat location, then shouldAvoidBig is True
             if len(self.puppets):
+                self.infos['player_0']['puppet_goal'] = self.agent_goal[self.puppets[-1]]
                 if self.agent_goal[self.puppets[-1]] == self.big_food_locations[-1]:
                     self.infos['player_0']['shouldAvoidBig'] = not self.subject_is_dominant
                     self.infos['player_0']['shouldAvoidSmall'] = False
