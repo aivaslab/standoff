@@ -178,7 +178,7 @@ if __name__ == 'main':
     parser = argparse.ArgumentParser(description='Experiment Configuration')
     # arg meaning it's curriculum learning
     parser.add_argument('--curriculum', action='store_true', help='Do curriculum learning')
-    parser.add_argument('--pretrained_folder', type=str, default='', help='Folder to load models from for curriculum')
+    parser.add_argument('--pretrain_dir', type=str, default='', help='Folder to load models from for curriculum')
 
     parser.add_argument('--experiment_name', type=str, default='test', help='Name of experiment')
     parser.add_argument('--log_dir', type=str, default='/monitor', help='Logging directory')
