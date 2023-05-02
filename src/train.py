@@ -115,7 +115,7 @@ def main(args):
         if this_pretrained_folder is not None:
             this_dirname = os.path.basename(this_pretrained_folder)
             this_model, start_timestep, rep_name, vec_norm_path = find_last_checkpoint_model(this_pretrained_folder)
-            train_path_ext = os.path.join(train_path + '-pretrained', this_dirname)
+            train_path_ext = os.path.join(train_path, this_dirname + '-pretrained')
             os.mkdir(train_path_ext)
         else:
             train_path_ext = train_path
