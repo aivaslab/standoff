@@ -96,7 +96,6 @@ def main(args):
     for name in ScenarioConfigs.env_groups[args.env_group]:
         configNames.append(f'Standoff-{name}-')
         short_names.append(name)
-    path = args.path
     episodes = args.episodes
 
 
@@ -104,9 +103,9 @@ def main(args):
     env_names = []
 
     if args.curriculum:
-        all_trained_folders = [p for p in os.scandir(path) if p.is_dir()]
+        all_trained_folders = [p for p in os.scandir(args.path) if p.is_dir()]
     else:
-        all_trained_folders = [None]
+        all_trained_folders = [args.path]
 
     for this_pretrained_folder in all_trained_folders:
         train_dirs = [f.path for f in os.scandir(this_pretrained_folder) if f.is_dir()]
