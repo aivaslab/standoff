@@ -172,11 +172,6 @@ def main(args):
                 print('model_class: ', model_class.__name__, 'size: ', size, 'style: ', style, 'frames: ', frames,
                       'vecNormalize: ', vecNormalize)
 
-                short_name = args.experiment_name
-                configName = name
-
-                net_arch = [width, width]
-
                 for repetition in range(repetitions):
                     start = time.time()
                     print('name: ', name, dir_name)
@@ -186,9 +181,9 @@ def main(args):
 
                     policy, policy_kwargs = init_policy(model_class, env.observation_space, env.action_space, rate,
                                                         width, hidden_size=hidden_size, conv_mult=conv_mult, frames=frames,
-                                                        name='cnn', net_arch=net_arch)
+                                                        name='cnn', net_arch=[width, width])
 
-                    log_line = start_global_logs(global_logs, short_name, dir_name, configName, model_class, policy,
+                    log_line = start_global_logs(global_logs, args.experiment_name, dir_name, name, model_class, policy,
                                                  global_log_path)
                     if args.curriculum and this_model is not None:
                         model = model_class.load(this_model, env=env)
