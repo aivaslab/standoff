@@ -116,6 +116,7 @@ def main(args):
             this_dirname = os.path.basename(this_pretrained_folder)
             this_model = find_last_checkpoint_model(this_pretrained_folder)
             train_path_ext = os.path.join(train_path, this_dirname)
+            os.mkdir(train_path_ext)
         else:
             train_path_ext = train_path
 
