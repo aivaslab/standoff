@@ -66,10 +66,10 @@ def main(args):
 
     if args.curriculum:
         # curriculum folder args are all in the new folder, not the pretrained folder
-        pretrained_folder = args.pretrained_folder
-        print('curriculum learning using', pretrained_folder)
+        pretrain_dir = args.pretrain_dir
+        print('curriculum learning using', pretrain_dir)
         # load all subdirs of pretrained_folder
-        all_pretrained_folders = [path for path in os.scandir(pretrained_folder) if path.is_dir()]
+        all_pretrained_folders = [path for path in os.scandir(pretrain_dir) if path.is_dir()]
     else:
         all_pretrained_folders = [None]
 
