@@ -111,14 +111,15 @@ def main(args):
     # if curriculum, we want to loop through each pretrained folder and update savepath2 to be a new subdirectory
 
     for this_pretrained_folder in all_pretrained_folders:
-        this_model = None
+
         if this_pretrained_folder is not None:
             this_dirname = os.path.basename(this_pretrained_folder)
-            this_model = find_last_checkpoint_model(this_pretrained_folder)
+            this_model, start_timestep, rep_name, vec_norm_path = find_last_checkpoint_model(this_pretrained_folder)
             train_path_ext = os.path.join(train_path, this_dirname)
             os.mkdir(train_path_ext)
         else:
             train_path_ext = train_path
+            this_model, start_timestep, rep_name, vec_norm_path = None, None, None, None
 
         if args.curriculum:
             assert this_model is not None, "curriculum learning requires a pretrained model, found none"
@@ -180,7 +181,8 @@ def main(args):
                     start = time.time()
                     print('name: ', name, dir_name)
                     env = make_env_comp(env_name, frames=frames, size=size, style=style, monitor_path=savePath3, rank=0,
-                                        vecNormalize=vecNormalize, norm_rewards=norm_rewards, threads=threads)
+                                        vecNormalize=vecNormalize, norm_rewards=norm_rewards, threads=threads,
+                                        load_path=vec_norm_path)
 
                     policy, policy_kwargs = init_policy(model_class, env.observation_space, env.action_space, rate,
                                                         width, hidden_size=hidden_size, conv_mult=conv_mult, frames=frames,
