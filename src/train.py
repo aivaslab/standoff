@@ -19,9 +19,50 @@ import torch as th
 # multiprocessing.set_start_method("fork")
 
 
-def train(_parser, _args):
-    args_string = str(_args)
-    args = _parser.parse_args(_args)
+def main(args):
+    parser = argparse.ArgumentParser(description='Experiment Configuration')
+    # arg meaning it's curriculum learning
+    parser.add_argument('--curriculum', action='store_true', help='Do curriculum learning')
+    parser.add_argument('--pretrain_dir', type=str, default='', help='Folder to load models from for curriculum')
+
+    parser.add_argument('--experiment_name', type=str, default='test', help='Name of experiment')
+    parser.add_argument('--log_dir', type=str, default='/monitor', help='Logging directory')
+    parser.add_argument('--savePath', type=str, default='drive/MyDrive/springExperiments/', help='Save path')
+    parser.add_argument('--continuing', action='store_true', default=False, help='Whether to continue training')
+    parser.add_argument('--overwrite', action='store_true', help='Whether to overwrite folder')
+    parser.add_argument('--repetitions', type=int, default=1, help='Number of experiment repetitions')
+    parser.add_argument('--timesteps', type=float, default=3e5, help='Number of timesteps per thread')
+    parser.add_argument('--checkpoints', type=int, default=20, help='Number of checkpoints to save')
+
+    parser.add_argument('--env_group', type=int, default=3, help='Environment group to use')
+    parser.add_argument('--style', type=str, default='rich', help='Evaluation output style')
+    parser.add_argument('--size', type=int, default=19, help='View size in tiles')
+    parser.add_argument('--tile_size', type=int, default=1,
+                        help='Size of each tile in pixels')  # not implemented since needs registered env
+    parser.add_argument('--frames', type=int, default=1, help='Number of frames to stack')
+    parser.add_argument('--threads', type=int, default=1, help='Number of cpu threads to use')
+    parser.add_argument('--difficulty', type=int, default=3, help='Difficulty 0-4, lower numbers enable cheats')
+    parser.add_argument('--reverse_order', action='store_true', help='Whether to reverse order of train envs')
+    parser.add_argument('--start_at', type=int, default=0, help='Start at a specific environment')
+    parser.add_argument('--end_at', type=int, default=100, help='End at a specific environment')
+
+    parser.add_argument('--model_class', type=str, default='PPO', help='Model class to use')
+    parser.add_argument('--conv_mult', type=int, default=1, help='Number of first level kernels')
+    parser.add_argument('--hidden_size', type=int, default=64, help='LSTM hidden layer size')
+    parser.add_argument('--width', type=int, default=32, help='MLP features')
+    parser.add_argument('--lr', type=float, default=1e-3, help='Learning rate')
+    parser.add_argument('--batch_size', type=int, default=128, help='Batch size')
+    parser.add_argument('--schedule', type=str, default='linear', help='Learning rate schedule')
+    parser.add_argument('--tqdm_steps', type=int, default=256, help='Number of steps between tqdm updates')
+    parser.add_argument('--buffer_size', type=int, default=2048,
+                        help='Number of steps per thread between weight updates')
+    parser.add_argument('--vecNormalize', action='store_true', help='Whether to normalize the observations')
+    parser.add_argument('--norm_rewards', action='store_true', help='Whether to normalize the rewards')
+    parser.add_argument('--variable', type=str, default='',
+                        help='Variable to override with multiple values, eg "batch_norm=[True,False]", "lr=[0.001,0.0001]" ')
+
+    args = parser.parse_args(args)
+    args_string = str(args)
 
     if args.curriculum:
         # curriculum folder args are all in the new folder, not the pretrained folder
@@ -175,46 +216,5 @@ def train(_parser, _args):
 
 if __name__ == 'main':
 
-    parser = argparse.ArgumentParser(description='Experiment Configuration')
-    # arg meaning it's curriculum learning
-    parser.add_argument('--curriculum', action='store_true', help='Do curriculum learning')
-    parser.add_argument('--pretrain_dir', type=str, default='', help='Folder to load models from for curriculum')
 
-    parser.add_argument('--experiment_name', type=str, default='test', help='Name of experiment')
-    parser.add_argument('--log_dir', type=str, default='/monitor', help='Logging directory')
-    parser.add_argument('--savePath', type=str, default='drive/MyDrive/springExperiments/', help='Save path')
-    parser.add_argument('--continuing', action='store_true', default=False, help='Whether to continue training')
-    parser.add_argument('--overwrite', action='store_true', help='Whether to overwrite folder')
-    parser.add_argument('--repetitions', type=int, default=1, help='Number of experiment repetitions')
-    parser.add_argument('--timesteps', type=float, default=3e5, help='Number of timesteps per thread')
-    parser.add_argument('--checkpoints', type=int, default=20, help='Number of checkpoints to save')
-
-    parser.add_argument('--env_group', type=int, default=3, help='Environment group to use')
-    parser.add_argument('--style', type=str, default='rich', help='Evaluation output style')
-    parser.add_argument('--size', type=int, default=19, help='View size in tiles')
-    parser.add_argument('--tile_size', type=int, default=1,
-                        help='Size of each tile in pixels')  # not implemented since needs registered env
-    parser.add_argument('--frames', type=int, default=1, help='Number of frames to stack')
-    parser.add_argument('--threads', type=int, default=1, help='Number of cpu threads to use')
-    parser.add_argument('--difficulty', type=int, default=3, help='Difficulty 0-4, lower numbers enable cheats')
-    parser.add_argument('--reverse_order', action='store_true', help='Whether to reverse order of train envs')
-    parser.add_argument('--start_at', type=int, default=0, help='Start at a specific environment')
-    parser.add_argument('--end_at', type=int, default=100, help='End at a specific environment')
-
-    parser.add_argument('--model_class', type=str, default='PPO', help='Model class to use')
-    parser.add_argument('--conv_mult', type=int, default=1, help='Number of first level kernels')
-    parser.add_argument('--hidden_size', type=int, default=64, help='LSTM hidden layer size')
-    parser.add_argument('--width', type=int, default=32, help='MLP features')
-    parser.add_argument('--lr', type=float, default=1e-3, help='Learning rate')
-    parser.add_argument('--batch_size', type=int, default=128, help='Batch size')
-    parser.add_argument('--schedule', type=str, default='linear', help='Learning rate schedule')
-    parser.add_argument('--tqdm_steps', type=int, default=256, help='Number of steps between tqdm updates')
-    parser.add_argument('--buffer_size', type=int, default=2048,
-                        help='Number of steps per thread between weight updates')
-    parser.add_argument('--vecNormalize', action='store_true', help='Whether to normalize the observations')
-    parser.add_argument('--norm_rewards', action='store_true', help='Whether to normalize the rewards')
-    parser.add_argument('--variable', type=str, default='',
-                        help='Variable to override with multiple values, eg "batch_norm=[True,False]", "lr=[0.001,0.0001]" ')
-
-    args = parser.parse_args(sys.argv[1:])
     train(parser, sys.argv[1:])
