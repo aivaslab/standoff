@@ -69,7 +69,7 @@ def main(args):
         pretrain_dir = args.pretrain_dir
         print('curriculum learning using', pretrain_dir)
         # load all subdirs of pretrained_folder
-        all_pretrained_folders = [path for path in os.scandir(pretrain_dir) if path.is_dir()]
+        all_pretrained_folders = [path for path in os.scandir(os.path.join(args.savePath, pretrain_dir)) if path.is_dir()]
     else:
         all_pretrained_folders = [None]
 
