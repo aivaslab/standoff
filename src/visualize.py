@@ -265,29 +265,38 @@ def main(args):
     parser.add_argument('--gtr', action='store_true', help='whether to plot gtr')
     parser.add_argument('--matrix', action='store_true', help='whether to plot transfer matrix')
     parser.add_argument('--tsne', action='store_true', help='whether to plot transfer matrix')
+    parser.add_argument('--curriculum', action='store_true', help='Use curriculum subfolders')
     args = parser.parse_args(args)
 
     env_rand = 'det' if args.det_env else 'rand'
     model_rand = 'det' if args.det_model else 'rand'
     prefix = 'gtr' if args.gtr else env_rand + "_" + model_rand
 
-    make_transfer_matrix_new(
-        args.path,
-        prefix,
-        make_tsne=args.tsne,
-        make_matrix=args.matrix)
 
-    train_paths = [os.path.join(f.path) for f in os.scandir(args.path) if f.is_dir()]
-    plot_train_many(train_paths, window=args.window, path=args.path)
+    if args.curriculum:
+        all_trained_folders = [p for p in os.scandir(args.path) if p.is_dir()]
+    else:
+        all_trained_folders = [args.path]
 
-    for k, train_path in enumerate(train_paths):
-        plot_train(train_path, window=args.window)
+    for trained_folder in all_trained_folders:
 
-        train_path = os.path.join(train_path, 'evaluations')
+        make_transfer_matrix_new(
+            trained_folder,
+            prefix,
+            make_tsne=args.tsne,
+            make_matrix=args.matrix)
 
-        make_eval_figures(os.path.join(train_path, prefix + '_data.csv'),
-                          os.path.abspath(os.path.join(train_path, '..', 'figures')), window=args.window,
-                          prefix=prefix)
+        train_paths = [os.path.join(f.path) for f in os.scandir(trained_folder) if f.is_dir()]
+        plot_train_many(train_paths, window=args.window, path=trained_folder)
+
+        for k, train_path in enumerate(train_paths):
+            plot_train(train_path, window=args.window)
+
+            train_path = os.path.join(train_path, 'evaluations')
+
+            make_eval_figures(os.path.join(train_path, prefix + '_data.csv'),
+                              os.path.abspath(os.path.join(train_path, '..', 'figures')), window=args.window,
+                              prefix=prefix)
 
 
 if __name__ == 'main':
