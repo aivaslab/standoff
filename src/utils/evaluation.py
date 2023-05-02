@@ -221,7 +221,7 @@ def ground_truth_evals(eval_env, model, repetitions=25, memory=1, skip_to_releas
     return df
 
 
-def find_checkpoint_models(path):
+def find_checkpoint_models(path, only_last=False):
     full_path = os.path.join(path, 'checkpoints')
     all_models = []
     all_lengths = []
@@ -249,4 +249,9 @@ def find_checkpoint_models(path):
             else:
                 norm_paths.append(checkpoint_path.path)
 
-    return all_models, all_lengths, repetition_names, norm_paths
+    if not only_last:
+        return all_models, all_lengths, repetition_names, norm_paths
+    else:
+        # return only the last model, as determined by the highest value in all_lengths
+        max_index = all_lengths.index(max(all_lengths))
+        return all_models[max_index], all_lengths[max_index], repetition_names[max_index], norm_paths[max_index]

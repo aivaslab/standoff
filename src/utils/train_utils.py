@@ -6,6 +6,8 @@ import shutil
 
 from sb3_contrib import TRPO, RecurrentPPO
 from sb3_contrib.common.recurrent.policies import RecurrentMultiInputActorCriticPolicy, RecurrentActorCriticCnnPolicy, RecurrentActorCriticPolicy
+
+from .evaluation import find_checkpoint_models
 from ..models.custom_cnn import CustomCNN
 from typing import Callable
 from stable_baselines3.common.preprocessing import preprocess_obs
@@ -118,29 +120,8 @@ def start_global_logs(global_logs, short_name, name, configName, model_class, po
     return log_line
     
 def find_last_checkpoint_model(path):
-    full_path = os.path.join(path, 'checkpoints')
-    best_model_path = None
-    best_length = 0
-    paths = os.scandir(full_path)
-    rep_folders = [pathx for pathx in paths if pathx.is_dir() and pathx.name.startswith('rep_')]
-    if rep_folders:
-        for rep_folder in rep_folders:
-            for checkpoint_path in os.scandir(rep_folder.path):
-                if int(checkpoint_path.path[
-                       checkpoint_path.path.find("model_") + 6:checkpoint_path.path.find("_steps")]) > best_length:
-                    best_length = int(
-                        checkpoint_path.path[
-                        checkpoint_path.path.find("model_") + 6:checkpoint_path.path.find("_steps")])
-                    best_model_path = checkpoint_path.path
-    else:
-        for checkpoint_path in os.scandir(full_path):
-            if int(checkpoint_path.path[
-                   checkpoint_path.path.find("model_") + 6:checkpoint_path.path.find("_steps")]) > best_length:
-                best_length = int(
-                    checkpoint_path.path[checkpoint_path.path.find("model_") + 6:checkpoint_path.path.find("_steps")])
-                best_model_path = checkpoint_path.path
+    return find_checkpoint_models(path, only_last=True)
 
-    return best_model_path, best_length
 
 
 def linear_schedule(initial_value: float) -> Callable[[float], float]:
