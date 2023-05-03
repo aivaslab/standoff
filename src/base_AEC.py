@@ -705,14 +705,16 @@ class para_MultiGridEnv(ParallelEnv):
 
         self.observations = {agent: self.gen_agent_obs(a) for agent, a in zip(self.agents, self.agent_instances)}
 
-        robservations = {agent: self.observations[agent] for agent in self.agents}
-        rrewards = {agent: self.rewards[agent] for agent in self.agents}
-        rdones = {agent: self.dones[agent] for agent in self.agents}
-        rinfos = {agent: self.infos[agent] for agent in self.agents}
+        #robservations = {agent: self.observations[agent] for agent in self.agents}
+        #rrewards = {agent: self.rewards[agent] for agent in self.agents}
+        #rdones = {agent: self.dones[agent] for agent in self.agents}
+        #rinfos = {agent: self.infos[agent] for agent in self.agents}
 
         print('reset', robservations, rrewards, rdones, rinfos)
 
-        return robservations, rrewards, rdones, rinfos
+        return self.observations
+
+        #return robservations, rrewards, rdones, rinfos
 
     def add_timer(self, event, time, arg=None):
         if str(time) in self.timers.keys():
