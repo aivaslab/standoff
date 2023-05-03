@@ -41,7 +41,7 @@ if True:
     trainMain(['--experiment_name', experiment_name,
                '--savePath', 'save_dir3',
                '--env_group', '3',
-               '--timesteps', '5e5',
+               '--timesteps', '3e5',
                '--model_class', 'RecurrentPPO',
                '--threads', '16',
                '--overwrite',
