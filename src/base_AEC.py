@@ -710,7 +710,7 @@ class para_MultiGridEnv(ParallelEnv):
         #rdones = {agent: self.dones[agent] for agent in self.agents}
         #rinfos = {agent: self.infos[agent] for agent in self.agents}
 
-        print('reset', robservations, rrewards, rdones, rinfos)
+        #print('reset', robservations, rrewards, rdones, rinfos)
 
         return self.observations
 
