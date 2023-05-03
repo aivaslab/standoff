@@ -1,7 +1,7 @@
 import numpy as np
 
 from ..base_AEC import para_MultiGridEnv, MultiGrid
-from ..objects import Wall, Goal, Curtain, Block, GlassBlock, Box
+from ..objects import Wall, Goal, Curtain, Block, Box
 import random
 from ..puppets import pathfind
 import copy

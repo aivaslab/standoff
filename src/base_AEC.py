@@ -6,7 +6,7 @@ import gym
 import numpy as np
 import functools
 import random
-import traceback
+#import traceback
 
 from .objects import Wall, Goal, Lava, GridAgent, COLORS, WorldObj
 from gym_minigrid.rendering import downsample

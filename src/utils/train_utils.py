@@ -10,23 +10,6 @@ from sb3_contrib.common.recurrent.policies import RecurrentMultiInputActorCritic
 from .evaluation import find_checkpoint_models
 from ..models.custom_cnn import CustomCNN
 from typing import Callable
-from stable_baselines3.common.preprocessing import preprocess_obs
-from gym.spaces import Box
-
-class CustomRecurrentActorCriticCnnPolicy(RecurrentActorCriticCnnPolicy):
-    def forward(self, obs, hidden_state=None, deterministic=False, use_sde=False, *args, **kwargs):
-        print(self.__dict__.keys())
-        
-        if isinstance(obs, Box):
-            dummy_action = th.zeros((1,) + self.action_space.shape)
-            dummy_value = th.zeros((1, 1))
-            dummy_hidden_state = th.zeros(self.lstm_hidden_state_shape)
-            return dummy_action, dummy_value, dummy_hidden_state
-            
-        obs = preprocess_obs(th.tensor(obs), self.observation_space)
-        if use_sde:
-            raise NotImplementedError("SDE not supported for CustomRecurrentActorCriticPolicy")
-        return super().forward(obs, hidden_state, deterministic, *args, **kwargs)
 
 def init_policy(model_class, obs_space, act_space, lr_schedule, width, hidden_size, conv_mult=1, frames=1, net_arch=None, name=''):
     if model_class == RecurrentPPO:
