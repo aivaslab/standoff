@@ -181,7 +181,7 @@ def main(args):
 
                     policy, policy_kwargs = init_policy(model_class, env.observation_space, env.action_space, rate,
                                                         width, hidden_size=hidden_size, conv_mult=conv_mult, frames=frames,
-                                                        name='cnn', net_arch=[width, width])
+                                                        name='cnn', net_arch=[width])
 
                     log_line = start_global_logs(global_logs, args.experiment_name, dir_name, name, model_class, policy,
                                                  global_log_path)
