@@ -2,44 +2,83 @@ from src.train import main as trainMain
 from src.evaluate import main as evalMain
 from src.visualize import main as visualizeMain
 import sys
-import os 
+import os
 
 sys.path.append(os.getcwd())
-#import torch
-#torch.cuda.is_available = lambda : False
+# import torch
+# torch.cuda.is_available = lambda : False
 
 print('train')
-
-if False:
-    trainMain(['--experiment_name', 'redo3',
-            '--env_group', '5',
-            '--timesteps', '1e5',
-            '--checkpoints', '20',
-            '--size', '13',
-            '--model_class', 'PPO',
-            '--threads', '16',
-            '--difficulty', '0',
-            '--vecNormalize',
-            '--overwrite', 
-            '--lr', '1e-4', 
-            #'--hidden_size', '32',
-            '--n_steps', '1024',
-            '--savePath', 'save_dir',
-            '--variable', 'lr=[1e-5, 5e-5, 1e-4, 5e-4, 1e-3, 5e-3]'
-            #'--start_at', '0',
-            #'--end_at', '2',
-            ])
-            
-print('evaluate')
-            
+all_exp_names = []
+curriculum = []
 if True:
-    evalMain(['--path', 'save_dir/redo3',
-            '--env_group', '4',
-            '--make_vids',
-            '--make_evals', '--episodes', '20',
-            '--det_model',
-            ])
-            
+    experiment_name = 'S1'
+    curriculum.append(False)
+    all_exp_names.append(experiment_name)
+    trainMain(['--experiment_name', experiment_name,
+               '--savePath', 'save_dir3',
+               '--env_group', '1',
+               '--timesteps', '5e5',
+               '--model_class', 'RecurrentPPO',
+               '--threads', '16',
+               '--overwrite',
+               ])
+    experiment_name = 'Curriculum-1'
+    all_exp_names.append(experiment_name)
+    curriculum.append(True)
+    trainMain(['--experiment_name', experiment_name,
+               '--savePath', 'save_dir3',
+               '--env_group', 's2+s2b',
+               '--curriculum', '--pretrain_dir', 'S1',
+               '--timesteps', '5e5',
+               '--model_class', 'RecurrentPPO',
+               '--threads', '16',
+               '--overwrite',
+               ])
+    experiment_name = 'DirectRecurrent'
+    all_exp_names.append(experiment_name)
+    curriculum.append(False)
+    trainMain(['--experiment_name', experiment_name,
+               '--savePath', 'save_dir3',
+               '--env_group', '3',
+               '--timesteps', '5e5',
+               '--model_class', 'RecurrentPPO',
+               '--threads', '16',
+               '--overwrite',
+               ])
+    experiment_name = 'DirectFeedforward'
+    all_exp_names.append(experiment_name)
+    curriculum.append(False)
+    trainMain(['--experiment_name', experiment_name,
+               '--savePath', 'save_dir3',
+               '--env_group', '3',
+               '--timesteps', '3e5',
+               '--model_class', 'PPO',
+               '--threads', '16',
+               '--overwrite',
+               ])
+
+print('evaluate')
+
+for experiment_name, cur in zip(all_exp_names, curriculum):
+    if cur:
+        evalMain(['--path', 'save_dir3/' + experiment_name,
+                  '--env_group', '3',
+                  '--curriculum',
+                  # '--make_vids',
+                  '--make_evals', '--episodes', '100',
+                  ])
+    else:
+        evalMain(['--path', 'save_dir3/' + experiment_name,
+                  '--env_group', '3',
+                  # '--make_vids',
+                  '--make_evals', '--episodes', '100',
+                  ])
+
 print('visualize')
-            
-visualizeMain(['--path', 'save_dir/redo-odd-rec', '--det_model'])
+
+for experiment_name, cur in zip(all_exp_names, curriculum):
+    if cur:
+        visualizeMain(['--path', 'save_dir3/' + experiment_name, '--matrix', '--curriculum'])
+    else:
+        visualizeMain(['--path', 'save_dir3/' + experiment_name, '--matrix'])
