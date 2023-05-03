@@ -16,7 +16,8 @@ from pettingzoo import ParallelEnv
 from .agents import occlude_mask
 
 from src.rendering import SimpleImageViewer
-#from gym.envs.classic_control.rendering import SimpleImageViewer
+
+# from gym.envs.classic_control.rendering import SimpleImageViewer
 
 TILE_PIXELS = 9
 NUM_ITERS = 100
@@ -478,10 +479,10 @@ class para_MultiGridEnv(ParallelEnv):
         self.height = height
         self.max_steps = max_steps
         self.reward_decay = reward_decay
-        self.step_reward = step_reward #0
-        self.done_without_box_reward = done_without_box_reward #-10
-        self.distance_from_boxes_reward = -0.5 # increase done penalty based on distance to goals
-        self.penalize_same_selection = -5.0 # penalty for selecting the same box as the opponent
+        self.step_reward = step_reward  # 0
+        self.done_without_box_reward = done_without_box_reward  # -10
+        self.distance_from_boxes_reward = -0.5  # increase done penalty based on distance to goals
+        self.penalize_same_selection = -5.0  # penalty for selecting the same box as the opponent
         self.seed(seed=seed)
         self.agent_spawn_kwargs = agent_spawn_kwargs
         self.ghost_mode = ghost_mode
@@ -514,7 +515,9 @@ class para_MultiGridEnv(ParallelEnv):
             self.rich_observation_layers = [
                 lambda k, mapping: (mapping[k].type == 'Agent' if hasattr(mapping[k], 'type') else False),
                 lambda k, mapping: (mapping[k].type == 'Box' if hasattr(mapping[k], 'type') else False),
-                lambda k, mapping: (mapping[k].get_reward() if hasattr(mapping[k], 'get_reward') else 0),
+                # only get reward if it's not a box
+                lambda k, mapping: (mapping[k].get_reward() if hasattr(mapping[k], 'get_reward') and
+                                                               mapping[k].contains is None else 0),
                 # we can see hidden rewards this way
                 # 'vis'  # show the visibility mask (temporarily disabled)
             ]
@@ -527,10 +530,10 @@ class para_MultiGridEnv(ParallelEnv):
             else:
                 self.rich_observation_layers.append(
                     lambda k, mapping: (
-                            4*(mapping[k].can_overlap() if hasattr(mapping[k], 'can_overlap') else 1) +
-                            2*(mapping[k].see_behind() if hasattr(mapping[k], 'see_behind') else 1) +
-                            1*(mapping[k].volatile() if hasattr(mapping[k], 'volatile') else 0)
-                            ),
+                            4 * (mapping[k].can_overlap() if hasattr(mapping[k], 'can_overlap') else 1) +
+                            2 * (mapping[k].see_behind() if hasattr(mapping[k], 'see_behind') else 1) +
+                            1 * (mapping[k].volatile() if hasattr(mapping[k], 'volatile') else 0)
+                    ),
                 )
             if self.gaze_highlighting:
                 self.rich_observation_layers.append('gaze')
@@ -633,7 +636,7 @@ class para_MultiGridEnv(ParallelEnv):
 
         Here it sets up the state dictionary which is used by step() and the observations dictionary which is used by step() and observe()
         """
-        
+
         if hasattr(self, "hard_reset"):
             self.hard_reset(self.configs[self.config_name])
         else:
@@ -651,7 +654,6 @@ class para_MultiGridEnv(ParallelEnv):
         self.state = {agent: NONE for agent in self.agents_and_puppets()}
         # we don't generate observations for puppets
 
-        self.observations = {agent: self.gen_agent_obs(a) for agent, a in zip(self.agents, self.agent_instances)}
         # self.observations = {agent: self.gen_agent_obs(a) for agent, a in zip(self.agents_and_puppets(), self.agent_and_puppet_instances())}
 
         self.total_step_count += self.step_count
@@ -701,7 +703,14 @@ class para_MultiGridEnv(ParallelEnv):
 
                 agent.activate()
 
-        return self.observations
+        self.observations = {agent: self.gen_agent_obs(a) for agent, a in zip(self.agents, self.agent_instances)}
+
+        robservations = {agent: self.observations[agent] for agent in self.agents}
+        rrewards = {agent: self.rewards[agent] for agent in self.agents}
+        rdones = {agent: self.dones[agent] for agent in self.agents}
+        rinfos = {agent: self.infos[agent] for agent in self.agents}
+
+        return robservations, rrewards, rdones, rinfos
 
     def add_timer(self, event, time, arg=None):
         if str(time) in self.timers.keys():
@@ -879,7 +888,7 @@ class para_MultiGridEnv(ParallelEnv):
                             og_rwd = fwd_cell.get_reward(agent)
 
                             # self.grid.set(*fwd_cell.pos, None) # don't remove box
-                            #fwd_cell.set_reward(self.penalize_same_selection)
+                            # fwd_cell.set_reward(self.penalize_same_selection)
 
                             if bool(self.reward_decay):
                                 rwd = og_rwd * (1.0 - 0.9 * (self.step_count / self.max_steps_real))
@@ -905,7 +914,9 @@ class para_MultiGridEnv(ParallelEnv):
                                 # handle infos
                                 box = (agent.pos[0] - 2) / 2
                                 self.infos[agent_name]["selection"] = box
-                                self.infos[agent_name]["accuracy"] = (box == self.infos[agent_name]["correctSelection"] or self.infos[agent_name]["correctSelection"] == -1)
+                                self.infos[agent_name]["accuracy"] = (
+                                        box == self.infos[agent_name]["correctSelection"] or self.infos[agent_name][
+                                    "correctSelection"] == -1)
                                 self.infos[agent_name]["weakAccuracy"] = (
                                         box == self.infos[agent_name]["correctSelection"] or box ==
                                         self.infos[agent_name]["incorrectSelection"])
@@ -916,7 +927,8 @@ class para_MultiGridEnv(ParallelEnv):
                                 self.infos[agent_name]["selectedPrevSmall"] = (box in self.small_food_locations)
                                 self.infos[agent_name]["selectedPrevNeither"] = not (
                                         box in self.big_food_locations) and not (box in self.small_food_locations)
-                                self.infos[agent_name]["selectedSame"] = same_selection # selected same box as a previous agent
+                                self.infos[agent_name][
+                                    "selectedSame"] = same_selection  # selected same box as a previous agent
                             else:
                                 agent.active = False
                             agent.reward(rwd)
@@ -1064,7 +1076,8 @@ class para_MultiGridEnv(ParallelEnv):
 
         if self.gaze_highlighting is True:
             # get the puppet's view mask
-            puppet_mask = np.zeros((agent.view_size, agent.view_size), dtype="uint8")  # if we don't find a puppet instance? unclear when this happens
+            puppet_mask = np.zeros((agent.view_size, agent.view_size),
+                                   dtype="uint8")  # if we don't find a puppet instance? unclear when this happens
             if self.params['num_puppets'] > 0:
                 for puppet in self.puppet_instances[:self.params['num_puppets']]:
                     if puppet != self.instance_from_name["player_0"]:
@@ -1077,7 +1090,8 @@ class para_MultiGridEnv(ParallelEnv):
                                 self.prev_puppet_mask = np.logical_or(self.prev_puppet_mask, puppet_mask)
                                 puppet_mask = self.prev_puppet_mask
 
-                            puppet_mask = self.slice_gaze_grid(agent, puppet_mask)  # get relative gaze mask in agent view
+                            puppet_mask = self.slice_gaze_grid(agent,
+                                                               puppet_mask)  # get relative gaze mask in agent view
             else:
                 # otherwise puppet mask is just 0s
                 puppet_mask = np.zeros((agent.view_size, agent.view_size), dtype="uint8")
@@ -1102,14 +1116,15 @@ class para_MultiGridEnv(ParallelEnv):
                         obs[i, :, :] = puppet_mask
                 else:
                     obs[i, :, :] = np.multiply(np.vectorize(layer)(view_grid.grid, mapping), visibility)
-                    
-            
+
+            # remove this to speed up training, though it's useful for debugging
+            '''
             if np.isnan(obs).any():
                 print("Warning: NaN values detected in the observations")
                 # To further debug, print relevant variables or arrays here
                 print("visibility:", visibility)
                 print("layers:", self.rich_observation_layers)
-                print("obs", obs)
+                print("obs", obs)'''
             return obs
 
         grid_image = view_grid.render(tile_size=agent.view_tile_size, visible_mask=vis_mask, top_agent=agent,
@@ -1219,7 +1234,7 @@ class para_MultiGridEnv(ParallelEnv):
             return
 
         if mode == "human" and not self.window:
-           self.window = SimpleImageViewer(caption='standoff')
+            self.window = SimpleImageViewer(caption='standoff')
         # Compute which cells are visible to the agent
         highlight_mask = np.full((self.width, self.height), False, dtype=np.bool)
         for agentname, agent in zip(self.agents, self.agent_instances):
