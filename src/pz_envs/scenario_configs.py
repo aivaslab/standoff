@@ -78,6 +78,7 @@ class ScenarioConfigs:
                   7: ["removedInformed2",
                       "removedUninformed2",
                       "misinformed"],
+                  8: ["all"]
                   }
 
     standoff = {
