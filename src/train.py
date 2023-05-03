@@ -36,7 +36,7 @@ def main(args):
 
     parser.add_argument('--env_group', type=str, default='1', help='Environment group to use')
     parser.add_argument('--style', type=str, default='rich', help='Evaluation output style')
-    parser.add_argument('--size', type=int, default=19, help='View size in tiles')
+    parser.add_argument('--size', type=int, default=17, help='View size in tiles')
     parser.add_argument('--tile_size', type=int, default=1,
                         help='Size of each tile in pixels')  # not implemented since needs registered env
     parser.add_argument('--frames', type=int, default=1, help='Number of frames to stack')
@@ -51,13 +51,13 @@ def main(args):
     parser.add_argument('--hidden_size', type=int, default=64, help='LSTM hidden layer size')
     parser.add_argument('--width', type=int, default=32, help='MLP features')
     parser.add_argument('--lr', type=float, default=1e-3, help='Learning rate')
-    parser.add_argument('--batch_size', type=int, default=128, help='Batch size')
+    parser.add_argument('--batch_size', type=int, default=2048, help='Batch size')
     parser.add_argument('--schedule', type=str, default='linear', help='Learning rate schedule')
     parser.add_argument('--tqdm_steps', type=int, default=256, help='Number of steps between tqdm updates')
-    parser.add_argument('--buffer_size', type=int, default=2048,
+    parser.add_argument('--buffer_size', type=int, default=2048*8,
                         help='Number of steps per thread between weight updates')
-    parser.add_argument('--vecNormalize', action='store_true', help='Whether to normalize the observations')
-    parser.add_argument('--norm_rewards', action='store_true', help='Whether to normalize the rewards')
+    parser.add_argument('--vecNormalize', type=bool, default=True, help='Whether to normalize the observations')
+    parser.add_argument('--norm_rewards', type=bool, default=True, help='Whether to normalize the rewards')
     parser.add_argument('--variable', type=str, default='',
                         help='Variable to override with multiple values, eg "batch_norm=[True,False]", "lr=[0.001,0.0001]" ')
 
