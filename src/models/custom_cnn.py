@@ -32,13 +32,13 @@ class CustomCNN(BaseFeaturesExtractor):
                 th.as_tensor(self.get_image_obs(observation_space).sample()[None]).float()
             ).shape[1]
 
-        self.linear = nn.Sequential(nn.Linear(n_flatten, features_dim), nn.ReLU())
+        #self.linear = nn.Sequential(nn.Linear(n_flatten, features_dim), nn.ReLU())
 
     def forward(self, observations: th.Tensor) -> th.Tensor:
         obs = self.get_image_obs(observations)
         #return self.linear(self.cnn(obs.permute(0, 3, 1, 2)))
-        obs = self.cnn(obs)
-        return self.linear(obs)
+        #obs = self.cnn(obs)
+        return self.cnn(obs)
 
     def get_image_obs(self, observations):
         return observations['image'] if type(observations) is dict else observations
