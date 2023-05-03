@@ -280,8 +280,8 @@ class StandoffEnv(para_MultiGridEnv):
 
         # add timers for events
         self.timers = {}
-        curTime = 0
-        self.add_timer(["init"], 0)
+        curTime = 1
+        self.add_timer(["init"], 1)
         for k, event in enumerate(events):
             self.add_timer(event, curTime, arg=event_args[k])
             curTime += 1
