@@ -80,7 +80,7 @@ def evaluate_models(eval_env_names, short_names, models, model_class, model_time
 
 def main(args):
     parser = argparse.ArgumentParser(description='Evaluate models on environments.')
-    parser.add_argument('--env_group', type=int, help='Environment group name')
+    parser.add_argument('--env_group', type=str, default='1', help='Environment group name')
     parser.add_argument('--path', type=str, help='Path to experiment')
     parser.add_argument('--episodes', type=int, default=20, help='Number of episodes to run per environment')
     parser.add_argument('--det_env', action='store_true', help='Deterministic environment')

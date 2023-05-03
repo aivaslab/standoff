@@ -50,10 +50,10 @@ class ScenarioConfigs:
         # ...
     }
 
-    env_groups = {0: ["stage_1", "stage_2"],
-                  1: ["stage_1"],
-                  2: ["stage_2"],
-                  3: ["informedControl",
+    env_groups = {'12': ["stage_1", "stage_2"],
+                  '1': ["stage_1"],
+                  '2': ["stage_2"],
+                  '3': ["informedControl",
                       "partiallyUninformed",
                       "removedInformed2",
                       "removedUninformed2",
@@ -62,7 +62,7 @@ class ScenarioConfigs:
                       "misinformed",
                       "swapped",
                       ],
-                  4: ["stage_1",
+                  '3+12b': ["stage_1",
                       "s2b",
                       "informedControl",
                       "partiallyUninformed",
@@ -73,12 +73,9 @@ class ScenarioConfigs:
                       "misinformed",
                       "swapped",
                       ],
-                  5: ["stage_2", "s2b"],
-                  6: ["all", "s2b", "stage_1"],
-                  7: ["removedInformed2",
-                      "removedUninformed2",
-                      "misinformed"],
-                  8: ["all"]
+                  's2+s2b': ["stage_2", "s2b"],
+                  '1+2b+all': ["all", "s2b", "stage_1"],
+                  'all': ["all"]
                   }
 
     standoff = {

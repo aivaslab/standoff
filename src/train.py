@@ -34,7 +34,7 @@ def main(args):
     parser.add_argument('--timesteps', type=float, default=3e5, help='Number of timesteps per thread')
     parser.add_argument('--checkpoints', type=int, default=20, help='Number of checkpoints to save')
 
-    parser.add_argument('--env_group', type=int, default=3, help='Environment group to use')
+    parser.add_argument('--env_group', type=str, default='1', help='Environment group to use')
     parser.add_argument('--style', type=str, default='rich', help='Evaluation output style')
     parser.add_argument('--size', type=int, default=19, help='View size in tiles')
     parser.add_argument('--tile_size', type=int, default=1,
