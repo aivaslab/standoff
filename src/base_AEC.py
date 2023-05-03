@@ -710,6 +710,8 @@ class para_MultiGridEnv(ParallelEnv):
         rdones = {agent: self.dones[agent] for agent in self.agents}
         rinfos = {agent: self.infos[agent] for agent in self.agents}
 
+        print('reset', robservations, rrewards, rdones, rinfos)
+
         return robservations, rrewards, rdones, rinfos
 
     def add_timer(self, event, time, arg=None):
