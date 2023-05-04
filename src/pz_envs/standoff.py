@@ -87,6 +87,7 @@ class StandoffEnv(para_MultiGridEnv):
         self.random_subject_spawn = True
         self.odd_spawns = True
         self.random_odd_spawns = True # overrides self.odd_spawns when true
+        self.record_supervised_labels = False
 
 
     def hard_reset(self, params=None):
@@ -425,11 +426,23 @@ class StandoffEnv(para_MultiGridEnv):
                         self.target_agent = agent
         if self.new_target:
             self.new_target = False
-            a = self.instance_from_name[self.target_agent]
+            target_agent = self.target_agent
+            a = self.instance_from_name[target_agent]
             if a.active:
-                x = self.agent_goal[self.target_agent] * 2 + 2
+                x = self.agent_goal[target_agent] * 2 + 2
                 path = pathfind(self.grid.volatile, a.pos, (x, y), self.cached_paths)
-                self.infos[self.target_agent]["path"] = path
+                self.infos[target_agent]["path"] = path
+                if self.record_supervised_labels:
+                    one_hot_goal = [0] * self.boxes
+                    one_hot_goal[self.agent_goal[target_agent]] = 1
+                    self.infos[target_agent]["target"] = one_hot_goal
+                    self.infos[target_agent]["vision"] = self.visible_event_list
+                    self.infos[target_agent]["b-loc"] = [self.last_seen_reward[target_agent + str(box)] > 0 for box in range(self.boxes)]
+                    all_rewards_seen = [self.last_seen_reward[target_agent + str(box)] for box in range(self.boxes)]
+                    has_seen_small = 1 if self.smallReward in all_rewards_seen else 0
+                    has_seen_big = 1 if self.bigReward in all_rewards_seen else 0
+                    self.infos[target_agent]["b-exist"] = [has_seen_small, has_seen_big]
+
                 #tile = self.grid.get(x, y)
                 # we cannot track shouldAvoidBig etc here because the treat location might change
         if name == "release":
