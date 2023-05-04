@@ -147,6 +147,7 @@ def main(args):
                 # override some variable with our test case
                 if hasattr(args, var_name):
                     setattr(args, var_name, value)
+                print('hidden_size', hidden_size)
 
                 env_name = f"Standoff-{env_name_temp}-{str(size)}-{style}-{str(difficulty)}-v0"
                 savePath3 = os.path.join(train_path_ext, env_name + name)
