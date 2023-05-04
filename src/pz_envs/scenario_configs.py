@@ -75,7 +75,8 @@ class ScenarioConfigs:
                       ],
                   's2+s2b': ["stage_2", "s2b"],
                   '1+2b+all': ["all", "s2b", "stage_1"],
-                  'all': ["all"]
+                  'all': ["all"],
+                  's2b': ["s2b"]
                   }
 
     standoff = {
