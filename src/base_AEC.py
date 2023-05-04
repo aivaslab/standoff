@@ -538,7 +538,6 @@ class para_MultiGridEnv(ParallelEnv):
             if self.gaze_highlighting:
                 self.rich_observation_layers.append('gaze')
             self.channels = len(self.rich_observation_layers)
-            print(self.channels)
 
         self.observation_spaces = {agent: Box(
             low=0,
