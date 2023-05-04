@@ -148,9 +148,6 @@ def main(args):
                 difficulty = args.difficulty
                 norm_rewards = args.norm_rewards
 
-                print('hidden_size', hidden_size)
-                print('schedule', args.schedule)
-
                 env_name = f"Standoff-{env_name_temp}-{str(size)}-{style}-{str(difficulty)}-v0"
                 savePath3 = os.path.join(train_path_ext, env_name + name)
                 if not os.path.exists(savePath3):
