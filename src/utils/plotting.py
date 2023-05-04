@@ -251,6 +251,7 @@ def plot_transfer_matrix(matrix_data, row_names, col_names, output_file):
 
     plt.tight_layout()
     plt.savefig(output_file)
+    plt.close()
 
 
 def plot_tsne(data, labels, index, color):
@@ -263,6 +264,7 @@ def plot_tsne(data, labels, index, color):
     plt.plot(data[index[0]:index[1], 0], data[index[0]:index[1], 1], marker=None, label=index[2], c=color)
     plt.scatter(data[index[0]:index[1], 0], data[index[0]:index[1], 1], marker='o', label=index[2], s=all_sizes,
                 c=color)
+    plt.close()
 
     # for i, name in enumerate(labels[index[0]:index[1]]):
     #    plt.annotate(name, (data[i + index[0], 0], data[i + index[0], 1]), textcoords="offset points", xytext=(-10, 5), ha='center')
