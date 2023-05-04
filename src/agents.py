@@ -22,7 +22,6 @@ class GridAgentInterface(GridAgent):
             view_tile_size=5,
             view_offset=0,
             observation_style='image',
-            observation_density=1,
             observe_rewards=False,
             observe_position=False,
             observe_orientation=False,

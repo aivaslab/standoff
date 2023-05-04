@@ -438,7 +438,7 @@ class para_MultiGridEnv(ParallelEnv):
             gaze_highlighting=False,
             persistent_gaze_highlighting=False,
             observation_style='rich',
-            observation_density=1,
+            dense_obs=0,
     ):
         """
         The init method takes in environment arguments and
@@ -508,7 +508,7 @@ class para_MultiGridEnv(ParallelEnv):
         self.total_step_count = 0
 
         self.observation_style = observation_style
-        self.observation_density = observation_density
+        self.dense_obs = dense_obs
         self.channels = 3
 
         if self.observation_style == 'rich':
@@ -521,11 +521,11 @@ class para_MultiGridEnv(ParallelEnv):
                 # we can see hidden rewards this way
                 # 'vis'  # show the visibility mask (temporarily disabled)
             ]
-            if self.observation_density == 0:
+            if self.dense_obs == 0:
                 self.rich_observation_layers.extend([
-                    lambda k, mapping: (mapping[k].can_overlap() if hasattr(mapping[k], 'can_overlap') else True),
-                    lambda k, mapping: (mapping[k].volatile() if hasattr(mapping[k], 'volatile') else False),
-                    lambda k, mapping: (mapping[k].see_behind() if hasattr(mapping[k], 'see_behind') else True),
+                    lambda k, mapping: (mapping[k].can_overlap() if hasattr(mapping[k], 'can_overlap') else 1),
+                    lambda k, mapping: (mapping[k].volatile() if hasattr(mapping[k], 'volatile') else 0),
+                    lambda k, mapping: (mapping[k].see_behind() if hasattr(mapping[k], 'see_behind') else 1),
                 ])
             else:
                 self.rich_observation_layers.append(
