@@ -88,7 +88,7 @@ class TqdmCallback(BaseCallback):
         self.iteration_size = threads * record_every
 
     def _on_training_start(self):
-        self.progress_bar = tqdm(total=self.locals['total_timesteps'])
+        self.progress_bar = tqdm(total=self.locals['total_timesteps'], smoothing=0.05)
 
     def _on_step(self):
         self.progress_bar.update(self.iteration_size)

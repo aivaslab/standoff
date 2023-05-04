@@ -43,7 +43,7 @@ def evaluate_models(eval_env_names, short_names, models, model_class, model_time
     if not use_gtr:
         prefix += '_det' if det_model else '_rand'
 
-    progress_bar = tqdm(total=len(models)*len(eval_env_names)*episodes)
+    progress_bar = tqdm(total=len(models)*len(eval_env_names)*episodes, smoothing=0.05)
 
     for k, (short_name, eval_env_name) in enumerate(zip(short_names, eval_env_names)):
         env = make_env_comp(eval_env_name, rank=k+1, skip_vecNorm=True, **env_kwargs)
