@@ -243,7 +243,8 @@ def plot_transfer_matrix(matrix_data, row_names, col_names, output_file):
     ax.set_yticklabels(row_names)
 
     plt.tick_params(axis='x', rotation=90)
-    ax.imshow(matrix_data, cmap=plt.cm.Blues, aspect='auto')
+    ax.imshow(matrix_data, cmap=plt.cm.Blues, aspect='auto', vmin=0, vmax=1)
+
 
     for i in range(len(row_names)):
         for j in range(len(col_names)):
