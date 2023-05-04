@@ -852,16 +852,16 @@ class para_MultiGridEnv(ParallelEnv):
 
                             # send signal to test next action outputs
 
-                            if "Test" in str(fwd_cell.__class__):
-                                self.infos[agent_name]["test"] = fwd_cell.dir
+                            #if "Test" in str(fwd_cell.__class__):
+                            #   self.infos[agent_name]["test"] = fwd_cell.dir
 
                             # send signal to override next action
-                            if "Arrow" in str(fwd_cell.__class__):
+                            '''if "Arrow" in str(fwd_cell.__class__):
                                 relative_dir = (agent.dir - fwd_cell.dir) % 4
                                 if relative_dir == 3:
                                     self.infos[agent_name]["act"] = 0
                                 if relative_dir == 1:
-                                    self.infos[agent_name]["act"] = 1
+                                    self.infos[agent_name]["act"] = 1'''
 
                         # Remove agent from old cell
                         if cur_cell == agent:
