@@ -102,7 +102,7 @@ def env_from_config(env_config, randomize_seed=True):
     return env_class(**env_kwargs)
 
 
-for observation_style in 'rich':
+for observation_style in ['rich']:
     for view_size in [17, 19]:
         for difficulty in range(4):
             for stage in range(3):
