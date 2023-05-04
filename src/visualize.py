@@ -112,6 +112,7 @@ def make_transfer_matrix_new(save_path, prefix, make_matrix=False, make_tsne=Fal
             plt.legend([x[2] for x in indices], bbox_to_anchor=(1.04, 1), loc="upper left")
             plt.tight_layout()
             plt.savefig(output_file)
+            plt.close()
 
 
 def make_eval_figures(path, figures_path, window=1, prefix=''):
