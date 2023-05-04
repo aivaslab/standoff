@@ -128,6 +128,10 @@ def main(args):
 
             for name, value in zip(na_names, var_values):  # use for any variable to change
 
+                # override some variable with our test case
+                if hasattr(args, var_name):
+                    setattr(args, var_name, value)
+
                 conv_mult = args.conv_mult
                 frames = args.frames
                 hidden_size = args.hidden_size
@@ -144,9 +148,6 @@ def main(args):
                 difficulty = args.difficulty
                 norm_rewards = args.norm_rewards
 
-                # override some variable with our test case
-                if hasattr(args, var_name):
-                    setattr(args, var_name, value)
                 print('hidden_size', hidden_size)
 
                 env_name = f"Standoff-{env_name_temp}-{str(size)}-{style}-{str(difficulty)}-v0"
