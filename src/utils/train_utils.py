@@ -28,6 +28,7 @@ def init_policy(model_class, obs_space, act_space, lr_schedule, width, hidden_si
                 'features_dim': width,
                 'conv_mult': conv_mult,
                 'frames': 1,
+                'observation_space': obs_space,
             },
         }
         #policy = RecurrentActorCriticCnnPolicy(obs_space, act_space, lr_schedule, **policy_kwargs)
@@ -42,7 +43,8 @@ def init_policy(model_class, obs_space, act_space, lr_schedule, width, hidden_si
                                 'activation_fn': th.nn.ReLU,
                                 'net_arch': net_arch,
                                 'features_extractor_kwargs':
-                                    {'features_dim': width, 'conv_mult': conv_mult, 'frames': frames},
+                                    {'features_dim': width, 'conv_mult': conv_mult, 'frames': frames,
+                                    'observation_space': obs_space,},
                             }
     return policy, policy_kwargs
 
