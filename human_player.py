@@ -46,9 +46,9 @@ env_config =  {
     "max_steps": 50,
     "respawn": True,
     "ghost_mode": False,
-    "reward_decay": True,
+    "reward_decay": False,
     "width": 9,
-    "height": 9
+    "height": 9,
 }
 
 player_interface_config = {
@@ -62,10 +62,10 @@ player_interface_config = {
     "move_type": 0
 }
 puppet_interface_config = {
-    "view_size": 15,
+    "view_size": 5,
     "view_offset": 3,
     "view_tile_size": 48,
-    "observation_style": "image",
+    "observation_style": "rich",
     "see_through_walls": False,
     "color": "red",
     #"move_type": 1,
@@ -73,7 +73,7 @@ puppet_interface_config = {
 }
 configs = ScenarioConfigs().standoff
 
-configName = 'all'
+configName = 'random'
 reset_configs = {**configs["defaults"],  **configs[configName]}
 
 if isinstance(reset_configs["num_agents"], list):
@@ -97,6 +97,7 @@ env_config['persistent_gaze_highlighting'] = (difficulty < 2)
 env_name = 'Standoff-S3-' + configName.replace(" ", "") + '-' + str(difficulty) + '-v0'
 
 env = env_from_config(env_config)
+env.record_supervised_labels = True
 if hasattr(env, "hard_reset"):
     env.hard_reset(reset_configs)
 
@@ -113,15 +114,26 @@ for i in range(5):
     obs = env.reset()
     print(env_name, env.gaze_highlighting, env.persistent_gaze_highlighting, env.opponent_visible_decs, env.subject_visible_decs, env.persistent_treat_images)
 
+    #print(np.round(obs['player_0'] * 10).sum(axis=0).astype(int))
     while True:
         #print(env, "agents", env.agents, "puppets", env.puppets, "done_penalties", env.done_without_box_reward, env.distance_from_boxes_reward)
         env.render(mode="human", show_agent_views=True, tile_size=15)
-        player_action = human.action_step(obs['player_0'])
         #print(np.round(obs['player_0']*10).sum(axis=0).astype(int))
+        #print([a.pos for a in env.puppet_instances])
+        player_action = human.action_step(obs['player_0'])
 
         agent_actions = {'player_0': player_action}
 
         next_obs, rew, done, info = env.step(agent_actions)
+        print(info)
+
+        if "player_1" in info:
+            print("loc", info["player_1"]["loc"])
+            print("bloc", info["player_1"]["b-loc"])
+            print("ex", info["player_1"]["exist"])
+            print("bex", info["player_1"]["b-exist"])
+            print("vis", info["player_1"]["vision"])
+            print("tar", info["player_1"]["target"])
         
         human.save_step(
             obs['player_0'], player_action, rew['player_0'], done
@@ -130,6 +142,7 @@ for i in range(5):
         obs = next_obs
 
         if done['player_0'] == True:
+            print(info['player_0']['correctSelection'])
             break
 
 human.end_episode()
