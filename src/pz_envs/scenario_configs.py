@@ -92,7 +92,10 @@ class ScenarioConfigs:
             "num_agents": 1,
             "events": [[['bait', 'empty'], ['bait', 'empty']]]  # list, event, args
         },
-
+        "random": {
+            "num_puppets": [1],
+            "events": [[['random']] * n for n in range(2, 6)]
+        },
         "stage_1": {
             "num_puppets": [0],
             "boxes": [5],

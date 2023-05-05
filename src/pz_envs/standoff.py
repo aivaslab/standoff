@@ -265,31 +265,63 @@ class StandoffEnv(para_MultiGridEnv):
         empty_buckets = [i for i in range(boxes)]
         event_args = [None for _ in range(len(events))]
         bait_args = [self.smallReward, self.bigReward]
-        for k, event in enumerate(events):
-            type = event[0]
-            for x in range(len(event)):
-                if event[x] == "empty":
-                    event[x] = empty_buckets.pop(random.randrange(
-                        len(empty_buckets)) if not self.deterministic else self.get_deterministic_seed() % len(
-                        empty_buckets))
-                elif event[x] == "else":
-                    available_spots = [i for i in range(boxes) if i != event[x - 1]]
-                    event[x] = available_spots.pop(random.randrange(
-                        len(available_spots)) if not self.deterministic else self.get_deterministic_seed() % len(
-                        available_spots))
-                elif isinstance(event[x], int):
-                    event[x] = events[event[x]][1]  # get first location
 
-            if type == "bait":
-                event_args[k] = bait_args.pop(
-                    random.randrange(len(bait_args)) if not self.deterministic else self.get_deterministic_seed() % len(
-                        bait_args))
-            elif type == "remove":
-                empty_buckets.append(event[1])
-            elif type == "obscure" or type == "reveal":
-                # hardcoded, will not work for multiple conspecifics
-                event_args[k] = "player_1"
-            # could also add functionality for moving empty buckets which are swapped, but that is not used in any tasks
+        baited = False
+        obscured = False
+        for k, event in enumerate(events):
+            event_type = event[0]
+
+            if event_type == "random":
+                event_list = ["bait"]
+                if baited:
+                    event_list += ["swap"]
+                if obscured:
+                    event_list += ["reveal"]
+                else:
+                    event_list += ["obscure"]
+                event_type = random.choice(event_list)
+                if event_type == "bait":
+                    event = ["bait", random.randrange(boxes)]
+                    baited = True
+                    event_args[k] = random.choice(bait_args)
+                elif event_type == "obscure":
+                    event = ["obscure", "player_1"]
+                    obscured = True
+                    event_args[k] = event[1]
+                elif event_type == "reveal":
+                    event = ["reveal", "player_1"]
+                    obscured = False
+                    event_args[k] = event[1]
+                elif event_type == "swap":
+                    event = ["swap", random.randrange(boxes), random.randrange(boxes)]
+                    event_args[k] = event[1:]
+                events[k] = event
+
+            else:
+                for x in range(len(event)):
+
+                    if event[x] == "empty":
+                        event[x] = empty_buckets.pop(random.randrange(
+                            len(empty_buckets)) if not self.deterministic else self.get_deterministic_seed() % len(
+                            empty_buckets))
+                    elif event[x] == "else":
+                        available_spots = [i for i in range(boxes) if i != event[x - 1]]
+                        event[x] = available_spots.pop(random.randrange(
+                            len(available_spots)) if not self.deterministic else self.get_deterministic_seed() % len(
+                            available_spots))
+                    elif isinstance(event[x], int):
+                        event[x] = events[event[x]][1]  # get first location
+
+                if event_type == "bait":
+                    event_args[k] = bait_args.pop(
+                        random.randrange(len(bait_args)) if not self.deterministic else self.get_deterministic_seed() % len(
+                            bait_args))
+                elif event_type == "remove":
+                    empty_buckets.append(event[1])
+                elif event_type == "obscure" or event_type == "reveal":
+                    # hardcoded, will not work for multiple conspecifics
+                    event_args[k] = "player_1"
+                # could also add functionality for moving empty buckets which are swapped, but that is not used in any tasks
 
         # add timers for events
         self.timers = {}
@@ -472,10 +504,10 @@ class StandoffEnv(para_MultiGridEnv):
             # if agent's goal of player_1 matches big treat location, then shouldAvoidBig is True
             if len(self.puppets):
                 self.infos['player_0']['puppet_goal'] = self.agent_goal[self.puppets[-1]]
-                if self.agent_goal[self.puppets[-1]] == self.big_food_locations[-1]:
+                if len(self.big_food_locations) > 0 and self.agent_goal[self.puppets[-1]] == self.big_food_locations[-1]:
                     self.infos['player_0']['shouldAvoidBig'] = not self.subject_is_dominant
                     self.infos['player_0']['shouldAvoidSmall'] = False
-                elif self.agent_goal[self.puppets[-1]] == self.small_food_locations[-1]:
+                elif len(self.small_food_locations) > 0 and self.agent_goal[self.puppets[-1]] == self.small_food_locations[-1]:
                     self.infos['player_0']['shouldAvoidSmall'] = not self.subject_is_dominant
                     self.infos['player_0']['shouldAvoidBig'] = False
                 else:
