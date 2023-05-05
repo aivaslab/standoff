@@ -192,8 +192,7 @@ def main(args):
                                               repetition=repetition, threads=args.threads, learning_rate=rate,
                                               args_string=args_string)
 
-                    print(env_name, model_class, name, savePath3, str(timedelta(seconds=time.time() - start)),
-                          policy_kwargs)
+                    print(env_name, name, savePath3, str(timedelta(seconds=time.time() - start)), policy_kwargs)
                     model.learn(total_timesteps=args.timesteps * args.threads, callback=callback)
                     print('finished, time=', str(timedelta(seconds=time.time() - start)))
 
