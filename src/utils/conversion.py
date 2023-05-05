@@ -25,7 +25,9 @@ def get_json_params(path):
         configName = data['configName']
         vecNormalize = data['vecNormalize'] if 'vecNormalize' in data.keys() else True
         norm_rewards = data['norm_rewards'] if 'norm_rewards' in data.keys() else True
-    return model_class, size, style, frames, vecNormalize, norm_rewards, difficulty, threads, configName
+        normalize_images = data['normalize_images'] if 'normalize_images' in data.keys() else True
+        shared_lstm = data['shared_lstm'] if 'shared_lstm' in data.keys() else False
+    return model_class, size, style, frames, vecNormalize, norm_rewards, difficulty, threads, configName, shared_lstm, normalize_images
 
 
 def make_env_comp(env_name, frames=1, vecNormalize=False, norm_rewards=False, size=32, style='rich', monitor_path='dir',

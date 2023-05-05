@@ -49,6 +49,8 @@ def main(args):
     parser.add_argument('--model_class', type=str, default='PPO', help='Model class to use')
     parser.add_argument('--conv_mult', type=int, default=1, help='Number of first level kernels')
     parser.add_argument('--hidden_size', type=int, default=64, help='LSTM hidden layer size')
+    parser.add_argument('--shared_lstm', type=bool, default=False, help='Share LSTM layer')
+    parser.add_argument('--normalize_images', type=bool, default=True, help='Divide obs by 255')
     parser.add_argument('--width', type=int, default=32, help='MLP features')
     parser.add_argument('--lr', type=float, default=1e-3, help='Learning rate')
     parser.add_argument('--batch_size', type=int, default=2048, help='Batch size')
@@ -96,9 +98,6 @@ def main(args):
             envs.append(f"{name}")
     log_dir = args.log_dir
     os.makedirs(log_dir, exist_ok=True)
-    timesteps = args.timesteps
-    checkpoints = args.checkpoints
-    repetitions = args.repetitions
 
     class_dict = {'PPO': PPO, 'A2C': A2C, 'TRPO': TRPO, 'RecurrentPPO': RecurrentPPO}
 
@@ -106,7 +105,7 @@ def main(args):
                                                                               continuing=args.continuing,
                                                                               overwrite=args.overwrite)
 
-    recordEvery = int(timesteps / checkpoints) if checkpoints > 0 else 2048000000
+    recordEvery = int(args.timesteps / args.checkpoints) if args.checkpoints > 0 else 2048000000
 
     # if curriculum, we want to loop through each pretrained folder and update savepath2 to be a new subdirectory
 
@@ -132,56 +131,45 @@ def main(args):
                 if hasattr(args, var_name):
                     setattr(args, var_name, value)
 
-                conv_mult = args.conv_mult
-                frames = args.frames
-                hidden_size = args.hidden_size
-                width = args.width
-                size = args.size
                 rate = linear_schedule(args.lr) if args.schedule == 'linear' else args.lr
-                batch_size = args.batch_size
-                buffer_size = args.buffer_size
-                style = args.style
-                tqdm_steps = args.tqdm_steps
-                vecNormalize = args.vecNormalize
                 model_class = class_dict[args.model_class]
-                threads = args.threads
-                difficulty = args.difficulty
-                norm_rewards = args.norm_rewards
 
-                env_name = f"Standoff-{env_name_temp}-{str(size)}-{style}-{str(difficulty)}-v0"
+                env_name = f"Standoff-{env_name_temp}-{str(args.size)}-{args.style}-{str(args.difficulty)}-v0"
                 savePath3 = os.path.join(train_path_ext, env_name + name)
                 if not os.path.exists(savePath3):
                     os.mkdir(savePath3)
 
                 if args.curriculum:
-                    model_class, size, style, frames, vecNormalize, norm_rewards, difficulty, threads, _ = get_json_params(
+                    model_class, size, style, frames, args.vecNormalize, norm_rewards, difficulty, threads, _ = get_json_params(
                         os.path.join(this_pretrained_folder, 'json_data.json'))
                     with open(os.path.join(savePath3, 'json_data.json'), 'w') as json_file:
-                        json.dump({'model_class': model_class.__name__, 'size': size, 'frames': frames, 'style': style,
-                                   'vecNormalize': vecNormalize, 'norm_rewards': norm_rewards, 'difficulty': difficulty,
-                                   'threads': threads, 'configName': env_name_temp}, json_file)
+                        json.dump({'model_class': model_class.__name__, 'size': args.size, 'frames': args.frames, 'style': args.style,
+                                   'vecNormalize': args.vecNormalize, 'norm_rewards': args.norm_rewards, 'difficulty': args.difficulty,
+                                   'threads': threads, 'configName': env_name_temp, 'shared_lstm': args.shared_lstm,
+                                   'normalize_images': args.normalize_images}, json_file)
                 elif continuing:
-                    model_class, size, style, frames, vecNormalize, norm_rewards, difficulty, threads, _ = get_json_params(
+                    model_class, size, style, frames, args.vecNormalize, norm_rewards, difficulty, threads, _ = get_json_params(
                         os.path.join(savePath3, 'json_data.json'))
                     # note that continuing will overwrite these things! It does not implement continuing under different conditions for curricula
                 else:
                     with open(os.path.join(savePath3, 'json_data.json'), 'w') as json_file:
-                        json.dump({'model_class': model_class.__name__, 'size': size, 'frames': frames, 'style': style,
-                                   'vecNormalize': vecNormalize, 'norm_rewards': norm_rewards, 'difficulty': difficulty,
-                                   'threads': threads, 'configName': env_name_temp}, json_file)
-                print('model_class: ', model_class.__name__, 'size: ', size, 'style: ', style, 'frames: ', frames,
-                      'vecNormalize: ', vecNormalize)
+                        json.dump({'model_class': model_class.__name__, 'size': args.size, 'frames': args.frames, 'style': args.style,
+                                   'vecNormalize': args.vecNormalize, 'norm_rewards': args.norm_rewards, 'difficulty': args.difficulty,
+                                   'threads': args.threads, 'configName': env_name_temp, 'shared_lstm': args.shared_lstm,
+                                   'normalize_images': args.normalize_images}, json_file)
+                print('model_class: ', model_class.__name__, 'size: ', args.size, 'style: ', args.style, 'frames: ', args.frames,
+                      'vecNormalize: ', args.vecNormalize)
 
-                for repetition in range(repetitions):
+                for repetition in range(args.repetitions):
                     start = time.time()
                     print('name: ', name, dir_name)
-                    env = make_env_comp(env_name, frames=frames, size=size, style=style, monitor_path=savePath3, rank=0,
-                                        vecNormalize=vecNormalize, norm_rewards=norm_rewards, threads=threads,
+                    env = make_env_comp(env_name, frames=args.frames, size=args.size, style=args.style, monitor_path=savePath3, rank=0,
+                                        vecNormalize=args.vecNormalize, norm_rewards=args.norm_rewards, threads=args.threads,
                                         load_path=vec_norm_path)
 
                     policy, policy_kwargs = init_policy(model_class, env.observation_space, env.action_space, rate,
-                                                        width, hidden_size=hidden_size, conv_mult=conv_mult, frames=frames,
-                                                        name='cnn', net_arch=[width])
+                                                        args.width, hidden_size=args.hidden_size, conv_mult=args.conv_mult, frames=args.frames,
+                                                        name='cnn', net_arch=[args.width])
 
                     log_line = start_global_logs(global_logs, args.experiment_name, dir_name, name, model_class, policy,
                                                  global_log_path)
@@ -197,16 +185,16 @@ def main(args):
                         else:
                             model = model_class(policy, env=env, verbose=0,
                                                 learning_rate=rate,
-                                                n_steps=buffer_size // threads,
-                                                batch_size=batch_size,
+                                                n_steps=args.buffer_size // args.threads,
+                                                batch_size=args.batch_size,
                                                 policy_kwargs=policy_kwargs)
-                    callback = make_callbacks(savePath3, env, batch_size, tqdm_steps, recordEvery, model,
-                                              repetition=repetition, threads=threads, learning_rate=rate,
+                    callback = make_callbacks(savePath3, env, args.batch_size, args.tqdm_steps, recordEvery, model,
+                                              repetition=repetition, threads=args.threads, learning_rate=rate,
                                               args_string=args_string)
 
                     print(env_name, model_class, name, savePath3, str(timedelta(seconds=time.time() - start)),
                           policy_kwargs)
-                    model.learn(total_timesteps=timesteps * threads, callback=callback)
+                    model.learn(total_timesteps=args.timesteps * args.threads, callback=callback)
                     print('finished, time=', str(timedelta(seconds=time.time() - start)))
 
                     del env

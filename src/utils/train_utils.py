@@ -11,7 +11,7 @@ from .evaluation import find_checkpoint_models
 from ..models.custom_cnn import CustomCNN
 from typing import Callable
 
-def init_policy(model_class, obs_space, act_space, lr_schedule, width, hidden_size, conv_mult=1, frames=1, net_arch=None, name=''):
+def init_policy(model_class, obs_space, act_space, lr_schedule, width, hidden_size, conv_mult=1, frames=1, net_arch=None, shared_lstm=False, normalize_images=True, name=''):
     if model_class == RecurrentPPO:
         '''print('using recurrent policy')
         net_arch = [
@@ -23,6 +23,8 @@ def init_policy(model_class, obs_space, act_space, lr_schedule, width, hidden_si
             'net_arch': net_arch,
             'features_extractor_class': CustomCNN,
             'lstm_hidden_size': hidden_size,
+            'shared_lstm': shared_lstm,
+            'normalize_images': normalize_images,
             'activation_fn': th.nn.ReLU,
             'features_extractor_kwargs': {
                 'features_dim': width,
@@ -41,6 +43,7 @@ def init_policy(model_class, obs_space, act_space, lr_schedule, width, hidden_si
             policy_kwargs = {'features_extractor_class': CustomCNN,
                                 'activation_fn': th.nn.ReLU,
                                 'net_arch': net_arch,
+                                'normalize_images': normalize_images,
                                 'features_extractor_kwargs':
                                     {'features_dim': width, 'conv_mult': conv_mult, 'frames': frames,
                                     },
