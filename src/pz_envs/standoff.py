@@ -467,39 +467,43 @@ class StandoffEnv(para_MultiGridEnv):
                         self.agent_goal[agent] = box
                         self.best_reward[agent] = reward
                         self.new_target = True
-                        self.target_agent = agent
+                        target_agent = agent
         if self.new_target:
             self.new_target = False
-            target_agent = self.target_agent
             a = self.instance_from_name[target_agent]
             if a.active:
                 x = self.agent_goal[target_agent] * 2 + 2
                 path = pathfind(self.grid.volatile, a.pos, (x, y), self.cached_paths)
                 self.infos[target_agent]["path"] = path
-                if self.record_supervised_labels:
-                    one_hot_goal = [0] * self.boxes
-                    one_hot_goal[self.agent_goal[target_agent]] = 1
-                    self.infos[target_agent]["target"] = one_hot_goal
-                    self.infos[target_agent]["vision"] = self.visible_event_list
-                    real_boxes = [self.grid.get(box * 2 + 2, y) for box in range(self.boxes)]
-                    all_rewards_seen = [self.last_seen_reward[target_agent + str(box)] for box in range(self.boxes)]
-                    self.infos[target_agent]["loc"] = [
-                        [1, 0] if box.reward == self.bigReward else
-                        [0, 1] if box.reward == self.smallReward else
-                        [0, 0]
-                        for box in real_boxes
-                    ]
-                    self.infos[target_agent]["b-loc"] = [
-                        [1, 0] if reward == self.bigReward else
-                        [0, 1] if reward == self.smallReward else
-                        [0, 0]
-                        for reward in all_rewards_seen
-                    ]
-                    self.infos[target_agent]["b-exist"] = [1 if self.smallReward in all_rewards_seen else 0,
-                                                           1 if self.bigReward in all_rewards_seen else 0]
-
                 # tile = self.grid.get(x, y)
                 # we cannot track shouldAvoidBig etc here because the treat location might change
+        if self.record_supervised_labels:
+            target_agent = "player_1"
+            print('recording supervised labels', target_agent)
+            one_hot_goal = [0] * self.boxes
+            one_hot_goal[self.agent_goal[target_agent]] = 1
+            self.infos['player_0']["target"] = one_hot_goal
+            self.infos['player_0']["vision"] = self.visible_event_list[-1]
+            real_boxes = [self.grid.get(box * 2 + 2, y) for box in range(self.boxes)]
+            real_box_rewards = [box.reward if box is not None and hasattr(box, "reward") else 0 for box in real_boxes]
+            all_rewards_seen = [self.last_seen_reward[target_agent + str(box)] for box in range(self.boxes)]
+            self.infos['player_0']["loc"] = [
+                [1, 0] if r == self.bigReward else
+                [0, 1] if r == self.smallReward else
+                [0, 0]
+                for r in real_box_rewards
+            ]
+            self.infos['player_0']["b-loc"] = [
+                [1, 0] if reward == self.bigReward else
+                [0, 1] if reward == self.smallReward else
+                [0, 0]
+                for reward in all_rewards_seen
+            ]
+            self.infos['player_0']["exist"] = [1 if self.bigReward in real_box_rewards else 0,
+                                               1 if self.smallReward in real_box_rewards else 0]
+            self.infos['player_0']["b-exist"] = [1 if self.bigReward in all_rewards_seen else 0,
+                                                   1 if self.smallReward in all_rewards_seen else 0]
+
         if name == "release":
             # if agent's goal of player_1 matches big treat location, then shouldAvoidBig is True
             if len(self.puppets):
