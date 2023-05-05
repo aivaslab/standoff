@@ -12,18 +12,14 @@ from ..models.custom_cnn import CustomCNN
 from typing import Callable
 
 def init_policy(model_class, obs_space, act_space, lr_schedule, width, hidden_size, conv_mult=1, frames=1, net_arch=None, shared_lstm=False, normalize_images=True, name=''):
+    enable_critic_lstm = not shared_lstm
     if model_class == RecurrentPPO:
-        '''print('using recurrent policy')
-        net_arch = [
-                {'activation_fn': th.nn.ReLU, 'pi': [32, 32, 32, 32], 'vf': [33, 32, 32, 32]},
-                {'lstm': 55},
-                {'activation_fn': th.nn.ReLU, 'pi': [25], 'vf': [26]}
-            ]'''
         policy_kwargs = {
             'net_arch': net_arch,
             'features_extractor_class': CustomCNN,
             'lstm_hidden_size': hidden_size,
             'shared_lstm': shared_lstm,
+            'enable_critic_lstm': enable_critic_lstm,
             'normalize_images': normalize_images,
             'activation_fn': th.nn.ReLU,
             'features_extractor_kwargs': {
