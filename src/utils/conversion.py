@@ -11,23 +11,23 @@ from sb3_contrib import TRPO, RecurrentPPO
 class_dict = {'PPO': PPO, 'A2C': A2C, 'TRPO': TRPO, 'RecurrentPPO': RecurrentPPO}
 
 
-def get_json_params(path):
+def get_json_params(path, args):
     with open(path) as json_data:
         data = json.load(json_data)
         model_class = data['model_class']
         if model_class in class_dict.keys():
             model_class = class_dict[model_class]
-        size = data['size']
-        style = data['style']
-        frames = data['frames']
-        threads = data['threads']
-        difficulty = data['difficulty']
+        args.size = data['size']
+        args.style = data['style']
+        args.frames = data['frames']
+        args.threads = data['threads']
+        args.difficulty = data['difficulty']
         configName = data['configName']
-        vecNormalize = data['vecNormalize'] if 'vecNormalize' in data.keys() else True
-        norm_rewards = data['norm_rewards'] if 'norm_rewards' in data.keys() else True
-        normalize_images = data['normalize_images'] if 'normalize_images' in data.keys() else True
-        shared_lstm = data['shared_lstm'] if 'shared_lstm' in data.keys() else False
-    return model_class, size, style, frames, vecNormalize, norm_rewards, difficulty, threads, configName, shared_lstm, normalize_images
+        args.vecNormalize = data['vecNormalize'] if 'vecNormalize' in data.keys() else True
+        args.norm_rewards = data['norm_rewards'] if 'norm_rewards' in data.keys() else True
+        args.normalize_images = data['normalize_images'] if 'normalize_images' in data.keys() else True
+        args.shared_lstm = data['shared_lstm'] if 'shared_lstm' in data.keys() else False
+    return model_class, configName, args
 
 
 def make_env_comp(env_name, frames=1, vecNormalize=False, norm_rewards=False, size=32, style='rich', monitor_path='dir',

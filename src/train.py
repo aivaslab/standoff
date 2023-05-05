@@ -140,16 +140,16 @@ def main(args):
                     os.mkdir(savePath3)
 
                 if args.curriculum:
-                    model_class, args.size, args.style, args.frames, args.vecNormalize, args.norm_rewards, args.difficulty, args.threads, _, args.shared_lstm, args.normalize_images = get_json_params(
-                        os.path.join(this_pretrained_folder, 'json_data.json'))
+                    model_class, _, args = get_json_params(
+                        os.path.join(this_pretrained_folder, 'json_data.json'), args)
                     with open(os.path.join(savePath3, 'json_data.json'), 'w') as json_file:
                         json.dump({'model_class': model_class.__name__, 'size': args.size, 'frames': args.frames, 'style': args.style,
                                    'vecNormalize': args.vecNormalize, 'norm_rewards': args.norm_rewards, 'difficulty': args.difficulty,
                                    'threads': args.threads, 'configName': env_name_temp, 'shared_lstm': args.shared_lstm,
                                    'normalize_images': args.normalize_images}, json_file)
                 elif continuing:
-                    model_class, args.size, args.style, args.frames, args.vecNormalize, args.norm_rewards, args.difficulty, args.threads, _, args.shared_lstm, args.normalize_images = get_json_params(
-                        os.path.join(savePath3, 'json_data.json'))
+                    model_class, _, args = get_json_params(
+                        os.path.join(savePath3, 'json_data.json'), args)
                     # note that continuing will overwrite these things! It does not implement continuing under different conditions for curricula
                 else:
                     with open(os.path.join(savePath3, 'json_data.json'), 'w') as json_file:
