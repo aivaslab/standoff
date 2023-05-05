@@ -502,7 +502,7 @@ class StandoffEnv(para_MultiGridEnv):
             self.infos['player_0']["exist"] = [1 if self.bigReward in real_box_rewards else 0,
                                                1 if self.smallReward in real_box_rewards else 0]
             self.infos['player_0']["b-exist"] = [1 if self.bigReward in all_rewards_seen else 0,
-                                                   1 if self.smallReward in all_rewards_seen else 0]
+                                                 1 if self.smallReward in all_rewards_seen else 0]
 
         if name == "release":
             # if agent's goal of player_1 matches big treat location, then shouldAvoidBig is True
