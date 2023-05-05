@@ -7,15 +7,16 @@ from ..puppets import pathfind
 import copy
 from ..pz_envs.scenario_configs import ScenarioConfigs
 
+
 class StandoffEnv(para_MultiGridEnv):
     mission = "get the best food before your opponent"
     metadata = {'render_modes': ['human', 'rgb_array'], "name": "standoffEnv"}
     configs = ScenarioConfigs.standoff
     info_keywords = ('minibatch', 'timestep',
                      'shouldAvoidBig', 'shouldAvoidSmall', 'correctSelection', 'selection',
-                    'selectedBig', 'selectedSmall', 'selectedNeither',
-                    'selectedPrevBig', 'selectedPrevSmall', 'selectedPrevNeither', 'incorrectSelection',
-                    'selectedSame', 'firstBaitReward', 'eventVisibility')
+                     'selectedBig', 'selectedSmall', 'selectedNeither',
+                     'selectedPrevBig', 'selectedPrevSmall', 'selectedPrevNeither', 'incorrectSelection',
+                     'selectedSame', 'firstBaitReward', 'eventVisibility')
 
     def __init__(
             self,
@@ -71,8 +72,8 @@ class StandoffEnv(para_MultiGridEnv):
         self.params = None
         self.configName = config_name
         self.minibatch = 0
-        self.deterministic = False #used for generating deterministic baiting events for ground-truth evaluation
-        self.deterministic_seed = 0 #cycles baiting locations, changes by one each time it is used
+        self.deterministic = False  # used for generating deterministic baiting events for ground-truth evaluation
+        self.deterministic_seed = 0  # cycles baiting locations, changes by one each time it is used
         self.cached_paths = {}
 
         # difficulty settings
@@ -86,9 +87,8 @@ class StandoffEnv(para_MultiGridEnv):
         self.fill_spawn_holes = False
         self.random_subject_spawn = True
         self.odd_spawns = True
-        self.random_odd_spawns = True # overrides self.odd_spawns when true
+        self.random_odd_spawns = True  # overrides self.odd_spawns when true
         self.record_supervised_labels = False
-
 
     def hard_reset(self, params=None):
         """
@@ -102,10 +102,13 @@ class StandoffEnv(para_MultiGridEnv):
         for k in defaults.keys():
             if k in params.keys():
                 if isinstance(params[k], list):
-                    newParams[k] = params[k][self.deterministic_seed % len(params[k])] if self.deterministic else random.choice(params[k])
+                    newParams[k] = params[k][
+                        self.deterministic_seed % len(params[k])] if self.deterministic else random.choice(params[k])
             else:
                 if isinstance(defaults[k], list):
-                    newParams[k] = defaults[k][self.deterministic_seed % len(defaults[k])] if self.deterministic else random.choice(defaults[k])
+                    newParams[k] = defaults[k][
+                        self.deterministic_seed % len(defaults[k])] if self.deterministic else random.choice(
+                        defaults[k])
                 else:
                     newParams[k] = defaults[k]
         self.params = copy.deepcopy(newParams)
@@ -120,7 +123,8 @@ class StandoffEnv(para_MultiGridEnv):
         self.agent_goal, self.last_seen_reward, self.can_see, self.best_reward = {}, {}, {}, {}
         boxes = self.params["boxes"]
         for agent in self.agents_and_puppets():
-            self.agent_goal[agent] = self.deterministic_seed % boxes if self.deterministic else random.choice(range(boxes))
+            self.agent_goal[agent] = self.deterministic_seed % boxes if self.deterministic else random.choice(
+                range(boxes))
             self.best_reward[agent] = -100
             for box in range(boxes):
                 self.last_seen_reward[agent + str(box)] = -100
@@ -128,7 +132,7 @@ class StandoffEnv(para_MultiGridEnv):
                     self.can_see[agent + str(box)] = True  # default to not hidden until it is
 
     def get_deterministic_seed(self):
-        #self.deterministic_seed += 1
+        # self.deterministic_seed += 1
         return self.deterministic_seed
 
     def _gen_grid(self,
@@ -154,8 +158,10 @@ class StandoffEnv(para_MultiGridEnv):
         if not self.deterministic:
             random.shuffle(self.food_locs)
         else:
-            #rotate food locs list by deterministic seed
-            self.food_locs = self.food_locs[self.deterministic_seed % len(self.food_locs):] + self.food_locs[:self.deterministic_seed % len(self.food_locs)]
+            # rotate food locs list by deterministic seed
+            self.food_locs = self.food_locs[self.deterministic_seed % len(self.food_locs):] + self.food_locs[
+                                                                                              :self.deterministic_seed % len(
+                                                                                                  self.food_locs)]
         self.released_tiles = [[] for _ in range(4)]
         release_gap = boxes * 2 + atrium - 1
         self.width = boxes * 2 + 3
@@ -169,7 +175,7 @@ class StandoffEnv(para_MultiGridEnv):
 
         self.agent_spawn_pos = {}
         self.agent_door_pos = {}
-        
+
         self.has_baited = False
         self.visible_event_list = []
         self.currently_visible = True
@@ -179,20 +185,21 @@ class StandoffEnv(para_MultiGridEnv):
         real_odd_spawns = self.odd_spawns if not self.random_odd_spawns else random.choice([True, False])
 
         self.bigReward = 100
-        self.smallReward = int(self.bigReward/(self.boxes-2))
+        self.smallReward = int(self.bigReward / (self.boxes - 2))
 
         for k, agent in enumerate(self.agents_and_puppets()):
             h = 1 if agent == "player_0" else self.height - 2
             d = 1 if agent == "player_0" else 3
             if self.random_subject_spawn:
                 if real_odd_spawns:
-                    bb = self.deterministic_seed % (self.boxes-1) if self.deterministic else random.choice(range(boxes-1))
+                    bb = self.deterministic_seed % (self.boxes - 1) if self.deterministic else random.choice(
+                        range(boxes - 1))
                     xx = 2 * bb + 3
                 else:
                     bb = self.deterministic_seed % self.boxes if self.deterministic else random.choice(range(boxes))
                     xx = 2 * bb + 2
             else:
-                xx = 2 * self.boxes//2 + 1
+                xx = 2 * self.boxes // 2 + 1
             self.agent_spawn_pos[agent] = (xx, h, d)
             self.agent_door_pos[agent] = (xx, h + (1 if agent == "player_0" else -1))
             all_door_poses.append(self.agent_door_pos[agent])
@@ -223,7 +230,6 @@ class StandoffEnv(para_MultiGridEnv):
                 self.put_obj(Wall(), box * 2 + 1, startRoom - 1)
                 xx_spawn = box * 2 + 2 + real_odd_spawns
 
-
                 # initial door release, only where door is not in all_door_poses
                 if (xx_spawn, startRoom) in all_door_poses:
                     self.put_obj(Block(init_state=0, color="blue"), xx_spawn, startRoom)
@@ -250,7 +256,7 @@ class StandoffEnv(para_MultiGridEnv):
                 self.released_tiles[3] += [(box * 2 + 2, self.height - startRoom - atrium - 1)]
 
             for j in range(lava_height):
-                #self.put_obj(GlassBlock(color="cyan", init_state=1), box * 2 + 1, j + startRoom + atrium + 1)
+                # self.put_obj(GlassBlock(color="cyan", init_state=1), box * 2 + 1, j + startRoom + atrium + 1)
                 self.put_obj(Wall(), box * 2 + 1, j + startRoom + atrium + 1)
 
         self.reset_vision()
@@ -263,15 +269,21 @@ class StandoffEnv(para_MultiGridEnv):
             type = event[0]
             for x in range(len(event)):
                 if event[x] == "empty":
-                    event[x] = empty_buckets.pop(random.randrange(len(empty_buckets)) if not self.deterministic else self.get_deterministic_seed() % len(empty_buckets))
+                    event[x] = empty_buckets.pop(random.randrange(
+                        len(empty_buckets)) if not self.deterministic else self.get_deterministic_seed() % len(
+                        empty_buckets))
                 elif event[x] == "else":
                     available_spots = [i for i in range(boxes) if i != event[x - 1]]
-                    event[x] = available_spots.pop(random.randrange(len(available_spots)) if not self.deterministic else self.get_deterministic_seed() % len(available_spots))
+                    event[x] = available_spots.pop(random.randrange(
+                        len(available_spots)) if not self.deterministic else self.get_deterministic_seed() % len(
+                        available_spots))
                 elif isinstance(event[x], int):
                     event[x] = events[event[x]][1]  # get first location
 
             if type == "bait":
-                event_args[k] = bait_args.pop(random.randrange(len(bait_args)) if not self.deterministic else self.get_deterministic_seed() % len(bait_args))
+                event_args[k] = bait_args.pop(
+                    random.randrange(len(bait_args)) if not self.deterministic else self.get_deterministic_seed() % len(
+                        bait_args))
             elif type == "remove":
                 empty_buckets.append(event[1])
             elif type == "obscure" or type == "reveal":
@@ -296,7 +308,7 @@ class StandoffEnv(para_MultiGridEnv):
         self.add_timer(["release"], curTime + sub_release, arg=1)
         self.add_timer(["release"], curTime + release_gap + dom_release, arg=2)
         self.add_timer(["release"], curTime + release_gap + sub_release, arg=3)
-        
+
         # returns the final timer, the release of the sub, could be made dynamic so just max of timers
         return curTime + release_gap + sub_release
 
@@ -312,7 +324,7 @@ class StandoffEnv(para_MultiGridEnv):
         maze = np.array(maze).astype(int)
         if not self.deterministic:
             return None
-        y = self.height//2 + offset
+        y = self.height // 2 + offset
         paths = []
         for box in range(self.boxes):
             x = box * 2 + 2
@@ -330,7 +342,7 @@ class StandoffEnv(para_MultiGridEnv):
                 self.put_obj(
                     Box("orange", contains=obj, reward=obj.reward, show_contains=self.persistent_treat_images),
                     pos[0], pos[1],
-                    update_vis=False) # do not change gaze highlight if puppet saw this bait
+                    update_vis=False)  # do not change gaze highlight if puppet saw this bait
         if name == 'init':
             for box in range(self.boxes):
                 x = box * 2 + 2
@@ -387,7 +399,7 @@ class StandoffEnv(para_MultiGridEnv):
             self.infos['player_0']['eventVisibility'] = ''.join(['1' if x else '0' for x in self.visible_event_list])
             for x, y in self.released_tiles[arg]:
                 self.del_obj(x, y)
-                
+
         # create visible event list info
         self.visible_event_list.append(self.currently_visible)
 
@@ -404,11 +416,11 @@ class StandoffEnv(para_MultiGridEnv):
                 for agent in self.agents_and_puppets():
                     if self.can_see[agent + str(box)] and self.currently_visible:
                         tile = self.grid.get(x, y)
-                        #if hasattr(tile, "reward") and hasattr(tile, "size"):
+                        # if hasattr(tile, "reward") and hasattr(tile, "size"):
                         if tile is not None and tile.type == "Goal":
                             # size used to distinguish treats from boxes
                             self.last_seen_reward[agent + str(box)] = tile.reward if isinstance(tile.reward, int) else 0
-                            #print('rew update', agent, box, tile.reward)
+                            # print('rew update', agent, box, tile.reward)
                         elif not self.grid.get(x, y) and self.last_seen_reward[agent + str(box)] != 0:
                             self.last_seen_reward[agent + str(box)] = 0
                             if self.agent_goal[agent] == box:
@@ -437,13 +449,24 @@ class StandoffEnv(para_MultiGridEnv):
                     one_hot_goal[self.agent_goal[target_agent]] = 1
                     self.infos[target_agent]["target"] = one_hot_goal
                     self.infos[target_agent]["vision"] = self.visible_event_list
-                    self.infos[target_agent]["b-loc"] = [self.last_seen_reward[target_agent + str(box)] > 0 for box in range(self.boxes)]
+                    real_boxes = [self.grid.get(box * 2 + 2, y) for box in range(self.boxes)]
                     all_rewards_seen = [self.last_seen_reward[target_agent + str(box)] for box in range(self.boxes)]
-                    has_seen_small = 1 if self.smallReward in all_rewards_seen else 0
-                    has_seen_big = 1 if self.bigReward in all_rewards_seen else 0
-                    self.infos[target_agent]["b-exist"] = [has_seen_small, has_seen_big]
+                    self.infos[target_agent]["loc"] = [
+                        [1, 0] if box.reward == self.bigReward else
+                        [0, 1] if box.reward == self.smallReward else
+                        [0, 0]
+                        for box in real_boxes
+                    ]
+                    self.infos[target_agent]["b-loc"] = [
+                        [1, 0] if reward == self.bigReward else
+                        [0, 1] if reward == self.smallReward else
+                        [0, 0]
+                        for reward in all_rewards_seen
+                    ]
+                    self.infos[target_agent]["b-exist"] = [1 if self.smallReward in all_rewards_seen else 0,
+                                                           1 if self.bigReward in all_rewards_seen else 0]
 
-                #tile = self.grid.get(x, y)
+                # tile = self.grid.get(x, y)
                 # we cannot track shouldAvoidBig etc here because the treat location might change
         if name == "release":
             # if agent's goal of player_1 matches big treat location, then shouldAvoidBig is True
@@ -480,4 +503,3 @@ class StandoffEnv(para_MultiGridEnv):
             else:
                 self.infos['player_0']['correctSelection'] = -1
                 self.infos['player_0']['incorrectSelection'] = self.big_food_locations[-1]
-            
