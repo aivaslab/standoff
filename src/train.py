@@ -140,15 +140,15 @@ def main(args):
                     os.mkdir(savePath3)
 
                 if args.curriculum:
-                    model_class, size, style, frames, args.vecNormalize, norm_rewards, difficulty, threads, _ = get_json_params(
+                    model_class, args.size, args.style, args.frames, args.vecNormalize, args.norm_rewards, args.difficulty, args.threads, _, args.shared_lstm, args.normalize_images = get_json_params(
                         os.path.join(this_pretrained_folder, 'json_data.json'))
                     with open(os.path.join(savePath3, 'json_data.json'), 'w') as json_file:
                         json.dump({'model_class': model_class.__name__, 'size': args.size, 'frames': args.frames, 'style': args.style,
                                    'vecNormalize': args.vecNormalize, 'norm_rewards': args.norm_rewards, 'difficulty': args.difficulty,
-                                   'threads': threads, 'configName': env_name_temp, 'shared_lstm': args.shared_lstm,
+                                   'threads': args.threads, 'configName': env_name_temp, 'shared_lstm': args.shared_lstm,
                                    'normalize_images': args.normalize_images}, json_file)
                 elif continuing:
-                    model_class, size, style, frames, args.vecNormalize, norm_rewards, difficulty, threads, _ = get_json_params(
+                    model_class, args.size, args.style, args.frames, args.vecNormalize, args.norm_rewards, args.difficulty, args.threads, _, args.shared_lstm, args.normalize_images = get_json_params(
                         os.path.join(savePath3, 'json_data.json'))
                     # note that continuing will overwrite these things! It does not implement continuing under different conditions for curricula
                 else:
@@ -169,7 +169,7 @@ def main(args):
 
                     policy, policy_kwargs = init_policy(model_class, env.observation_space, env.action_space, rate,
                                                         args.width, hidden_size=args.hidden_size, conv_mult=args.conv_mult, frames=args.frames,
-                                                        name='cnn', net_arch=[args.width])
+                                                        name='cnn', net_arch=[args.width], shared_lstm=args.shared_lstm, normalize_images=args.normalize_images,)
 
                     log_line = start_global_logs(global_logs, args.experiment_name, dir_name, name, model_class, policy,
                                                  global_log_path)
