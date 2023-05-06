@@ -103,19 +103,18 @@ def env_from_config(env_config, randomize_seed=True):
 
 
 for observation_style in ['rich']:
-    for view_size in [17, 19]:
-        for difficulty in range(4):
-            for stage in range(3):
-                for config in ScenarioConfigs.standoff.keys():
-                    configName = 'S'+str(stage) if stage < 2 else config.replace(" ", "")
-                    register_standoff_env(
-                        f"Standoff-{configName}-{view_size}-{observation_style}-{difficulty}-v0".format(stage+1, configName, view_size, observation_style),
-                        StandoffEnv,
-                        config,
-                        difficulty,
-                        observation_style=observation_style,
-                        #observation_density=1,
-                        view_tile_size=1,
-                        view_size=view_size,
-                        view_offset=1,
-                    )
+    for view_size in [17]:
+        for difficulty in [3]:
+            for config in ScenarioConfigs.standoff.keys():
+                configName = config.replace(" ", "")
+                register_standoff_env(
+                    f"Standoff-{configName}-{view_size}-{observation_style}-{difficulty}-v0",
+                    StandoffEnv,
+                    config,
+                    difficulty,
+                    observation_style=observation_style,
+                    #observation_density=1,
+                    view_tile_size=1,
+                    view_size=view_size,
+                    view_offset=1,
+                )
