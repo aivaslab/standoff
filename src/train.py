@@ -12,7 +12,7 @@ from .utils.train_utils import init_dirs, init_policy, start_global_logs, linear
 from .utils.conversion import make_env_comp, get_json_params
 from stable_baselines3 import TD3, PPO, A2C
 from sb3_contrib import TRPO, RecurrentPPO
-import torch as th
+# import torch as th
 
 
 # import multiprocessing
