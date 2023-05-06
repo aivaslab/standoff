@@ -391,7 +391,8 @@ class StandoffEnv(para_MultiGridEnv):
             obj = Goal(reward=arg, size=arg * 0.01, color='green', hide=self.hidden)
             if not self.has_baited:
                 self.has_baited = True
-                self.infos['player_0']['firstBaitReward'] = arg
+                if self.record_info:
+                    self.infos['player_0']['firstBaitReward'] = arg
             self.put_obj(obj, x, y)
             self.objs_to_hide.append(obj)
         elif name == "remove":
