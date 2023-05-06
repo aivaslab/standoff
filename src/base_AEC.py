@@ -6,7 +6,7 @@ import gym
 import numpy as np
 import functools
 import random
-#import traceback
+# import traceback
 
 from .objects import Wall, Goal, Lava, GridAgent, COLORS, WorldObj
 from gym_minigrid.rendering import downsample
@@ -449,6 +449,7 @@ class para_MultiGridEnv(ParallelEnv):
 
         These attributes should not be changed after initialization.
         """
+        self.record_info = False  # set this to true during evaluation
         self.max_steps_real = None
         self.only_highlight_treats = False
         self.gaze_highlighting = gaze_highlighting
@@ -705,16 +706,16 @@ class para_MultiGridEnv(ParallelEnv):
 
         self.observations = {agent: self.gen_agent_obs(a) for agent, a in zip(self.agents, self.agent_instances)}
 
-        #robservations = {agent: self.observations[agent] for agent in self.agents}
-        #rrewards = {agent: self.rewards[agent] for agent in self.agents}
-        #rdones = {agent: self.dones[agent] for agent in self.agents}
-        #rinfos = {agent: self.infos[agent] for agent in self.agents}
+        # robservations = {agent: self.observations[agent] for agent in self.agents}
+        # rrewards = {agent: self.rewards[agent] for agent in self.agents}
+        # rdones = {agent: self.dones[agent] for agent in self.agents}
+        # rinfos = {agent: self.infos[agent] for agent in self.agents}
 
-        #print('reset', robservations, rrewards, rdones, rinfos)
+        # print('reset', robservations, rrewards, rdones, rinfos)
 
         return self.observations
 
-        #return robservations, rrewards, rdones, rinfos
+        # return robservations, rrewards, rdones, rinfos
 
     def add_timer(self, event, time, arg=None):
         if str(time) in self.timers.keys():
@@ -852,7 +853,7 @@ class para_MultiGridEnv(ParallelEnv):
 
                             # send signal to test next action outputs
 
-                            #if "Test" in str(fwd_cell.__class__):
+                            # if "Test" in str(fwd_cell.__class__):
                             #   self.infos[agent_name]["test"] = fwd_cell.dir
 
                             # send signal to override next action
@@ -916,23 +917,24 @@ class para_MultiGridEnv(ParallelEnv):
                                 agent.done = True
 
                                 # handle infos
-                                box = (agent.pos[0] - 2) / 2
-                                self.infos[agent_name]["selection"] = box
-                                self.infos[agent_name]["accuracy"] = (
-                                        box == self.infos[agent_name]["correctSelection"] or self.infos[agent_name][
-                                    "correctSelection"] == -1)
-                                self.infos[agent_name]["weakAccuracy"] = (
-                                        box == self.infos[agent_name]["correctSelection"] or box ==
-                                        self.infos[agent_name]["incorrectSelection"])
-                                self.infos[agent_name]["selectedBig"] = (og_rwd == 100)
-                                self.infos[agent_name]["selectedSmall"] = (og_rwd == self.smallReward)
-                                self.infos[agent_name]["selectedNeither"] = (og_rwd < self.smallReward)
-                                self.infos[agent_name]["selectedPrevBig"] = (box in self.big_food_locations)
-                                self.infos[agent_name]["selectedPrevSmall"] = (box in self.small_food_locations)
-                                self.infos[agent_name]["selectedPrevNeither"] = not (
-                                        box in self.big_food_locations) and not (box in self.small_food_locations)
-                                self.infos[agent_name][
-                                    "selectedSame"] = same_selection  # selected same box as a previous agent
+                                if self.record_info:
+                                    box = (agent.pos[0] - 2) / 2
+                                    self.infos[agent_name]["selection"] = box
+                                    self.infos[agent_name]["accuracy"] = (
+                                            box == self.infos[agent_name]["correctSelection"] or self.infos[agent_name][
+                                        "correctSelection"] == -1)
+                                    self.infos[agent_name]["weakAccuracy"] = (
+                                            box == self.infos[agent_name]["correctSelection"] or box ==
+                                            self.infos[agent_name]["incorrectSelection"])
+                                    self.infos[agent_name]["selectedBig"] = (og_rwd == 100)
+                                    self.infos[agent_name]["selectedSmall"] = (og_rwd == self.smallReward)
+                                    self.infos[agent_name]["selectedNeither"] = (og_rwd < self.smallReward)
+                                    self.infos[agent_name]["selectedPrevBig"] = (box in self.big_food_locations)
+                                    self.infos[agent_name]["selectedPrevSmall"] = (box in self.small_food_locations)
+                                    self.infos[agent_name]["selectedPrevNeither"] = not (
+                                            box in self.big_food_locations) and not (box in self.small_food_locations)
+                                    self.infos[agent_name][
+                                        "selectedSame"] = same_selection  # selected same box as a previous agent
                             else:
                                 agent.active = False
                             agent.reward(rwd)

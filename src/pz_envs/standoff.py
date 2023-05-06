@@ -379,12 +379,13 @@ class StandoffEnv(para_MultiGridEnv):
             for box in range(self.boxes):
                 x = box * 2 + 2
                 self.put_obj(Box(color="orange"), x, y)
-            self.infos['player_0']['shouldAvoidBig'] = False
-            self.infos['player_0']['shouldAvoidSmall'] = False
-            self.infos['player_0']['correctSelection'] = -1
-            self.infos['player_0']['incorrectSelection'] = -1
-            self.infos['player_0']['minibatch'] = self.minibatch
-            self.infos['player_0']['timestep'] = self.total_step_count
+            if self.record_info:
+                self.infos['player_0']['shouldAvoidBig'] = False
+                self.infos['player_0']['shouldAvoidSmall'] = False
+                self.infos['player_0']['correctSelection'] = -1
+                self.infos['player_0']['incorrectSelection'] = -1
+                self.infos['player_0']['minibatch'] = self.minibatch
+                self.infos['player_0']['timestep'] = self.total_step_count
         elif name == 'bait':
             x = event[1] * 2 + 2
             obj = Goal(reward=arg, size=arg * 0.01, color='green', hide=self.hidden)
@@ -428,7 +429,8 @@ class StandoffEnv(para_MultiGridEnv):
             self.objs_to_hide.append(obj1)
             self.objs_to_hide.append(obj2)
         elif name == "release":
-            self.infos['player_0']['eventVisibility'] = ''.join(['1' if x else '0' for x in self.visible_event_list])
+            if self.record_info:
+                self.infos['player_0']['eventVisibility'] = ''.join(['1' if x else '0' for x in self.visible_event_list])
             for x, y in self.released_tiles[arg]:
                 self.del_obj(x, y)
 
@@ -504,7 +506,7 @@ class StandoffEnv(para_MultiGridEnv):
             self.infos['player_0']["b-exist"] = [1 if self.bigReward in all_rewards_seen else 0,
                                                  1 if self.smallReward in all_rewards_seen else 0]
 
-        if name == "release":
+        if name == "release" and self.record_info:
             # if agent's goal of player_1 matches big treat location, then shouldAvoidBig is True
             if len(self.puppets):
                 self.infos['player_0']['puppet_goal'] = self.agent_goal[self.puppets[-1]]
