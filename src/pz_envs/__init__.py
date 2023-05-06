@@ -25,12 +25,12 @@ def register_standoff_env(
         env_name,
         env_class,
         config_name,
-        difficulty,
+        _difficulty,
         reward_decay=False,
-        observation_style='rich',
+        _observation_style='rich',
         #observation_density=1,
         view_tile_size=1,
-        view_size=15,
+        _view_size=15,
         view_offset=4,
 ):
     configs = ScenarioConfigs().standoff
@@ -47,10 +47,10 @@ def register_standoff_env(
 
 
     player_config = {
-        "view_size": view_size,
+        "view_size": _view_size,
         "view_offset": view_offset,
         "view_tile_size": view_tile_size,
-        "observation_style": observation_style,
+        "observation_style": _observation_style,
         "see_through_walls": False,
         "color": "prestige",
         "view_type": 0,
@@ -73,11 +73,11 @@ def register_standoff_env(
         def __new__(cls):
             env = super(env_class, RegEnv).__new__(env_class)
             env.__init__(
-                opponent_visible_decs=(difficulty < 1),
-                persistent_treat_images=(difficulty < 2),
-                subject_visible_decs=(difficulty < 3),
-                gaze_highlighting=(difficulty < 3),
-                persistent_gaze_highlighting=(difficulty < 2),
+                opponent_visible_decs=(_difficulty < 1),
+                persistent_treat_images=(_difficulty < 2),
+                subject_visible_decs=(_difficulty < 3),
+                gaze_highlighting=(_difficulty < 3),
+                persistent_gaze_highlighting=(_difficulty < 2),
                 **env_config,
                 )
 
@@ -112,9 +112,9 @@ for observation_style in ['rich']:
                     StandoffEnv,
                     config,
                     difficulty,
-                    observation_style=observation_style,
+                    _observation_style=observation_style,
                     #observation_density=1,
                     view_tile_size=1,
-                    view_size=view_size,
+                    _view_size=view_size,
                     view_offset=1,
                 )
