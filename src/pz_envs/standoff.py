@@ -505,39 +505,39 @@ class StandoffEnv(para_MultiGridEnv):
                                                1 if self.smallReward in real_box_rewards else 0]
             self.infos['player_0']["b-exist"] = [1 if self.bigReward in all_rewards_seen else 0,
                                                  1 if self.smallReward in all_rewards_seen else 0]
+        if self.record_info:
+            if name == "release":
+                # if agent's goal of player_1 matches big treat location, then shouldAvoidBig is True
+                if len(self.puppets):
+                    self.infos['player_0']['puppet_goal'] = self.agent_goal[self.puppets[-1]]
+                    if len(self.big_food_locations) > 0 and self.agent_goal[self.puppets[-1]] == self.big_food_locations[-1]:
+                        self.infos['player_0']['shouldAvoidBig'] = not self.subject_is_dominant
+                        self.infos['player_0']['shouldAvoidSmall'] = False
+                    elif len(self.small_food_locations) > 0 and self.agent_goal[self.puppets[-1]] == self.small_food_locations[-1]:
+                        self.infos['player_0']['shouldAvoidSmall'] = not self.subject_is_dominant
+                        self.infos['player_0']['shouldAvoidBig'] = False
+                    else:
+                        self.infos['player_0']['shouldAvoidBig'] = False
+                        self.infos['player_0']['shouldAvoidSmall'] = False
 
-        if name == "release" and self.record_info:
-            # if agent's goal of player_1 matches big treat location, then shouldAvoidBig is True
-            if len(self.puppets):
-                self.infos['player_0']['puppet_goal'] = self.agent_goal[self.puppets[-1]]
-                if len(self.big_food_locations) > 0 and self.agent_goal[self.puppets[-1]] == self.big_food_locations[-1]:
-                    self.infos['player_0']['shouldAvoidBig'] = not self.subject_is_dominant
-                    self.infos['player_0']['shouldAvoidSmall'] = False
-                elif len(self.small_food_locations) > 0 and self.agent_goal[self.puppets[-1]] == self.small_food_locations[-1]:
-                    self.infos['player_0']['shouldAvoidSmall'] = not self.subject_is_dominant
-                    self.infos['player_0']['shouldAvoidBig'] = False
+            if len(self.big_food_locations) > 0 and len(self.small_food_locations) > 0:
+                if 'shouldAvoidBig' in self.infos['player_0'].keys() and self.infos['player_0']['shouldAvoidBig']:
+                    self.infos['player_0']['correctSelection'] = self.small_food_locations[-1]
+                    self.infos['player_0']['incorrectSelection'] = self.big_food_locations[-1]
                 else:
-                    self.infos['player_0']['shouldAvoidBig'] = False
-                    self.infos['player_0']['shouldAvoidSmall'] = False
-
-        if len(self.big_food_locations) > 0 and len(self.small_food_locations) > 0:
-            if 'shouldAvoidBig' in self.infos['player_0'].keys() and self.infos['player_0']['shouldAvoidBig']:
-                self.infos['player_0']['correctSelection'] = self.small_food_locations[-1]
-                self.infos['player_0']['incorrectSelection'] = self.big_food_locations[-1]
-            else:
-                self.infos['player_0']['correctSelection'] = self.big_food_locations[-1]
-                self.infos['player_0']['incorrectSelection'] = self.small_food_locations[-1]
-        elif len(self.small_food_locations) > 0:
-            if not self.infos['player_0']['shouldAvoidSmall']:
-                self.infos['player_0']['correctSelection'] = self.small_food_locations[-1]
-                self.infos['player_0']['incorrectSelection'] = -1
-            else:
-                self.infos['player_0']['correctSelection'] = -1
-                self.infos['player_0']['incorrectSelection'] = self.small_food_locations[-1]
-        elif len(self.big_food_locations) > 0:
-            if not self.infos['player_0']['shouldAvoidBig']:
-                self.infos['player_0']['correctSelection'] = self.big_food_locations[-1]
-                self.infos['player_0']['incorrectSelection'] = -1
-            else:
-                self.infos['player_0']['correctSelection'] = -1
-                self.infos['player_0']['incorrectSelection'] = self.big_food_locations[-1]
+                    self.infos['player_0']['correctSelection'] = self.big_food_locations[-1]
+                    self.infos['player_0']['incorrectSelection'] = self.small_food_locations[-1]
+            elif len(self.small_food_locations) > 0:
+                if not self.infos['player_0']['shouldAvoidSmall']:
+                    self.infos['player_0']['correctSelection'] = self.small_food_locations[-1]
+                    self.infos['player_0']['incorrectSelection'] = -1
+                else:
+                    self.infos['player_0']['correctSelection'] = -1
+                    self.infos['player_0']['incorrectSelection'] = self.small_food_locations[-1]
+            elif len(self.big_food_locations) > 0:
+                if not self.infos['player_0']['shouldAvoidBig']:
+                    self.infos['player_0']['correctSelection'] = self.big_food_locations[-1]
+                    self.infos['player_0']['incorrectSelection'] = -1
+                else:
+                    self.infos['player_0']['correctSelection'] = -1
+                    self.infos['player_0']['incorrectSelection'] = self.big_food_locations[-1]

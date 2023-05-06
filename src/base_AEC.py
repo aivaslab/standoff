@@ -650,8 +650,9 @@ class para_MultiGridEnv(ParallelEnv):
         self.has_reached_goal = {agent: False for agent in self.agents_and_puppets()}
         self.dones = {agent: False for agent in self.agents_and_puppets()}
         self.infos = {agent: {} for agent in self.agents_and_puppets()}
-        for key in self.info_keywords:
-            self.infos['player_0'][key] = ''
+        if self.record_info:
+            for key in self.info_keywords:
+                self.infos['player_0'][key] = ''
         self.state = {agent: NONE for agent in self.agents_and_puppets()}
         # we don't generate observations for puppets
 
