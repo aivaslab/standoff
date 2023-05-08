@@ -53,7 +53,7 @@ env_config =  {
 
 player_interface_config = {
     "view_size": 15,
-    "view_offset": 1,
+    "view_offset": 4,
     "view_tile_size": 15,
     "observation_style": "image",
     "see_through_walls": False,
@@ -108,6 +108,7 @@ human.start_episode()
 
 
 done = False
+print(env.record_info)
 
 
 for i in range(5):
@@ -118,7 +119,7 @@ for i in range(5):
     while True:
         #print(env, "agents", env.agents, "puppets", env.puppets, "done_penalties", env.done_without_box_reward, env.distance_from_boxes_reward)
         env.render(mode="human", show_agent_views=True, tile_size=15)
-        #print(np.round(obs['player_0']*10).sum(axis=0).astype(int))
+        print(np.round(obs['player_0']*10).sum(axis=0).astype(int))
         #print([a.pos for a in env.puppet_instances])
         player_action = human.action_step(obs['player_0'])
 
