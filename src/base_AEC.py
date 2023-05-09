@@ -449,6 +449,7 @@ class para_MultiGridEnv(ParallelEnv):
 
         These attributes should not be changed after initialization.
         """
+        self.past_observations = None
         self.record_info = False  # set this to true during evaluation
         self.max_steps_real = None
         self.only_highlight_treats = False
@@ -711,6 +712,9 @@ class para_MultiGridEnv(ParallelEnv):
 
         self.observations = {agent: self.gen_agent_obs(a) for agent, a in zip(self.agents, self.agent_instances)}
         self.has_released = False
+
+        # past obs array is 10 by size of obs
+        self.past_observations = np.zeros((10, *self.observations[self.agents[0]].shape))
 
         # robservations = {agent: self.observations[agent] for agent in self.agents}
         # rrewards = {agent: self.rewards[agent] for agent in self.agents}
@@ -991,10 +995,13 @@ class para_MultiGridEnv(ParallelEnv):
         for agent_name, agent in zip(self.agents, self.agent_instances):
             generated_obs = self.gen_agent_obs(agent)
             if self.supervised_model is not None:
-                self.observations[agent_name] = {"obs": generated_obs, "label": self.supervised_model.predict(generated_obs)}
+                if self.step_count < 10 and not self.has_released:
+                    self.past_observations[agent_name][self.step_count] = generated_obs
+                    self.last_supervised_labels = self.supervised_model.predict(generated_obs)
+                self.observations[agent_name] = {"obs": generated_obs, "label": self.last_supervised_labels}
             else:
                 self.observations[agent_name] = generated_obs
-                
+
             # self.rewards[agent_name] = agent.rew
             if self.env_done:
                 self.dones[agent_name] = True
