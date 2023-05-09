@@ -223,10 +223,11 @@ def train_model(data_name, label, additional_val_sets):
 
     return train_losses, val_losses
 
-def plot_losses(data_name, label, train_losses, val_losses):
+def plot_losses(data_name, label, train_losses, val_losses, val_set_names):
     plt.figure()
-    plt.plot(train_losses, label='train loss')
-    plt.plot(val_losses, label='validation loss')
+    plt.plot(train_losses, label='train')
+    for val_set_name, val_loss in zip(val_set_names, val_losses):
+        plt.plot(val_loss, label=val_set_name + 'val loss')
     plt.legend()
     plt.savefig(f'{data_name}-{label}-losses.png')
 
