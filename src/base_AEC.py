@@ -998,7 +998,7 @@ class para_MultiGridEnv(ParallelEnv):
                 if self.step_count < 10 and not self.has_released:
                     self.past_observations[agent_name][self.step_count] = generated_obs
                     self.last_supervised_labels = self.supervised_model.predict(generated_obs)
-                self.observations[agent_name] = {"obs": generated_obs, "label": self.last_supervised_labels}
+                self.observations[agent_name] = {"image": generated_obs, "label": self.last_supervised_labels}
             else:
                 self.observations[agent_name] = generated_obs
 

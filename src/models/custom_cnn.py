@@ -17,6 +17,7 @@ class CustomCNN(BaseFeaturesExtractor):
         # We assume CxHxW images (channels first)
         # Re-ordering will be done by pre-preprocessing or wrapper
         n_input_channels = self.get_image_obs(observation_space).shape[0]
+        self.n_label_channels = self.get_label_obs(observation_space).shape[0]
         #print(self.get_image_obs(observation_space).shape)
         self.cnn = nn.Sequential(
             nn.Conv2d(n_input_channels, 4*conv_mult*frames, kernel_size=5, stride=2, padding=0),
@@ -32,10 +33,17 @@ class CustomCNN(BaseFeaturesExtractor):
                 th.as_tensor(self.get_image_obs(observation_space).sample()[None]).float()
             ).shape[1]
 
-        self.linear = nn.Sequential(nn.Linear(n_flatten, features_dim), nn.ReLU())
+        self.linear = nn.Sequential(nn.Linear(n_flatten + self.n_label_channels, features_dim), nn.ReLU())
 
     def forward(self, observations: th.Tensor) -> th.Tensor:
-        return self.linear(self.cnn(self.get_image_obs(observations)))
+        image_features = self.cnn(self.get_image_obs(observations))
+
+        if self.n_label_channels > 0:
+            features = th.cat((image_features, observations['label']), dim=1)
+        else:
+            features = image_features
+
+        return self.linear(features)
 
     def get_image_obs(self, observations):
         return observations['image'] if type(observations) is dict else observations
