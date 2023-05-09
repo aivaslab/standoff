@@ -118,73 +118,8 @@ def gen_data():
         for label in labels:
             np.save('supervised/' + data_name + '-label-' + label, np.array(data_labels[label]))
         # np.load('file', mmap_mode='r')
-          
 
-def train_model(data_name, label):
-    data = np.load('supervised/' + data_name + '-obs.npy')
-    labels = np.load('supervised/' + data_name + '-label-' + label + '.npy')
-    
-    print(data[0].shape)
-    
-    train_data, val_data, train_labels, val_labels = train_test_split(
-        data, labels, test_size=0.2, random_state=42
-    )
-    
-    batch_size = 32
-    train_dataset = CustomDataset(train_data, train_labels)
-    val_dataset = CustomDataset(val_data, val_labels)
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
-    
-    #output_shape = (batch_size, train_labels.shape[1])
-    #print(output_shape)
-    output_len = (train_labels.shape[1])
-    
-    input_size = 6 * 17 * 17
-    hidden_size = 32
-    num_layers = 1
-    model = RNNModel(hidden_size, num_layers, [output_len])
-    criterion = nn.MSELoss() # or nn.CrossEntropyLoss() if it's a classification problem
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
-    
-    num_epochs = 20
-    train_losses = []
-    val_losses = []
-    for epoch in range(num_epochs):
-        train_loss = 0
-        for i, (inputs, target_labels) in enumerate(train_loader):
-            #inputs = inputs.to(device)
-            #target_labels = [label.to(device) for label in target_labels]
 
-            # Forward pass
-            outputs = model(inputs)
-            
-            loss = criterion(outputs, target_labels)
-            
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-            train_loss += loss.item()
-            
-        train_losses.append(train_loss / len(train_loader))
-        model.eval()
-        with torch.no_grad():
-            val_loss = 0
-            for inputs, labels in val_loader:
-                inputs = inputs.view(-1, 10, input_size)
-                outputs = model(inputs)
-                loss = criterion(outputs, labels)
-                val_loss += loss.item()
-        val_loss /= len(val_loader)
-        val_losses.append(val_loss)
-        model.train()
-    plt.figure()
-    plt.plot(train_losses, label='train loss')
-    plt.plot(val_losses, label='validation loss')
-    plt.legend()
-    plt.savefig(f'{data_name}-{label}-losses.png')
-
-    
 class CustomDataset(Dataset):
     def __init__(self, data, labels):
         self.data = data
@@ -198,55 +133,102 @@ class CustomDataset(Dataset):
         flat_labels = torch.tensor(self.labels[idx].flatten(), dtype=torch.float32)
         return torch.tensor(self.data[idx], dtype=torch.float32), flat_labels
 
-        
 class RNNModel(nn.Module):
     def __init__(self, hidden_size, num_layers, output_lens):
         super(RNNModel, self).__init__()
 
-        # Add convolutional layers before the LSTM
         self.conv1 = nn.Conv2d(6, 8, kernel_size=3, padding=1)
         self.conv2 = nn.Conv2d(8, 16, kernel_size=3, padding=1)
         self.pool = nn.MaxPool2d(kernel_size=2, stride=2, padding=0)
         self.output_lens = output_lens
 
-        # Calculate the input size for the LSTM after the convolutions and pooling
-        conv_output_height = (17 // 2) // 2
-        conv_output_width = (17 // 2) // 2
-        input_size = 16 * conv_output_height * conv_output_width
-
+        conv_output_size = (17 // 2) // 2
+        input_size = 16 * conv_output_size * conv_output_size
 
         self.rnn = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
 
         self.fc = nn.Linear(hidden_size, output_lens[0])
-        # Use an adaptive fully connected layer for each output type
-        #self.fc_layers = nn.ModuleList([nn.Linear(hidden_size, output_len) for output_len in output_lens])
 
     def forward(self, x):
-        # Split the input tensor into a list of tensors for each time step
         x = x.view(-1, 10, 6, 17, 17)
-
-        # Apply the convolutional layers to each time step separately
         conv_outputs = []
-        for t in range(10):  # Assuming 10 time steps
+        for t in range(10):
             x_t = x[:, t, :, :, :]
             x_t = self.pool(F.relu(self.conv1(x_t)))
             x_t = self.pool(F.relu(self.conv2(x_t)))
             conv_outputs.append(x_t.view(x.size(0), -1))
-
-        # Stack the processed tensors along the temporal dimension
         x = torch.stack(conv_outputs, dim=1)
 
         out, _ = self.rnn(x)
         out = out[:, -1, :]  # Use only the last time step's output
         outputs = self.fc(out)
-
-        # Apply the fully connected layers and reshape the outputs to match the desired shapes
-        #outputs = [fc(out).view(-1, output_len) for fc, output_len in zip(self.fc_layers, self.output_lens)]
-        
-
         return outputs
 
+def train_model(data_name, label, additional_val_sets):
+    data = np.load('supervised/' + data_name + '-obs.npy')
+    labels = np.load('supervised/' + data_name + '-label-' + label + '.npy')
+    
+    train_data, val_data, train_labels, val_labels = train_test_split(
+        data, labels, test_size=0.2, random_state=42
+    )
+    
+    batch_size = 32
+    train_dataset = CustomDataset(train_data, train_labels)
+    val_dataset = CustomDataset(val_data, val_labels)
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
 
+    additional_val_loaders = []
+    for val_set_name in additional_val_sets:
+        val_data = np.load('supervised/' + val_set_name + '-obs.npy')
+        val_labels = np.load('supervised/' + val_set_name + '-label-' + label + '.npy')
+        val_dataset = CustomDataset(val_data, val_labels)
+        additional_val_loaders.append(DataLoader(val_dataset, batch_size=batch_size, shuffle=False))
 
-train_model('random-2500', 'exist')
+    output_len = (train_labels.shape[1])
+    
+    input_size = 6 * 17 * 17
+    hidden_size = 32
+    num_layers = 1
+    model = RNNModel(hidden_size, num_layers, [output_len])
+    criterion = nn.MSELoss()
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+    
+    num_epochs = 20
+    train_losses = []
+    val_losses = [[] for _ in range(len(additional_val_loaders) + 1)]
+    for epoch in range(num_epochs):
+        train_loss = 0
+        for i, (inputs, target_labels) in enumerate(train_loader):
+            outputs = model(inputs)
+            loss = criterion(outputs, target_labels)
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+            train_loss += loss.item()
+            
+        train_losses.append(train_loss / len(train_loader))
+        model.eval()
+        for idx, val_loader in enumerate([val_loader] + additional_val_loaders):
+            with torch.no_grad():
+                val_loss = 0
+                for inputs, labels in val_loader:
+                    inputs = inputs.view(-1, 10, input_size)
+                    outputs = model(inputs)
+                    loss = criterion(outputs, labels)
+                    val_loss += loss.item()
+            val_loss /= len(val_loader)
+            val_losses[idx].append(val_loss)
+        model.train()
+
+    return train_losses, val_losses
+
+def plot_losses(data_name, label, train_losses, val_losses):
+    plt.figure()
+    plt.plot(train_losses, label='train loss')
+    plt.plot(val_losses, label='validation loss')
+    plt.legend()
+    plt.savefig(f'{data_name}-{label}-losses.png')
+
+#train_model('random-2500', 'exist')
 #gen_data()
