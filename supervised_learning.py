@@ -3,16 +3,13 @@ import copy
 import numpy as np
 import sys
 import os
+
 sys.path.append(os.getcwd())
 
-from src.rendering import InteractivePlayerWindow
 from src.agents import GridAgentInterface
 from src.pz_envs import env_from_config
 from src.pz_envs.scenario_configs import ScenarioConfigs
-from src.utils.conversion import make_env_comp
-import pyglet
-import gym
-#import src.pz_envs
+# import src.pz_envs
 from torch.utils.data import Dataset, DataLoader
 import tqdm
 import copy
@@ -23,8 +20,8 @@ from sklearn.model_selection import train_test_split
 from matplotlib import pyplot as plt
 
 
-def gen_data():
-    env_config =  {
+def gen_data(configNames, num_timesteps=2500):
+    env_config = {
         "env_class": "StandoffEnv",
         "max_steps": 15,
         "respawn": True,
@@ -51,13 +48,12 @@ def gen_data():
         "observation_style": "rich",
         "see_through_walls": False,
         "color": "red",
-        #"move_type": 1,
-        #"view_type": 1,
+        # "move_type": 1,
+        # "view_type": 1,
     }
     configs = ScenarioConfigs().standoff
 
-    configName = 'random'
-    reset_configs = {**configs["defaults"],  **configs[configName]}
+    reset_configs = {**configs["defaults"], **configs[configName]}
 
     if isinstance(reset_configs["num_agents"], list):
         reset_configs["num_agents"] = reset_configs["num_agents"][0]
@@ -67,8 +63,8 @@ def gen_data():
     env_config['config_name'] = configName
     env_config['agents'] = [GridAgentInterface(**player_interface_config) for _ in range(reset_configs['num_agents'])]
     env_config['puppets'] = [GridAgentInterface(**puppet_interface_config) for _ in range(reset_configs['num_puppets'])]
-    #env_config['num_agents'] = reset_configs['num_agents']
-    #env_config['num_puppets'] = reset_configs['num_puppets']
+    # env_config['num_agents'] = reset_configs['num_agents']
+    # env_config['num_puppets'] = reset_configs['num_puppets']
 
     difficulty = 3
     env_config['opponent_visible_decs'] = (difficulty < 1)
@@ -77,18 +73,16 @@ def gen_data():
     env_config['gaze_highlighting'] = (difficulty < 3)
     env_config['persistent_gaze_highlighting'] = (difficulty < 2)
 
-    env_name = 'Standoff-S3-' + configName.replace(" ", "") + '-' + str(difficulty) + '-v0'
-
     env = env_from_config(env_config)
     env.record_supervised_labels = True
     if hasattr(env, "hard_reset"):
         env.hard_reset(reset_configs)
 
-    num_timesteps = int(2500)
+    # num_timesteps = int(2500)
     labels = ['loc', 'exist', 'vision', 'b-loc', 'b-exist', 'target']
 
-    for configName in ['random']:
-        data_name  = f'{configName}-{num_timesteps}'
+    for configName in configNames:
+        data_name = f'{configName}-{num_timesteps}'
         data_obs = []
         data_labels = {}
         for label in labels:
@@ -98,26 +92,23 @@ def gen_data():
             obs = env.reset()
             this_ob = np.zeros((10, *obs['player_0'].shape))
             pos = 0
-            
+
             while True:
                 next_obs, rew, done, info = env.step({'player_0': 2})
                 this_ob[pos, :, :, :] = next_obs['player_0']
                 if not any([np.array_equal(this_ob, x) for x in data_obs]):
-                    #if True:
+                    # if True:
                     data_obs.append(copy.copy(this_ob))
                     for label in labels:
                         data_labels[label].append(info['player_0'][label])
                     tq.update(1)
-                #datapoints.append((next_obs['player_0'], info['player_0'][label]))
 
-                obs = next_obs
                 pos += 1
                 if done['player_0']:
                     break
         np.save('supervised/' + data_name + '-obs', np.array(data_obs))
         for label in labels:
             np.save('supervised/' + data_name + '-label-' + label, np.array(data_labels[label]))
-        # np.load('file', mmap_mode='r')
 
 
 class CustomDataset(Dataset):
@@ -133,12 +124,13 @@ class CustomDataset(Dataset):
         flat_labels = torch.tensor(self.labels[idx].flatten(), dtype=torch.float32)
         return torch.tensor(self.data[idx], dtype=torch.float32), flat_labels
 
+
 class RNNModel(nn.Module):
     def __init__(self, hidden_size, num_layers, output_lens):
         super(RNNModel, self).__init__()
 
-        self.conv1 = nn.Conv2d(6, 8, kernel_size=3, padding=1)
-        self.conv2 = nn.Conv2d(8, 16, kernel_size=3, padding=1)
+        self.conv1 = nn.Conv2d(6, 8, kernel_size=3, padding=0)
+        self.conv2 = nn.Conv2d(8, 16, kernel_size=3, padding=0)
         self.pool = nn.MaxPool2d(kernel_size=2, stride=2, padding=0)
         self.output_lens = output_lens
 
@@ -164,14 +156,15 @@ class RNNModel(nn.Module):
         outputs = self.fc(out)
         return outputs
 
+
 def train_model(data_name, label, additional_val_sets):
     data = np.load('supervised/' + data_name + '-obs.npy')
     labels = np.load('supervised/' + data_name + '-label-' + label + '.npy')
-    
+
     train_data, val_data, train_labels, val_labels = train_test_split(
         data, labels, test_size=0.2, random_state=42
     )
-    
+
     batch_size = 32
     train_dataset = CustomDataset(train_data, train_labels)
     val_dataset = CustomDataset(val_data, val_labels)
@@ -186,14 +179,14 @@ def train_model(data_name, label, additional_val_sets):
         additional_val_loaders.append(DataLoader(val_dataset, batch_size=batch_size, shuffle=False))
 
     output_len = (train_labels.shape[1])
-    
+
     input_size = 6 * 17 * 17
     hidden_size = 32
     num_layers = 1
     model = RNNModel(hidden_size, num_layers, [output_len])
     criterion = nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
-    
+
     num_epochs = 20
     train_losses = []
     val_losses = [[] for _ in range(len(additional_val_loaders) + 1)]
@@ -206,7 +199,7 @@ def train_model(data_name, label, additional_val_sets):
             loss.backward()
             optimizer.step()
             train_loss += loss.item()
-            
+
         train_losses.append(train_loss / len(train_loader))
         model.eval()
         for idx, val_loader in enumerate([val_loader] + additional_val_loaders):
@@ -223,6 +216,7 @@ def train_model(data_name, label, additional_val_sets):
 
     return train_losses, val_losses
 
+
 def plot_losses(data_name, label, train_losses, val_losses, val_set_names):
     plt.figure()
     plt.plot(train_losses, label='train')
@@ -231,5 +225,5 @@ def plot_losses(data_name, label, train_losses, val_losses, val_set_names):
     plt.legend()
     plt.savefig(f'{data_name}-{label}-losses.png')
 
-#train_model('random-2500', 'exist')
-#gen_data()
+# train_model('random-2500', 'exist')
+# gen_data()
