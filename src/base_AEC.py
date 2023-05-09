@@ -713,8 +713,8 @@ class para_MultiGridEnv(ParallelEnv):
         self.observations = {agent: self.gen_agent_obs(a) for agent, a in zip(self.agents, self.agent_instances)}
         self.has_released = False
 
-        # past obs array is 10 by size of obs
-        self.past_observations = np.zeros((10, *self.observations[self.agents[0]].shape))
+        if self.supervised_model is not None:
+            self.past_observations = np.zeros((10, *self.observations[self.agents[0]].shape))
 
         # robservations = {agent: self.observations[agent] for agent in self.agents}
         # rrewards = {agent: self.rewards[agent] for agent in self.agents}
