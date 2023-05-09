@@ -204,6 +204,7 @@ def train_model(data_name, label, additional_val_sets):
     criterion = nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 
+    max_val_samples = 500
     num_epochs = 25
     train_losses = []
     val_losses = [[] for _ in range(len(additional_val_loaders) + 1)]
@@ -223,12 +224,16 @@ def train_model(data_name, label, additional_val_sets):
         for idx, _val_loader in enumerate([val_loader] + additional_val_loaders):
             with torch.no_grad():
                 val_loss = 0
+                val_samples_processed = 0
                 for inputs, labels in _val_loader:
                     inputs = inputs.view(-1, 10, input_size)
                     outputs = model(inputs)
                     loss = criterion(outputs, labels)
                     val_loss += loss.item()
-            val_loss /= len(_val_loader)
+                    val_samples_processed += inputs.size(0)
+                    if val_samples_processed >= max_val_samples:
+                        break
+            val_loss /= val_samples_processed/batch_size
             val_losses[idx].append(val_loss)
         model.train()
 
