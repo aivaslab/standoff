@@ -112,7 +112,7 @@ def main(args):
 
         for train_dir in train_dirs:
             print('evaluating at train_dir', train_dir)
-            model_class, configName, args = get_json_params(os.path.join(train_dir, 'json_data.json'), None)
+            model_class, configName, args = get_json_params(os.path.join(train_dir, 'json_data.json'), args)
             model_paths, model_timesteps, repetition_names, norm_paths = find_checkpoint_models(train_dir)
             if not model_paths:
                 continue
