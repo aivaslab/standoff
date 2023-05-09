@@ -90,6 +90,10 @@ class StandoffEnv(para_MultiGridEnv):
         self.random_odd_spawns = True  # overrides self.odd_spawns when true
         self.record_supervised_labels = False
 
+        self.supervised_model = None # used for generating special supervised labels
+        self.last_supervised_labels = None
+        self.has_released = False
+
     def hard_reset(self, params=None):
         """
         Reset the environment params.
@@ -436,6 +440,7 @@ class StandoffEnv(para_MultiGridEnv):
                 self.del_obj(x, y)
             if self.record_supervised_labels:
                 self.dones['player_0'] = True
+            self.has_released = True
 
         # create visible event list info
         self.visible_event_list.append(self.currently_visible)

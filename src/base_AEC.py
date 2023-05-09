@@ -558,6 +558,10 @@ class para_MultiGridEnv(ParallelEnv):
         self.loadingPickle = False
         self.allRooms = []
 
+        self.supervised_model = None
+        self.last_supervised_labels = None
+        self.has_released = False
+
     @functools.lru_cache(maxsize=None)
     def action_space(self, agent):
         return self.action_spaces[agent]
@@ -706,6 +710,7 @@ class para_MultiGridEnv(ParallelEnv):
                 agent.activate()
 
         self.observations = {agent: self.gen_agent_obs(a) for agent, a in zip(self.agents, self.agent_instances)}
+        self.has_released = False
 
         # robservations = {agent: self.observations[agent] for agent in self.agents}
         # rrewards = {agent: self.rewards[agent] for agent in self.agents}
@@ -984,7 +989,12 @@ class para_MultiGridEnv(ParallelEnv):
 
         # observe the current state
         for agent_name, agent in zip(self.agents, self.agent_instances):
-            self.observations[agent_name] = self.gen_agent_obs(agent)
+            generated_obs = self.gen_agent_obs(agent)
+            if self.supervised_model is not None:
+                self.observations[agent_name] = {"obs": generated_obs, "label": self.supervised_model.predict(generated_obs)}
+            else:
+                self.observations[agent_name] = generated_obs
+                
             # self.rewards[agent_name] = agent.rew
             if self.env_done:
                 self.dones[agent_name] = True
