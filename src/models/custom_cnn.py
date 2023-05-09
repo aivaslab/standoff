@@ -47,3 +47,6 @@ class CustomCNN(BaseFeaturesExtractor):
 
     def get_image_obs(self, observations):
         return observations['image'] if type(observations) is dict else observations
+
+    def get_label_obs(self, observations):
+        return observations['label'] if type(observations) is dict else []
