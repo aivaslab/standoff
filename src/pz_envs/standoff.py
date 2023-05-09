@@ -434,6 +434,8 @@ class StandoffEnv(para_MultiGridEnv):
                 self.infos['player_0']['eventVisibility'] = ''.join(['1' if x else '0' for x in self.visible_event_list])
             for x, y in self.released_tiles[arg]:
                 self.del_obj(x, y)
+            if self.record_supervised_labels:
+                self.dones['player_0'] = True
 
         # create visible event list info
         self.visible_event_list.append(self.currently_visible)
@@ -482,7 +484,6 @@ class StandoffEnv(para_MultiGridEnv):
                 # we cannot track shouldAvoidBig etc here because the treat location might change
         if self.record_supervised_labels:
             target_agent = "player_1"
-            print('recording supervised labels', target_agent)
             one_hot_goal = [0] * self.boxes
             one_hot_goal[self.agent_goal[target_agent]] = 1
             self.infos['player_0']["target"] = one_hot_goal
