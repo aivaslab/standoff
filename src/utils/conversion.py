@@ -7,11 +7,14 @@ import gym
 import json
 from stable_baselines3 import TD3, PPO, A2C
 from sb3_contrib import TRPO, RecurrentPPO
+from argparse import Namespace
 
 class_dict = {'PPO': PPO, 'A2C': A2C, 'TRPO': TRPO, 'RecurrentPPO': RecurrentPPO}
 
 
 def get_json_params(path, args):
+    if args is None:
+        args = Namespace()
     with open(path) as json_data:
         data = json.load(json_data)
         model_class = data['model_class']

@@ -112,23 +112,23 @@ def main(args):
 
         for train_dir in train_dirs:
             print('evaluating at train_dir', train_dir)
-            model_class, size, style, frames, vecNormalize, norm_rewards, difficulty, threads, configName = get_json_params(os.path.join(train_dir, 'json_data.json'))
+            model_class, configName, args = get_json_params(os.path.join(train_dir, 'json_data.json'), None)
             model_paths, model_timesteps, repetition_names, norm_paths = find_checkpoint_models(train_dir)
             if not model_paths:
                 continue
 
             if not renamed_envs:
                 for k, env_name in enumerate(configNames):
-                    env_names.append(env_name + str(size) + '-' + style + '-' + str(difficulty) + '-v0')
+                    env_names.append(env_name + str(args.size) + '-' + args.style + '-' + str(args.difficulty) + '-v0')
                 renamed_envs = True
 
-            env_kwargs = {"size": size, "style": style, "threads": threads, "frames": frames, "monitor_path": train_dir, "vecNormalize": vecNormalize, "norm_rewards": norm_rewards}
+            env_kwargs = {"size": args.size, "style": args.style, "threads": args.threads, "frames": args.frames, "monitor_path": train_dir, "vecNormalize": args.vecNormalize, "norm_rewards": args.norm_rewards}
 
             if args.make_evals:
                 evaluate_models(env_names, short_names, model_paths, model_class, model_timesteps, det_env=args.det_env, det_model=args.det_model, use_gtr=args.use_gtr,
-                                frames=frames, episodes=episodes, train_dir=train_dir, norm_paths=norm_paths, env_kwargs=env_kwargs)
+                                frames=args.frames, episodes=episodes, train_dir=train_dir, norm_paths=norm_paths, env_kwargs=env_kwargs)
             if args.make_vids:
-                make_videos(train_dir, env_names, short_names, model_paths[-1], model_class, model_timesteps[-1], size, norm_path=norm_paths[-1], env_kwargs=env_kwargs)
+                make_videos(train_dir, env_names, short_names, model_paths[-1], model_class, model_timesteps[-1], args.size, norm_path=norm_paths[-1], env_kwargs=env_kwargs)
                         
 
 if __name__ == '__main__':
