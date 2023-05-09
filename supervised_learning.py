@@ -51,37 +51,38 @@ def gen_data(configNames, num_timesteps=2500):
         # "move_type": 1,
         # "view_type": 1,
     }
-    configs = ScenarioConfigs().standoff
-
-    reset_configs = {**configs["defaults"], **configs[configName]}
-
-    if isinstance(reset_configs["num_agents"], list):
-        reset_configs["num_agents"] = reset_configs["num_agents"][0]
-    if isinstance(reset_configs["num_puppets"], list):
-        reset_configs["num_puppets"] = reset_configs["num_puppets"][0]
-
-    env_config['config_name'] = configName
-    env_config['agents'] = [GridAgentInterface(**player_interface_config) for _ in range(reset_configs['num_agents'])]
-    env_config['puppets'] = [GridAgentInterface(**puppet_interface_config) for _ in range(reset_configs['num_puppets'])]
-    # env_config['num_agents'] = reset_configs['num_agents']
-    # env_config['num_puppets'] = reset_configs['num_puppets']
-
-    difficulty = 3
-    env_config['opponent_visible_decs'] = (difficulty < 1)
-    env_config['persistent_treat_images'] = (difficulty < 2)
-    env_config['subject_visible_decs'] = (difficulty < 3)
-    env_config['gaze_highlighting'] = (difficulty < 3)
-    env_config['persistent_gaze_highlighting'] = (difficulty < 2)
-
-    env = env_from_config(env_config)
-    env.record_supervised_labels = True
-    if hasattr(env, "hard_reset"):
-        env.hard_reset(reset_configs)
-
-    # num_timesteps = int(2500)
-    labels = ['loc', 'exist', 'vision', 'b-loc', 'b-exist', 'target']
+    
 
     for configName in configNames:
+        configs = ScenarioConfigs().standoff
+
+        reset_configs = {**configs["defaults"], **configs[configName]}
+
+        if isinstance(reset_configs["num_agents"], list):
+            reset_configs["num_agents"] = reset_configs["num_agents"][0]
+        if isinstance(reset_configs["num_puppets"], list):
+            reset_configs["num_puppets"] = reset_configs["num_puppets"][0]
+
+        env_config['config_name'] = configName
+        env_config['agents'] = [GridAgentInterface(**player_interface_config) for _ in range(reset_configs['num_agents'])]
+        env_config['puppets'] = [GridAgentInterface(**puppet_interface_config) for _ in range(reset_configs['num_puppets'])]
+        # env_config['num_agents'] = reset_configs['num_agents']
+        # env_config['num_puppets'] = reset_configs['num_puppets']
+
+        difficulty = 3
+        env_config['opponent_visible_decs'] = (difficulty < 1)
+        env_config['persistent_treat_images'] = (difficulty < 2)
+        env_config['subject_visible_decs'] = (difficulty < 3)
+        env_config['gaze_highlighting'] = (difficulty < 3)
+        env_config['persistent_gaze_highlighting'] = (difficulty < 2)
+
+        env = env_from_config(env_config)
+        env.record_supervised_labels = True
+        if hasattr(env, "hard_reset"):
+            env.hard_reset(reset_configs)
+
+        labels = ['loc', 'exist', 'vision', 'b-loc', 'b-exist', 'target']
+    
         data_name = f'{configName}-{num_timesteps}'
         data_obs = []
         data_labels = {}
@@ -126,20 +127,36 @@ class CustomDataset(Dataset):
 
 
 class RNNModel(nn.Module):
-    def __init__(self, hidden_size, num_layers, output_lens):
+    def __init__(self, hidden_size, num_layers, output_len):
         super(RNNModel, self).__init__()
 
-        self.conv1 = nn.Conv2d(6, 8, kernel_size=3, padding=0)
-        self.conv2 = nn.Conv2d(8, 16, kernel_size=3, padding=0)
-        self.pool = nn.MaxPool2d(kernel_size=2, stride=2, padding=0)
-        self.output_lens = output_lens
+        padding1 = 0
+        padding2 = 0
+        kernel_size1 = 3
+        kernel_size2 = 3
+        input_size = 17
+        stride1 = 1
+        stride2 = 1
+        pool_kernel_size = 2
+        pool_stride = 2
 
-        conv_output_size = (17 // 2) // 2
-        input_size = 16 * conv_output_size * conv_output_size
+        self.conv1 = nn.Conv2d(6, 8, kernel_size=kernel_size1, padding=padding1)
+        self.conv2 = nn.Conv2d(8, 16, kernel_size=kernel_size2, padding=padding2)
+        self.pool = nn.MaxPool2d(kernel_size=pool_kernel_size, stride=pool_stride, padding=0)
+        #self.output_len = output_len
+
+        conv1_output_size = (input_size - kernel_size1 + 2 * padding1) // stride1 + 1
+        pool1_output_size = (conv1_output_size - pool_kernel_size) // pool_stride + 1
+
+        conv2_output_size = (pool1_output_size - kernel_size2 + 2 * padding2) // stride2 + 1
+        pool2_output_size = (conv2_output_size - pool_kernel_size) // pool_stride + 1
+
+        input_size = 16 * pool2_output_size * pool2_output_size
 
         self.rnn = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
-
-        self.fc = nn.Linear(hidden_size, output_lens[0])
+        
+        self.fc = nn.Linear(hidden_size, int(output_len))
+     
 
     def forward(self, x):
         x = x.view(-1, 10, 6, 17, 17)
@@ -165,7 +182,7 @@ def train_model(data_name, label, additional_val_sets):
         data, labels, test_size=0.2, random_state=42
     )
 
-    batch_size = 32
+    batch_size = 64
     train_dataset = CustomDataset(train_data, train_labels)
     val_dataset = CustomDataset(val_data, val_labels)
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
@@ -173,26 +190,27 @@ def train_model(data_name, label, additional_val_sets):
 
     additional_val_loaders = []
     for val_set_name in additional_val_sets:
-        val_data = np.load('supervised/' + val_set_name + '-obs.npy')
-        val_labels = np.load('supervised/' + val_set_name + '-label-' + label + '.npy')
+        val_data = np.load('supervised/' + val_set_name + '-2500-obs.npy')
+        val_labels = np.load('supervised/' + val_set_name + '-2500-label-' + label + '.npy')
         val_dataset = CustomDataset(val_data, val_labels)
         additional_val_loaders.append(DataLoader(val_dataset, batch_size=batch_size, shuffle=False))
 
-    output_len = (train_labels.shape[1])
+    output_len = np.prod(train_labels.shape[1:])
 
     input_size = 6 * 17 * 17
     hidden_size = 32
     num_layers = 1
-    model = RNNModel(hidden_size, num_layers, [output_len])
+    model = RNNModel(hidden_size, num_layers, output_len)
     criterion = nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 
-    num_epochs = 20
+    num_epochs = 25
     train_losses = []
     val_losses = [[] for _ in range(len(additional_val_loaders) + 1)]
-    for epoch in range(num_epochs):
+    for epoch in tqdm.trange(num_epochs):
         train_loss = 0
         for i, (inputs, target_labels) in enumerate(train_loader):
+            inputs = inputs.view(-1, 10, input_size)
             outputs = model(inputs)
             loss = criterion(outputs, target_labels)
             optimizer.zero_grad()
@@ -202,15 +220,15 @@ def train_model(data_name, label, additional_val_sets):
 
         train_losses.append(train_loss / len(train_loader))
         model.eval()
-        for idx, val_loader in enumerate([val_loader] + additional_val_loaders):
+        for idx, _val_loader in enumerate([val_loader] + additional_val_loaders):
             with torch.no_grad():
                 val_loss = 0
-                for inputs, labels in val_loader:
+                for inputs, labels in _val_loader:
                     inputs = inputs.view(-1, 10, input_size)
                     outputs = model(inputs)
                     loss = criterion(outputs, labels)
                     val_loss += loss.item()
-            val_loss /= len(val_loader)
+            val_loss /= len(_val_loader)
             val_losses[idx].append(val_loss)
         model.train()
 
@@ -223,7 +241,15 @@ def plot_losses(data_name, label, train_losses, val_losses, val_set_names):
     for val_set_name, val_loss in zip(val_set_names, val_losses):
         plt.plot(val_loss, label=val_set_name + 'val loss')
     plt.legend()
-    plt.savefig(f'{data_name}-{label}-losses.png')
+    plt.savefig(f'supervised/{data_name}-{label}-losses.png')
 
 # train_model('random-2500', 'exist')
-# gen_data()
+#gen_data(['stage_2', 'all', 'random'], 2500)
+labels = ['loc', 'exist', 'vision', 'b-loc', 'b-exist', 'target']
+sets = ['stage_2', 'all', 'random']
+for data_name in ['random']:
+    unused_sets = [s for s in sets if s != data_name]
+    for label in labels:
+        t_loss, v_loss = train_model(data_name + '-2500', label, unused_sets)
+        plot_losses(data_name, label, t_loss, v_loss, [data_name] + unused_sets)
+
