@@ -205,7 +205,7 @@ def train_model(data_name, label, additional_val_sets):
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 
     max_val_samples = 500
-    num_epochs = 25
+    num_epochs = 100
     train_losses = []
     val_losses = [[] for _ in range(len(additional_val_loaders) + 1)]
     for epoch in tqdm.trange(num_epochs):
@@ -246,6 +246,7 @@ def plot_losses(data_name, label, train_losses, val_losses, val_set_names):
     for val_set_name, val_loss in zip(val_set_names, val_losses):
         plt.plot(val_loss, label=val_set_name + 'val loss')
     plt.legend()
+    plt.ylim(bottom=0)
     plt.savefig(f'supervised/{data_name}-{label}-losses.png')
 
 # train_model('random-2500', 'exist')
@@ -254,7 +255,19 @@ labels = ['loc', 'exist', 'vision', 'b-loc', 'b-exist', 'target']
 sets = ['stage_2', 'all', 'random']
 for data_name in ['random']:
     unused_sets = [s for s in sets if s != data_name]
+    # sum losses
+    t_loss_sum = []
+    v_loss_sum = []
     for label in labels:
         t_loss, v_loss = train_model(data_name + '-2500', label, unused_sets)
         plot_losses(data_name, label, t_loss, v_loss, [data_name] + unused_sets)
+        # add losses elementwise
+        if len(t_loss_sum) == 0:
+            t_loss_sum = t_loss
+            v_loss_sum = v_loss
+        else:
+            t_loss_sum = [x + y for x, y in zip(t_loss_sum, t_loss)]
+            v_loss_sum = [x + y for x, y in zip(v_loss_sum, v_loss)]
+    # plot sum
+    plot_losses(data_name, 'sum', t_loss_sum, v_loss_sum)
 
