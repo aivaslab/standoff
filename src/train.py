@@ -12,7 +12,7 @@ from .utils.train_utils import init_dirs, init_policy, start_global_logs, linear
 from .utils.conversion import make_env_comp, get_json_params
 from stable_baselines3 import TD3, PPO, A2C
 from sb3_contrib import TRPO, RecurrentPPO
-# import torch as th
+import torch as th
 
 
 # import multiprocessing
@@ -33,6 +33,11 @@ def main(args):
     parser.add_argument('--repetitions', type=int, default=1, help='Number of experiment repetitions')
     parser.add_argument('--timesteps', type=float, default=3e5, help='Number of timesteps per thread')
     parser.add_argument('--checkpoints', type=int, default=20, help='Number of checkpoints to save')
+    # supervised model use
+    parser.add_argument('--use_supervised_models', action='store_true', help='Whether to use supervised model')
+    parser.add_argument('--supervised_model_data', type=str, default='random', help='Supervised model data source')
+    parser.add_argument('--supervised_model_label', type=str, default='loc', help='Supervised model label to use')
+    parser.add_argument('--supervised_model_path', type=str, default='supervised', help='Supervised model path')
 
     parser.add_argument('--env_group', type=str, default='1', help='Environment group to use')
     parser.add_argument('--style', type=str, default='rich', help='Evaluation output style')
@@ -109,6 +114,8 @@ def main(args):
 
     # if curriculum, we want to loop through each pretrained folder and update savepath2 to be a new subdirectory
 
+
+
     for this_pretrained_folder in all_pretrained_folders:
 
         if this_pretrained_folder is not None:
@@ -146,7 +153,11 @@ def main(args):
                         json.dump({'model_class': model_class.__name__, 'size': args.size, 'frames': args.frames, 'style': args.style,
                                    'vecNormalize': args.vecNormalize, 'norm_rewards': args.norm_rewards, 'difficulty': args.difficulty,
                                    'threads': args.threads, 'configName': env_name_temp, 'shared_lstm': args.shared_lstm,
-                                   'normalize_images': args.normalize_images}, json_file)
+                                   'normalize_images': args.normalize_images,
+                                   'supervised_data_source': args.supervised_data_source,
+                                   'supervised_model_labels': args.supervised_model_labels,
+                                   'supervised_model_path': args.supervised_model_path
+                                   }, json_file)
                 elif continuing:
                     model_class, _, args = get_json_params(
                         os.path.join(savePath3, 'json_data.json'), args)
@@ -156,16 +167,30 @@ def main(args):
                         json.dump({'model_class': model_class.__name__, 'size': args.size, 'frames': args.frames, 'style': args.style,
                                    'vecNormalize': args.vecNormalize, 'norm_rewards': args.norm_rewards, 'difficulty': args.difficulty,
                                    'threads': args.threads, 'configName': env_name_temp, 'shared_lstm': args.shared_lstm,
-                                   'normalize_images': args.normalize_images}, json_file)
+                                   'normalize_images': args.normalize_images,
+                                   'supervised_data_source': args.supervised_data_source,
+                                   'supervised_model_labels': args.supervised_model_labels,
+                                   'supervised_model_path': args.supervised_model_path
+                                   }, json_file)
                 print('model_class: ', model_class.__name__, 'size: ', args.size, 'style: ', args.style, 'frames: ', args.frames,
                       'vecNormalize: ', args.vecNormalize)
 
                 for repetition in range(args.repetitions):
                     start = time.time()
                     print('name: ', name, dir_name)
+
+                    if args.use_supervised_models:
+                        print('loading SL module', args.supervised_data_source, args.supervised_model_labels,
+                              args.supervised_model_path)
+                        sl_module = th.load(
+                            args.supervised_model_path + '/' + args.supervised_data_source + '-' +
+                            args.supervised_model_label + '-model.pt')
+                    else:
+                        sl_module = None
+
                     env = make_env_comp(env_name, frames=args.frames, size=args.size, style=args.style, monitor_path=savePath3, rank=0,
                                         vecNormalize=args.vecNormalize, norm_rewards=args.norm_rewards, threads=args.threads,
-                                        load_path=vec_norm_path)
+                                        load_path=vec_norm_path, sl_module=sl_module)
 
                     policy, policy_kwargs = init_policy(model_class, env.observation_space, env.action_space, rate,
                                                         args.width, hidden_size=args.hidden_size, conv_mult=args.conv_mult, frames=args.frames,
@@ -198,6 +223,7 @@ def main(args):
 
                     del env
                     del model
+                    del sl_module
 
 if __name__ == 'main':
 

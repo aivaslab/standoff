@@ -11,17 +11,18 @@ from src.utils.evaluation import collect_rollouts, ground_truth_evals, find_chec
 from stable_baselines3 import PPO, A2C
 from sb3_contrib import TRPO, RecurrentPPO
 from stable_baselines3.common.vec_env import VecNormalize
+import torch as th
 
 class_dict = {'PPO': PPO, 'A2C': A2C, 'TRPO': TRPO, 'RecurrentPPO': RecurrentPPO}
 
 
-def make_videos(train_dir, env_names, short_names, model_path, model_class, model_timestep, size, norm_path, env_kwargs):
+def make_videos(train_dir, env_names, short_names, model_path, model_class, model_timestep, size, norm_path, env_kwargs, sl_module):
     vidPath = os.path.join(train_dir, 'videos')
     if not os.path.exists(vidPath):
         os.mkdir(vidPath)
     for k, (short_name, env_name) in enumerate(zip(short_names, env_names)):
         env_kwargs["threads"] = 1
-        eval_env = make_env_comp(env_name, rank=k+1, load_path=norm_path, **env_kwargs)
+        eval_env = make_env_comp(env_name, rank=k+1, load_path=norm_path, sl_module=sl_module, **env_kwargs)
         model = model_class.load(model_path, eval_env)
         model.set_env(eval_env)
         vidPath2 = os.path.join(vidPath, env_name)
@@ -36,7 +37,7 @@ def make_videos(train_dir, env_names, short_names, model_path, model_class, mode
         del model
 
 
-def evaluate_models(eval_env_names, short_names, models, model_class, model_timesteps, det_env, det_model, use_gtr, frames, episodes, train_dir, norm_paths, env_kwargs):
+def evaluate_models(eval_env_names, short_names, models, model_class, model_timesteps, det_env, det_model, use_gtr, frames, episodes, train_dir, norm_paths, env_kwargs, sl_module):
     eval_data = pd.DataFrame()
 
     prefix = 'gtr' if use_gtr else 'det' if det_env else 'rand'
@@ -46,7 +47,7 @@ def evaluate_models(eval_env_names, short_names, models, model_class, model_time
     progress_bar = tqdm(total=len(models)*len(eval_env_names)*episodes, smoothing=0.05)
 
     for k, (short_name, eval_env_name) in enumerate(zip(short_names, eval_env_names)):
-        env = make_env_comp(eval_env_name, rank=k+1, skip_vecNorm=True, **env_kwargs)
+        env = make_env_comp(eval_env_name, rank=k+1, skip_vecNorm=True, sl_module=sl_module, **env_kwargs)
         for model_name, model_timestep, norm_path in zip(models, model_timesteps, norm_paths):
             eval_env = VecNormalize.load(norm_path, env) if env_kwargs["vecNormalize"] else env
             model = model_class.load(model_name, env=eval_env)
@@ -89,6 +90,10 @@ def main(args):
     parser.add_argument('--make_vids', action='store_true', help='Make vids')
     parser.add_argument('--make_evals', action='store_true', help='Make eval csvs')
     parser.add_argument('--curriculum', action='store_true', help='Do evals one directory deeper')
+    parser.add_argument('--use_supervised_models', action='store_true', help='Whether to use supervised model')
+    parser.add_argument('--supervised_model_data', type=str, default='random', help='Supervised model data source')
+    parser.add_argument('--supervised_model_label', type=str, default='loc', help='Supervised model label to use')
+    parser.add_argument('--supervised_model_path', type=str, default='supervised', help='Supervised model path')
     args = parser.parse_args(args)
 
     configNames = []
@@ -124,11 +129,22 @@ def main(args):
 
             env_kwargs = {"size": args.size, "style": args.style, "threads": args.threads, "frames": args.frames, "monitor_path": train_dir, "vecNormalize": args.vecNormalize, "norm_rewards": args.norm_rewards}
 
+            if args.use_supervised_models:
+                print('loading SL module', args.supervised_data_source, args.supervised_model_labels,
+                      args.supervised_model_path)
+                sl_module = th.load(
+                    args.supervised_model_path + '/' + args.supervised_data_source + '-' +
+                    args.supervised_model_label + '-model.pt')
+            else:
+                sl_module = None
+
             if args.make_evals:
                 evaluate_models(env_names, short_names, model_paths, model_class, model_timesteps, det_env=args.det_env, det_model=args.det_model, use_gtr=args.use_gtr,
-                                frames=args.frames, episodes=episodes, train_dir=train_dir, norm_paths=norm_paths, env_kwargs=env_kwargs)
+                                frames=args.frames, episodes=episodes, train_dir=train_dir, norm_paths=norm_paths, env_kwargs=env_kwargs, sl_module=sl_module)
             if args.make_vids:
-                make_videos(train_dir, env_names, short_names, model_paths[-1], model_class, model_timesteps[-1], args.size, norm_path=norm_paths[-1], env_kwargs=env_kwargs)
+                make_videos(train_dir, env_names, short_names, model_paths[-1], model_class, model_timesteps[-1], args.size, norm_path=norm_paths[-1], env_kwargs=env_kwargs, sl_module=sl_module)
+
+            del sl_module
                         
 
 if __name__ == '__main__':
