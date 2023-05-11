@@ -713,7 +713,7 @@ class para_MultiGridEnv(ParallelEnv):
 
                 agent.activate()
         self.observations = {agent: self.gen_agent_obs(a) if self.supervised_model is None else
-        np.concatenate((self.gen_agent_obs(a), np.zeros((a.view_size, a.view_size)))) for
+        np.concatenate((self.gen_agent_obs(a), np.zeros((1, a.view_size, a.view_size)))) for
                              agent, a in zip(self.agents, self.agent_instances)}
         self.has_released = False
 
@@ -1003,7 +1003,7 @@ class para_MultiGridEnv(ParallelEnv):
                     self.past_observations[agent_name][self.step_count] = generated_obs
                     self.last_supervised_labels = self.supervised_model.predict(generated_obs)
 
-                label_obs = np.zeros((agent.view_size, agent.view_size), dtype="uint8").fill(
+                label_obs = np.zeros((1, agent.view_size, agent.view_size), dtype="uint8").fill(
                     self.last_supervised_labels)
                 self.observations[agent_name] = np.concatenate((generated_obs, label_obs), axis=0)
             else:
