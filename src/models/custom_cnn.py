@@ -18,6 +18,8 @@ class CustomCNN(BaseFeaturesExtractor):
         # Re-ordering will be done by pre-preprocessing or wrapper
         n_input_channels = self.get_image_obs(observation_space).shape[0]
 
+        self.n_label_channels = 0
+
         self.cnn = nn.Sequential(
             nn.Conv2d(n_input_channels, 4*conv_mult*frames, kernel_size=5, stride=2, padding=0),
             nn.ReLU(),
