@@ -194,7 +194,8 @@ def main(args):
 
                     policy, policy_kwargs = init_policy(model_class, env.observation_space, env.action_space, rate,
                                                         args.width, hidden_size=args.hidden_size, conv_mult=args.conv_mult, frames=args.frames,
-                                                        name='cnn', net_arch=[args.width], shared_lstm=args.shared_lstm, normalize_images=args.normalize_images,)
+                                                        name='cnn', net_arch=[args.width], shared_lstm=args.shared_lstm, normalize_images=args.normalize_images,
+                                                        use_labels=args.use_supervised_models)
 
                     log_line = start_global_logs(global_logs, args.experiment_name, dir_name, name, model_class, policy,
                                                  global_log_path)
