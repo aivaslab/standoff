@@ -279,5 +279,6 @@ for data_name in ['random']:
     plt.xlabel('Epoch')
     plt.ylabel('Validation Loss')
     plt.legend()
-    plt.show()
+    plt.ylim(bottom=0)
+    plt.savefig(f'supervised/{data_name}-first-losses.png')
 
