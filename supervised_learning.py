@@ -174,9 +174,9 @@ class RNNModel(nn.Module):
         return outputs
 
 
-def train_model(data_name, label, additional_val_sets):
-    data = np.load('supervised/' + data_name + '-obs.npy')
-    labels = np.load('supervised/' + data_name + '-label-' + label + '.npy')
+def train_model(data_name, label, additional_val_sets, path='supervised/'):
+    data = np.load(path + data_name + '-obs.npy')
+    labels = np.load(path + data_name + '-label-' + label + '.npy')
 
     train_data, val_data, train_labels, val_labels = train_test_split(
         data, labels, test_size=0.2, random_state=42
@@ -190,8 +190,8 @@ def train_model(data_name, label, additional_val_sets):
 
     additional_val_loaders = []
     for val_set_name in additional_val_sets:
-        val_data = np.load('supervised/' + val_set_name + '-2500-obs.npy')
-        val_labels = np.load('supervised/' + val_set_name + '-2500-label-' + label + '.npy')
+        val_data = np.load(path + val_set_name + '-2500-obs.npy')
+        val_labels = np.load(path + val_set_name + '-2500-label-' + label + '.npy')
         val_dataset = CustomDataset(val_data, val_labels)
         additional_val_loaders.append(DataLoader(val_dataset, batch_size=batch_size, shuffle=False))
 
@@ -236,6 +236,8 @@ def train_model(data_name, label, additional_val_sets):
             val_loss /= val_samples_processed/batch_size
             val_losses[idx].append(val_loss)
         model.train()
+    # save model
+    torch.save(model.state_dict(), f'{path}{data_name}-{label}-model.pt')
 
     return train_losses, val_losses
 
@@ -260,7 +262,7 @@ for data_name in ['random']:
     v_loss_sum = []
     first_v_loss = []
     for label in labels:
-        t_loss, v_loss = train_model(data_name + '-2500', label, unused_sets)
+        t_loss, v_loss, = train_model(data_name + '-2500', label, unused_sets)
         plot_losses(data_name, label, t_loss, v_loss, [data_name] + unused_sets)
         first_v_loss.append(v_loss[0])
         # add losses elementwise
