@@ -712,13 +712,15 @@ class para_MultiGridEnv(ParallelEnv):
                     self.place_obj(agent, **self.agent_spawn_kwargs)
 
                 agent.activate()
-        self.observations = {agent: self.gen_agent_obs(a) if self.supervised_model is None else
-        np.concatenate((self.gen_agent_obs(a), np.zeros((1, a.view_size, a.view_size)))) for
+
+        self.prior_observations = {agent: self.gen_agent_obs(a) for agent, a in zip(self.agents, self.agent_instances)}
+        self.observations = {agent: self.prior_observations[agent] if self.supervised_model is None else
+        np.concatenate((self.prior_observations[agent], np.zeros((1, a.view_size, a.view_size)))) for
                              agent, a in zip(self.agents, self.agent_instances)}
         self.has_released = False
 
         if self.supervised_model is not None:
-            self.past_observations = np.zeros((10, *self.observations[self.agents[0]].shape))
+            self.past_observations = np.zeros((10, *self.prior_observations[self.agents[0]].shape))
 
         # robservations = {agent: self.observations[agent] for agent in self.agents}
         # rrewards = {agent: self.rewards[agent] for agent in self.agents}
