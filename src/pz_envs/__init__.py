@@ -32,6 +32,7 @@ def register_standoff_env(
         view_tile_size=1,
         _view_size=15,
         view_offset=4,
+        use_label=False,
 ):
     configs = ScenarioConfigs().standoff
 
@@ -43,6 +44,7 @@ def register_standoff_env(
         "height": 19,
         "step_reward": -0.1,
         "config_name": config_name,
+        "supervised_model": None if not use_label else 1,
     }
 
 
@@ -103,18 +105,21 @@ def env_from_config(env_config, randomize_seed=True):
 
 
 for observation_style in ['rich']:
-    for view_size in [17]:
-        for difficulty in [3]:
-            for config in ScenarioConfigs.standoff.keys():
-                configName = config.replace(" ", "")
-                register_standoff_env(
-                    f"Standoff-{configName}-{view_size}-{observation_style}-{difficulty}-v0",
-                    StandoffEnv,
-                    config,
-                    difficulty,
-                    _observation_style=observation_style,
-                    #observation_density=1,
-                    view_tile_size=1,
-                    _view_size=view_size,
-                    view_offset=1,
-                )
+    for use_label in [True, False]:
+        for view_size in [17]:
+            for difficulty in [3]:
+                for config in ScenarioConfigs.standoff.keys():
+                    configName = config.replace(" ", "")
+                    register_standoff_env(
+                        f"Standoff-{configName}-{view_size}-{observation_style}-{difficulty}-v0" if not use_label else
+                        f"Standoff-{configName}-{view_size}-{observation_style}-{difficulty}-v1",
+                        StandoffEnv,
+                        config,
+                        difficulty,
+                        _observation_style=observation_style,
+                        #observation_density=1,
+                        view_tile_size=1,
+                        _view_size=view_size,
+                        view_offset=1,
+                        use_label=use_label,
+                    )

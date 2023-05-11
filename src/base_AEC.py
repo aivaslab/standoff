@@ -439,6 +439,7 @@ class para_MultiGridEnv(ParallelEnv):
             persistent_gaze_highlighting=False,
             observation_style='rich',
             dense_obs=0,
+            supervised_model=None
     ):
         """
         The init method takes in environment arguments and
@@ -449,6 +450,8 @@ class para_MultiGridEnv(ParallelEnv):
 
         These attributes should not be changed after initialization.
         """
+
+        self.supervised_model = supervised_model
         self.past_observations = None
         self.record_info = False  # set this to true during evaluation
         self.max_steps_real = None
@@ -539,7 +542,8 @@ class para_MultiGridEnv(ParallelEnv):
                 )
             if self.gaze_highlighting:
                 self.rich_observation_layers.append('gaze')
-            self.channels = len(self.rich_observation_layers)
+
+            self.channels = len(self.rich_observation_layers) + (1 if self.supervised_model is not None else 0)
 
         self.observation_spaces = {agent: Box(
             low=0,
@@ -559,7 +563,6 @@ class para_MultiGridEnv(ParallelEnv):
         self.loadingPickle = False
         self.allRooms = []
 
-        self.supervised_model = None
         self.last_supervised_labels = None
         self.has_released = False
 
@@ -998,7 +1001,10 @@ class para_MultiGridEnv(ParallelEnv):
                 if self.step_count < 10 and not self.has_released:
                     self.past_observations[agent_name][self.step_count] = generated_obs
                     self.last_supervised_labels = self.supervised_model.predict(generated_obs)
-                self.observations[agent_name] = {"image": generated_obs, "label": self.last_supervised_labels}
+
+                label_obs = np.zeros((agent.view_size, agent.view_size), dtype="uint8").fill(
+                    self.last_supervised_labels)
+                self.observations[agent_name] = np.concatenate((generated_obs, label_obs), axis=0)
             else:
                 self.observations[agent_name] = generated_obs
 
