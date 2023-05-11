@@ -242,7 +242,7 @@ def train_model(data_name, label, additional_val_sets):
 
 def plot_losses(data_name, label, train_losses, val_losses, val_set_names):
     plt.figure()
-    plt.plot(train_losses, label='train')
+    plt.plot(train_losses, label=data_name + ' train loss')
     for val_set_name, val_loss in zip(val_set_names, val_losses):
         plt.plot(val_loss, label=val_set_name + 'val loss')
     plt.legend()
@@ -269,5 +269,5 @@ for data_name in ['random']:
             t_loss_sum = [x + y for x, y in zip(t_loss_sum, t_loss)]
             v_loss_sum = [x + y for x, y in zip(v_loss_sum, v_loss)]
     # plot sum
-    plot_losses(data_name, 'sum', t_loss_sum, v_loss_sum)
+    plot_losses(data_name, 'sum', t_loss_sum, v_loss_sum, [data_name])
 
