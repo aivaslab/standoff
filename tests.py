@@ -12,48 +12,16 @@ print('train')
 all_exp_names = []
 curriculum = []
 if True:
-    experiment_name = 'S1'
-    curriculum.append(False)
-    all_exp_names.append(experiment_name)
-    trainMain(['--experiment_name', experiment_name,
-               '--savePath', 'save_dir3',
-               '--env_group', '1',
-               '--timesteps', '5e5',
-               '--model_class', 'RecurrentPPO',
-               '--threads', '16',
-               '--overwrite',
-               ])
-    experiment_name = 'Curriculum-1'
+
+    experiment_name = '1e6-cur'
     all_exp_names.append(experiment_name)
     curriculum.append(True)
     trainMain(['--experiment_name', experiment_name,
-               '--savePath', 'save_dir3',
+               '--savePath', 'may',
                '--env_group', 's2+s2b',
-               '--curriculum', '--pretrain_dir', 'S1',
-               '--timesteps', '5e5',
+               '--curriculum', '--pretrain_dir', 's1-1e6',
+               '--timesteps', '1e6',
                '--model_class', 'RecurrentPPO',
-               '--threads', '16',
-               '--overwrite',
-               ])
-    experiment_name = 'DirectRecurrent'
-    all_exp_names.append(experiment_name)
-    curriculum.append(False)
-    trainMain(['--experiment_name', experiment_name,
-               '--savePath', 'save_dir3',
-               '--env_group', '3',
-               '--timesteps', '3e5',
-               '--model_class', 'RecurrentPPO',
-               '--threads', '16',
-               '--overwrite',
-               ])
-    experiment_name = 'DirectFeedforward'
-    all_exp_names.append(experiment_name)
-    curriculum.append(False)
-    trainMain(['--experiment_name', experiment_name,
-               '--savePath', 'save_dir3',
-               '--env_group', '3',
-               '--timesteps', '3e5',
-               '--model_class', 'PPO',
                '--threads', '16',
                '--overwrite',
                ])
