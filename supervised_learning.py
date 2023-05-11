@@ -237,7 +237,7 @@ def train_model(data_name, label, additional_val_sets, path='supervised/'):
             val_losses[idx].append(val_loss)
         model.train()
     # save model
-    torch.save(model.state_dict(), f'{path}{data_name}-{label}-model.pt')
+    torch.save([model.kwargs, model.state_dict()], f'{path}{data_name}-{label}-model.pt')
 
     return train_losses, val_losses
 

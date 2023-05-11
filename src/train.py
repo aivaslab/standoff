@@ -13,7 +13,7 @@ from .utils.conversion import make_env_comp, get_json_params
 from stable_baselines3 import TD3, PPO, A2C
 from sb3_contrib import TRPO, RecurrentPPO
 import torch as th
-
+from .supervised_learning import RNNModel
 
 # import multiprocessing
 # multiprocessing.set_start_method("fork")
@@ -186,9 +186,10 @@ def main(args):
                     if args.use_supervised_models:
                         print('loading SL module', args.supervised_data_source, args.supervised_model_label,
                               args.supervised_model_path)
-                        sl_module = th.load(
-                            args.supervised_model_path + '/' + args.supervised_data_source + '-' +
-                            args.supervised_model_label + '-model.pt')
+                        kwargs, state = th.load(args.supervised_model_path + '/' + args.supervised_data_source + '-' +
+                                                args.supervised_model_label + '-model.pt')
+                        sl_module = RNNModel(**kwargs)
+                        sl_module.load_state_dict(state)
                     else:
                         sl_module = None
 
