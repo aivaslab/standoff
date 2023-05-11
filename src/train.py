@@ -155,7 +155,7 @@ def main(args):
                                    'threads': args.threads, 'configName': env_name_temp, 'shared_lstm': args.shared_lstm,
                                    'normalize_images': args.normalize_images,
                                    'supervised_data_source': args.supervised_data_source,
-                                   'supervised_model_labels': args.supervised_model_labels,
+                                   'supervised_model_label': args.supervised_model_label,
                                    'supervised_model_path': args.supervised_model_path
                                    }, json_file)
                 elif continuing:
@@ -169,7 +169,7 @@ def main(args):
                                    'threads': args.threads, 'configName': env_name_temp, 'shared_lstm': args.shared_lstm,
                                    'normalize_images': args.normalize_images,
                                    'supervised_data_source': args.supervised_data_source,
-                                   'supervised_model_labels': args.supervised_model_labels,
+                                   'supervised_model_label': args.supervised_model_label,
                                    'supervised_model_path': args.supervised_model_path
                                    }, json_file)
                 print('model_class: ', model_class.__name__, 'size: ', args.size, 'style: ', args.style, 'frames: ', args.frames,
@@ -180,7 +180,7 @@ def main(args):
                     print('name: ', name, dir_name)
 
                     if args.use_supervised_models:
-                        print('loading SL module', args.supervised_data_source, args.supervised_model_labels,
+                        print('loading SL module', args.supervised_data_source, args.supervised_model_label,
                               args.supervised_model_path)
                         sl_module = th.load(
                             args.supervised_model_path + '/' + args.supervised_data_source + '-' +
