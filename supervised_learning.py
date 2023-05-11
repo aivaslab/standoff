@@ -129,6 +129,7 @@ class CustomDataset(Dataset):
 class RNNModel(nn.Module):
     def __init__(self, hidden_size, num_layers, output_len):
         super(RNNModel, self).__init__()
+        self.kwargs = {'hidden_size': hidden_size, 'num_layers': num_layers, 'output_len': output_len}
 
         padding1 = 0
         padding2 = 0
