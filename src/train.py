@@ -45,7 +45,7 @@ def main(args):
     parser.add_argument('--tile_size', type=int, default=1,
                         help='Size of each tile in pixels')  # not implemented since needs registered env
     parser.add_argument('--frames', type=int, default=1, help='Number of frames to stack')
-    parser.add_argument('--threads', type=int, default=1, help='Number of cpu threads to use')
+    parser.add_argument('--threads', type=int, default=16, help='Number of cpu threads to use')
     parser.add_argument('--difficulty', type=int, default=3, help='Difficulty 0-4, lower numbers enable cheats')
     parser.add_argument('--reverse_order', action='store_true', help='Whether to reverse order of train envs')
     parser.add_argument('--start_at', type=int, default=0, help='Start at a specific environment')
@@ -55,7 +55,7 @@ def main(args):
     parser.add_argument('--conv_mult', type=int, default=1, help='Number of first level kernels')
     parser.add_argument('--hidden_size', type=int, default=64, help='LSTM hidden layer size')
     parser.add_argument('--shared_lstm', type=bool, default=False, help='Share LSTM layer')
-    parser.add_argument('--normalize_images', type=bool, default=True, help='Divide obs by 255')
+    parser.add_argument('--normalize_images', type=bool, default=False, help='Divide obs by 255')
     parser.add_argument('--width', type=int, default=32, help='MLP features')
     parser.add_argument('--lr', type=float, default=1e-3, help='Learning rate')
     parser.add_argument('--batch_size', type=int, default=2048, help='Batch size')
