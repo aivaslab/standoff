@@ -1000,7 +1000,7 @@ class para_MultiGridEnv(ParallelEnv):
             generated_obs = self.gen_agent_obs(agent)
             if self.supervised_model is not None:
                 if self.step_count < 10 and not self.has_released:
-                    self.past_observations[agent_name][self.step_count] = generated_obs
+                    self.past_observations[self.step_count] = generated_obs
                     self.last_supervised_labels = self.supervised_model.predict(generated_obs)
 
                 label_obs = np.zeros((1, agent.view_size, agent.view_size), dtype="uint8").fill(
