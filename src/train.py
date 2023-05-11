@@ -141,7 +141,11 @@ def main(args):
                 rate = linear_schedule(args.lr) if args.schedule == 'linear' else args.lr
                 model_class = class_dict[args.model_class]
 
-                env_name = f"Standoff-{env_name_temp}-{str(args.size)}-{args.style}-{str(args.difficulty)}-v0"
+                env_name = f"Standoff-{env_name_temp}-{str(args.size)}-{args.style}-{str(args.difficulty)}-v"
+                if args.use_supervised_models:
+                    env_name += "1"
+                else:
+                    env_name += "0"
                 savePath3 = os.path.join(train_path_ext, env_name + name)
                 if not os.path.exists(savePath3):
                     os.mkdir(savePath3)
