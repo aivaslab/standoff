@@ -39,6 +39,7 @@ class StandoffEnv(para_MultiGridEnv):
             persistent_treat_images=False,
             gaze_highlighting=False,
             persistent_gaze_highlighting=False,
+            supervised_model=None,
     ):
         super().__init__(agents,
                          puppets,
@@ -60,7 +61,8 @@ class StandoffEnv(para_MultiGridEnv):
                          opponent_visible_decs=opponent_visible_decs,
                          persistent_treat_images=persistent_treat_images,
                          gaze_highlighting=gaze_highlighting,
-                         persistent_gaze_highlighting=persistent_gaze_highlighting, )
+                         persistent_gaze_highlighting=persistent_gaze_highlighting, 
+                         supervised_model=supervised_model)
         self.new_target = None
         if agent_spawn_kwargs is None:
             agent_spawn_kwargs = {'top': (0, 0), 'size': (2, self.width)}
@@ -90,7 +92,7 @@ class StandoffEnv(para_MultiGridEnv):
         self.random_odd_spawns = True  # overrides self.odd_spawns when true
         self.record_supervised_labels = False
 
-        self.supervised_model = None # used for generating special supervised labels
+        self.supervised_model = supervised_model # used for generating special supervised labels
         self.last_supervised_labels = None
         self.has_released = False
 
