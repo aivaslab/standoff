@@ -10,10 +10,10 @@ from .pz_envs import ScenarioConfigs
 from .utils.callbacks import make_callbacks
 from .utils.train_utils import init_dirs, init_policy, start_global_logs, linear_schedule, find_last_checkpoint_model
 from .utils.conversion import make_env_comp, get_json_params
-from stable_baselines3 import TD3, PPO, A2C
+from stable_baselines3 import PPO, A2C
 from sb3_contrib import TRPO, RecurrentPPO
 import torch as th
-from ..supervised_learning import RNNModel
+from src.supervised_learning import RNNModel
 
 # import multiprocessing
 # multiprocessing.set_start_method("fork")

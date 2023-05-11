@@ -6,9 +6,9 @@ import os
 
 sys.path.append(os.getcwd())
 
-from src.agents import GridAgentInterface
-from src.pz_envs import env_from_config
-from src.pz_envs.scenario_configs import ScenarioConfigs
+from .agents import GridAgentInterface
+from .pz_envs import env_from_config
+from .pz_envs.scenario_configs import ScenarioConfigs
 # import src.pz_envs
 from torch.utils.data import Dataset, DataLoader
 import tqdm
