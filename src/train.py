@@ -13,7 +13,7 @@ from .utils.conversion import make_env_comp, get_json_params
 from stable_baselines3 import TD3, PPO, A2C
 from sb3_contrib import TRPO, RecurrentPPO
 import torch as th
-from .supervised_learning import RNNModel
+from ..supervised_learning import RNNModel
 
 # import multiprocessing
 # multiprocessing.set_start_method("fork")
