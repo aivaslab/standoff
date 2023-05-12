@@ -254,34 +254,35 @@ def plot_losses(data_name, label, train_losses, val_losses, val_set_names):
 
 # train_model('random-2500', 'exist')
 #gen_data(['stage_2', 'all', 'random'], 2500)
-labels = ['loc', 'exist', 'vision', 'b-loc', 'b-exist', 'target']
-sets = ['stage_2', 'all', 'random']
-for data_name in ['random']:
-    unused_sets = [s for s in sets if s != data_name]
-    # sum losses
-    t_loss_sum = []
-    v_loss_sum = []
-    first_v_loss = []
-    for label in labels:
-        t_loss, v_loss, = train_model(data_name + '-2500', label, unused_sets)
-        plot_losses(data_name, label, t_loss, v_loss, [data_name] + unused_sets)
-        first_v_loss.append(v_loss[0])
-        # add losses elementwise
-        if len(t_loss_sum) == 0:
-            t_loss_sum = t_loss
-            v_loss_sum = v_loss
-        else:
-            t_loss_sum = [x + y for x, y in zip(t_loss_sum, t_loss)]
-            v_loss_sum = [x + y for x, y in zip(v_loss_sum, v_loss)]
-    # plot sum
-    plot_losses(data_name, 'sum', t_loss_sum, v_loss_sum, [data_name])
+if __name__ == '__main__':
+    labels = ['loc', 'exist', 'vision', 'b-loc', 'b-exist', 'target']
+    sets = ['stage_2', 'all', 'random']
+    for data_name in ['random']:
+        unused_sets = [s for s in sets if s != data_name]
+        # sum losses
+        t_loss_sum = []
+        v_loss_sum = []
+        first_v_loss = []
+        for label in labels:
+            t_loss, v_loss, = train_model(data_name + '-2500', label, unused_sets)
+            plot_losses(data_name, label, t_loss, v_loss, [data_name] + unused_sets)
+            first_v_loss.append(v_loss[0])
+            # add losses elementwise
+            if len(t_loss_sum) == 0:
+                t_loss_sum = t_loss
+                v_loss_sum = v_loss
+            else:
+                t_loss_sum = [x + y for x, y in zip(t_loss_sum, t_loss)]
+                v_loss_sum = [x + y for x, y in zip(v_loss_sum, v_loss)]
+        # plot sum
+        plot_losses(data_name, 'sum', t_loss_sum, v_loss_sum, [data_name])
 
-    plt.figure(figsize=(10, 5))
-    for label, loss in zip(labels, first_v_loss):
-        plt.plot(loss, label=label)
-    plt.xlabel('Epoch')
-    plt.ylabel('Validation Loss')
-    plt.legend()
-    plt.ylim(bottom=0)
-    plt.savefig(f'supervised/{data_name}-first-losses.png')
+        plt.figure(figsize=(10, 5))
+        for label, loss in zip(labels, first_v_loss):
+            plt.plot(loss, label=label)
+        plt.xlabel('Epoch')
+        plt.ylabel('Validation Loss')
+        plt.legend()
+        plt.ylim(bottom=0)
+        plt.savefig(f'supervised/{data_name}-first-losses.png')
 
