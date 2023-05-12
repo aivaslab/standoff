@@ -55,8 +55,10 @@ def main(args):
     parser.add_argument('--conv_mult', type=int, default=1, help='Number of first level kernels')
     parser.add_argument('--hidden_size', type=int, default=64, help='LSTM hidden layer size')
     parser.add_argument('--shared_lstm', type=bool, default=False, help='Share LSTM layer')
+    parser.add_argument('--n_lstm_layers', type=int, default=1, help='LSTM layers')
     parser.add_argument('--normalize_images', type=bool, default=False, help='Divide obs by 255')
     parser.add_argument('--width', type=int, default=32, help='MLP features')
+    parser.add_argument('--num_hidden_layers', type=int, default=1, help='MLP layers')
     parser.add_argument('--lr', type=float, default=1e-3, help='Learning rate')
     parser.add_argument('--batch_size', type=int, default=2048, help='Batch size')
     parser.add_argument('--schedule', type=str, default='linear', help='Learning rate schedule')
@@ -199,7 +201,8 @@ def main(args):
 
                     policy, policy_kwargs = init_policy(model_class, env.observation_space, env.action_space, rate,
                                                         args.width, hidden_size=args.hidden_size, conv_mult=args.conv_mult, frames=args.frames,
-                                                        name='cnn', net_arch=[args.width], shared_lstm=args.shared_lstm, normalize_images=args.normalize_images,
+                                                        name='cnn', net_arch=[args.width for _ in range(args.num_hidden_layers)],
+                                                        shared_lstm=args.shared_lstm, normalize_images=args.normalize_images,
                                                         use_labels=args.use_supervised_models)
 
                     log_line = start_global_logs(global_logs, args.experiment_name, dir_name, name, model_class, policy,
