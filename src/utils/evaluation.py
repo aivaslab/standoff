@@ -234,7 +234,7 @@ def find_checkpoint_models(path, only_last=False):
             for checkpoint_path in os.scandir(new_path.path):
                 if "norm" not in checkpoint_path.path:
                     all_models.append(checkpoint_path.path)
-                    all_lengths.append(int(checkpoint_path.path[checkpoint_path.path.find("/model_") + 6:checkpoint_path.path.find("_steps.zip")]))
+                    all_lengths.append(int(checkpoint_path.path[checkpoint_path.path.find("/model_") + 7:checkpoint_path.path.find("_steps.zip")]))
                     repetition_names.append(new_path.name)
                 else:
                     norm_paths.append(checkpoint_path.path)
@@ -244,7 +244,7 @@ def find_checkpoint_models(path, only_last=False):
             # print('loading from ' + checkpoint_path.path)
             if ".pkl" not in checkpoint_path.path:
                 all_models.append( checkpoint_path.path)
-                all_lengths.append(int(checkpoint_path.path[checkpoint_path.path.find("/model_")+6:checkpoint_path.path.find("_steps.zip")]))
+                all_lengths.append(int(checkpoint_path.path[checkpoint_path.path.find("/model_")+7:checkpoint_path.path.find("_steps.zip")]))
                 repetition_names.append('rep_0')
             else:
                 norm_paths.append(checkpoint_path.path)
