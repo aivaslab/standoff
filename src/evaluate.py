@@ -130,7 +130,7 @@ def main(args):
             env_kwargs = {"size": args.size, "style": args.style, "threads": args.threads, "frames": args.frames, "monitor_path": train_dir, "vecNormalize": args.vecNormalize, "norm_rewards": args.norm_rewards}
             print("args", args)
             if args.use_supervised_models:
-                print('loading SL module', args.supervised_data_source, args.supervised_model_labels,
+                print('loading SL module', args.supervised_data_source, args.supervised_model_label,
                       args.supervised_model_path)
                 sl_module = th.load(
                     args.supervised_model_path + '/' + args.supervised_data_source + '-' +
