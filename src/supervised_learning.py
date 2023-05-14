@@ -160,7 +160,7 @@ class RNNModel(nn.Module):
      
 
     def forward(self, x):
-        x = x.view(-1, 10, 6, 17, 17)
+        x = x.view((-1, 10, 6, 17, 17))
         conv_outputs = []
         for t in range(10):
             x_t = x[:, t, :, :, :]
