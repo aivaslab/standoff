@@ -216,6 +216,7 @@ def train_model(data_name, label, additional_val_sets, path='supervised/'):
         train_loss = 0
         for i, (inputs, target_labels) in enumerate(train_loader):
             #inputs = inputs.view(-1, 10, input_size)
+            print(inputs.shape)
             outputs = model(inputs)
             loss = criterion(outputs, target_labels)
             optimizer.zero_grad()
