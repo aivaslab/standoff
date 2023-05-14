@@ -1008,7 +1008,7 @@ class para_MultiGridEnv(ParallelEnv):
                     self.past_observations[self.step_count] = generated_obs
                     hashed = hashlib.sha1(self.past_observations.view(np.uint8)).hexdigest()
                     if hashed in self.supervised_label_dict.keys():
-                        self.last_supervised_labels = self.supervised_label_dict[str(self.past_observations)]
+                        self.last_supervised_labels = self.supervised_label_dict[hashed]
                     else:
                         self.last_supervised_labels = self.supervised_model.forward(np.asarray([self.past_observations])).detach().numpy()
                         self.supervised_label_dict[hashed] = self.last_supervised_labels
