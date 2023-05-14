@@ -1005,7 +1005,8 @@ class para_MultiGridEnv(ParallelEnv):
                     self.past_observations[self.step_count] = generated_obs
                     self.last_supervised_labels = self.supervised_model.forward(np.asarray([self.past_observations])).detach().numpy()
 
-                label_obs = np.zeros((1, agent.view_size, agent.view_size), dtype="uint8")[0, :self.last_supervised_labels.shape[1]] = self.last_supervised_labels
+                label_obs = np.zeros((1, agent.view_size, agent.view_size), dtype="uint8")
+                label_obs[0, 0, :self.last_supervised_labels.shape[1]] = self.last_supervised_labels
                 self.observations[agent_name] = np.concatenate((generated_obs, label_obs), axis=0)
             else:
                 self.observations[agent_name] = generated_obs
