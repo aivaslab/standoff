@@ -14,6 +14,7 @@ from gym.utils.seeding import np_random
 from gym.spaces import Discrete, Box
 from pettingzoo import ParallelEnv
 from .agents import occlude_mask
+import hashlib
 
 from src.rendering import SimpleImageViewer
 
@@ -1005,8 +1006,7 @@ class para_MultiGridEnv(ParallelEnv):
             if self.supervised_model is not None:
                 if self.step_count < 10 and not self.has_released:
                     self.past_observations[self.step_count] = generated_obs
-                    hashed = hash(self.past_observations)
-                    print(len(hashed))
+                    hashed = hashlib.sha1(self.past_observations.view(np.uint8)).hexdigest()
                     if hashed in self.supervised_label_dict.keys():
                         self.last_supervised_labels = self.supervised_label_dict[str(self.past_observations)]
                     else:
