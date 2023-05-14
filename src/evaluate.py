@@ -128,7 +128,7 @@ def main(args):
                 renamed_envs = True
 
             env_kwargs = {"size": args.size, "style": args.style, "threads": args.threads, "frames": args.frames, "monitor_path": train_dir, "vecNormalize": args.vecNormalize, "norm_rewards": args.norm_rewards}
-
+            print("args", args)
             if args.use_supervised_models:
                 print('loading SL module', args.supervised_data_source, args.supervised_model_labels,
                       args.supervised_model_path)
