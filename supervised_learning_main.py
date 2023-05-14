@@ -215,7 +215,7 @@ def train_model(data_name, label, additional_val_sets, path='supervised/'):
     for epoch in tqdm.trange(num_epochs):
         train_loss = 0
         for i, (inputs, target_labels) in enumerate(train_loader):
-            inputs = inputs.view(-1, 10, input_size)
+            #inputs = inputs.view(-1, 10, input_size)
             outputs = model(inputs)
             loss = criterion(outputs, target_labels)
             optimizer.zero_grad()
@@ -230,7 +230,7 @@ def train_model(data_name, label, additional_val_sets, path='supervised/'):
                 val_loss = 0
                 val_samples_processed = 0
                 for inputs, labels in _val_loader:
-                    inputs = inputs.view(-1, 10, input_size)
+                    #inputs = inputs.view(-1, 10, input_size)
                     outputs = model(inputs)
                     loss = criterion(outputs, labels)
                     val_loss += loss.item()
