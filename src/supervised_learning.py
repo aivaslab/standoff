@@ -161,9 +161,11 @@ class RNNModel(nn.Module):
 
     def forward(self, x):
         #x = x.view((-1, 10, 6, 17, 17))
+        print(x.shape)
         conv_outputs = []
         for t in range(10):
             x_t = x[:, t, :, :, :]
+
             x_t = self.pool(F.relu(self.conv1(x_t)))
             x_t = self.pool(F.relu(self.conv2(x_t)))
             conv_outputs.append(x_t.view(x.size(0), -1))
