@@ -174,6 +174,7 @@ def main(args):
                                    'vecNormalize': args.vecNormalize, 'norm_rewards': args.norm_rewards, 'difficulty': args.difficulty,
                                    'threads': args.threads, 'configName': env_name_temp, 'shared_lstm': args.shared_lstm,
                                    'normalize_images': args.normalize_images,
+                                   'use_supervised_models': args.use_supervised_models,
                                    'supervised_data_source': args.supervised_data_source,
                                    'supervised_model_label': args.supervised_model_label,
                                    'supervised_model_path': args.supervised_model_path
