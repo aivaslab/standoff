@@ -1005,6 +1005,7 @@ class para_MultiGridEnv(ParallelEnv):
             if self.supervised_model is not None:
                 if self.step_count < 10 and not self.has_released:
                     self.past_observations[self.step_count] = generated_obs
+                    print(self.past_observations)
                     if str(self.past_observations) in self.supervised_label_dict.keys():
                         self.last_supervised_labels = self.supervised_label_dict[str(self.past_observations)]
                     else:
