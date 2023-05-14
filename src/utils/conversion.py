@@ -30,6 +30,10 @@ def get_json_params(path, args):
         args.norm_rewards = data['norm_rewards'] if 'norm_rewards' in data.keys() else True
         args.normalize_images = data['normalize_images'] if 'normalize_images' in data.keys() else True
         args.shared_lstm = data['shared_lstm'] if 'shared_lstm' in data.keys() else False
+        args.use_supervised_models = data['use_supervised_models'] if 'use_supervised_models' in data.keys() else False
+        args.supervised_data_source = data['supervised_data_source'] if 'supervised_data_source' in data.keys() else 'random-2500'
+        args.supervised_model_label = data['supervised_model_label'] if 'supervised_model_label' in data.keys() else 'loc'
+        args.supervised_model_path = data['supervised_model_path'] if 'supervised_model_path' in data.keys() else 'supervised'
     return model_class, configName, args
 
 
