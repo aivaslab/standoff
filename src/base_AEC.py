@@ -1005,12 +1005,12 @@ class para_MultiGridEnv(ParallelEnv):
             if self.supervised_model is not None:
                 if self.step_count < 10 and not self.has_released:
                     self.past_observations[self.step_count] = generated_obs
-                    print(self.past_observations)
-                    if str(self.past_observations) in self.supervised_label_dict.keys():
+                    hashed = self.past_observations.tobytes()
+                    if hashed in self.supervised_label_dict.keys():
                         self.last_supervised_labels = self.supervised_label_dict[str(self.past_observations)]
                     else:
                         self.last_supervised_labels = self.supervised_model.forward(np.asarray([self.past_observations])).detach().numpy()
-                        self.supervised_label_dict[str(self.past_observations)] = self.last_supervised_labels
+                        self.supervised_label_dict[hashed] = self.last_supervised_labels
                 label_obs = np.zeros((1, agent.view_size, agent.view_size), dtype="uint8")
                 label_obs[0, 0, :self.last_supervised_labels.shape[1]] = self.last_supervised_labels
                 self.observations[agent_name] = np.concatenate((generated_obs, label_obs), axis=0)
