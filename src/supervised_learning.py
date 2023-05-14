@@ -142,17 +142,18 @@ class RNNModel(nn.Module):
         pool_stride = 2
 
         self.conv1 = nn.Conv2d(6, 8, kernel_size=kernel_size1, padding=padding1)
-        self.conv2 = nn.Conv2d(8, 16, kernel_size=kernel_size2, padding=padding2)
+        #self.conv2 = nn.Conv2d(8, 16, kernel_size=kernel_size2, padding=padding2)
         self.pool = nn.MaxPool2d(kernel_size=pool_kernel_size, stride=pool_stride, padding=0)
         #self.output_len = output_len
 
         conv1_output_size = (input_size - kernel_size1 + 2 * padding1) // stride1 + 1
         pool1_output_size = (conv1_output_size - pool_kernel_size) // pool_stride + 1
 
-        conv2_output_size = (pool1_output_size - kernel_size2 + 2 * padding2) // stride2 + 1
-        pool2_output_size = (conv2_output_size - pool_kernel_size) // pool_stride + 1
+        #conv2_output_size = (pool1_output_size - kernel_size2 + 2 * padding2) // stride2 + 1
+        #pool2_output_size = (conv2_output_size - pool_kernel_size) // pool_stride + 1
 
-        input_size = 16 * pool2_output_size * pool2_output_size
+        #input_size = 16 * pool2_output_size * pool2_output_size
+        input_size = 16 * pool1_output_size * pool1_output_size
 
         self.rnn = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
         
@@ -166,7 +167,7 @@ class RNNModel(nn.Module):
             x_t = x[:, t, :, :, :]
 
             x_t = self.pool(F.relu(self.conv1(x_t)))
-            x_t = self.pool(F.relu(self.conv2(x_t)))
+            #x_t = self.pool(F.relu(self.conv2(x_t)))
             conv_outputs.append(x_t.view(x.size(0), -1))
         x = torch.stack(conv_outputs, dim=1)
 
@@ -200,7 +201,7 @@ def train_model(data_name, label, additional_val_sets, path='supervised/'):
     output_len = np.prod(train_labels.shape[1:])
 
     input_size = 6 * 17 * 17
-    hidden_size = 32
+    hidden_size = 16
     num_layers = 1
     model = RNNModel(hidden_size, num_layers, output_len)
     criterion = nn.MSELoss()
