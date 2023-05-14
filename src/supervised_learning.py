@@ -161,7 +161,7 @@ class RNNModel(nn.Module):
 
     def forward(self, x):
         #x = x.view((-1, 10, 6, 17, 17))
-        #print(x.shape)
+        print('xshape', x.shape)
         # convert x to tensor
         x = torch.tensor(x, dtype=torch.float32)
         conv_outputs = []
