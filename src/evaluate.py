@@ -12,6 +12,7 @@ from stable_baselines3 import PPO, A2C
 from sb3_contrib import TRPO, RecurrentPPO
 from stable_baselines3.common.vec_env import VecNormalize
 import torch as th
+from src.supervised_learning import RNNModel
 
 class_dict = {'PPO': PPO, 'A2C': A2C, 'TRPO': TRPO, 'RecurrentPPO': RecurrentPPO}
 
@@ -132,9 +133,11 @@ def main(args):
             if args.use_supervised_models:
                 print('loading SL module', args.supervised_data_source, args.supervised_model_label,
                       args.supervised_model_path)
-                sl_module = th.load(
+                kwargs, state = th.load(
                     args.supervised_model_path + '/' + args.supervised_data_source + '-' +
                     args.supervised_model_label + '-model.pt')
+                sl_module = RNNModel(**kwargs)
+                sl_module.load_state_dict(state)
             else:
                 sl_module = None
 
