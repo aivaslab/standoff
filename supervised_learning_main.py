@@ -155,7 +155,7 @@ class RNNModel(nn.Module):
         # pool2_output_size = (conv2_output_size - pool_kernel_size) // pool_stride + 1
 
         # input_size = 16 * pool2_output_size * pool2_output_size
-        input_size = 16 * pool1_output_size * pool1_output_size
+        input_size = 8 * pool1_output_size * pool1_output_size
 
         self.rnn = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
 
@@ -216,7 +216,7 @@ def train_model(data_name, label, additional_val_sets, path='supervised/'):
         train_loss = 0
         for i, (inputs, target_labels) in enumerate(train_loader):
             #inputs = inputs.view(-1, 10, input_size)
-            print(inputs.shape)
+            #print(inputs.shape)
             outputs = model(inputs)
             loss = criterion(outputs, target_labels)
             optimizer.zero_grad()
