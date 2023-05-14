@@ -160,7 +160,7 @@ class RNNModel(nn.Module):
      
 
     def forward(self, x):
-        x = torch.tensor(x, dtype=torch.uint8)
+        x = torch.tensor(x, dtype=torch.float32)
         conv_outputs = []
         for t in range(10):
             x_t = x[:, t, :, :, :]
