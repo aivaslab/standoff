@@ -11,14 +11,13 @@ class CustomCNN(BaseFeaturesExtractor):
         This corresponds to the number of unit for the last layer.
     """
 
-    def __init__(self, observation_space: gym.spaces.Box, features_dim: int = 16, conv_mult: int = 1, frames: int = 1, use_label=False):
+    def __init__(self, observation_space: gym.spaces.Box, features_dim: int = 16, conv_mult: int = 1, frames: int = 1, use_label=False, label_dim=0):
         super(CustomCNN, self).__init__(observation_space, features_dim)
 
         # We assume CxHxW images (channels first)
         # Re-ordering will be done by pre-preprocessing or wrapper
         n_input_channels = self.get_image_obs(observation_space).shape[0]
-
-        self.n_label_channels = 0
+        self.label_dim = label_dim
 
         self.cnn = nn.Sequential(
             nn.Conv2d(n_input_channels, 4*conv_mult*frames, kernel_size=5, stride=2, padding=0),
@@ -34,10 +33,16 @@ class CustomCNN(BaseFeaturesExtractor):
                 th.as_tensor(self.get_image_obs(observation_space).sample()[None]).float()
             ).shape[1]
 
-        self.linear = nn.Sequential(nn.Linear(n_flatten + self.n_label_channels, features_dim), nn.ReLU())
+        self.linear = nn.Sequential(nn.Linear(n_flatten + self.label_dim, features_dim), nn.ReLU())
 
     def forward(self, observations: th.Tensor) -> th.Tensor:
-        return self.linear(self.cnn(self.get_image_obs(observations)))
+        image_obs = self.get_image_obs(observations)
+        features = self.cnn(image_obs[: -1 if self.label_dim > 0 else None])
+        if self.label_dim > 0:
+            labels = image_obs[-1]
+            features = th.cat([features, labels], dim=1)
+            
+        return self.linear(features)
 
     def get_image_obs(self, observations):
         return observations['image'] if type(observations) is dict else observations
