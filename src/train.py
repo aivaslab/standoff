@@ -202,6 +202,7 @@ def main(args):
                         # we get the size of the labels by referencing the dataset, saved as npy file
                         dset = np.load(args.supervised_model_path + '/' + args.supervised_data_source + '-' + 'label' + '-' + args.supervised_model_label + '.npy')
                         label_dim = dset.shape[1]
+                        del dset
                     else:
                         sl_module = None
 
