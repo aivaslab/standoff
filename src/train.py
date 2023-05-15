@@ -6,6 +6,8 @@ import sys
 
 from datetime import timedelta
 
+import numpy as np
+
 from .pz_envs import ScenarioConfigs
 from .utils.callbacks import make_callbacks
 from .utils.train_utils import init_dirs, init_policy, start_global_logs, linear_schedule, find_last_checkpoint_model
@@ -188,24 +190,30 @@ def main(args):
                     print('name: ', name, dir_name)
 
                     if args.use_supervised_models:
-                        print('loading SL module', args.supervised_data_source, args.supervised_model_label,
-                              args.supervised_model_path)
-                        kwargs, state = th.load(args.supervised_model_path + '/' + args.supervised_data_source + '-' +
-                                                args.supervised_model_label + '-model.pt')
-                        sl_module = RNNModel(**kwargs)
-                        sl_module.load_state_dict(state)
+                        if args.ground_truth_modules is False:
+                            print('loading SL module', args.supervised_data_source, args.supervised_model_label,
+                                  args.supervised_model_path)
+                            kwargs, state = th.load(args.supervised_model_path + '/' + args.supervised_data_source + '-' +
+                                                    args.supervised_model_label + '-model.pt')
+                            sl_module = RNNModel(**kwargs)
+                            sl_module.load_state_dict(state)
+                        else:
+                            sl_module = args.supervised_model_label
+                        # we get the size of the labels by referencing the dataset, saved as npy file
+                        dset = np.load(args.supervised_model_path + '/' + args.supervised_data_source + '-' + 'label' + '-' + args.supervised_model_label + '.npy')
+                        label_dim = dset.shape[1]
                     else:
                         sl_module = None
 
                     env = make_env_comp(env_name, frames=args.frames, size=args.size, style=args.style, monitor_path=savePath3, rank=0,
                                         vecNormalize=args.vecNormalize, norm_rewards=args.norm_rewards, threads=args.threads,
-                                        load_path=vec_norm_path, sl_module=sl_module)
+                                        load_path=vec_norm_path, sl_module=sl_module, label_dim=label_dim)
 
                     policy, policy_kwargs = init_policy(model_class, env.observation_space, env.action_space, rate,
                                                         args.width, hidden_size=args.hidden_size, conv_mult=args.conv_mult, frames=args.frames,
                                                         name='cnn', net_arch=[args.width for _ in range(args.num_hidden_layers)],
                                                         shared_lstm=args.shared_lstm, normalize_images=args.normalize_images,
-                                                        use_labels=args.use_supervised_models)
+                                                        label_dim=label_dim)
 
                     log_line = start_global_logs(global_logs, args.experiment_name, dir_name, name, model_class, policy,
                                                  global_log_path)

@@ -38,12 +38,13 @@ def get_json_params(path, args):
 
 
 def make_env_comp(env_name, frames=1, vecNormalize=False, norm_rewards=False, size=32, style='rich', monitor_path='dir',
-                  rank=-1, threads=1, load_path=None, reduce_color=False, skip_vecNorm=False, sl_module=None):
+                  rank=-1, threads=1, load_path=None, reduce_color=False, skip_vecNorm=False, sl_module=None, label_dim=0):
     env = gym.make(env_name)
     #print(env.__dict__.keys()) #yields env, _action_space, _observation_space, _reward_range, _metadata, _has_reset
     env = env.env #this line feels silly?
     if sl_module is not None:
         env.supervised_model = sl_module
+        env.label_dim = label_dim
     env.record_info = rank != 0
     channels = env.channels
     #num_cpus = min(threads, os.cpu_count())

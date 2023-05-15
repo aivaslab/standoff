@@ -11,7 +11,7 @@ class CustomCNN(BaseFeaturesExtractor):
         This corresponds to the number of unit for the last layer.
     """
 
-    def __init__(self, observation_space: gym.spaces.Box, features_dim: int = 16, conv_mult: int = 1, frames: int = 1, use_label=False, label_dim=0):
+    def __init__(self, observation_space: gym.spaces.Box, features_dim: int = 16, conv_mult: int = 1, frames: int = 1, label_dim=0):
         super(CustomCNN, self).__init__(observation_space, features_dim)
 
         # We assume CxHxW images (channels first)
@@ -41,7 +41,7 @@ class CustomCNN(BaseFeaturesExtractor):
         if self.label_dim > 0:
             labels = image_obs[-1]
             features = th.cat([features, labels], dim=1)
-            
+
         return self.linear(features)
 
     def get_image_obs(self, observations):

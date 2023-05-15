@@ -11,7 +11,7 @@ from .evaluation import find_checkpoint_models
 from ..models.custom_cnn import CustomCNN
 from typing import Callable
 
-def init_policy(model_class, obs_space, act_space, lr_schedule, width, hidden_size, conv_mult=1, frames=1, net_arch=None, shared_lstm=False, normalize_images=True, name='', use_labels=False, n_lstm_layers=1):
+def init_policy(model_class, obs_space, act_space, lr_schedule, width, hidden_size, conv_mult=1, frames=1, net_arch=None, shared_lstm=False, normalize_images=True, name='', label_dim=0, n_lstm_layers=1):
     enable_critic_lstm = not shared_lstm
     if model_class == RecurrentPPO:
         policy_kwargs = {
@@ -27,7 +27,7 @@ def init_policy(model_class, obs_space, act_space, lr_schedule, width, hidden_si
                 'features_dim': width,
                 'conv_mult': conv_mult,
                 'frames': 1,
-                'use_label': use_labels,
+                'label_dim': label_dim,
             },
         }
         #policy = RecurrentActorCriticCnnPolicy(obs_space, act_space, lr_schedule, **policy_kwargs)
@@ -44,7 +44,7 @@ def init_policy(model_class, obs_space, act_space, lr_schedule, width, hidden_si
                                 'normalize_images': normalize_images,
                                 'features_extractor_kwargs':
                                     {'features_dim': width, 'conv_mult': conv_mult, 'frames': frames,
-                                    'use_label': use_labels,
+                                    'label_dim': label_dim,
                                     },
                             }
     return policy, policy_kwargs
