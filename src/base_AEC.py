@@ -440,7 +440,7 @@ class para_MultiGridEnv(ParallelEnv):
             gaze_highlighting=False,
             persistent_gaze_highlighting=False,
             observation_style='rich',
-            dense_obs=0,
+            dense_obs=True,
             supervised_model=None
     ):
         """
@@ -528,7 +528,7 @@ class para_MultiGridEnv(ParallelEnv):
                 # we can see hidden rewards this way
                 # 'vis'  # show the visibility mask (temporarily disabled)
             ]
-            if self.dense_obs == 0:
+            if self.dense_obs is False:
                 self.rich_observation_layers.extend([
                     lambda k, mapping: (mapping[k].can_overlap() if hasattr(mapping[k], 'can_overlap') else 1),
                     lambda k, mapping: (mapping[k].volatile() if hasattr(mapping[k], 'volatile') else 0),
