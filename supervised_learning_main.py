@@ -19,6 +19,7 @@ import torch.nn.functional as F
 import torch
 from sklearn.model_selection import train_test_split
 from matplotlib import pyplot as plt
+from src.supervised_learning import RNNModel
 
 
 def gen_data(configNames, num_timesteps=2500):
@@ -128,54 +129,7 @@ class CustomDataset(Dataset):
         return torch.tensor(self.data[idx], dtype=torch.float32), flat_labels
 
 
-class RNNModel(nn.Module):
-    def __init__(self, hidden_size, num_layers, output_len):
-        super(RNNModel, self).__init__()
-        self.kwargs = {'hidden_size': hidden_size, 'num_layers': num_layers, 'output_len': output_len}
 
-        padding1 = 0
-        padding2 = 0
-        kernel_size1 = 3
-        kernel_size2 = 3
-        input_size = 17
-        stride1 = 1
-        stride2 = 1
-        pool_kernel_size = 2
-        pool_stride = 2
-
-        self.conv1 = nn.Conv2d(6, 8, kernel_size=kernel_size1, padding=padding1)
-        # self.conv2 = nn.Conv2d(8, 16, kernel_size=kernel_size2, padding=padding2)
-        self.pool = nn.MaxPool2d(kernel_size=pool_kernel_size, stride=pool_stride, padding=0)
-        # self.output_len = output_len
-
-        conv1_output_size = (input_size - kernel_size1 + 2 * padding1) // stride1 + 1
-        pool1_output_size = (conv1_output_size - pool_kernel_size) // pool_stride + 1
-
-        # conv2_output_size = (pool1_output_size - kernel_size2 + 2 * padding2) // stride2 + 1
-        # pool2_output_size = (conv2_output_size - pool_kernel_size) // pool_stride + 1
-
-        # input_size = 16 * pool2_output_size * pool2_output_size
-        input_size = 8 * pool1_output_size * pool1_output_size
-
-        self.rnn = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
-
-        self.fc = nn.Linear(hidden_size, int(output_len))
-
-    def forward(self, x):
-        x = torch.tensor(x, dtype=torch.float32)
-        conv_outputs = []
-        for t in range(10):
-            x_t = x[:, t, :, :, :]
-
-            x_t = self.pool(F.relu(self.conv1(x_t)))
-            # x_t = self.pool(F.relu(self.conv2(x_t)))
-            conv_outputs.append(x_t.view(x.size(0), -1))
-        x = torch.stack(conv_outputs, dim=1)
-
-        out, _ = self.rnn(x)
-        out = out[:, -1, :]  # Use only the last time step's output
-        outputs = self.fc(out)
-        return outputs
 
 
 def train_model(data_name, label, additional_val_sets, path='supervised/'):
