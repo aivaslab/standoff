@@ -25,6 +25,7 @@ class GridAgentInterface(GridAgent):
             observe_rewards=False,
             observe_position=False,
             observe_orientation=False,
+            observe_extra=False,
             restrict_actions=False,
             see_through_walls=False,
             hide_item_types=None,
@@ -58,6 +59,9 @@ class GridAgentInterface(GridAgent):
         self.prestige_scale = prestige_scale
         self.allow_negative_prestige = allow_negative_prestige
         self.spawn_delay = spawn_delay
+        self.observe_extra = observe_extra
+
+        self.observation_dense = True
 
         self.valence = 1
 
@@ -70,7 +74,11 @@ class GridAgentInterface(GridAgent):
             
         if self.observation_style == 'rich':
             view_tile_size = 1
-            channels = 7 # add one if opponent gaze
+            channels = 6
+            if self.observation_dense:
+                channels = channels - 2
+            if self.observe_extra:
+                channels = channels + 1
         else:
             channels = 3
 
