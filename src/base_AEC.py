@@ -453,6 +453,7 @@ class para_MultiGridEnv(ParallelEnv):
         These attributes should not be changed after initialization.
         """
 
+        self.record_supervised_labels = False
         self.supervised_model = supervised_model
         self.past_observations = None
         self.record_info = False  # set this to true during evaluation
@@ -723,7 +724,11 @@ class para_MultiGridEnv(ParallelEnv):
         self.has_released = False
 
         if self.supervised_model is not None:
-            self.supervised_model.training = False
+            # if supervised model is 0 we will use ground truth
+            if isinstance(self.supervised_model, str):
+                self.record_supervised_labels = True
+            else:
+                self.supervised_model.training = False
             self.past_observations = np.zeros((10, *self.prior_observations[self.agents[0]].shape))
 
         # robservations = {agent: self.observations[agent] for agent in self.agents}
@@ -1013,7 +1018,11 @@ class para_MultiGridEnv(ParallelEnv):
                     if hashed in self.supervised_label_dict.keys():
                         self.last_supervised_labels = self.supervised_label_dict[hashed]
                     else:
-                        self.last_supervised_labels = self.supervised_model.forward(np.asarray([self.past_observations])).detach().numpy()
+                        # check if supervised model is string
+                        if isinstance(self.supervised_model, str):
+                            self.last_supervised_labels = self.infos['player_0'][self.supervised_model].flatten()
+                        else:
+                            self.last_supervised_labels = self.supervised_model.forward(np.asarray([self.past_observations])).detach().numpy()
                         self.supervised_label_dict[hashed] = self.last_supervised_labels
                 label_obs = np.zeros((1, agent.view_size, agent.view_size), dtype="uint8")
                 label_obs[0, 0, :self.last_supervised_labels.shape[1]] = self.last_supervised_labels
