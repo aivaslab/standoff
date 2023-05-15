@@ -125,7 +125,8 @@ def main(args):
 
             if not renamed_envs:
                 for k, env_name in enumerate(configNames):
-                    env_names.append(env_name + str(args.size) + '-' + args.style + '-' + str(args.difficulty) + '-v' + "1" if args.use_supervised_models else "0")
+                    env_names.append(env_name + str(args.size) + '-' + args.style + '-' + str(args.difficulty) + '-v' + "1" if args.use_supervised_models else
+                                        env_name + str(args.size) + '-' + args.style + '-' + str(args.difficulty) + '-v' + "0")
                 renamed_envs = True
 
             env_kwargs = {"size": args.size, "style": args.style, "threads": args.threads, "frames": args.frames, "monitor_path": train_dir, "vecNormalize": args.vecNormalize, "norm_rewards": args.norm_rewards}
