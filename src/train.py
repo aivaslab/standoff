@@ -167,6 +167,7 @@ def main(args):
                                    'supervised_data_source': args.supervised_data_source,
                                    'supervised_model_label': args.supervised_model_label,
                                    'supervised_model_path': args.supervised_model_path
+                                   'use_ground_truth_modules': args.use_ground_truth_modules,
                                    }, json_file)
                 elif continuing:
                     model_class, _, args = get_json_params(
@@ -181,7 +182,8 @@ def main(args):
                                    'use_supervised_models': args.use_supervised_models,
                                    'supervised_data_source': args.supervised_data_source,
                                    'supervised_model_label': args.supervised_model_label,
-                                   'supervised_model_path': args.supervised_model_path
+                                   'supervised_model_path': args.supervised_model_path,
+                                   'use_ground_truth_modules': args.use_ground_truth_modules,
                                    }, json_file)
                 print('model_class: ', model_class.__name__, 'size: ', args.size, 'style: ', args.style, 'frames: ', args.frames,
                       'vecNormalize: ', args.vecNormalize)
