@@ -1019,7 +1019,7 @@ class para_MultiGridEnv(ParallelEnv):
                     else:
                         # check if supervised model is string
                         if isinstance(self.supervised_model, str):
-                            self.last_supervised_labels = self.infos['player_0'][self.supervised_model].flatten()
+                            self.last_supervised_labels = np.asarray(self.infos['player_0'][self.supervised_model]).flatten()
                         else:
                             self.last_supervised_labels = self.supervised_model.forward(
                                 np.asarray([self.past_observations])).detach().numpy()
