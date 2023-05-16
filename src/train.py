@@ -166,7 +166,7 @@ def main(args):
                                    'use_supervised_models': args.use_supervised_models,
                                    'supervised_data_source': args.supervised_data_source,
                                    'supervised_model_label': args.supervised_model_label,
-                                   'supervised_model_path': args.supervised_model_path
+                                   'supervised_model_path': args.supervised_model_path,
                                    'use_ground_truth_modules': args.use_ground_truth_modules,
                                    }, json_file)
                 elif continuing:
