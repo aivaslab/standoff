@@ -498,7 +498,10 @@ class StandoffEnv(para_MultiGridEnv):
             self.infos['player_0']["vision"] = self.visible_event_list[-1]
             real_boxes = [self.grid.get(box * 2 + 2, y) for box in range(self.boxes)]
             real_box_rewards = [box.reward if box is not None and hasattr(box, "reward") else 0 for box in real_boxes]
-            all_rewards_seen = [self.last_seen_reward[target_agent + str(box)] for box in range(self.boxes)]
+            if self.params['num_puppets'] > 0:
+                all_rewards_seen = [self.last_seen_reward[target_agent + str(box)] for box in range(self.boxes)]
+            else:
+                all_rewards_seen = [0] * self.boxes
             self.infos['player_0']["loc"] = [
                 [1, 0] if reward == self.bigReward else
                 [0, 1] if reward == self.smallReward else
