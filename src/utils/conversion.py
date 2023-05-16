@@ -34,7 +34,7 @@ def get_json_params(path, args):
         args.supervised_data_source = data['supervised_data_source'] if 'supervised_data_source' in data.keys() else 'random-2500'
         args.supervised_model_label = data['supervised_model_label'] if 'supervised_model_label' in data.keys() else 'loc'
         args.supervised_model_path = data['supervised_model_path'] if 'supervised_model_path' in data.keys() else 'supervised'
-        args.use_ground_truth_modules = data['use_ground_truth_modules'] if 'use_ground_truth_modules' in data.keys() else False
+        args.ground_truth_modules = data['ground_truth_modules'] if 'ground_truth_modules' in data.keys() else False
     return model_class, configName, args
 
 
