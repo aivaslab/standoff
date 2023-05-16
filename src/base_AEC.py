@@ -1022,10 +1022,10 @@ class para_MultiGridEnv(ParallelEnv):
                             self.last_supervised_labels = np.asarray(self.infos['player_0'][self.supervised_model]).flatten()
                         else:
                             self.last_supervised_labels = self.supervised_model.forward(
-                                np.asarray([self.past_observations])).detach().numpy()
+                                np.asarray([self.past_observations])).detach().numpy()[0]
                         self.supervised_label_dict[hashed] = self.last_supervised_labels
                 label_obs = np.zeros((1, agent.view_size, agent.view_size), dtype="uint8")
-                label_obs[0, 0, :self.last_supervised_labels.shape[1]] = self.last_supervised_labels
+                label_obs[0, 0, :self.last_supervised_labels.shape[0]] = self.last_supervised_labels
                 self.observations[agent_name] = np.concatenate((generated_obs, label_obs), axis=0)
             else:
                 self.observations[agent_name] = generated_obs
