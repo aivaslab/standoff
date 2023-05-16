@@ -44,11 +44,12 @@ def train_model(data_name, label, additional_val_sets, path='supervised/', epoch
         additional_val_loaders.append(DataLoader(val_dataset, batch_size=batch_size, shuffle=False))
 
     output_len = np.prod(train_labels.shape[1:])
+    channels = np.prod(train_data.shape[1])
 
-    input_size = 6 * 17 * 17
+    input_size = channels * 17 * 17
     hidden_size = 16
     num_layers = 1
-    model = RNNModel(hidden_size, num_layers, output_len)
+    model = RNNModel(hidden_size, num_layers, output_len, channels)
     criterion = nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 
