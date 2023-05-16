@@ -492,7 +492,7 @@ class StandoffEnv(para_MultiGridEnv):
         if self.record_supervised_labels:
             target_agent = "player_1"
             one_hot_goal = [0] * self.boxes
-            if len(self.puppet_instances) > 0:
+            if self.params['num_puppets'] > 0:
                 one_hot_goal[self.agent_goal[target_agent]] = 1
             self.infos['player_0']["target"] = one_hot_goal
             self.infos['player_0']["vision"] = self.visible_event_list[-1]
