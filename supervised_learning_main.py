@@ -22,7 +22,7 @@ from matplotlib import pyplot as plt
 from src.supervised_learning import RNNModel, CustomDataset, gen_data
 
 
-def train_model(data_name, label, additional_val_sets, path='supervised/'):
+def train_model(data_name, label, additional_val_sets, path='supervised/', epochs=100):
     data = np.load(path + data_name + '-obs.npy')
     labels = np.load(path + data_name + '-label-' + label + '.npy')
 
@@ -53,7 +53,7 @@ def train_model(data_name, label, additional_val_sets, path='supervised/'):
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 
     max_val_samples = 500
-    num_epochs = 100
+    num_epochs = epochs
     train_losses = []
     val_losses = [[] for _ in range(len(additional_val_loaders) + 1)]
     for epoch in tqdm.trange(num_epochs):
@@ -113,7 +113,7 @@ if __name__ == '__main__':
         v_loss_sum = []
         first_v_loss = []
         for label in labels:
-            t_loss, v_loss, = train_model(data_name + '-2500', label, unused_sets)
+            t_loss, v_loss, = train_model(data_name + '-2500', label, unused_sets, 20)
             plot_losses(data_name, label, t_loss, v_loss, [data_name] + unused_sets)
             first_v_loss.append(v_loss[0])
             # add losses elementwise
