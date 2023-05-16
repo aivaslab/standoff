@@ -38,10 +38,11 @@ class CustomCNN(BaseFeaturesExtractor):
     def forward(self, observations: th.Tensor) -> th.Tensor:
         image_obs = self.get_image_obs(observations)
         print(image_obs.shape)
-        features = self.cnn(image_obs[: -1 if self.label_dim > 0 else None])
+        features = self.cnn(image_obs[:, :-1 if self.label_dim > 0 else None])
         print(features.shape)
         if self.label_dim > 0:
-            labels = image_obs[-1]
+            labels = image_obs[:, -1, 0, :self.label_dim]
+            print(labels.shape)
 
             features = th.cat([features, labels], dim=1)
 
