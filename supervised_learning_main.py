@@ -113,7 +113,7 @@ if __name__ == '__main__':
         v_loss_sum = []
         first_v_loss = []
         for label in labels:
-            t_loss, v_loss, = train_model(data_name + '-2500', label, unused_sets, 20)
+            t_loss, v_loss, = train_model(data_name + '-2500', label, unused_sets, epochs=20)
             plot_losses(data_name, label, t_loss, v_loss, [data_name] + unused_sets)
             first_v_loss.append(v_loss[0])
             # add losses elementwise
