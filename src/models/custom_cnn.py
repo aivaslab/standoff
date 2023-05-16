@@ -30,7 +30,7 @@ class CustomCNN(BaseFeaturesExtractor):
         # Compute shape by doing one forward pass
         with th.no_grad():
             n_flatten = self.cnn(
-                th.as_tensor(self.get_image_obs(observation_space).sample()[None]).float()
+                th.as_tensor(self.get_image_obs(observation_space)[:, :-1 if self.label_dim > 0 else None].sample()[None]).float()
             ).shape[1]
 
         self.linear = nn.Sequential(nn.Linear(n_flatten + self.label_dim, features_dim), nn.ReLU())
