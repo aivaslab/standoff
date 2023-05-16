@@ -14,7 +14,7 @@ from gym.utils.seeding import np_random
 from gym.spaces import Discrete, Box
 from pettingzoo import ParallelEnv
 from .agents import occlude_mask
-#import hashlib
+# import hashlib
 import xxhash
 
 from src.rendering import SimpleImageViewer
@@ -545,8 +545,8 @@ class para_MultiGridEnv(ParallelEnv):
                 )
             if self.gaze_highlighting:
                 self.rich_observation_layers.append('gaze')
-
             self.channels = len(self.rich_observation_layers) + (1 if self.supervised_model is not None else 0)
+            print('channels', self.channels, self.dense_obs)
 
         self.observation_spaces = {agent: Box(
             low=0,
@@ -1012,7 +1012,7 @@ class para_MultiGridEnv(ParallelEnv):
             if self.supervised_model is not None:
                 if self.step_count < 10 and not self.has_released:
                     self.past_observations[self.step_count] = generated_obs
-                    #hashed = hashlib.sha1(self.past_observations.view(np.uint8)).hexdigest()
+                    # hashed = hashlib.sha1(self.past_observations.view(np.uint8)).hexdigest()
                     # let's use a faster hashing function from xxhash:
                     hashed = xxhash.xxh64(self.past_observations.view(np.uint8)).hexdigest()
                     if hashed in self.supervised_label_dict.keys():
@@ -1022,7 +1022,8 @@ class para_MultiGridEnv(ParallelEnv):
                         if isinstance(self.supervised_model, str):
                             self.last_supervised_labels = self.infos['player_0'][self.supervised_model].flatten()
                         else:
-                            self.last_supervised_labels = self.supervised_model.forward(np.asarray([self.past_observations])).detach().numpy()
+                            self.last_supervised_labels = self.supervised_model.forward(
+                                np.asarray([self.past_observations])).detach().numpy()
                         self.supervised_label_dict[hashed] = self.last_supervised_labels
                 label_obs = np.zeros((1, agent.view_size, agent.view_size), dtype="uint8")
                 label_obs[0, 0, :self.last_supervised_labels.shape[1]] = self.last_supervised_labels
