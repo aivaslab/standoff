@@ -39,7 +39,8 @@ class CustomCNN(BaseFeaturesExtractor):
         image_obs = self.get_image_obs(observations)
         features = self.cnn(image_obs[: -1 if self.label_dim > 0 else None])
         if self.label_dim > 0:
-            labels = image_obs[-1]
+            labels = image_obs[-1].unsqueeze(0)
+            
             features = th.cat([features, labels], dim=1)
 
         return self.linear(features)
