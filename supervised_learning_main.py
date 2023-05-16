@@ -102,8 +102,8 @@ def plot_losses(data_name, label, train_losses, val_losses, val_set_names):
 
 
 # train_model('random-2500', 'exist')
-gen_data(['stage_2', 'all', 'random'], 2500)
 if __name__ == '__main__':
+    gen_data(['stage_2', 'all', 'random'], 2500)
     labels = ['loc', 'exist', 'vision', 'b-loc', 'b-exist', 'target']
     sets = ['stage_2', 'all', 'random']
     for data_name in ['random']:
