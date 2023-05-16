@@ -546,7 +546,6 @@ class para_MultiGridEnv(ParallelEnv):
             if self.gaze_highlighting:
                 self.rich_observation_layers.append('gaze')
             self.channels = len(self.rich_observation_layers) + (1 if self.supervised_model is not None else 0)
-            print('channels', self.channels, self.dense_obs)
 
         self.observation_spaces = {agent: Box(
             low=0,
