@@ -16,7 +16,9 @@ class CustomCNN(BaseFeaturesExtractor):
 
         # We assume CxHxW images (channels first)
         # Re-ordering will be done by pre-preprocessing or wrapper
+        print(label_dim)
         n_input_channels = self.get_image_obs(observation_space).shape[0] - label_dim
+        print(n_input_channels)
         self.label_dim = label_dim
 
         self.cnn = nn.Sequential(
