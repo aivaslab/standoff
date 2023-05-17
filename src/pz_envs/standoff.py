@@ -440,7 +440,7 @@ class StandoffEnv(para_MultiGridEnv):
                 self.infos['player_0']['eventVisibility'] = ''.join(['1' if x else '0' for x in self.visible_event_list])
             for x, y in self.released_tiles[arg]:
                 self.del_obj(x, y)
-            if self.record_supervised_labels and self.supervised_model is not None:
+            if self.record_supervised_labels and self.supervised_model is None:
                 self.dones['player_0'] = True
             self.has_released = True
 
