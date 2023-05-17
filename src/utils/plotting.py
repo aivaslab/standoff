@@ -72,7 +72,7 @@ def plot_merged(indexer, df, mypath, title, window, values=None,
     colors = ['green', 'blue', 'orange', 'red', 'purple', 'brown', 'pink', 'gray', 'olive', 'cyan']
     if stacked_bar:
         bar_width = (max(df[indexer]) - min(df[indexer])) / (
-                    2 * len(df['selectedBig_mean']) + 1)  # (len(df['selectedBig_mean']) * 2 + 1
+                2 * len(df['selectedBig_mean']) + 1)  # (len(df['selectedBig_mean']) * 2 + 1
         values_mean = [df[value + "_mean"] for value in values]
         plt.bar(df[indexer], values_mean[0], label=labels[0], width=bar_width, color=colors[0])
         for i in range(1, len(values)):
@@ -196,6 +196,46 @@ def plot_train_many(train_paths, window=1000, path=None):
         plt.close()
 
 
+def plot_train_curriculum(train_paths, window=1000, path=None):
+    plt.figure()
+    max_episode = 0  # to track maximum episode seen so far
+    col = "index"
+
+    for log_folder in train_paths:
+        monitor_files = get_monitor_files(log_folder)
+
+        for file_name in monitor_files:
+            with open(file_name) as file_handler:
+                first_line = file_handler.readline()
+                assert first_line[0] == "#", print(first_line)
+                df = pd.read_csv(file_handler, index_col=None, on_bad_lines='skip')  # , usecols=cols)
+                if len(df):
+                    if col == 'index':
+                        df['index_col'] = df.index
+                        realcol = 'index_col'
+                    else:
+                        realcol = col
+                    #df['index_col'] = df.index + max_episode  # shift the episode numbers
+                    df['yrolling'] = df['r'].rolling(window=window).mean()
+                    plt.plot(df[realcol] + max_episode, df.yrolling, label=os.path.basename(log_folder))
+
+        # plot a vertical dotted line to separate the training regimes
+        plt.axvline(x=max_episode, color='k', linestyle='--')
+
+        # update the maximum episode seen so far
+        max_episode = df['index_col'].max()
+
+    plt.rcParams["figure.figsize"] = (15, 5)
+    plt.gcf().set_size_inches(15, 5)
+    plt.xlabel('Episode')
+    plt.ylabel('Reward')
+    plt.title('Learning curve')
+    plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+    plt.tight_layout()
+    plt.savefig(os.path.join(path, 'all_trains_curriculum' + 'Episode' + '.png'))
+    plt.close()
+
+
 def plot_results2(log_folder, policynames, modelnames, repetitions, env_name, title='Learning Curve', window=50):
     """
     plot the results
@@ -244,7 +284,6 @@ def plot_transfer_matrix(matrix_data, row_names, col_names, output_file):
 
     plt.tick_params(axis='x', rotation=90)
     ax.imshow(matrix_data, cmap=plt.cm.Blues, aspect='auto', vmin=0, vmax=1)
-
 
     for i in range(len(row_names)):
         for j in range(len(col_names)):
