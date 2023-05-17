@@ -64,7 +64,7 @@ def entropy_multi_cols(x, y, z):
 
 
 def agg_dict(frame):
-    ignored_columns = ['configName', 'minibatch', 'model_ep']
+    ignored_columns = ['configName', 'minibatch', 'model_ep', 'loc', 'b-loc', 'exist', 'b-exist', 'vision', 'target']
     return {col: (['mean', 'std'] if col != 'selection' else ['mean', 'std',
                                                               entropy_func]) if col not in ignored_columns else 'first'
             for col in frame.columns}
