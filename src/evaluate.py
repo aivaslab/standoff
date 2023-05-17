@@ -132,16 +132,19 @@ def main(args):
             env_kwargs = {"size": args.size, "style": args.style, "threads": args.threads, "frames": args.frames, "monitor_path": train_dir, "vecNormalize": args.vecNormalize, "norm_rewards": args.norm_rewards}
             print("args", args)
             if args.use_supervised_models:
-                print('loading SL module', args.supervised_data_source, args.supervised_model_label,
-                      args.supervised_model_path)
-                kwargs, state = th.load(
-                    args.supervised_model_path + '/' + args.supervised_data_source + '-' +
-                    args.supervised_model_label + '-model.pt')
-                # temp for legacy code
-                kwargs['channels'] = 6
-                print(kwargs)
-                sl_module = RNNModel(**kwargs)
-                sl_module.load_state_dict(state)
+                if args.ground_truth_modules is False:
+                    print('loading SL module', args.supervised_data_source, args.supervised_model_label,
+                          args.supervised_model_path)
+                    kwargs, state = th.load(
+                        args.supervised_model_path + '/' + args.supervised_data_source + '-' +
+                        args.supervised_model_label + '-model.pt')
+                    # temp for legacy code
+                    kwargs['channels'] = 6
+                    print(kwargs)
+                    sl_module = RNNModel(**kwargs)
+                    sl_module.load_state_dict(state)
+                else:
+                    sl_module = args.supervised_model_label
             else:
                 sl_module = None
 
