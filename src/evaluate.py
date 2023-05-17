@@ -95,6 +95,7 @@ def main(args):
     parser.add_argument('--supervised_data_source', type=str, default='random', help='Supervised model data source')
     parser.add_argument('--supervised_model_label', type=str, default='loc', help='Supervised model label to use')
     parser.add_argument('--supervised_model_path', type=str, default='supervised', help='Supervised model path')
+    parser.add_argument('--ground_truth_modules', type=bool, default=False, help='modules dont use network')
     args = parser.parse_args(args)
 
     configNames = []
