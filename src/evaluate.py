@@ -138,7 +138,7 @@ def main(args):
                     args.supervised_model_path + '/' + args.supervised_data_source + '-' +
                     args.supervised_model_label + '-model.pt')
                 # temp for legacy code
-                kwargs['channels'] = 6
+                kwargs['channels'] = 4
                 sl_module = RNNModel(**kwargs)
                 sl_module.load_state_dict(state)
             else:
