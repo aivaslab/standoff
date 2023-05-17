@@ -208,6 +208,7 @@ def main(args):
                         del dset
                     else:
                         sl_module = None
+                        label_dim = 0
 
                     env = make_env_comp(env_name, frames=args.frames, size=args.size, style=args.style, monitor_path=savePath3, rank=0,
                                         vecNormalize=args.vecNormalize, norm_rewards=args.norm_rewards, threads=args.threads,
