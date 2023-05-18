@@ -10,7 +10,7 @@ import matplotlib.pylab as pl
 
 from src.utils.display import process_csv, get_transfer_matrix_row
 from src.utils.plotting import plot_merged, plot_selection, plot_split, plot_train, plot_transfer_matrix, plot_tsne, \
-    plot_train_many
+    plot_train_many, plot_train_curriculum
 
 from matplotlib import pyplot as plt
 
@@ -267,6 +267,7 @@ def main(args):
     parser.add_argument('--matrix', action='store_true', help='whether to plot transfer matrix')
     parser.add_argument('--tsne', action='store_true', help='whether to plot transfer matrix')
     parser.add_argument('--curriculum', action='store_true', help='Use curriculum subfolders')
+    parser.add_argument('--pretrained_dir', type=str, default='', help='pretrained dir for curriculum')
     args = parser.parse_args(args)
 
     env_rand = 'det' if args.det_env else 'rand'
@@ -276,6 +277,8 @@ def main(args):
 
     if args.curriculum:
         all_trained_folders = [p for p in os.scandir(args.path) if p.is_dir()]
+        if args.pretrained_dir:
+            all_starter_folders = [args.pretrained_dir]
     else:
         all_trained_folders = [args.path]
 
@@ -289,6 +292,10 @@ def main(args):
 
         train_paths = [os.path.join(f.path) for f in os.scandir(trained_folder) if f.is_dir()]
         plot_train_many(train_paths, window=args.window, path=trained_folder)
+        if args.pretrained_dir != '':
+            start_paths = [os.path.join(f.path) for f in os.scandir(args.pretrained_dir) if f.is_dir()]
+
+            plot_train_curriculum(start_paths, train_paths, window=args.window, path=trained_folder)
 
         for k, train_path in enumerate(train_paths):
             plot_train(train_path, window=args.window)

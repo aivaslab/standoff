@@ -196,12 +196,12 @@ def plot_train_many(train_paths, window=1000, path=None):
         plt.close()
 
 
-def plot_train_curriculum(train_paths, window=1000, path=None):
+def plot_train_curriculum(start_paths, train_paths, window=1000, path=None):
     plt.figure()
     max_episode = 0  # to track maximum episode seen so far
     col = "index"
 
-    for log_folder in train_paths:
+    for log_folder in start_paths:
         monitor_files = get_monitor_files(log_folder)
 
         for file_name in monitor_files:
@@ -218,12 +218,25 @@ def plot_train_curriculum(train_paths, window=1000, path=None):
                     #df['index_col'] = df.index + max_episode  # shift the episode numbers
                     df['yrolling'] = df['r'].rolling(window=window).mean()
                     plt.plot(df[realcol] + max_episode, df.yrolling, label=os.path.basename(log_folder))
-
-        # plot a vertical dotted line to separate the training regimes
-        plt.axvline(x=max_episode, color='k', linestyle='--')
-
-        # update the maximum episode seen so far
         max_episode = df['index_col'].max()
+
+    plt.axvline(x=max_episode, color='k', linestyle='--')
+
+    for log_folder in train_paths:
+        monitor_files = get_monitor_files(log_folder)
+        for file_name in monitor_files:
+            with open(file_name) as file_handler:
+                first_line = file_handler.readline()
+                assert first_line[0] == "#", print(first_line)
+                df = pd.read_csv(file_handler, index_col=None, on_bad_lines='skip')  # , usecols=cols)
+                if len(df):
+                    if col == 'index':
+                        df['index_col'] = df.index
+                        realcol = 'index_col'
+                    else:
+                        realcol = col
+                    df['yrolling'] = df['r'].rolling(window=window).mean()
+                    plt.plot(df[realcol] + max_episode, df.yrolling, label=os.path.basename(log_folder))
 
     plt.rcParams["figure.figsize"] = (15, 5)
     plt.gcf().set_size_inches(15, 5)
