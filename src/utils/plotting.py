@@ -224,7 +224,6 @@ def plot_train_curriculum(start_paths, train_paths, window=1000, path=None):
         # we want the last 1000 datapoints in df to be in df_start:
         df_start = df.iloc[-1000:]
 
-    plt.axvline(x=max_episode, color='k', linestyle='--')
 
     for log_folder in train_paths:
         monitor_files = get_monitor_files(log_folder)
@@ -245,6 +244,8 @@ def plot_train_curriculum(start_paths, train_paths, window=1000, path=None):
                     plt.scatter(df.index  + max_episode, df.r, marker='.', alpha=0.05, s=0.1, label=os.path.basename(log_folder))
                     df_combined['yrolling'] = df_combined['r'].rolling(window=window).mean()#.iloc[1000:]
                     plt.plot(df_combined[realcol] + max_episode, df_combined.yrolling, label=os.path.basename(log_folder))
+
+    plt.axvline(x=max_episode, color='k', linestyle='--')
 
     plt.rcParams["figure.figsize"] = (15, 5)
     plt.gcf().set_size_inches(15, 5)
