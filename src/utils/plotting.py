@@ -217,8 +217,12 @@ def plot_train_curriculum(start_paths, train_paths, window=1000, path=None):
                         realcol = col
                     #df['index_col'] = df.index + max_episode  # shift the episode numbers
                     df['yrolling'] = df['r'].rolling(window=window).mean()
+                    plt.scatter(df.index, df.r, marker='.', alpha=0.3, label=os.path.basename(log_folder))
                     plt.plot(df[realcol] + max_episode, df.yrolling, label=os.path.basename(log_folder))
         max_episode = df['index_col'].max()
+
+        # we want the last 1000 datapoints in df to be in df_start:
+        df_start = df.iloc[-1000:]
 
     plt.axvline(x=max_episode, color='k', linestyle='--')
 
@@ -229,14 +233,17 @@ def plot_train_curriculum(start_paths, train_paths, window=1000, path=None):
                 first_line = file_handler.readline()
                 assert first_line[0] == "#", print(first_line)
                 df = pd.read_csv(file_handler, index_col=None, on_bad_lines='skip')  # , usecols=cols)
+                # here we combine df_start and df
+                df_combined = pd.concat([df_start, df])
                 if len(df):
                     if col == 'index':
                         df['index_col'] = df.index
                         realcol = 'index_col'
                     else:
                         realcol = col
-                    df['yrolling'] = df['r'].rolling(window=window).mean()
-                    plt.plot(df[realcol] + max_episode, df.yrolling, label=os.path.basename(log_folder))
+                    plt.scatter(df.index, df.r, marker='.', alpha=0.3, label=os.path.basename(log_folder))
+                    df_combined['yrolling'] = df_combined['r'].rolling(window=window).mean().iloc[1000:]
+                    plt.plot(df_combined[realcol] + max_episode, df_combined.yrolling, label=os.path.basename(log_folder))
 
     plt.rcParams["figure.figsize"] = (15, 5)
     plt.gcf().set_size_inches(15, 5)
