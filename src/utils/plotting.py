@@ -238,7 +238,7 @@ def plot_train_curriculum(start_paths, train_paths, window=1000, path=None):
                 if len(df):
                     if col == 'index':
                         df['index_col'] = df.index
-                        df_combined['index_col'] = df.index
+                        df_combined['index_col'] = df_combined.index
                         realcol = 'index_col'
                     else:
                         realcol = col
