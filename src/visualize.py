@@ -277,8 +277,8 @@ def main(args):
 
     if args.curriculum:
         all_trained_folders = [p for p in os.scandir(args.path) if p.is_dir()]
-        if args.pretrained_dir:
-            all_starter_folders = [args.pretrained_dir]
+        if args.pretrain_dir:
+            all_starter_folders = [args.pretrain_dir]
     else:
         all_trained_folders = [args.path]
 
