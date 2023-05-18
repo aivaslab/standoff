@@ -292,8 +292,8 @@ def main(args):
 
         train_paths = [os.path.join(f.path) for f in os.scandir(trained_folder) if f.is_dir()]
         plot_train_many(train_paths, window=args.window, path=trained_folder)
-        if args.pretrained_dir != '':
-            start_paths = [os.path.join(f.path) for f in os.scandir(args.pretrained_dir) if f.is_dir()]
+        if args.pretrain_dir != '':
+            start_paths = [os.path.join(f.path) for f in os.scandir(args.pretrain_dir) if f.is_dir()]
 
             plot_train_curriculum(start_paths, train_paths, window=args.window, path=trained_folder)
 
