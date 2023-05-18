@@ -241,7 +241,7 @@ def plot_train_curriculum(start_paths, train_paths, window=1000, path=None):
                         realcol = 'index_col'
                     else:
                         realcol = col
-                    plt.scatter(df.index  + max_episode, df.r, marker='.', alpha=0.3, label=os.path.basename(log_folder))
+                    plt.scatter(df.index  + max_episode, df.r, marker='.', alpha=0.05, s=0.1, label=os.path.basename(log_folder))
                     df_combined['yrolling'] = df_combined['r'].rolling(window=window).mean()#.iloc[1000:]
                     plt.plot(df_combined[realcol] + max_episode, df_combined.yrolling, label=os.path.basename(log_folder))
 
