@@ -267,7 +267,7 @@ def main(args):
     parser.add_argument('--matrix', action='store_true', help='whether to plot transfer matrix')
     parser.add_argument('--tsne', action='store_true', help='whether to plot transfer matrix')
     parser.add_argument('--curriculum', action='store_true', help='Use curriculum subfolders')
-    parser.add_argument('--pretrained_dir', type=str, default='', help='pretrained dir for curriculum')
+    parser.add_argument('--pretrain_dir', type=str, default='', help='pretrained dir for curriculum')
     args = parser.parse_args(args)
 
     env_rand = 'det' if args.det_env else 'rand'
