@@ -217,8 +217,8 @@ def plot_train_curriculum(start_paths, train_paths, window=1000, path=None):
                         realcol = col
                     #df['index_col'] = df.index + max_episode  # shift the episode numbers
                     df['yrolling'] = df['r'].rolling(window=window).mean()
-                    plt.scatter(df.index, df.r, marker='.', alpha=0.3, label=os.path.basename(log_folder))
-                    plt.plot(df[realcol] + max_episode, df.yrolling, label=os.path.basename(log_folder))
+                    plt.scatter(df.index, df.r, marker='.', alpha=0.05, s=0.1, label=os.path.basename(log_folder))
+                    plt.plot(df[realcol], df.yrolling, label=os.path.basename(log_folder))
         max_episode = df['index_col'].max()
 
         # we want the last 1000 datapoints in df to be in df_start:
@@ -238,6 +238,7 @@ def plot_train_curriculum(start_paths, train_paths, window=1000, path=None):
                 if len(df):
                     if col == 'index':
                         df['index_col'] = df.index
+                        df_combined['index_col'] = df.index
                         realcol = 'index_col'
                     else:
                         realcol = col
