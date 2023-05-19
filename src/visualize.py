@@ -72,7 +72,7 @@ def make_transfer_matrix_new(save_path, prefix, make_matrix=False, make_tsne=Fal
             'inf'))
         lines = [x["values"] for x in matrix_data_sorted]
         row_names = [x["train_name"] for x in matrix_data_sorted]
-        print(lines)
+        #print(lines)
         plot_transfer_matrix(matrix_data=lines,
                              row_names=row_names,
                              col_names=eval_ordering,
