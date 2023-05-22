@@ -23,6 +23,7 @@ def init_policy(model_class, obs_space, act_space, lr_schedule, width, hidden_si
             'enable_critic_lstm': enable_critic_lstm,
             'normalize_images': normalize_images,
             'activation_fn': th.nn.ReLU,
+            'optimizer_class': th.optim.RMSprop,
             'features_extractor_kwargs': {
                 'features_dim': width,
                 'conv_mult': conv_mult,
