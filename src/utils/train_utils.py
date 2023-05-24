@@ -24,6 +24,7 @@ def init_policy(model_class, obs_space, act_space, lr_schedule, width, hidden_si
             'normalize_images': normalize_images,
             'activation_fn': th.nn.ReLU,
             'optimizer_class': th.optim.SGD,
+            'optimizer_kwargs': {'momentum': 0.9, 'nesterov': True},
             'features_extractor_kwargs': {
                 'features_dim': width,
                 'conv_mult': conv_mult,
