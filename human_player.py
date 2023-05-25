@@ -1,22 +1,17 @@
-import copy
-
 import numpy as np
-import src
-
 from src.rendering import InteractivePlayerWindow
 from src.agents import GridAgentInterface
 from src.pz_envs import env_from_config
 from src.pz_envs.scenario_configs import ScenarioConfigs
-from src.utils.conversion import make_env_comp
-import pyglet
-import gym
-import src.pz_envs
 
+from PIL import Image
+from PIL import ImageFont
+from PIL import ImageDraw
 
 class HumanPlayer:
     def __init__(self):
         self.player_window = InteractivePlayerWindow(
-            caption="standoff",
+            caption="standoff player",
             #display=pyglet.canvas.get_display()
         )
         self.episode_count = 0
@@ -52,7 +47,7 @@ env_config =  {
 }
 
 player_interface_config = {
-    "view_size": 15,
+    "view_size": 17,
     "view_offset": 4,
     "view_tile_size": 15,
     "observation_style": "image",
@@ -62,10 +57,10 @@ player_interface_config = {
     "move_type": 0
 }
 puppet_interface_config = {
-    "view_size": 5,
+    "view_size": 17,
     "view_offset": 3,
-    "view_tile_size": 48,
-    "observation_style": "rich",
+    "view_tile_size": 15,
+    "observation_style": "image",
     "see_through_walls": False,
     "color": "red",
     #"move_type": 1,
@@ -94,56 +89,45 @@ env_config['subject_visible_decs'] = (difficulty < 3)
 env_config['gaze_highlighting'] = (difficulty < 3)
 env_config['persistent_gaze_highlighting'] = (difficulty < 2)
 
-env_name = 'Standoff-S3-' + configName.replace(" ", "") + '-' + str(difficulty) + '-v0'
+env_name = 'Standoff-S3-' + configName.replace(" ", "") + '-' + str(difficulty) + '-v1'
 
 env = env_from_config(env_config)
+env.observation_style = "image"
 env.record_supervised_labels = True
 if hasattr(env, "hard_reset"):
     env.hard_reset(reset_configs)
 
 human = HumanPlayer()
 human.start_episode()
-#env.window = human.player_window
-
-
 
 done = False
-print(env.record_info)
+print('recording eval info:', env.record_info) # recording info aside from supervised labels, used at eval
 
 
-for i in range(5):
+for i in range(100):
     obs = env.reset()
     print(env_name, env.gaze_highlighting, env.persistent_gaze_highlighting, env.opponent_visible_decs, env.subject_visible_decs, env.persistent_treat_images)
 
     #print(np.round(obs['player_0'] * 10).sum(axis=0).astype(int))
     while True:
-        #print(env, "agents", env.agents, "puppets", env.puppets, "done_penalties", env.done_without_box_reward, env.distance_from_boxes_reward)
         env.render(mode="human", show_agent_views=True, tile_size=15)
-        print(np.round(obs['player_0']*10).sum(axis=0).astype(int))
-        #print([a.pos for a in env.puppet_instances])
-        player_action = human.action_step(obs['player_0'])
-
+        #print(np.round(obs['player_0']*10).sum(axis=0).astype(int))
+        img = Image.fromarray(obs['player_0'], 'RGB')
+        ImageDraw.Draw(img).text((0, 0), "Step " + str(env.step_count), (255, 255, 255))
+        player_action = human.action_step(np.array(img))
         agent_actions = {'player_0': player_action}
-
         next_obs, rew, done, info = env.step(agent_actions)
-        print(info)
-
-        if "player_1" in info:
-            print("loc", info["player_1"]["loc"])
-            print("bloc", info["player_1"]["b-loc"])
-            print("ex", info["player_1"]["exist"])
-            print("bex", info["player_1"]["b-exist"])
-            print("vis", info["player_1"]["vision"])
-            print("tar", info["player_1"]["target"])
-        
-        human.save_step(
-            obs['player_0'], player_action, rew['player_0'], done
-        )
+        #print(info)
+        human.save_step(obs['player_0'], player_action, rew['player_0'], done)
 
         obs = next_obs
 
-        if done['player_0'] == True:
-            print(info['player_0']['correctSelection'])
+        if done['player_0']:
             break
+    # render special screen here
+    img = Image.fromarray(env.grid.render(15, None) * 0, 'RGB')
+    ImageDraw.Draw(img).text((16, 16), "Episode done\n\nReward: " + str(rew['player_0']), (255, 255, 255))
+    _ = human.action_step(np.array(img))
+
 
 human.end_episode()

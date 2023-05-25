@@ -17,7 +17,7 @@ from .agents import occlude_mask
 # import hashlib
 import xxhash
 
-from src.rendering import SimpleImageViewer
+from src.rendering import SimpleImageViewer, InteractivePlayerWindow
 
 # from gym.envs.classic_control.rendering import SimpleImageViewer
 
@@ -1309,7 +1309,7 @@ class para_MultiGridEnv(ParallelEnv):
             X, np.ones((int(rescale_factor), int(rescale_factor), 1))
         )
 
-        if show_agent_views and self.observation_style != 'rich':
+        if show_agent_views and mode == "human":
 
             target_partial_width = int(img.shape[0] * agent_col_width_frac - 2 * agent_col_padding_px)
             target_partial_height = (img.shape[1] - 2 * agent_col_padding_px) // max_agents_per_col
@@ -1338,10 +1338,12 @@ class para_MultiGridEnv(ParallelEnv):
 
             img = np.concatenate((img, *cols), axis=1)
 
+
         if mode == "human":
             if not self.window.isopen:
                 self.window.imshow(img)
-                self.window.window.set_caption("Standoff")
+                #self.window.window.set_caption("Standoff")
+                self.window.isopen = True
             else:
                 self.window.imshow(img)
 
