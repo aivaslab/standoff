@@ -191,7 +191,7 @@ class MiniStandoffEnv(para_MultiGridEnv):
         self.smallReward = int(self.bigReward / (self.boxes - 2))
 
         for k, agent in enumerate(self.agents_and_puppets()):
-            h = 1 if agent == "player_0" else self.height - 2  # todo: make this work with dominance properly
+            h = 0 if agent == "player_0" else self.height - 1  # todo: make this work with dominance properly
             d = 1 if agent == "player_0" else 3
             if self.random_subject_spawn:
                 bb = 1 + self.deterministic_seed % (self.boxes - 2) if self.deterministic else 1 + random.choice(range(boxes - 2))
