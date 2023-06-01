@@ -30,7 +30,7 @@ class MiniStandoffEnv(para_MultiGridEnv):
             seed=1337,
             respawn=False,
             ghost_mode=True,
-            step_reward=0,
+            step_reward=0.01,
             done_without_box_reward=-3,
             agent_spawn_kwargs=None,
             config_name="error",
@@ -61,7 +61,7 @@ class MiniStandoffEnv(para_MultiGridEnv):
                          opponent_visible_decs=opponent_visible_decs,
                          persistent_treat_images=persistent_treat_images,
                          gaze_highlighting=gaze_highlighting,
-                         persistent_gaze_highlighting=persistent_gaze_highlighting, 
+                         persistent_gaze_highlighting=persistent_gaze_highlighting,
                          supervised_model=supervised_model)
         self.new_target = None
         if agent_spawn_kwargs is None:
@@ -92,7 +92,7 @@ class MiniStandoffEnv(para_MultiGridEnv):
         self.random_odd_spawns = True  # overrides self.odd_spawns when true
         self.record_supervised_labels = False
 
-        self.supervised_model = supervised_model # used for generating special supervised labels
+        self.supervised_model = supervised_model  # used for generating special supervised labels
         self.last_supervised_labels = None
         self.has_released = False
 
@@ -191,10 +191,10 @@ class MiniStandoffEnv(para_MultiGridEnv):
         self.smallReward = int(self.bigReward / (self.boxes - 2))
 
         for k, agent in enumerate(self.agents_and_puppets()):
-            h = 1 if agent == "player_0" else self.height - 2
+            h = 1 if agent == "player_0" else self.height - 2  # todo: make this work with dominance properly
             d = 1 if agent == "player_0" else 3
             if self.random_subject_spawn:
-                bb = self.deterministic_seed % self.boxes if self.deterministic else random.choice(range(boxes))
+                bb = 1 + self.deterministic_seed % (self.boxes - 2) if self.deterministic else 1 + random.choice(range(boxes - 2))
                 xx = bb + 1
             else:
                 xx = self.boxes // 2 + 1
@@ -207,49 +207,29 @@ class MiniStandoffEnv(para_MultiGridEnv):
                 a.spawn_delay = 1000
                 a.active = False
 
-        for j in range(2, self.width - 2):
-            if not self.subject_visible_decs:
-                for i in range(startRoom + 1, startRoom + atrium):
-                    self.put_obj(Curtain(color='red'), j, i)
-            if not self.opponent_visible_decs:
-                for i in range(self.height - startRoom - atrium - 1 + 1, self.height - startRoom - 1):
-                    self.put_obj(Curtain(color='red'), j, i)
-
-        self.grid.wall_rect(0, 0, self.width, self.height)
+        self.grid.wall_rect(0, 0, self.width - 1, self.height)
 
         for box in range(boxes + 1):
             if box < boxes:
-                self.put_obj(Wall(), box + 1, startRoom - 1)
-                xx_spawn = box * 2 + 2 + real_odd_spawns
+                # self.put_obj(Wall(), box + 1, startRoom - 1)
+                xx_spawn = box + 1
 
                 # initial door release, only where door is not in all_door_poses
-                if (xx_spawn, startRoom) in all_door_poses:
-                    self.put_obj(Block(init_state=0, color="blue"), xx_spawn, startRoom)
+                self.put_obj(Block(init_state=0, color="blue"), xx_spawn, startRoom + 2)
+                self.released_tiles[0] += [(xx_spawn, startRoom + 2)]
+
+                if (xx_spawn, startRoom + 1) not in all_door_poses:
+                    self.put_obj(Wall(), xx_spawn, startRoom + 1)
+                    self.put_obj(Wall(), xx_spawn, startRoom + 0)
                 else:
-                    self.put_obj(Wall(), xx_spawn, startRoom)
+                    self.put_obj(Block(init_state=0, color="blue"), xx_spawn, startRoom + 1)
+                    self.released_tiles[0] += [(xx_spawn, startRoom + 1)]
 
                 # same as above, for opponent
-                if (xx_spawn, self.height - startRoom - 1) in all_door_poses:
-                    self.put_obj(Block(init_state=0, color="blue"), xx_spawn, self.height - startRoom - 1)
-                else:
+                self.put_obj(Block(init_state=0, color="blue"), xx_spawn, self.height - startRoom - 2)
+                self.released_tiles[0] += [(xx_spawn, self.height - startRoom - 2)]
+                if (xx_spawn, self.height - startRoom - 1) not in all_door_poses:
                     self.put_obj(Wall(), xx_spawn, self.height - startRoom - 1)
-
-                if (xx_spawn, startRoom) in all_door_poses:
-                    self.released_tiles[0] += [(xx_spawn, startRoom)]
-                if (xx_spawn, self.height - startRoom - 1) in all_door_poses:
-                    self.released_tiles[1] += [(xx_spawn, self.height - startRoom - 1)]
-
-                # secondary door release
-                self.put_obj(Wall(), box + 1, self.height - 2)
-                self.put_obj(Block(init_state=0, color="blue"), box + 2, startRoom + atrium)
-                self.put_obj(Block(init_state=0, color="blue"), box + 2, self.height - startRoom - atrium - 1)
-
-                self.released_tiles[2] += [(box + 2, startRoom + atrium)]
-                self.released_tiles[3] += [(box + 2, self.height - startRoom - atrium - 1)]
-
-            for j in range(lava_height):
-                # self.put_obj(GlassBlock(color="cyan", init_state=1), box * 2 + 1, j + startRoom + atrium + 1)
-                self.put_obj(Wall(), box + 1, j + startRoom + atrium + 1)
 
         self.reset_vision()
 
@@ -306,7 +286,8 @@ class MiniStandoffEnv(para_MultiGridEnv):
 
                 if event_type == "bait":
                     event_args[k] = bait_args.pop(
-                        random.randrange(len(bait_args)) if not self.deterministic else self.get_deterministic_seed() % len(
+                        random.randrange(
+                            len(bait_args)) if not self.deterministic else self.get_deterministic_seed() % len(
                             bait_args))
                 elif event_type == "remove":
                     empty_buckets.append(event[1])
@@ -351,7 +332,7 @@ class MiniStandoffEnv(para_MultiGridEnv):
         y = self.height // 2 + offset
         paths = []
         for box in range(self.boxes):
-            x = box * 2 + 2
+            x = box * 1 + 1
             path = pathfind(maze, position[0:2], (x, y), self.cached_paths)
             paths += [path, ]
         return paths
@@ -369,7 +350,7 @@ class MiniStandoffEnv(para_MultiGridEnv):
                     update_vis=False)  # do not change gaze highlight if puppet saw this bait
         if name == 'init':
             for box in range(self.boxes):
-                x = box * 2 + 2
+                x = box * 1 + 1
                 self.put_obj(Box(color="orange"), x, y)
             if self.record_info:
                 self.infos['player_0']['shouldAvoidBig'] = False
@@ -379,7 +360,7 @@ class MiniStandoffEnv(para_MultiGridEnv):
                 self.infos['player_0']['minibatch'] = self.minibatch
                 self.infos['player_0']['timestep'] = self.total_step_count
         elif name == 'bait':
-            x = event[1] * 2 + 2
+            x = event[1] * 1 + 1
             obj = Goal(reward=arg, size=arg * 0.01, color='green', hide=self.hidden)
             if not self.has_baited:
                 self.has_baited = True
@@ -388,7 +369,7 @@ class MiniStandoffEnv(para_MultiGridEnv):
             self.put_obj(obj, x, y)
             self.objs_to_hide.append(obj)
         elif name == "remove":
-            x = event[1] * 2 + 2
+            x = event[1] * 1 + 1
             tile = self.grid.get(x, y)
             if tile is not None:
                 if hasattr(tile, "reward") and tile.reward == self.bigReward and self.currently_visible:
@@ -411,21 +392,23 @@ class MiniStandoffEnv(para_MultiGridEnv):
             for box in range(self.boxes):
                 self.can_see[arg + str(box)] = False if "obscure" in name else True
         elif name == "swap":
-            b1 = self.grid.get(event[1] * 2 + 2, y)
-            b2 = self.grid.get(event[2] * 2 + 2, y)
+            b1 = self.grid.get(event[1] * 1 + 1, y)
+            b2 = self.grid.get(event[2] * 1 + 1, y)
             r1 = b1.reward if hasattr(b1, "reward") else 0
             r2 = b2.reward if hasattr(b2, "reward") else 0
             obj1 = Goal(reward=r2, size=r2 * 0.01, color='green', hide=self.hidden)
             obj2 = Goal(reward=r1, size=r1 * 0.01, color='green', hide=self.hidden)
-            self.put_obj(obj1, event[1] * 2 + 2, y)
-            self.put_obj(obj2, event[2] * 2 + 2, y)
+            self.put_obj(obj1, event[1] * 1 + 1, y)
+            self.put_obj(obj2, event[2] * 1 + 1, y)
             self.objs_to_hide.append(obj1)
             self.objs_to_hide.append(obj2)
         elif name == "release":
             if self.record_info:
-                self.infos['player_0']['eventVisibility'] = ''.join(['1' if x else '0' for x in self.visible_event_list])
+                self.infos['player_0']['eventVisibility'] = ''.join(
+                    ['1' if x else '0' for x in self.visible_event_list])
             for x, y in self.released_tiles[arg]:
                 self.del_obj(x, y)
+                self.put_obj(Curtain(color='red'), x, y, update_vis=False)
             if self.record_supervised_labels and self.supervised_model is None:
                 self.dones['player_0'] = True
             self.has_released = True
@@ -435,14 +418,14 @@ class MiniStandoffEnv(para_MultiGridEnv):
 
         # track where the big and small foods have been
         for loc in range(self.boxes):
-            x = loc * 2 + 2
+            x = loc * 1 + 1
             obj = self.grid.get(x, y)
             self.append_food_locs(obj, loc)  # appends to self.big_food_locations and self.small_food_locations
 
         # oracle food location memory for puppet ai
         if name == "bait" or name == "swap" or name == "remove" or (self.hidden is True and name == "reveal"):
             for box in range(self.boxes):
-                x = box * 2 + 2
+                x = box * 1 + 1
                 for agent in self.agents_and_puppets():
                     if self.can_see[agent + str(box)] and self.currently_visible:
                         tile = self.grid.get(x, y)
@@ -470,7 +453,7 @@ class MiniStandoffEnv(para_MultiGridEnv):
             self.new_target = False
             a = self.instance_from_name[target_agent]
             if a.active:
-                x = self.agent_goal[target_agent] * 2 + 2
+                x = self.agent_goal[target_agent] * 1 + 1
                 path = pathfind(self.grid.volatile, a.pos, (x, y), self.cached_paths)
                 self.infos[target_agent]["path"] = path
                 # tile = self.grid.get(x, y)
@@ -482,7 +465,7 @@ class MiniStandoffEnv(para_MultiGridEnv):
                 one_hot_goal[self.agent_goal[target_agent]] = 1
             self.infos['player_0']["target"] = one_hot_goal
             self.infos['player_0']["vision"] = self.visible_event_list[-1] if len(self.visible_event_list) > 0 else [0]
-            real_boxes = [self.grid.get(box * 2 + 2, y) for box in range(self.boxes)]
+            real_boxes = [self.grid.get(box * 1 + 1, y) for box in range(self.boxes)]
             real_box_rewards = [box.reward if box is not None and hasattr(box, "reward") else 0 for box in real_boxes]
             if self.params['num_puppets'] > 0:
                 all_rewards_seen = [self.last_seen_reward[target_agent + str(box)] for box in range(self.boxes)]
@@ -509,10 +492,12 @@ class MiniStandoffEnv(para_MultiGridEnv):
                 # if agent's goal of player_1 matches big treat location, then shouldAvoidBig is True
                 if len(self.puppets):
                     self.infos['player_0']['puppet_goal'] = self.agent_goal[self.puppets[-1]]
-                    if len(self.big_food_locations) > 0 and self.agent_goal[self.puppets[-1]] == self.big_food_locations[-1]:
+                    if len(self.big_food_locations) > 0 and self.agent_goal[self.puppets[-1]] == \
+                            self.big_food_locations[-1]:
                         self.infos['player_0']['shouldAvoidBig'] = not self.subject_is_dominant
                         self.infos['player_0']['shouldAvoidSmall'] = False
-                    elif len(self.small_food_locations) > 0 and self.agent_goal[self.puppets[-1]] == self.small_food_locations[-1]:
+                    elif len(self.small_food_locations) > 0 and self.agent_goal[self.puppets[-1]] == \
+                            self.small_food_locations[-1]:
                         self.infos['player_0']['shouldAvoidSmall'] = not self.subject_is_dominant
                         self.infos['player_0']['shouldAvoidBig'] = False
                     else:

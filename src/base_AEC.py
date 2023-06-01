@@ -428,7 +428,7 @@ class para_MultiGridEnv(ParallelEnv):
             seed=1337,
             respawn=False,
             ghost_mode=True,
-            step_reward=0,
+            step_reward=0.01,
             done_without_box_reward=-10,
             agent_spawn_kwargs=None,
             num_agents=1,
@@ -823,8 +823,8 @@ class para_MultiGridEnv(ParallelEnv):
             self.rewards[agent_name] = 0
 
             if agent.active:
-                self.rewards[agent_name] = self.step_reward
-                agent.reward(self.step_reward)
+                #self.rewards[agent_name] = self.step_reward
+                #agent.reward(self.step_reward)
 
                 # get stuff from timers
                 # infos[agent_name] = self.infos[agent_name]
@@ -920,9 +920,9 @@ class para_MultiGridEnv(ParallelEnv):
                             # fwd_cell.set_reward(self.penalize_same_selection)
 
                             if bool(self.reward_decay):
-                                rwd = og_rwd * (1.0 - 0.9 * (self.step_count / self.max_steps_real))
+                                rwd = og_rwd * (1.0 - 0.9 * (self.step_count / self.max_steps_real)) + (self.step_reward * self.step_count)
                             else:
-                                rwd = og_rwd
+                                rwd = og_rwd + (self.step_reward * self.step_count)
 
                             if fwd_cell in self.previously_selected_boxes:
                                 same_selection = True
