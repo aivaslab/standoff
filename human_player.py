@@ -35,7 +35,7 @@ class HumanPlayer:
 TILE_SIZE = 16
 
 env_config =  {
-    "env_class": "StandoffEnv",
+    "env_class": "MiniStandoffEnv",
     "max_steps": 50,
     "respawn": True,
     "ghost_mode": False,
@@ -45,8 +45,8 @@ env_config =  {
 }
 
 player_interface_config = {
-    "view_size": 17,
-    "view_offset": 4,
+    "view_size": 7,
+    "view_offset": 0,
     "view_tile_size": TILE_SIZE,
     "observation_style": "image",
     "see_through_walls": False,
