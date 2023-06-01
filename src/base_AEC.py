@@ -203,9 +203,10 @@ class MultiGrid:
         self.grid[i, j] = self.obj_reg.get_key(obj)
 
     def get(self, i: object, j: object) -> object:
-        assert 0 <= i < self.width
-        assert 0 <= j < self.height
-        return self.obj_reg.key_to_obj_map[self.grid[i, j]]
+        if 0 <= i < self.width:
+            if 0 <= j < self.height:
+                return self.obj_reg.key_to_obj_map[self.grid[i, j]]
+        return -1
 
     def horz_wall(self, x, y, length=None, obj_type=Wall):
         if length is None:
@@ -861,7 +862,7 @@ class para_MultiGridEnv(ParallelEnv):
                 if action == agent.actions.forward or (agent.move_type == 1 and (
                         action in [agent.actions.left, agent.actions.right, agent.actions.done])):
                     # Under the follow conditions, the agent can move forward.
-                    can_move = fwd_cell is None or fwd_cell.can_overlap()
+                    can_move = fwd_cell is not -1 and (fwd_cell is None or fwd_cell.can_overlap())
                     if self.ghost_mode is False and isinstance(fwd_cell, GridAgent):
                         can_move = False
 
