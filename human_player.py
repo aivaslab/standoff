@@ -3,10 +3,7 @@ from src.rendering import InteractivePlayerWindow
 from src.agents import GridAgentInterface
 from src.pz_envs import env_from_config
 from src.pz_envs.scenario_configs import ScenarioConfigs
-
-from PIL import Image
-from PIL import ImageFont
-from PIL import ImageDraw
+from PIL import Image, ImageDraw
 
 class HumanPlayer:
     def __init__(self):
@@ -35,6 +32,7 @@ class HumanPlayer:
         )
         self.episode_count += 1
 
+TILE_SIZE = 16
 
 env_config =  {
     "env_class": "StandoffEnv",
@@ -49,7 +47,7 @@ env_config =  {
 player_interface_config = {
     "view_size": 17,
     "view_offset": 4,
-    "view_tile_size": 15,
+    "view_tile_size": TILE_SIZE,
     "observation_style": "image",
     "see_through_walls": False,
     "color": "yellow",
@@ -59,7 +57,7 @@ player_interface_config = {
 puppet_interface_config = {
     "view_size": 17,
     "view_offset": 3,
-    "view_tile_size": 15,
+    "view_tile_size": TILE_SIZE,
     "observation_style": "image",
     "see_through_walls": False,
     "color": "red",
@@ -68,7 +66,7 @@ puppet_interface_config = {
 }
 configs = ScenarioConfigs().standoff
 
-configName = 'random'
+configName = 'removedUninformed2'
 reset_configs = {**configs["defaults"],  **configs[configName]}
 
 if isinstance(reset_configs["num_agents"], list):
@@ -93,7 +91,7 @@ env_name = 'Standoff-S3-' + configName.replace(" ", "") + '-' + str(difficulty) 
 
 env = env_from_config(env_config)
 env.observation_style = "image"
-env.record_supervised_labels = True
+#env.record_supervised_labels = True
 if hasattr(env, "hard_reset"):
     env.hard_reset(reset_configs)
 
@@ -110,7 +108,7 @@ for i in range(100):
 
     #print(np.round(obs['player_0'] * 10).sum(axis=0).astype(int))
     while True:
-        env.render(mode="human", show_agent_views=True, tile_size=15)
+        env.render(mode="human", show_agent_views=True, tile_size=TILE_SIZE)
         #print(np.round(obs['player_0']*10).sum(axis=0).astype(int))
         img = Image.fromarray(obs['player_0'], 'RGB')
         ImageDraw.Draw(img).text((0, 0), "Step " + str(env.step_count), (255, 255, 255))
