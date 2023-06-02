@@ -44,7 +44,7 @@ def main(args):
 
     parser.add_argument('--env_group', type=str, default='1', help='Environment group to use')
     parser.add_argument('--style', type=str, default='rich', help='Evaluation output style')
-    parser.add_argument('--size', type=int, default=17, help='View size in tiles')
+    parser.add_argument('--size', type=int, default=7, help='View size in tiles')
     parser.add_argument('--tile_size', type=int, default=1,
                         help='Size of each tile in pixels')  # not implemented since needs registered env
     parser.add_argument('--frames', type=int, default=1, help='Number of frames to stack')
