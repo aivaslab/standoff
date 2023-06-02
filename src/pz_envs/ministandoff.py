@@ -169,7 +169,8 @@ class MiniStandoffEnv(para_MultiGridEnv):
                                                                                               :self.deterministic_seed % len(
                                                                                                   self.food_locs)]
         self.released_tiles = [[] for _ in range(4)]
-        release_gap = 5
+        self.curtain_tiles = []
+        release_gap = 6
         self.width = 8
         self.height = 8
         self.grid = MultiGrid((self.width, self.height))
@@ -191,7 +192,7 @@ class MiniStandoffEnv(para_MultiGridEnv):
         self.smallReward = int(self.bigReward / (self.boxes - 2))
 
         for k, agent in enumerate(self.agents_and_puppets()):
-            h = 0 if agent == "player_0" else self.height - 1  # todo: make this work with dominance properly
+            h = 1 if agent == "player_0" else self.height - 1  # todo: make this work with dominance properly
             d = 1 if agent == "player_0" else 3
             if self.random_subject_spawn:
                 bb = 1 + self.deterministic_seed % (self.boxes - 2) if self.deterministic else 1 + random.choice(range(boxes - 2))
@@ -215,21 +216,26 @@ class MiniStandoffEnv(para_MultiGridEnv):
                 xx_spawn = box + 1
 
                 # initial door release, only where door is not in all_door_poses
-                self.put_obj(Block(init_state=0, color="blue"), xx_spawn, startRoom + 2)
-                self.released_tiles[0] += [(xx_spawn, startRoom + 2)]
+                self.put_obj(Block(init_state=0, color="blue"), xx_spawn, startRoom + 1)
+                self.released_tiles[1] += [(xx_spawn, startRoom + 1)]
+                self.curtain_tiles += [(xx_spawn, startRoom + 0)]
 
                 if (xx_spawn, startRoom + 1) not in all_door_poses:
-                    self.put_obj(Wall(), xx_spawn, startRoom + 1)
-                    self.put_obj(Wall(), xx_spawn, startRoom + 0)
+                    pass
                 else:
                     self.put_obj(Block(init_state=0, color="blue"), xx_spawn, startRoom + 1)
-                    self.released_tiles[0] += [(xx_spawn, startRoom + 1)]
+                    self.released_tiles[1] += [(xx_spawn, startRoom + 1)]
 
                 # same as above, for opponent
                 self.put_obj(Block(init_state=0, color="blue"), xx_spawn, self.height - startRoom - 2)
-                self.released_tiles[0] += [(xx_spawn, self.height - startRoom - 2)]
+                self.released_tiles[1] += [(xx_spawn, self.height - startRoom - 2)]
+                self.curtain_tiles += [(xx_spawn, self.height - startRoom - 1)]
                 if (xx_spawn, self.height - startRoom - 1) not in all_door_poses:
-                    self.put_obj(Wall(), xx_spawn, self.height - startRoom - 1)
+                    #self.put_obj(Wall(), xx_spawn, self.height - startRoom - 1)
+                    pass
+                else:
+                    self.put_obj(Block(init_state=0, color="blue"), xx_spawn, self.height - startRoom - 1)
+                    self.released_tiles[0] += [(xx_spawn, self.height - startRoom - 1)]
 
         self.reset_vision()
 
@@ -303,19 +309,11 @@ class MiniStandoffEnv(para_MultiGridEnv):
         for k, event in enumerate(events):
             self.add_timer(event, curTime, arg=event_args[k])
             curTime += 1
-        if subject_is_dominant:
-            sub_release = 1
-            dom_release = 0
-        else:
-            sub_release = 0
-            dom_release = 1
-        self.add_timer(["release"], curTime + dom_release, arg=0)
-        self.add_timer(["release"], curTime + sub_release, arg=1)
-        self.add_timer(["release"], curTime + release_gap + dom_release, arg=2)
-        self.add_timer(["release"], curTime + release_gap + sub_release, arg=3)
+        self.add_timer(["release"], curTime, arg=0)
+        self.add_timer(["release"], curTime + release_gap + 1, arg=1)
 
         # returns the final timer, the release of the sub, could be made dynamic so just max of timers
-        return curTime + release_gap + sub_release
+        return curTime + release_gap
 
     def append_food_locs(self, obj, loc):
         if hasattr(obj, "reward") and obj.reward == self.bigReward:
@@ -333,6 +331,13 @@ class MiniStandoffEnv(para_MultiGridEnv):
         paths = []
         for box in range(self.boxes):
             x = box * 1 + 1
+
+            pgrid = maze
+            for _x in range(self.width):
+                if _x != x:
+                    pgrid[_x, y] = True
+                    pgrid[_x, y + 1] = True
+
             path = pathfind(maze, position[0:2], (x, y), self.cached_paths)
             paths += [path, ]
         return paths
@@ -408,7 +413,9 @@ class MiniStandoffEnv(para_MultiGridEnv):
                     ['1' if x else '0' for x in self.visible_event_list])
             for x, y in self.released_tiles[arg]:
                 self.del_obj(x, y)
-                self.put_obj(Curtain(color='red'), x, y, update_vis=False)
+            if arg == 0:
+                for x, y in self.curtain_tiles:
+                    self.put_obj(Curtain(color='red'), x, y, update_vis=False)
             if self.record_supervised_labels and self.supervised_model is None:
                 self.dones['player_0'] = True
             self.has_released = True
@@ -454,7 +461,13 @@ class MiniStandoffEnv(para_MultiGridEnv):
             a = self.instance_from_name[target_agent]
             if a.active:
                 x = self.agent_goal[target_agent] * 1 + 1
-                path = pathfind(self.grid.volatile, a.pos, (x, y), self.cached_paths)
+                pgrid = self.grid.volatile
+                for _x in range(self.width):
+                    if _x != x:
+                        pgrid[_x, y] = True
+                        pgrid[_x, y+1] = True
+                path = pathfind(pgrid, a.pos, (x, y), self.cached_paths)
+                #print('path', path)
                 self.infos[target_agent]["path"] = path
                 # tile = self.grid.get(x, y)
                 # we cannot track shouldAvoidBig etc here because the treat location might change
