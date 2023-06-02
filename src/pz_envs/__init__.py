@@ -132,8 +132,8 @@ for observation_style in ['rich']:
                 for config in ScenarioConfigs.standoff.keys():
                     configName = config.replace(" ", "")
                     register_standoff_env(
-                        f"MStandoff-{configName}-{view_size}-{observation_style}-{difficulty}-v0" if not use_label else
-                        f"MStandoff-{configName}-{view_size}-{observation_style}-{difficulty}-v1",
+                        f"Standoff-{configName}-{view_size}-{observation_style}-{difficulty}-v0" if not use_label else
+                        f"Standoff-{configName}-{view_size}-{observation_style}-{difficulty}-v1",
                         MiniStandoffEnv,
                         config,
                         difficulty,
