@@ -30,7 +30,7 @@ class StandoffEnv(para_MultiGridEnv):
             seed=1337,
             respawn=False,
             ghost_mode=True,
-            step_reward=0,
+            step_reward=-0.01,
             done_without_box_reward=-3,
             agent_spawn_kwargs=None,
             config_name="error",
