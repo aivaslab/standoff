@@ -862,7 +862,7 @@ class para_MultiGridEnv(ParallelEnv):
                 if action == agent.actions.forward or (agent.move_type == 1 and (
                         action in [agent.actions.left, agent.actions.right, agent.actions.done])):
                     # Under the follow conditions, the agent can move forward.
-                    can_move = fwd_cell is not -1 and (fwd_cell is None or fwd_cell.can_overlap())
+                    can_move = fwd_cell != -1 and (fwd_cell is None or fwd_cell.can_overlap())
                     if self.ghost_mode is False and isinstance(fwd_cell, GridAgent):
                         can_move = False
 
@@ -872,7 +872,7 @@ class para_MultiGridEnv(ParallelEnv):
                         if fwd_cell is None:
                             self.grid.set(*fwd_pos, agent, update_vis_mask=self.prev_puppet_mask)
                             agent.pos = fwd_pos
-                        else:
+                        elif fwd_cell != -1:
                             fwd_cell.agents.append(agent)
                             agent.pos = fwd_pos
 
@@ -973,7 +973,7 @@ class para_MultiGridEnv(ParallelEnv):
 
                 # Pick up an object
                 elif action == agent.actions.pickup:
-                    if fwd_cell and fwd_cell.can_pickup():
+                    if fwd_cell and fwd_cell != -1 and fwd_cell.can_pickup():
                         if agent.carrying is None:
                             agent.carrying = fwd_cell
                             agent.carrying.cur_pos = np.array([-1, -1])
@@ -992,7 +992,7 @@ class para_MultiGridEnv(ParallelEnv):
 
                 # Toggle/activate an object
                 elif action == agent.actions.toggle:
-                    if fwd_cell:
+                    if fwd_cell and fwd_cell != -1:
                         wasted = bool(fwd_cell.toggle(agent, fwd_pos))
                         self.prev_puppet_mask[fwd_pos[0], fwd_pos[1]] = False
                     else:
