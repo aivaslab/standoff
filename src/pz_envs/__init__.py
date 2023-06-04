@@ -114,7 +114,7 @@ for observation_style in ['rich']:
                     register_standoff_env(
                         f"Standoff-{configName}-{view_size}-{observation_style}-{difficulty}-v0" if not use_label else
                         f"Standoff-{configName}-{view_size}-{observation_style}-{difficulty}-v1",
-                        StandoffEnv,
+                        StandoffEnv if view_size == 17 else MiniStandoffEnv,
                         config,
                         difficulty,
                         _observation_style=observation_style,
@@ -122,25 +122,5 @@ for observation_style in ['rich']:
                         view_tile_size=1,
                         _view_size=view_size,
                         view_offset=1,
-                        use_label=use_label,
-                    )
-
-for observation_style in ['rich']:
-    for use_label in [True, False]:
-        for view_size in [7]:
-            for difficulty in [3]:
-                for config in ScenarioConfigs.standoff.keys():
-                    configName = config.replace(" ", "")
-                    register_standoff_env(
-                        f"Standoff-{configName}-{view_size}-{observation_style}-{difficulty}-v0" if not use_label else
-                        f"Standoff-{configName}-{view_size}-{observation_style}-{difficulty}-v1",
-                        MiniStandoffEnv,
-                        config,
-                        difficulty,
-                        _observation_style=observation_style,
-                        #observation_density=1,
-                        view_tile_size=1,
-                        _view_size=view_size,
-                        view_offset=3,
                         use_label=use_label,
                     )

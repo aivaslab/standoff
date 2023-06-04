@@ -943,7 +943,10 @@ class para_MultiGridEnv(ParallelEnv):
 
                                 # handle infos
                                 if self.record_info:
-                                    box = (agent.pos[0] - 2) / 2
+                                    if self.metadata["name"][0] == "miniStandoffEnv":
+                                        box = agent.pos[0] - 1
+                                    else:
+                                        box = (agent.pos[0] - 2) / 2
                                     self.infos[agent_name]["selection"] = box
                                     self.infos[agent_name]["accuracy"] = (
                                             box == self.infos[agent_name]["correctSelection"] or self.infos[agent_name][
