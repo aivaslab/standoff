@@ -107,7 +107,7 @@ def env_from_config(env_config, randomize_seed=True):
 
 for observation_style in ['rich']:
     for use_label in [True, False]:
-        for view_size in [17]:
+        for view_size in [7, 17]:
             for difficulty in [3]:
                 for config in ScenarioConfigs.standoff.keys():
                     configName = config.replace(" ", "")
