@@ -70,7 +70,7 @@ class MiniCustomCNN(BaseFeaturesExtractor):
         self.cnn = nn.Sequential(
             nn.Conv2d(n_input_channels, 4*conv_mult*frames, kernel_size=3, stride=2, padding=1),
             nn.ReLU(),
-            nn.Conv2d(4*conv_mult*frames, 8*conv_mult, kernel_size=3, stride=2, padding=0),
+            nn.Conv2d(4*conv_mult*frames, 8*conv_mult, kernel_size=3, stride=2, padding=1),
             nn.ReLU(),
             nn.Flatten(),
         )
