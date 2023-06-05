@@ -121,6 +121,6 @@ for observation_style in ['rich']:
                         #observation_density=1,
                         view_tile_size=1,
                         _view_size=view_size,
-                        view_offset=1,
+                        view_offset=1 if view_size > 7 else 0,
                         use_label=use_label,
                     )
