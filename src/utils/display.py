@@ -258,6 +258,8 @@ def make_pic_video(model, env, random_policy=False, video_length=50, savePath=''
             cv2.putText(img=img, text=str(action), org=(0, image_size), fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=1,
                         color=(255, 255, 255), thickness=2)
 
+    vidName = "det_" + vidName if deterministic else "rand_" + vidName
+
     imageio.mimsave(os.path.join(savePath, vidName), [img for i, img in enumerate(images)], fps=10)
 
 
