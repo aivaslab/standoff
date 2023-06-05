@@ -77,7 +77,19 @@ class ScenarioConfigs:
                   '1+2b+all': ["all", "s2b", "stage_1"],
                   'all': ["all"],
                   's2b': ["s2b"],
-                  'rand': ["random"]
+                  'rand': ["random"],
+                  'everything': ["stage_1",
+                      "s2b",
+                      "informedControl",
+                      "partiallyUninformed",
+                      "removedInformed2",
+                      "removedUninformed2",
+                      "moved",
+                      "replaced",
+                      "misinformed",
+                      "swapped",
+                      "all"
+                      ],
                   }
 
     standoff = {
