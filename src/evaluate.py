@@ -17,7 +17,7 @@ from src.supervised_learning import RNNModel
 class_dict = {'PPO': PPO, 'A2C': A2C, 'TRPO': TRPO, 'RecurrentPPO': RecurrentPPO}
 
 
-def make_videos(train_dir, env_names, short_names, model_path, model_class, model_timestep, size, norm_path, env_kwargs, sl_module):
+def make_videos(train_dir, env_names, short_names, model_path, model_class, model_timestep, size, norm_path, env_kwargs, sl_module, det_model):
     vidPath = os.path.join(train_dir, 'videos')
     if not os.path.exists(vidPath):
         os.mkdir(vidPath)
@@ -33,7 +33,7 @@ def make_videos(train_dir, env_names, short_names, model_path, model_class, mode
 
         # make_pic_video(model, eval_env, random_policy=False, savePath=vidPath2, deterministic=False, vidName='rand_'+str(model_timestep)+'.mp4', obs_size=size )
         print('vid', vidPath2)
-        make_pic_video(model, eval_env, random_policy=False, savePath=vidPath2, deterministic=True, vidName='det_'+str(model_timestep)+'.gif', obs_size=size)
+        make_pic_video(model, eval_env, random_policy=False, savePath=vidPath2, deterministic=det_model, vidName='det_'+str(model_timestep)+'.gif', obs_size=size)
         del eval_env
         del model
 
@@ -153,7 +153,8 @@ def main(args):
                 evaluate_models(env_names, short_names, model_paths, model_class, model_timesteps, det_env=args.det_env, det_model=args.det_model, use_gtr=args.use_gtr,
                                 frames=args.frames, episodes=episodes, train_dir=train_dir, norm_paths=norm_paths, env_kwargs=env_kwargs, sl_module=sl_module)
             if args.make_vids:
-                make_videos(train_dir, env_names, short_names, model_paths[-1], model_class, model_timesteps[-1], args.size, norm_path=norm_paths[-1], env_kwargs=env_kwargs, sl_module=sl_module)
+                make_videos(train_dir, env_names, short_names, model_paths[-1], model_class, model_timesteps[-1],
+                            args.size, norm_path=norm_paths[-1], env_kwargs=env_kwargs, sl_module=sl_module, det_model=det_model)
 
             del sl_module
                         
