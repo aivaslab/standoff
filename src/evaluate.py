@@ -154,7 +154,8 @@ def main(args):
                                 frames=args.frames, episodes=episodes, train_dir=train_dir, norm_paths=norm_paths, env_kwargs=env_kwargs, sl_module=sl_module)
             if args.make_vids:
                 make_videos(train_dir, env_names, short_names, model_paths[-1], model_class, model_timesteps[-1],
-                            args.size, norm_path=norm_paths[-1], env_kwargs=env_kwargs, sl_module=sl_module, det_model=det_model)
+                            args.size, norm_path=norm_paths[-1], env_kwargs=env_kwargs, sl_module=sl_module,
+                            det_model=args.det_model)
 
             del sl_module
                         
