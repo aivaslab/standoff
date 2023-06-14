@@ -519,17 +519,24 @@ class para_MultiGridEnv(ParallelEnv):
         self.observation_style = observation_style
         self.dense_obs = dense_obs
         self.channels = 3
+        self.use_box_colors = True
 
         if self.observation_style == 'rich':
-            self.rich_observation_layers = [
-                lambda k, mapping: (mapping[k].type == 'Agent' if hasattr(mapping[k], 'type') else False),
-                lambda k, mapping: (mapping[k].type == 'Box' if hasattr(mapping[k], 'type') else False),
-                # only get reward if it's not a box
-                lambda k, mapping: (mapping[k].get_reward() if hasattr(mapping[k], 'get_reward') and
-                                                               mapping[k].contains is None else 0),
-                # we can see hidden rewards this way
-                # 'vis'  # show the visibility mask (temporarily disabled)
-            ]
+            if self.use_box_colors:
+                self.rich_observation_layers = [
+                    lambda k, mapping: (mapping[k].type == 'Agent' if hasattr(mapping[k], 'type') else False),
+                    lambda k, mapping: (mapping[k].type == 'Box' * mapping[k].state if hasattr(mapping[k], 'type') else False),
+                    lambda k, mapping: (mapping[k].get_reward() if hasattr(mapping[k], 'get_reward') and
+                                                                   mapping[k].contains is None else 0),
+                ]
+            else:
+                self.rich_observation_layers = [
+                    lambda k, mapping: (mapping[k].type == 'Agent' if hasattr(mapping[k], 'type') else False),
+                    lambda k, mapping: (mapping[k].type == 'Box' if hasattr(mapping[k], 'type') else False),
+                    # only get reward if it's not a box
+                    lambda k, mapping: (mapping[k].get_reward() if hasattr(mapping[k], 'get_reward') and
+                                                                   mapping[k].contains is None else 0),
+                ]
             if self.dense_obs is False:
                 self.rich_observation_layers.extend([
                     lambda k, mapping: (mapping[k].can_overlap() if hasattr(mapping[k], 'can_overlap') else 1),
@@ -687,7 +694,7 @@ class para_MultiGridEnv(ParallelEnv):
             self.grid = random.choice(self.allRooms)
             last_timer = 40
         else:
-            valid_params = ['sub_valence', 'dom_valence', 'num_puppets', 'subject_is_dominant', 'lava_height', 'events',
+            valid_params = ['sub_valence', 'dom_valence', 'num_puppets', 'subject_is_dominant', 'events',
                             'hidden', 'boxes']
             params2 = {x: self.params[x] for x in valid_params}
             last_timer = self._gen_grid(**params2)
