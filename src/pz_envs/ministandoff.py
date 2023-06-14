@@ -157,14 +157,6 @@ class MiniStandoffEnv(para_MultiGridEnv):
         self.hidden = hidden
         self.subject_is_dominant = subject_is_dominant
         self.box_reward = 1
-        self.food_locs = list(range(boxes))
-        if not self.deterministic:
-            random.shuffle(self.food_locs)
-        else:
-            # rotate food locs list by deterministic seed
-            self.food_locs = self.food_locs[self.deterministic_seed % len(self.food_locs):] + self.food_locs[
-                                                                                              :self.deterministic_seed % len(
-                                                                                                  self.food_locs)]
         self.released_tiles = [[] for _ in range(4)]
         self.curtain_tiles = []
         release_gap = 6
