@@ -340,10 +340,17 @@ class MiniStandoffEnv(para_MultiGridEnv):
         if self.hidden and len(self.objs_to_hide) > 0:
             for obj in self.objs_to_hide:
                 pos = obj.pos
-                self.put_obj(
-                    Box("orange", contains=obj, reward=obj.reward, show_contains=self.persistent_treat_images),
-                    pos[0], pos[1],
-                    update_vis=False)  # do not change gaze highlight if puppet saw this bait
+                if self.use_box_colors:
+                    col = self.box_color_order[pos[0]-1]
+                    self.put_obj(
+                        Box(color=COLORS[col], state=col, contains=obj, reward=obj.reward, show_contains=self.persistent_treat_images),
+                        pos[0], pos[1],
+                        update_vis=False)
+                else:
+                    self.put_obj(
+                        Box("orange", contains=obj, reward=obj.reward, show_contains=self.persistent_treat_images),
+                        pos[0], pos[1],
+                        update_vis=False)
         if name == 'init':
             for box in range(self.boxes):
                 x = box * 1 + 1
