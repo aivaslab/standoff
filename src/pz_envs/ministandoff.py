@@ -146,15 +146,12 @@ class MiniStandoffEnv(para_MultiGridEnv):
                   dom_valence=1,
                   num_puppets=1,
                   subject_is_dominant=False,
-                  lava_height=0,
                   events=[],
                   hidden=False,
-                  share_rewards=False,
                   boxes=5,
                   ):
 
         startRoom = 1
-        atrium = 0
         self.boxes = boxes
 
         self.hidden = hidden

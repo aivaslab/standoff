@@ -100,7 +100,6 @@ class ScenarioConfigs:
             "sub_valence": 1,
             "dom_valence": 1,
             "subject_is_dominant": False,  # subordinate has delayed release. for subordinate first, use negative
-            "lava_height": 3,  # should be odd, >=2
             "num_puppets": 1,
             "num_agents": 1,
             "events": [[['bait', 'empty'], ['bait', 'empty']]]  # list, event, args

@@ -146,7 +146,6 @@ class StandoffEnv(para_MultiGridEnv):
                   dom_valence=1,
                   num_puppets=1,
                   subject_is_dominant=False,
-                  lava_height=2,
                   events=[],
                   hidden=False,
                   share_rewards=False,
@@ -171,7 +170,7 @@ class StandoffEnv(para_MultiGridEnv):
         self.released_tiles = [[] for _ in range(4)]
         release_gap = boxes * 2 + atrium - 1
         self.width = boxes * 2 + 3
-        self.height = lava_height + startRoom * 2 + atrium * 2 + 2
+        self.height = 3 + startRoom * 2 + atrium * 2 + 2 #first 2 is lava height, was 2 here and 3 default param?
         self.grid = MultiGrid((self.width, self.height))
         self.grid.wall_rect(1, 1, self.width - 2, self.height - 2)
         self.small_food_locations = []
@@ -261,7 +260,7 @@ class StandoffEnv(para_MultiGridEnv):
                 self.released_tiles[2] += [(box * 2 + 2, startRoom + atrium)]
                 self.released_tiles[3] += [(box * 2 + 2, self.height - startRoom - atrium - 1)]
 
-            for j in range(lava_height):
+            for j in range(2):
                 # self.put_obj(GlassBlock(color="cyan", init_state=1), box * 2 + 1, j + startRoom + atrium + 1)
                 self.put_obj(Wall(), box * 2 + 1, j + startRoom + atrium + 1)
 
