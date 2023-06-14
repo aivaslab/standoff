@@ -501,9 +501,9 @@ class para_MultiGridEnv(ParallelEnv):
         self.puppets = puppets
         self.grid = MultiGrid(shape=(width, height))  # added this, not sure where grid comes from in og
 
-        self.possible_agents = [f"player_{r}" for r in range(num_agents)]
+        self.possible_agents = [f"p_{r}" for r in range(num_agents)]
         if num_puppets > 0:
-            self.possible_puppets = [f"player_{r + num_agents}" for r in range(num_puppets)]
+            self.possible_puppets = [f"p_{r + num_agents}" for r in range(num_puppets)]
         else:
             self.possible_puppets = []
 
@@ -664,7 +664,7 @@ class para_MultiGridEnv(ParallelEnv):
         self.infos = {agent: {} for agent in self.agents_and_puppets()}
         if self.record_info:
             for key in self.info_keywords:
-                self.infos['player_0'][key] = ''
+                self.infos['p_0'][key] = ''
         self.state = {agent: NONE for agent in self.agents_and_puppets()}
         # we don't generate observations for puppets
 
@@ -937,7 +937,7 @@ class para_MultiGridEnv(ParallelEnv):
                             self.rewards[agent_name] += rwd
                             self.has_reached_goal[agent_name] = True
 
-                            if agent_name == 'player_0':
+                            if agent_name == 'p_0':
                                 self.dones[agent_name] = True
                                 agent.done = True
 
@@ -969,7 +969,7 @@ class para_MultiGridEnv(ParallelEnv):
                             # agent.step_reward = rwd
 
                         if isinstance(fwd_cell, (Lava, Goal)):
-                            if agent_name == 'player_0':
+                            if agent_name == 'p_0':
                                 agent.done = True
                                 # added below
                                 self.dones[agent_name] = True
@@ -1023,7 +1023,7 @@ class para_MultiGridEnv(ParallelEnv):
                     else:
                         # check if supervised model is string
                         if isinstance(self.supervised_model, str):
-                            self.last_supervised_labels = np.asarray(self.infos['player_0'][self.supervised_model]).flatten()
+                            self.last_supervised_labels = np.asarray(self.infos['p_0'][self.supervised_model]).flatten()
                         else:
                             self.last_supervised_labels = self.supervised_model.forward(
                                 np.asarray([self.past_observations])).detach().numpy()[0]
@@ -1136,7 +1136,7 @@ class para_MultiGridEnv(ParallelEnv):
                                    dtype="uint8")  # if we don't find a puppet instance? unclear when this happens
             if self.params['num_puppets'] > 0:
                 for puppet in self.puppet_instances[:self.params['num_puppets']]:
-                    if puppet != self.instance_from_name["player_0"]:
+                    if puppet != self.instance_from_name["p_0"]:
                         if puppet.pos is not None:
                             puppet_mask = occlude_mask(~self.grid.opacity, puppet.pos)  # only reveals one tile?
                             if self.only_highlight_treats:

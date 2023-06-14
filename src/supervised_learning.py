@@ -92,21 +92,21 @@ def gen_data(configNames, num_timesteps=2500):
         tq = tqdm.tqdm(range(int(num_timesteps)))
         while len(data_obs) < num_timesteps:
             obs = env.reset()
-            this_ob = np.zeros((10, *obs['player_0'].shape))
+            this_ob = np.zeros((10, *obs['p_0'].shape))
             pos = 0
 
             while True:
-                next_obs, rew, done, info = env.step({'player_0': 2})
-                this_ob[pos, :, :, :] = next_obs['player_0']
+                next_obs, rew, done, info = env.step({'p_0': 2})
+                this_ob[pos, :, :, :] = next_obs['p_0']
                 if not any([np.array_equal(this_ob, x) for x in data_obs]):
                     # if True:
                     data_obs.append(copy.copy(this_ob))
                     for label in labels:
-                        data_labels[label].append(info['player_0'][label])
+                        data_labels[label].append(info['p_0'][label])
                     tq.update(1)
 
                 pos += 1
-                if done['player_0']:
+                if done['p_0']:
                     break
         np.save('supervised/' + data_name + '-obs', np.array(data_obs))
         for label in labels:

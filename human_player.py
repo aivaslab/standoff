@@ -110,21 +110,22 @@ for i in range(100):
     while True:
         env.render(mode="human", show_agent_views=True, tile_size=TILE_SIZE)
         #print(np.round(obs['player_0']*10).sum(axis=0).astype(int))
-        img = Image.fromarray(obs['player_0'], 'RGB')
+        img = Image.fromarray(obs['p_0'], 'RGB')
         ImageDraw.Draw(img).text((0, 0), "Step " + str(env.step_count), (255, 255, 255))
         player_action = human.action_step(np.array(img))
-        agent_actions = {'player_0': player_action}
+        agent_actions = {'p_0': player_action}
         next_obs, rew, done, info = env.step(agent_actions)
         #print(info)
-        human.save_step(obs['player_0'], player_action, rew['player_0'], done)
+        human.save_step(obs['p_0'], player_action, rew['p_0'], done)
 
         obs = next_obs
 
-        if done['player_0']:
+        if done['p_0']:
+            print(info)
             break
     # render special screen here
     img = Image.fromarray(env.grid.render(15, None) * 0, 'RGB')
-    ImageDraw.Draw(img).text((16, 16), "Episode done\n\nReward: " + str(rew['player_0']), (255, 255, 255))
+    ImageDraw.Draw(img).text((16, 16), "Episode done\n\nReward: " + str(rew['p_0']), (255, 255, 255))
     _ = human.action_step(np.array(img))
 
 

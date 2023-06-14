@@ -130,7 +130,7 @@ def ground_truth_evals(eval_env, model, repetitions=25, memory=1, skip_to_releas
         env.deterministic_seed = k
         env.reset()
 
-        all_paths = env.get_all_paths(env.grid.volatile, env.instance_from_name['player_0'].pos)
+        all_paths = env.get_all_paths(env.grid.volatile, env.instance_from_name['p_0'].pos)
 
         # todo: advance paths to point of divergence instead of first chance
 
@@ -147,18 +147,18 @@ def ground_truth_evals(eval_env, model, repetitions=25, memory=1, skip_to_releas
             obs = env.reset()
 
             episode_starts = torch.from_numpy(np.ones((1,), dtype=int))
-            a = env.instance_from_name['player_0']
+            a = env.instance_from_name['p_0']
 
             taken_path = []
             lstm_states = None
             for t in range(50):
 
                 if t < release and skip_to_release:
-                    obs, rewards, dones, info = env.step({'player_0': 2})
+                    obs, rewards, dones, info = env.step({'p_0': 2})
                     continue
 
                 act = get_relative_direction(a, path)
-                cur_obs = torch.from_numpy(obs['player_0']).swapdims(0, 2).unsqueeze(0).swapdims(2, 3)
+                cur_obs = torch.from_numpy(obs['p_0']).swapdims(0, 2).unsqueeze(0).swapdims(2, 3)
 
                 # todo: update episode starts?
                 if hasattr(model, '_last_lstm_states'):
@@ -170,13 +170,13 @@ def ground_truth_evals(eval_env, model, repetitions=25, memory=1, skip_to_releas
                     value, log, entropy = model.policy.evaluate_actions(cur_obs, actions=torch.tensor(act))
 
                 total_likelihood += log.detach().numpy()[0]
-                obs, rewards, dones, info = env.step({'player_0': act})
-                taken_path += [env.instance_from_name['player_0'].pos]
-                if dones['player_0']:
+                obs, rewards, dones, info = env.step({'p_0': act})
+                taken_path += [env.instance_from_name['p_0'].pos]
+                if dones['p_0']:
                     break
 
-            infos = env.infos['player_0']
-            infos['r'] = rewards['player_0']
+            infos = env.infos['p_0']
+            infos['r'] = rewards['p_0']
             infos['likelihood'] = total_likelihood
             infos['configName'] = env.configName
             infos['episode_timesteps'] = t

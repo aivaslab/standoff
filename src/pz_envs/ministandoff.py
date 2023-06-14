@@ -120,7 +120,7 @@ class MiniStandoffEnv(para_MultiGridEnv):
         self.params = copy.deepcopy(newParams)
 
         # deal with num_puppets being lower than maximum
-        self.possible_puppets = [f"player_{x + len(self.agents)}" for x in range(self.params["num_puppets"])]
+        self.possible_puppets = [f"p_{x + len(self.agents)}" for x in range(self.params["num_puppets"])]
 
     def reset_vision(self):
         """
@@ -192,18 +192,18 @@ class MiniStandoffEnv(para_MultiGridEnv):
         self.smallReward = int(self.bigReward / (self.boxes - 2))
 
         for k, agent in enumerate(self.agents_and_puppets()):
-            h = 1 if agent == "player_0" else self.height - 1  # todo: make this work with dominance properly
-            d = 1 if agent == "player_0" else 3
+            h = 1 if agent == "p_0" else self.height - 1  # todo: make this work with dominance properly
+            d = 1 if agent == "p_0" else 3
             if self.random_subject_spawn:
                 bb = 1 + self.deterministic_seed % (self.boxes - 2) if self.deterministic else 1 + random.choice(range(boxes - 2))
                 xx = bb + 1
             else:
                 xx = self.boxes // 2 + 1
             self.agent_spawn_pos[agent] = (xx, h, d)
-            self.agent_door_pos[agent] = (xx, h + (1 if agent == "player_0" else -1))
+            self.agent_door_pos[agent] = (xx, h + (1 if agent == "p_0" else -1))
             all_door_poses.append(self.agent_door_pos[agent])
             a = self.instance_from_name[agent]
-            a.valence = sub_valence if agent == "player_0" else dom_valence
+            a.valence = sub_valence if agent == "p_0" else dom_valence
             if k > num_puppets:
                 a.spawn_delay = 1000
                 a.active = False
@@ -263,11 +263,11 @@ class MiniStandoffEnv(para_MultiGridEnv):
                     baited = True
                     event_args[k] = random.choice(bait_args)
                 elif event_type == "obscure":
-                    event = ["obscure", "player_1"]
+                    event = ["obscure", "p_1"]
                     obscured = True
                     event_args[k] = event[1]
                 elif event_type == "reveal":
-                    event = ["reveal", "player_1"]
+                    event = ["reveal", "p_1"]
                     obscured = False
                     event_args[k] = event[1]
                 elif event_type == "swap":
@@ -299,7 +299,7 @@ class MiniStandoffEnv(para_MultiGridEnv):
                     empty_buckets.append(event[1])
                 elif event_type == "obscure" or event_type == "reveal":
                     # hardcoded, will not work for multiple conspecifics
-                    event_args[k] = "player_1"
+                    event_args[k] = "p_1"
                 # could also add functionality for moving empty buckets which are swapped, but that is not used in any tasks
 
         # add timers for events
@@ -358,19 +358,19 @@ class MiniStandoffEnv(para_MultiGridEnv):
                 x = box * 1 + 1
                 self.put_obj(Box(color="orange"), x, y)
             if self.record_info:
-                self.infos['player_0']['shouldAvoidBig'] = False
-                self.infos['player_0']['shouldAvoidSmall'] = False
-                self.infos['player_0']['correctSelection'] = -1
-                self.infos['player_0']['incorrectSelection'] = -1
-                self.infos['player_0']['minibatch'] = self.minibatch
-                self.infos['player_0']['timestep'] = self.total_step_count
+                self.infos['p_0']['shouldAvoidBig'] = False
+                self.infos['p_0']['shouldAvoidSmall'] = False
+                self.infos['p_0']['correctSelection'] = -1
+                self.infos['p_0']['incorrectSelection'] = -1
+                self.infos['p_0']['minibatch'] = self.minibatch
+                self.infos['p_0']['timestep'] = self.total_step_count
         elif name == 'bait':
             x = event[1] * 1 + 1
             obj = Goal(reward=arg, size=arg * 0.01, color='green', hide=self.hidden)
             if not self.has_baited:
                 self.has_baited = True
                 if self.record_info:
-                    self.infos['player_0']['firstBaitReward'] = arg
+                    self.infos['p_0']['firstBaitReward'] = arg
             self.put_obj(obj, x, y)
             self.objs_to_hide.append(obj)
         elif name == "remove":
@@ -409,7 +409,7 @@ class MiniStandoffEnv(para_MultiGridEnv):
             self.objs_to_hide.append(obj2)
         elif name == "release":
             if self.record_info:
-                self.infos['player_0']['eventVisibility'] = ''.join(
+                self.infos['p_0']['eventVisibility'] = ''.join(
                     ['1' if x else '0' for x in self.visible_event_list])
             for x, y in self.released_tiles[arg]:
                 self.del_obj(x, y)
@@ -417,7 +417,7 @@ class MiniStandoffEnv(para_MultiGridEnv):
                 for x, y in self.curtain_tiles:
                     self.put_obj(Curtain(color='red'), x, y, update_vis=False)
             if self.record_supervised_labels and self.supervised_model is None:
-                self.dones['player_0'] = True
+                self.dones['p_0'] = True
             self.has_released = True
 
         # create visible event list info
@@ -472,69 +472,69 @@ class MiniStandoffEnv(para_MultiGridEnv):
                 # tile = self.grid.get(x, y)
                 # we cannot track shouldAvoidBig etc here because the treat location might change
         if self.record_supervised_labels:
-            target_agent = "player_1"
+            target_agent = "p_1"
             one_hot_goal = [0] * self.boxes
             if self.params['num_puppets'] > 0:
                 one_hot_goal[self.agent_goal[target_agent]] = 1
-            self.infos['player_0']["target"] = one_hot_goal
-            self.infos['player_0']["vision"] = self.visible_event_list[-1] if len(self.visible_event_list) > 0 else [0]
+            self.infos['p_0']["target"] = one_hot_goal
+            self.infos['p_0']["vision"] = self.visible_event_list[-1] if len(self.visible_event_list) > 0 else [0]
             real_boxes = [self.grid.get(box * 1 + 1, y) for box in range(self.boxes)]
             real_box_rewards = [box.reward if box is not None and hasattr(box, "reward") else 0 for box in real_boxes]
             if self.params['num_puppets'] > 0:
                 all_rewards_seen = [self.last_seen_reward[target_agent + str(box)] for box in range(self.boxes)]
             else:
                 all_rewards_seen = [0] * self.boxes
-            self.infos['player_0']["loc"] = [
+            self.infos['p_0']["loc"] = [
                 [1, 0] if reward == self.bigReward else
                 [0, 1] if reward == self.smallReward else
                 [0, 0]
                 for reward in real_box_rewards
             ]
-            self.infos['player_0']["b-loc"] = [
+            self.infos['p_0']["b-loc"] = [
                 [1, 0] if reward == self.bigReward else
                 [0, 1] if reward == self.smallReward else
                 [0, 0]
                 for reward in all_rewards_seen
             ]
-            self.infos['player_0']["exist"] = [1 if self.bigReward in real_box_rewards else 0,
+            self.infos['p_0']["exist"] = [1 if self.bigReward in real_box_rewards else 0,
                                                1 if self.smallReward in real_box_rewards else 0]
-            self.infos['player_0']["b-exist"] = [1 if self.bigReward in all_rewards_seen else 0,
+            self.infos['p_0']["b-exist"] = [1 if self.bigReward in all_rewards_seen else 0,
                                                  1 if self.smallReward in all_rewards_seen else 0]
         if self.record_info:
             if name == "release":
                 # if agent's goal of player_1 matches big treat location, then shouldAvoidBig is True
                 if len(self.puppets):
-                    self.infos['player_0']['puppet_goal'] = self.agent_goal[self.puppets[-1]]
+                    self.infos['p_0']['puppet_goal'] = self.agent_goal[self.puppets[-1]]
                     if len(self.big_food_locations) > 0 and self.agent_goal[self.puppets[-1]] == \
                             self.big_food_locations[-1]:
-                        self.infos['player_0']['shouldAvoidBig'] = not self.subject_is_dominant
-                        self.infos['player_0']['shouldAvoidSmall'] = False
+                        self.infos['p_0']['shouldAvoidBig'] = not self.subject_is_dominant
+                        self.infos['p_0']['shouldAvoidSmall'] = False
                     elif len(self.small_food_locations) > 0 and self.agent_goal[self.puppets[-1]] == \
                             self.small_food_locations[-1]:
-                        self.infos['player_0']['shouldAvoidSmall'] = not self.subject_is_dominant
-                        self.infos['player_0']['shouldAvoidBig'] = False
+                        self.infos['p_0']['shouldAvoidSmall'] = not self.subject_is_dominant
+                        self.infos['p_0']['shouldAvoidBig'] = False
                     else:
-                        self.infos['player_0']['shouldAvoidBig'] = False
-                        self.infos['player_0']['shouldAvoidSmall'] = False
+                        self.infos['p_0']['shouldAvoidBig'] = False
+                        self.infos['p_0']['shouldAvoidSmall'] = False
 
             if len(self.big_food_locations) > 0 and len(self.small_food_locations) > 0:
-                if 'shouldAvoidBig' in self.infos['player_0'].keys() and self.infos['player_0']['shouldAvoidBig']:
-                    self.infos['player_0']['correctSelection'] = self.small_food_locations[-1]
-                    self.infos['player_0']['incorrectSelection'] = self.big_food_locations[-1]
+                if 'shouldAvoidBig' in self.infos['p_0'].keys() and self.infos['p_0']['shouldAvoidBig']:
+                    self.infos['p_0']['correctSelection'] = self.small_food_locations[-1]
+                    self.infos['p_0']['incorrectSelection'] = self.big_food_locations[-1]
                 else:
-                    self.infos['player_0']['correctSelection'] = self.big_food_locations[-1]
-                    self.infos['player_0']['incorrectSelection'] = self.small_food_locations[-1]
+                    self.infos['p_0']['correctSelection'] = self.big_food_locations[-1]
+                    self.infos['p_0']['incorrectSelection'] = self.small_food_locations[-1]
             elif len(self.small_food_locations) > 0:
-                if not self.infos['player_0']['shouldAvoidSmall']:
-                    self.infos['player_0']['correctSelection'] = self.small_food_locations[-1]
-                    self.infos['player_0']['incorrectSelection'] = -1
+                if not self.infos['p_0']['shouldAvoidSmall']:
+                    self.infos['p_0']['correctSelection'] = self.small_food_locations[-1]
+                    self.infos['p_0']['incorrectSelection'] = -1
                 else:
-                    self.infos['player_0']['correctSelection'] = -1
-                    self.infos['player_0']['incorrectSelection'] = self.small_food_locations[-1]
+                    self.infos['p_0']['correctSelection'] = -1
+                    self.infos['p_0']['incorrectSelection'] = self.small_food_locations[-1]
             elif len(self.big_food_locations) > 0:
-                if not self.infos['player_0']['shouldAvoidBig']:
-                    self.infos['player_0']['correctSelection'] = self.big_food_locations[-1]
-                    self.infos['player_0']['incorrectSelection'] = -1
+                if not self.infos['p_0']['shouldAvoidBig']:
+                    self.infos['p_0']['correctSelection'] = self.big_food_locations[-1]
+                    self.infos['p_0']['incorrectSelection'] = -1
                 else:
-                    self.infos['player_0']['correctSelection'] = -1
-                    self.infos['player_0']['incorrectSelection'] = self.big_food_locations[-1]
+                    self.infos['p_0']['correctSelection'] = -1
+                    self.infos['p_0']['incorrectSelection'] = self.big_food_locations[-1]
