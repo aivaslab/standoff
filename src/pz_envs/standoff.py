@@ -1,7 +1,7 @@
 import numpy as np
 
 from ..base_AEC import para_MultiGridEnv, MultiGrid
-from ..objects import Wall, Goal, Curtain, Block, Box
+from ..objects import Wall, Goal, Curtain, Block, Box, COLORS
 import random
 from ..puppets import pathfind
 import copy
@@ -155,6 +155,9 @@ class StandoffEnv(para_MultiGridEnv):
         startRoom = 2
         atrium = 2
         self.boxes = boxes
+        if self.use_box_colors:
+            self.box_color_order = list(range(boxes))
+            random.shuffle(self.box_color_order)
 
         self.hidden = hidden
         self.subject_is_dominant = subject_is_dominant
@@ -374,7 +377,10 @@ class StandoffEnv(para_MultiGridEnv):
         if name == 'init':
             for box in range(self.boxes):
                 x = box * 2 + 2
-                self.put_obj(Box(color="orange"), x, y)
+                if self.use_box_colors:
+                    self.put_obj(Box(color=COLORS[self.box_color_order[box]], state=self.box_color_order[box]), x, y)
+                else:
+                    self.put_obj(Box(color="orange"), x, y)
             if self.record_info:
                 self.infos['p_0']['shouldAvoidBig'] = False
                 self.infos['p_0']['shouldAvoidSmall'] = False
@@ -415,16 +421,21 @@ class StandoffEnv(para_MultiGridEnv):
             for box in range(self.boxes):
                 self.can_see[arg + str(box)] = False if "obscure" in name else True
         elif name == "swap":
+
             b1 = self.grid.get(event[1] * 2 + 2, y)
             b2 = self.grid.get(event[2] * 2 + 2, y)
-            r1 = b1.reward if hasattr(b1, "reward") else 0
-            r2 = b2.reward if hasattr(b2, "reward") else 0
-            obj1 = Goal(reward=r2, size=r2 * 0.01, color='green', hide=self.hidden)
-            obj2 = Goal(reward=r1, size=r1 * 0.01, color='green', hide=self.hidden)
-            self.put_obj(obj1, event[1] * 2 + 2, y)
-            self.put_obj(obj2, event[2] * 2 + 2, y)
-            self.objs_to_hide.append(obj1)
-            self.objs_to_hide.append(obj2)
+            if self.use_box_colors:
+                self.put_obj(b2, event[1] * 2 + 2, y)
+                self.put_obj(b1, event[2] * 2 + 2, y)
+            else:
+                r1 = b1.reward if hasattr(b1, "reward") else 0
+                r2 = b2.reward if hasattr(b2, "reward") else 0
+                obj1 = Goal(reward=r2, size=r2 * 0.01, color='green', hide=self.hidden)
+                obj2 = Goal(reward=r1, size=r1 * 0.01, color='green', hide=self.hidden)
+                self.put_obj(obj1, event[1] * 2 + 2, y)
+                self.put_obj(obj2, event[2] * 2 + 2, y)
+                self.objs_to_hide.append(obj1)
+                self.objs_to_hide.append(obj2)
         elif name == "release":
             if self.record_info:
                 self.infos['p_0']['eventVisibility'] = ''.join(['1' if x else '0' for x in self.visible_event_list])
