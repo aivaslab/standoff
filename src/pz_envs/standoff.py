@@ -230,39 +230,38 @@ class StandoffEnv(para_MultiGridEnv):
 
         self.grid.wall_rect(0, 0, self.width, self.height)
 
-        for box in range(boxes + 1):
-            if box < boxes:
-                self.put_obj(Wall(), box * 2 + 1, startRoom - 1)
-                xx_spawn = box * 2 + 2 + real_odd_spawns
+        for box in range(boxes):
+            self.put_obj(Wall(), box * 2 + 1, startRoom - 1)
+            xx_spawn = box * 2 + 2 + real_odd_spawns
 
-                # initial door release, only where door is not in all_door_poses
-                if (xx_spawn, startRoom) in all_door_poses:
-                    self.put_obj(Block(init_state=0, color="blue"), xx_spawn, startRoom)
-                else:
-                    self.put_obj(Wall(), xx_spawn, startRoom)
+            # initial door release, only where door is not in all_door_poses
+            if (xx_spawn, startRoom) in all_door_poses:
+                self.put_obj(Block(init_state=0, color="blue"), xx_spawn, startRoom)
+            else:
+                self.put_obj(Wall(), xx_spawn, startRoom)
 
-                # same as above, for opponent
-                if (xx_spawn, self.height - startRoom - 1) in all_door_poses:
-                    self.put_obj(Block(init_state=0, color="blue"), xx_spawn, self.height - startRoom - 1)
-                else:
-                    self.put_obj(Wall(), xx_spawn, self.height - startRoom - 1)
+            # same as above, for opponent
+            if (xx_spawn, self.height - startRoom - 1) in all_door_poses:
+                self.put_obj(Block(init_state=0, color="blue"), xx_spawn, self.height - startRoom - 1)
+            else:
+                self.put_obj(Wall(), xx_spawn, self.height - startRoom - 1)
 
-                if (xx_spawn, startRoom) in all_door_poses:
-                    self.released_tiles[0] += [(xx_spawn, startRoom)]
-                if (xx_spawn, self.height - startRoom - 1) in all_door_poses:
-                    self.released_tiles[1] += [(xx_spawn, self.height - startRoom - 1)]
+            if (xx_spawn, startRoom) in all_door_poses:
+                self.released_tiles[0] += [(xx_spawn, startRoom)]
+            if (xx_spawn, self.height - startRoom - 1) in all_door_poses:
+                self.released_tiles[1] += [(xx_spawn, self.height - startRoom - 1)]
 
-                # secondary door release
-                self.put_obj(Wall(), box * 2 + 1, self.height - 2)
-                self.put_obj(Block(init_state=0, color="blue"), box * 2 + 2, startRoom + atrium)
-                self.put_obj(Block(init_state=0, color="blue"), box * 2 + 2, self.height - startRoom - atrium - 1)
+            # secondary door release
+            self.put_obj(Wall(), box * 2 + 1, self.height - 2)
+            self.put_obj(Block(init_state=0, color="blue"), box * 2 + 2, startRoom + atrium)
+            self.put_obj(Block(init_state=0, color="blue"), box * 2 + 2, self.height - startRoom - atrium - 1)
 
-                self.released_tiles[2] += [(box * 2 + 2, startRoom + atrium)]
-                self.released_tiles[3] += [(box * 2 + 2, self.height - startRoom - atrium - 1)]
+            self.released_tiles[2] += [(box * 2 + 2, startRoom + atrium)]
+            self.released_tiles[3] += [(box * 2 + 2, self.height - startRoom - atrium - 1)]
 
-            for j in range(2):
-                # self.put_obj(GlassBlock(color="cyan", init_state=1), box * 2 + 1, j + startRoom + atrium + 1)
-                self.put_obj(Wall(), box * 2 + 1, j + startRoom + atrium + 1)
+        for j in range(2):
+            # self.put_obj(GlassBlock(color="cyan", init_state=1), box * 2 + 1, j + startRoom + atrium + 1)
+            self.put_obj(Wall(), boxes * 2 + 1, j + startRoom + atrium + 1)
 
         self.reset_vision()
 

@@ -207,32 +207,31 @@ class MiniStandoffEnv(para_MultiGridEnv):
 
         self.grid.wall_rect(0, 0, self.width - 1, self.height)
 
-        for box in range(boxes + 1):
-            if box < boxes:
-                # self.put_obj(Wall(), box + 1, startRoom - 1)
-                xx_spawn = box + 1
+        for box in range(boxes):
+            # self.put_obj(Wall(), box + 1, startRoom - 1)
+            xx_spawn = box + 1
 
-                # initial door release, only where door is not in all_door_poses
+            # initial door release, only where door is not in all_door_poses
+            self.put_obj(Block(init_state=0, color="blue"), xx_spawn, startRoom + 1)
+            self.released_tiles[1] += [(xx_spawn, startRoom + 1)]
+            self.curtain_tiles += [(xx_spawn, startRoom + 0)]
+
+            if (xx_spawn, startRoom + 1) not in all_door_poses:
+                pass
+            else:
                 self.put_obj(Block(init_state=0, color="blue"), xx_spawn, startRoom + 1)
                 self.released_tiles[1] += [(xx_spawn, startRoom + 1)]
-                self.curtain_tiles += [(xx_spawn, startRoom + 0)]
 
-                if (xx_spawn, startRoom + 1) not in all_door_poses:
-                    pass
-                else:
-                    self.put_obj(Block(init_state=0, color="blue"), xx_spawn, startRoom + 1)
-                    self.released_tiles[1] += [(xx_spawn, startRoom + 1)]
-
-                # same as above, for opponent
-                self.put_obj(Block(init_state=0, color="blue"), xx_spawn, self.height - startRoom - 2)
-                self.released_tiles[1] += [(xx_spawn, self.height - startRoom - 2)]
-                self.curtain_tiles += [(xx_spawn, self.height - startRoom - 1)]
-                if (xx_spawn, self.height - startRoom - 1) not in all_door_poses:
-                    #self.put_obj(Wall(), xx_spawn, self.height - startRoom - 1)
-                    pass
-                else:
-                    self.put_obj(Block(init_state=0, color="blue"), xx_spawn, self.height - startRoom - 1)
-                    self.released_tiles[0] += [(xx_spawn, self.height - startRoom - 1)]
+            # same as above, for opponent
+            self.put_obj(Block(init_state=0, color="blue"), xx_spawn, self.height - startRoom - 2)
+            self.released_tiles[1] += [(xx_spawn, self.height - startRoom - 2)]
+            self.curtain_tiles += [(xx_spawn, self.height - startRoom - 1)]
+            if (xx_spawn, self.height - startRoom - 1) not in all_door_poses:
+                #self.put_obj(Wall(), xx_spawn, self.height - startRoom - 1)
+                pass
+            else:
+                self.put_obj(Block(init_state=0, color="blue"), xx_spawn, self.height - startRoom - 1)
+                self.released_tiles[0] += [(xx_spawn, self.height - startRoom - 1)]
 
         self.reset_vision()
 
