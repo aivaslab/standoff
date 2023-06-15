@@ -1,7 +1,7 @@
 import numpy as np
 
 from ..base_AEC import para_MultiGridEnv, MultiGrid
-from ..objects import Goal, Curtain, Block, Box, COLORS
+from ..objects import Goal, Curtain, Block, Box
 import random
 from ..puppets import pathfind
 import copy
@@ -95,6 +95,7 @@ class MiniStandoffEnv(para_MultiGridEnv):
         self.supervised_model = supervised_model  # used for generating special supervised labels
         self.last_supervised_labels = None
         self.has_released = False
+
 
     def hard_reset(self, params=None):
         """
@@ -343,7 +344,7 @@ class MiniStandoffEnv(para_MultiGridEnv):
                 if self.use_box_colors:
                     col = self.box_color_order[pos[0]-1]
                     self.put_obj(
-                        Box(color=COLORS[col], state=col, contains=obj, reward=obj.reward, show_contains=self.persistent_treat_images),
+                        Box(color=self.color_list[col], state=col, contains=obj, reward=obj.reward, show_contains=self.persistent_treat_images),
                         pos[0], pos[1],
                         update_vis=False)
                 else:
@@ -355,7 +356,7 @@ class MiniStandoffEnv(para_MultiGridEnv):
             for box in range(self.boxes):
                 x = box * 1 + 1
                 if self.use_box_colors:
-                    self.put_obj(Box(color=COLORS[self.box_color_order[box]], state=self.box_color_order[box]), x, y)
+                    self.put_obj(Box(color=self.color_list[self.box_color_order[box]], state=self.box_color_order[box]), x, y)
                 else:
                     self.put_obj(Box(color="orange"), x, y)
             if self.record_info:

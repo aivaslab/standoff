@@ -8,7 +8,7 @@ import functools
 import random
 # import traceback
 
-from .objects import Wall, Goal, Lava, GridAgent, COLORS, WorldObj
+from .objects import Wall, Goal, Lava, GridAgent, COLORS
 from gym_minigrid.rendering import downsample
 from gym.utils.seeding import np_random
 from gym.spaces import Discrete, Box
@@ -17,7 +17,7 @@ from .agents import occlude_mask
 # import hashlib
 import xxhash
 
-from src.rendering import SimpleImageViewer, InteractivePlayerWindow
+from src.rendering import SimpleImageViewer
 
 # from gym.envs.classic_control.rendering import SimpleImageViewer
 
@@ -520,6 +520,9 @@ class para_MultiGridEnv(ParallelEnv):
         self.dense_obs = dense_obs
         self.channels = 3
         self.use_box_colors = True
+
+        if self.use_box_colors:
+            self.color_list = list(COLORS)
 
         if self.observation_style == 'rich':
             if self.use_box_colors:
