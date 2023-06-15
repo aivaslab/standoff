@@ -404,6 +404,9 @@ class MiniStandoffEnv(para_MultiGridEnv):
             if self.use_box_colors:
                 self.put_obj(b2, event[1] * 1 + 1, y)
                 self.put_obj(b1, event[2] * 1 + 1, y)
+                temp = self.box_color_order[event[1]]
+                self.box_color_order[event[1]] = self.box_color_order[event[2]]
+                self.box_color_order[event[2]] = temp
             else:
                 r1 = b1.reward if hasattr(b1, "reward") else 0
                 r2 = b2.reward if hasattr(b2, "reward") else 0
