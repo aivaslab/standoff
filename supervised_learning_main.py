@@ -106,9 +106,9 @@ def plot_losses(data_name, label, train_losses, val_losses, val_set_names):
 if __name__ == '__main__':
     sets = ScenarioConfigs.env_groups['3'] + ['stage_2', 'all', 'random']
     dsize = 2000
-    gen_data(sets, 2000)
-    #labels = ['loc', 'exist', 'vision', 'b-loc', 'b-exist', 'target', 'correctSelection']
     labels = ['correctSelection']
+    gen_data(sets, 2000, labels)
+    #labels = ['loc', 'exist', 'vision', 'b-loc', 'b-exist', 'target', 'correctSelection']
     for data_name in sets:
         unused_sets = [s for s in sets if s != data_name]
         # sum losses

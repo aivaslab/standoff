@@ -17,13 +17,13 @@ import copy
 import torch.nn as nn
 import torch.nn.functional as F
 import torch
-#from sklearn.model_selection import train_test_split
-#from matplotlib import pyplot as plt
+from sklearn.model_selection import train_test_split
+from matplotlib import pyplot as plt
 
 def one_hot(size, data):
     return np.eye(size)[data]
 
-def gen_data(configNames, num_timesteps=2500):
+def gen_data(configNames, num_timesteps=2500, labels=[]):
     env_config = {
         "env_class": "StandoffEnv",
         "max_steps": 15,
@@ -84,7 +84,7 @@ def gen_data(configNames, num_timesteps=2500):
         if hasattr(env, "hard_reset"):
             env.hard_reset(reset_configs)
 
-        labels = ['loc', 'exist', 'vision', 'b-loc', 'b-exist', 'target']
+        #labels = ['loc', 'exist', 'vision', 'b-loc', 'b-exist', 'target']
     
         data_name = f'{configName}-{num_timesteps}'
         data_obs = []
