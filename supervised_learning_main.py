@@ -104,17 +104,19 @@ def plot_losses(data_name, label, train_losses, val_losses, val_set_names):
 
 # train_model('random-2500', 'exist')
 if __name__ == '__main__':
-    gen_data(['stage_2', 'all', 'random'], 2500)
-    labels = ['loc', 'exist', 'vision', 'b-loc', 'b-exist', 'target']
-    sets = ['stage_2', 'all', 'random']
-    for data_name in ['random']:
+    sets = ScenarioConfigs.env_groups['3'] + ['stage_2', 'all', 'random']
+    dsize = 2000
+    gen_data(sets, 2000)
+    #labels = ['loc', 'exist', 'vision', 'b-loc', 'b-exist', 'target', 'correctSelection']
+    labels = ['correctSelection']
+    for data_name in sets:
         unused_sets = [s for s in sets if s != data_name]
         # sum losses
         t_loss_sum = []
         v_loss_sum = []
         first_v_loss = []
         for label in labels:
-            t_loss, v_loss, = train_model(data_name + '-2500', label, unused_sets, epochs=20)
+            t_loss, v_loss, = train_model(data_name + '-' + str(dsize), label, unused_sets, epochs=20)
             plot_losses(data_name, label, t_loss, v_loss, [data_name] + unused_sets)
             first_v_loss.append(v_loss[0])
             # add losses elementwise

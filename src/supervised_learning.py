@@ -17,9 +17,11 @@ import copy
 import torch.nn as nn
 import torch.nn.functional as F
 import torch
-from sklearn.model_selection import train_test_split
-from matplotlib import pyplot as plt
+#from sklearn.model_selection import train_test_split
+#from matplotlib import pyplot as plt
 
+def one_hot(size, data):
+    return np.eye(size)[data]
 
 def gen_data(configNames, num_timesteps=2500):
     env_config = {
@@ -102,7 +104,11 @@ def gen_data(configNames, num_timesteps=2500):
                     # if True:
                     data_obs.append(copy.copy(this_ob))
                     for label in labels:
-                        data_labels[label].append(info['p_0'][label])
+                        if label == "correctSelection":
+                            data_labels[label].append(one_hot(5, info['p_0'][label]))
+                        else:
+                            data_labels[label].append(info['p_0'][label])
+
                     tq.update(1)
 
                 pos += 1
