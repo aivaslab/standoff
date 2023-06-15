@@ -81,6 +81,7 @@ def gen_data(configNames, num_timesteps=2500, labels=[]):
 
         env = env_from_config(env_config)
         env.record_supervised_labels = True
+        env.record_info = True # used for correctSelection right now
         if hasattr(env, "hard_reset"):
             env.hard_reset(reset_configs)
 

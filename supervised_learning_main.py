@@ -22,7 +22,7 @@ from matplotlib import pyplot as plt
 from src.supervised_learning import RNNModel, CustomDataset, gen_data
 
 
-def train_model(data_name, label, additional_val_sets, path='supervised/', epochs=100):
+def train_model(data_name, label, additional_val_sets, path='supervised/', dsize=2500, epochs=100):
     data = np.load(path + data_name + '-obs.npy')
     labels = np.load(path + data_name + '-label-' + label + '.npy')
 
@@ -38,8 +38,8 @@ def train_model(data_name, label, additional_val_sets, path='supervised/', epoch
 
     additional_val_loaders = []
     for val_set_name in additional_val_sets:
-        val_data = np.load(path + val_set_name + '-2500-obs.npy')
-        val_labels = np.load(path + val_set_name + '-2500-label-' + label + '.npy')
+        val_data = np.load(path + val_set_name + '-' + str(dsize) + '-obs.npy')
+        val_labels = np.load(path + val_set_name + '-' + str(dsize) + '-label-' + label + '.npy')
         val_dataset = CustomDataset(val_data, val_labels)
         additional_val_loaders.append(DataLoader(val_dataset, batch_size=batch_size, shuffle=False))
 
@@ -107,7 +107,7 @@ if __name__ == '__main__':
     sets = ScenarioConfigs.env_groups['3'] + ['stage_2', 'all', 'random']
     dsize = 2000
     labels = ['correctSelection']
-    gen_data(sets, 2000, labels)
+    #gen_data(sets, 2000, labels)
     #labels = ['loc', 'exist', 'vision', 'b-loc', 'b-exist', 'target', 'correctSelection']
     for data_name in sets:
         unused_sets = [s for s in sets if s != data_name]
