@@ -44,8 +44,8 @@ def train_model(data_name, label, additional_val_sets, path='supervised/', dsize
         additional_val_loaders.append(DataLoader(val_dataset, batch_size=batch_size, shuffle=False))
 
     output_len = np.prod(train_labels.shape[1:])
-    channels = np.prod(train_data.shape[1])
-    print(train_data.shape)
+    channels = np.prod(train_data.shape[2])
+    #print('sha', train_data.shape)
 
     input_size = channels * 7 * 7
     hidden_size = 16
@@ -62,7 +62,7 @@ def train_model(data_name, label, additional_val_sets, path='supervised/', dsize
         train_loss = 0
         for i, (inputs, target_labels) in enumerate(train_loader):
             #inputs = inputs.view(-1, 10, input_size)
-            print(inputs.shape)
+            #print(inputs.shape)
             outputs = model(inputs)
             loss = criterion(outputs, target_labels)
             optimizer.zero_grad()
@@ -98,17 +98,18 @@ def plot_losses(data_name, label, train_losses, val_losses, val_set_names):
     plt.plot(train_losses, label=data_name + ' train loss')
     for val_set_name, val_loss in zip(val_set_names, val_losses):
         plt.plot(val_loss, label=val_set_name + 'val loss')
-    plt.legend()
+    plt.legend(loc='upper left', bbox_to_anchor=(1.0, 1.0))
     plt.ylim(bottom=0)
+    plt.tight_layout()
     plt.savefig(f'supervised/{data_name}-{label}-losses.png')
 
 
 # train_model('random-2500', 'exist')
 if __name__ == '__main__':
-    sets = ScenarioConfigs.env_groups['3'] + ['stage_2', 'all', 'random']
+    sets = ScenarioConfigs.env_groups['3'] + ['all'] #use stage_2 and random for the other thing
     dsize = 750
     labels = ['correctSelection']
-    gen_data(sets, dsize, labels)
+    #gen_data(sets, dsize, labels)
     #labels = ['loc', 'exist', 'vision', 'b-loc', 'b-exist', 'target', 'correctSelection']
     for data_name in sets:
         unused_sets = [s for s in sets if s != data_name]
@@ -117,7 +118,7 @@ if __name__ == '__main__':
         v_loss_sum = []
         first_v_loss = []
         for label in labels:
-            t_loss, v_loss, = train_model(data_name + '-' + str(dsize), label, unused_sets, epochs=20, dsize=dsize)
+            t_loss, v_loss, = train_model(data_name + '-' + str(dsize), label, unused_sets, epochs=100, dsize=dsize)
             plot_losses(data_name, label, t_loss, v_loss, [data_name] + unused_sets)
             first_v_loss.append(v_loss[0])
             # add losses elementwise
