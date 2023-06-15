@@ -25,7 +25,7 @@ def one_hot(size, data):
 
 def gen_data(configNames, num_timesteps=2500, labels=[]):
     env_config = {
-        "env_class": "StandoffEnv",
+        "env_class": "MiniStandoffEnv",
         "max_steps": 15,
         "respawn": True,
         "ghost_mode": False,
@@ -35,9 +35,9 @@ def gen_data(configNames, num_timesteps=2500, labels=[]):
     }
 
     player_interface_config = {
-        "view_size": 17,
-        "view_offset": 4,
-        "view_tile_size": 15,
+        "view_size": 7,
+        "view_offset": 0,
+        "view_tile_size": 1,
         "observation_style": "rich",
         "see_through_walls": False,
         "color": "yellow",
@@ -143,7 +143,7 @@ class RNNModel(nn.Module):
         padding2 = 0
         kernel_size1 = 3
         kernel_size2 = 3
-        input_size = 17
+        input_size = 7
         stride1 = 1
         stride2 = 1
         pool_kernel_size = 2

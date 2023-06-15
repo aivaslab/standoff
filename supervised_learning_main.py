@@ -45,8 +45,9 @@ def train_model(data_name, label, additional_val_sets, path='supervised/', dsize
 
     output_len = np.prod(train_labels.shape[1:])
     channels = np.prod(train_data.shape[1])
+    print(train_data.shape)
 
-    input_size = channels * 17 * 17
+    input_size = channels * 7 * 7
     hidden_size = 16
     num_layers = 1
     model = RNNModel(hidden_size, num_layers, output_len, channels)
@@ -61,7 +62,7 @@ def train_model(data_name, label, additional_val_sets, path='supervised/', dsize
         train_loss = 0
         for i, (inputs, target_labels) in enumerate(train_loader):
             #inputs = inputs.view(-1, 10, input_size)
-            #print(inputs.shape)
+            print(inputs.shape)
             outputs = model(inputs)
             loss = criterion(outputs, target_labels)
             optimizer.zero_grad()
@@ -105,9 +106,9 @@ def plot_losses(data_name, label, train_losses, val_losses, val_set_names):
 # train_model('random-2500', 'exist')
 if __name__ == '__main__':
     sets = ScenarioConfigs.env_groups['3'] + ['stage_2', 'all', 'random']
-    dsize = 2000
+    dsize = 750
     labels = ['correctSelection']
-    #gen_data(sets, 2000, labels)
+    gen_data(sets, dsize, labels)
     #labels = ['loc', 'exist', 'vision', 'b-loc', 'b-exist', 'target', 'correctSelection']
     for data_name in sets:
         unused_sets = [s for s in sets if s != data_name]
