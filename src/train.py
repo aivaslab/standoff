@@ -99,7 +99,7 @@ def main(args):
 
     envs = []
     # f"Standoff-{configName}-{view_size}-{observation_style}-{difficulty}-v0"
-    end_at = (args.end_at, len(ScenarioConfigs.env_groups[args.env_group]))
+    end_at = min(args.end_at, len(ScenarioConfigs.env_groups[args.env_group]))
     if args.reverse_order:
         for name in reversed(ScenarioConfigs.env_groups[args.env_group]):
             envs.append(f"{name}")
