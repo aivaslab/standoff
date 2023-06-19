@@ -519,7 +519,7 @@ class para_MultiGridEnv(ParallelEnv):
         self.observation_style = observation_style
         self.dense_obs = dense_obs
         self.channels = 3
-        self.use_box_colors = False
+        self.use_box_colors = True
 
         if self.use_box_colors:
             self.color_list = list(COLORS)
