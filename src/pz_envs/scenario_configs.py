@@ -16,6 +16,14 @@ def parameter_generator(space, params={}):
     else:
         yield params
 
+def add_swap(events, swap_num, swap_indices, uninformed_swap, visible_swaps):
+    swap_index, swap_location = swap_indices
+    if swap_num == uninformed_swap or visible_swaps == 0:
+        events.extend([['obscure'], ['swap', swap_index, swap_location], ['reveal']])
+        return len(events) - 2
+    else:
+        events.append(['swap', swap_index, swap_location])
+        return len(events) - 1
 
 def remove_unnecessary_sequences(events):
     removed_indices = []
@@ -162,96 +170,49 @@ class ScenarioConfigs:
         second_swap_to_first_loc = params['second_swap_to_first_loc']
         delay_2nd_bait = params['delay_2nd_bait']
 
-        name = str(visible_baits) + "." + str(swaps) + "." + str(visible_swaps)
-        if first_swap_is_both:
-            name += "a"
-        if second_swap_to_first_loc:
-            name += "c"
-        if delay_2nd_bait:
-            name += "d"
+        name = f"{visible_baits}.{swaps}.{visible_swaps}"
+        name += "a" if first_swap_is_both else ""
+        name += "c" if second_swap_to_first_loc else ""
+        name += "d" if delay_2nd_bait else ""
         count += 1
         events = []
-
-        print(name)
 
         bait_index = []
         for bait_num in range(1 if delay_2nd_bait else 2):
             bait_size = first_bait_size if bait_num == 0 else 1 - first_bait_size
             if bait_num == uninformed_bait or visible_baits == 0:
-                events.extend(
-                    [['obscure'], ['bait', bait_size, 'empty'], ['reveal']])
+                events.extend([['obscure'], ['bait', bait_size, 'empty'], ['reveal']])
                 bait_index.append(len(events) - 2)
             else:
                 events.append(['bait', bait_size, 'empty'])
                 bait_index.append(len(events) - 1)
 
-            # Add swaps
         first_swap_index = None
         for swap_num in range(1 if delay_2nd_bait else swaps):
             if swap_num == 0 and first_swap_is_both:
-                if swap_num == uninformed_swap or visible_swaps == 0:
-                    events.extend([['obscure'], ['swap', bait_index[0], bait_index[1]], ['reveal']])
-                    first_swap_index = len(events) - 2
-                else:
-                    events.append(['swap', bait_index[0], bait_index[1]])
-                    first_swap_index = len(events) - 1
-
+                first_swap_index = add_swap(events, swap_num, (bait_index[0], bait_index[1]), uninformed_swap,
+                                            visible_swaps)
             else:
                 swap_index = bait_index[first_swap] if swap_num == 0 else bait_index[1 - first_swap]
-                if swap_num == 1 and second_swap_to_first_loc:
-                    if swap_num == uninformed_swap or visible_swaps == 0:
-                        events.extend([['obscure'], ['swap', swap_index, first_swap_index], ['reveal']])
-                    else:
-                        events.append(['swap', swap_index, first_swap_index])
-                else:
-                    if swap_num == uninformed_swap or visible_swaps == 0:
-                        events.extend([['obscure'], ['swap', swap_index, 'empty'], ['reveal']])
-                        if swap_num == 0:
-                            first_swap_index = len(events) - 2
-                    else:
-                        events.append(['swap', swap_index, 'empty'])
-                        if swap_num == 0:
-                            first_swap_index = len(events) - 1
+                swap_location = first_swap_index if swap_num == 1 and second_swap_to_first_loc else 'empty'
+                first_swap_index = add_swap(events, swap_num, (swap_index, swap_location), uninformed_swap, visible_swaps)
 
         if delay_2nd_bait:
             bait_size = 1 - first_bait_size
-            bait_num = 1
-            if bait_num == uninformed_bait or visible_baits == 0:
+            if uninformed_bait == 1 or visible_baits == 0:
                 events.extend([['obscure'], ['bait', bait_size, first_swap_index], ['reveal']])
                 bait_index.append(len(events) - 2)
             else:
                 events.append(['bait', bait_size, first_swap_index])
                 bait_index.append(len(events) - 1)
 
-        for swap_num in range(swap_num if delay_2nd_bait else 2, swaps):
-            if swap_num == 0 and first_swap_is_both:
-                if swap_num == uninformed_swap or visible_swaps == 0:
-                    events.extend([['obscure'], ['swap', bait_index[0], bait_index[1]], ['reveal']])
-                    first_swap_index = len(events) - 2
-                else:
-                    events.append(['swap', bait_index[0], bait_index[1]])
-                    first_swap_index = len(events) - 1
-
-            else:
-                print(bait_index, first_swap, swap_num)
-                swap_index = bait_index[first_swap] if swap_num == 0 else bait_index[1 - first_swap]
-                if swap_num == 1 and second_swap_to_first_loc:
-                    if swap_num == uninformed_swap or visible_swaps == 0:
-                        events.extend([['obscure'], ['swap', swap_index, first_swap_index], ['reveal']])
-                    else:
-                        events.append(['swap', swap_index, first_swap_index])
-                else:
-                    if swap_num == uninformed_swap or visible_swaps == 0:
-                        events.extend([['obscure'], ['swap', swap_index, 'empty'], ['reveal']])
-                        if swap_num == 0:
-                            first_swap_index = len(events) - 2
-                    else:
-                        events.append(['swap', swap_index, 'empty'])
-                        if swap_num == 0:
-                            first_swap_index = len(events) - 1
+        for swap_num in range(1 if delay_2nd_bait else 2, swaps):
+            swap_index = bait_index[first_swap] if swap_num == 0 else bait_index[1 - first_swap]
+            swap_location = first_swap_index if swap_num == 1 and second_swap_to_first_loc else 'empty'
+            first_swap_index = add_swap(events, swap_num, (swap_index, swap_location), uninformed_swap, visible_swaps)
 
         events = remove_unnecessary_sequences(events)
-        print(events)
+        print(name, events)
     print('env count', count)
 
     standoff = {
