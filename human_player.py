@@ -55,10 +55,10 @@ player_interface_config = {
     "move_type": 0
 }
 puppet_interface_config = {
-    "view_size": 17,
-    "view_offset": 3,
+    "view_size": 7,
+    "view_offset": 1,
     "view_tile_size": TILE_SIZE,
-    "observation_style": "image",
+    "observation_style": "rich",
     "see_through_walls": False,
     "color": "red",
     #"move_type": 1,
@@ -66,7 +66,7 @@ puppet_interface_config = {
 }
 configs = ScenarioConfigs().standoff
 
-configName = 'removedUninformed2'
+configName = 'all'
 reset_configs = {**configs["defaults"],  **configs[configName]}
 
 if isinstance(reset_configs["num_agents"], list):
@@ -99,6 +99,7 @@ human = HumanPlayer()
 human.start_episode()
 
 done = False
+env.record_info = True
 print('recording eval info:', env.record_info) # recording info aside from supervised labels, used at eval
 
 
