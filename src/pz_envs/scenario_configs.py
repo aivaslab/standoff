@@ -145,16 +145,16 @@ class ScenarioConfigs:
     count = 0
 
     parameter_space = {
-        "visible_baits": range(3),  # x
-        "swaps": range(3),  # y
+        "visible_baits": [0, 1, 2],  # x
+        "swaps": [0, 1, 2],  # y
         "visible_swaps": lambda params: range(params['swaps'] + 1),  # z
-        "first_bait_size": [0, 1],  # i
-        "uninformed_bait": lambda params: [0, 1] if params['visible_baits'] == 1 else [-1],  # k
-        "uninformed_swap": lambda params: [0, 1] if params['swaps'] == 2 and params['visible_swaps'] == 1 else [-1],  # l
         "first_swap_is_both": lambda params: [True, False] if params['swaps'] > 0 else [False],  # ab
         "delay_2nd_bait": lambda params: [True, False] if params['swaps'] > 0 and params['first_swap_is_both'] is False else [False],  # d
         "second_swap_to_first_loc": lambda params: [True, False] if params['swaps'] == 2 and params['delay_2nd_bait'] is False else [False],  # c
+        "first_bait_size": [0, 1],  # i
         "first_swap": lambda params: [0, 1] if params['swaps'] > 0 and params['delay_2nd_bait'] is False and params['first_swap_is_both'] is False else [0],  # j
+        "uninformed_bait": lambda params: [0, 1] if params['visible_baits'] == 1 else [-1],  # k
+        "uninformed_swap": lambda params: [0, 1] if params['swaps'] == 2 and params['visible_swaps'] == 1 else [-1],  # l
     }
 
     for params in parameter_generator(parameter_space):
