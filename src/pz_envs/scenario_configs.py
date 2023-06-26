@@ -174,6 +174,7 @@ class ScenarioConfigs:
         name += "a" if first_swap_is_both else ""
         name += "c" if second_swap_to_first_loc else ""
         name += "d" if delay_2nd_bait else ""
+        name += "-" + str(1*first_bait_size + 2*(uninformed_bait > 0) + 4*(uninformed_swap > 0) + 8*(first_swap > 0))
         count += 1
         events = []
 
@@ -190,8 +191,7 @@ class ScenarioConfigs:
         first_swap_index = None
         for swap_num in range(1 if delay_2nd_bait else swaps):
             if swap_num == 0 and first_swap_is_both:
-                first_swap_index = add_swap(events, swap_num, (bait_index[0], bait_index[1]), uninformed_swap,
-                                            visible_swaps)
+                first_swap_index = add_swap(events, swap_num, (bait_index[0], bait_index[1]), uninformed_swap, visible_swaps)
             else:
                 swap_index = bait_index[first_swap] if swap_num == 0 else bait_index[1 - first_swap]
                 swap_location = first_swap_index if swap_num == 1 and second_swap_to_first_loc else 'empty'
