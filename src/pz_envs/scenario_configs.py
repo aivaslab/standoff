@@ -1,8 +1,27 @@
+from itertools import product
+
+
+def parameter_generator(space, params={}):
+    if space:
+        key, value = next(iter(space.items()))
+        if callable(value):
+            values = value(params)
+        else:
+            values = value
+        for v in values:
+            new_params = params.copy()
+            new_params[key] = v
+            new_space = {k: v for k, v in space.items() if k != key}
+            yield from parameter_generator(new_space, new_params)
+    else:
+        yield params
+
+
 def remove_unnecessary_sequences(events):
     removed_indices = []
     for i in range(len(events) - 1, 0, -1):
         if events[i] == ['obscure'] and events[i - 1] == ['reveal']:
-            removed_indices.extend([i-1, i])
+            removed_indices.extend([i - 1, i])
             del events[i - 1:i + 1]
 
     if events and events[-1] == ['reveal']:
@@ -15,7 +34,6 @@ def remove_unnecessary_sequences(events):
             event[1] -= count
             if event[2] != 'empty':
                 event[2] -= count
-
 
     return events
 
@@ -116,48 +134,67 @@ class ScenarioConfigs:
 
     so2 = {}
 
-
     count = 0
-    for visible_baits in [0, 1, 2]:  # x
-        for swaps in [0, 1, 2]:  # y
-            for visible_swaps in range(swaps + 1):  # z
-                for first_bait_size in [0, 1]:  # i
-                    for uninformed_bait in [0, 1] if visible_baits == 1 else [-1]:  # k
-                        for first_swap in [0, 1] if swaps > 0 else [-1]:  # j
-                            for uninformed_swap in [0, 1] if swaps == 2 and visible_swaps == 1 else [-1]:  # l
-                                for first_swap_is_both in [True, False] if swaps > 0 else [False]:  # ab
-                                    for second_swap_to_first_loc in [True, False] if swaps == 2 else [False]:  # c
-                                        for delay_2nd_bait in [True, False] if swaps > 0 else [False]:  # d
-                                            name = str(visible_baits) + "." + str(swaps) + "." + str(visible_swaps)
-                                            if first_swap_is_both:
-                                                name += "a"
-                                            if second_swap_to_first_loc:
-                                                name += "c"
-                                            if delay_2nd_bait:
-                                                name += "d"
-                                            count += 1
-                                            events = []
 
-                                            bait_index = []
-                                            for bait_num in range(2):
-                                                bait_size = first_bait_size if bait_num == 0 else 1 - first_bait_size
-                                                if bait_num == uninformed_bait or visible_baits == 0:
-                                                    events.extend([['obscure'], ['bait', bait_size, 'empty'], ['reveal']])
-                                                    bait_index.append(len(events) - 2)
-                                                else:
-                                                    events.append(['bait', bait_size, 'empty'])
-                                                    bait_index.append(len(events) - 1)
+    parameter_space = {
+        "visible_baits": range(3),  # x
+        "swaps": range(3),  # y
+        "visible_swaps": lambda params: range(params['swaps'] + 1),  # z
+        "first_bait_size": [0, 1],  # i
+        "first_swap": lambda params: [0, 1] if params['swaps'] > 0 else [-1],  # j
+        "uninformed_bait": lambda params: [0, 1] if params['visible_baits'] == 1 else [-1],  # k
+        "uninformed_swap": lambda params: [0, 1] if params['swaps'] == 2 and params['visible_swaps'] == 1 else [-1],  # l
+        "first_swap_is_both": lambda params: [True, False] if params['swaps'] > 0 else [False],  # ab
+        "second_swap_to_first_loc": lambda params: [True, False] if params['swaps'] == 2 else [False],  # c
+        "delay_2nd_bait": lambda params: [True, False] if params['swaps'] > 0 else [False]  # d
+    }
 
-                                                # Add swaps
-                                            for swap_num in range(swaps):
-                                                swap_index = bait_index[first_swap] if swap_num == 0 else bait_index[1 - first_swap]
-                                                if swap_num == uninformed_swap or visible_swaps == 0:
-                                                    events.extend( [['obscure'], ['swap', swap_index, 'empty'], ['reveal']])
-                                                else:
-                                                    events.append(['swap', swap_index, 'empty'])
+    for params in parameter_generator(parameter_space):
 
-                                            events = remove_unnecessary_sequences(events)
-                                            print(name, events)
+        visible_baits = params['visible_baits']
+        swaps = params['swaps']
+        visible_swaps = params['visible_swaps']
+        first_bait_size = params['first_bait_size']
+        uninformed_bait = params['uninformed_bait']
+        first_swap = params['first_swap']
+        uninformed_swap = params['uninformed_swap']
+        first_swap_is_both = params['first_swap_is_both']
+        second_swap_to_first_loc = params['second_swap_to_first_loc']
+        delay_2nd_bait = params['delay_2nd_bait']
+
+        name = str(visible_baits) + "." + str(swaps) + "." + str(visible_swaps)
+        if first_swap_is_both:
+            name += "a"
+        if second_swap_to_first_loc:
+            name += "c"
+        if delay_2nd_bait:
+            name += "d"
+        count += 1
+        events = []
+
+        bait_index = []
+        for bait_num in range(2):
+            bait_size = first_bait_size if bait_num == 0 else 1 - first_bait_size
+            if bait_num == uninformed_bait or visible_baits == 0:
+                events.extend(
+                    [['obscure'], ['bait', bait_size, 'empty'], ['reveal']])
+                bait_index.append(len(events) - 2)
+            else:
+                events.append(['bait', bait_size, 'empty'])
+                bait_index.append(len(events) - 1)
+
+            # Add swaps
+        for swap_num in range(swaps):
+            swap_index = bait_index[first_swap] if swap_num == 0 else bait_index[
+                1 - first_swap]
+            if swap_num == uninformed_swap or visible_swaps == 0:
+                events.extend(
+                    [['obscure'], ['swap', swap_index, 'empty'], ['reveal']])
+            else:
+                events.append(['swap', swap_index, 'empty'])
+
+        events = remove_unnecessary_sequences(events)
+        print(name, events)
     print('env count', count)
 
     standoff = {
