@@ -365,6 +365,7 @@ class StandoffEnv(para_MultiGridEnv):
                 else:
                     self.put_obj(Box(color="orange"), x, y)
             if self.record_info:
+                self.infos['p_0']['eName'] = self.current_event_list_name
                 self.infos['p_0']['shouldAvoidBig'] = False
                 self.infos['p_0']['shouldAvoidSmall'] = False
                 self.infos['p_0']['correctSelection'] = -1

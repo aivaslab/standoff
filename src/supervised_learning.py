@@ -21,8 +21,10 @@ import torch
 from sklearn.model_selection import train_test_split
 from matplotlib import pyplot as plt
 
+
 def one_hot(size, data):
     return np.eye(size)[data]
+
 
 def gen_data(configNames, num_timesteps=2500, labels=[]):
     env_config = {
@@ -55,7 +57,6 @@ def gen_data(configNames, num_timesteps=2500, labels=[]):
         # "move_type": 1,
         # "view_type": 1,
     }
-    
 
     for configName in configNames:
         configs = ScenarioConfigs().standoff
@@ -68,8 +69,10 @@ def gen_data(configNames, num_timesteps=2500, labels=[]):
             reset_configs["num_puppets"] = reset_configs["num_puppets"][0]
 
         env_config['config_name'] = configName
-        env_config['agents'] = [GridAgentInterface(**player_interface_config) for _ in range(reset_configs['num_agents'])]
-        env_config['puppets'] = [GridAgentInterface(**puppet_interface_config) for _ in range(reset_configs['num_puppets'])]
+        env_config['agents'] = [GridAgentInterface(**player_interface_config) for _ in
+                                range(reset_configs['num_agents'])]
+        env_config['puppets'] = [GridAgentInterface(**puppet_interface_config) for _ in
+                                 range(reset_configs['num_puppets'])]
         # env_config['num_agents'] = reset_configs['num_agents']
         # env_config['num_puppets'] = reset_configs['num_puppets']
 
@@ -82,17 +85,23 @@ def gen_data(configNames, num_timesteps=2500, labels=[]):
 
         env = env_from_config(env_config)
         env.record_supervised_labels = True
-        env.record_info = True # used for correctSelection right now
+        env.record_info = True  # used for correctSelection right now
         if hasattr(env, "hard_reset"):
             env.hard_reset(reset_configs)
 
-        #labels = ['loc', 'exist', 'vision', 'b-loc', 'b-exist', 'target']
-    
+        # labels = ['loc', 'exist', 'vision', 'b-loc', 'b-exist', 'target']
+        prior_metrics = ['eName', 'shouldAvoidBig', 'shouldAvoidSmall', 'correctSelection', 'incorrectSelection', 'firstBaitReward', 'eventVisibility']
+        posterior_metrics = ['selection', 'selectedBig', 'selectedSmall', 'selectedNeither',
+                   'selectedPrevBig', 'selectedPrevSmall', 'selectedPrevNeither',
+                   'selectedSame', ]
+
         data_name = f'{configName}-{num_timesteps}'
         data_obs = []
         data_labels = {}
         for label in labels:
             data_labels[label] = []
+
+        five_path_labels = {}
         tq = tqdm.tqdm(range(int(num_timesteps)))
         while len(data_obs) < num_timesteps:
             obs = env.reset()
@@ -105,12 +114,13 @@ def gen_data(configNames, num_timesteps=2500, labels=[]):
                 if not any([np.array_equal(this_ob, x) for x in data_obs]):
                     # if True:
                     data_obs.append(copy.copy(this_ob))
-                    for label in labels:
-                        if label == "correctSelection":
+                    for label in labels + prior_metrics:
+                        if label == "correctSelection" or 'incorrectSelection':
                             data_labels[label].append(one_hot(5, info['p_0'][label]))
                         else:
                             data_labels[label].append(info['p_0'][label])
 
+                    # next we save this env, run 5 paths as in gtrs, save all posterior metrics
                     tq.update(1)
 
                 pos += 1
@@ -136,7 +146,9 @@ class CustomDataset(Dataset):
 
 
 class RNNModel(nn.Module):
-    def __init__(self, hidden_size, num_layers, output_len, channels, kernels=8, kernels2=8, kernel_size1=3, kernel_size2=3, stride1=1, pool_kernel_size=2, pool_stride=2, padding1=0, padding2=0, use_pool=True, use_conv2=False):
+    def __init__(self, hidden_size, num_layers, output_len, channels, kernels=8, kernels2=8, kernel_size1=3,
+                 kernel_size2=3, stride1=1, pool_kernel_size=2, pool_stride=2, padding1=0, padding2=0, use_pool=True,
+                 use_conv2=False):
         super(RNNModel, self).__init__()
         self.kwargs = {'hidden_size': hidden_size, 'num_layers': num_layers,
                        'output_len': output_len, 'pool_kernel_size': pool_kernel_size,
@@ -153,20 +165,25 @@ class RNNModel(nn.Module):
         self.conv1 = nn.Conv2d(channels, kernels, kernel_size=kernel_size1, padding=padding1, stride=stride1)
 
         if use_pool:
-            self.pool = nn.MaxPool2d(kernel_size=pool_kernel_size, stride=pool_stride, padding=0 if pool_kernel_size < conv1_output_size else 1)
+            self.pool = nn.MaxPool2d(kernel_size=pool_kernel_size, stride=pool_stride,
+                                     padding=0 if pool_kernel_size < conv1_output_size else 1)
         # self.output_len = output_len
 
-        pool1_output_size = (conv1_output_size - pool_kernel_size + 2 * 0 if pool_kernel_size < conv1_output_size else 1) // pool_stride + 1 if use_pool else conv1_output_size
+        pool1_output_size = (
+                                conv1_output_size - pool_kernel_size + 2 * 0 if pool_kernel_size < conv1_output_size else 1) // pool_stride + 1 if use_pool else conv1_output_size
 
         print(self.kwargs, conv1_output_size, pool1_output_size)
 
         if use_conv2:
             conv2_output_size = (pool1_output_size - min(kernel_size2, pool1_output_size) + 2 * padding2) // stride1 + 1
-            self.conv2 = nn.Conv2d(kernels, kernels2, kernel_size=min(pool1_output_size, kernel_size2), padding=padding2)
+            self.conv2 = nn.Conv2d(kernels, kernels2, kernel_size=min(pool1_output_size, kernel_size2),
+                                   padding=padding2)
             pks = min(pool_kernel_size, conv2_output_size)
             if use_pool:
-                self.pool2 = nn.MaxPool2d(kernel_size=pks, stride=pool_stride, padding=0 if pool_kernel_size < conv2_output_size else 1)
-            pool2_output_size = (conv2_output_size - pks + 2 * 0 if pks < conv2_output_size else 1) // pool_stride + 1 if use_pool else conv2_output_size
+                self.pool2 = nn.MaxPool2d(kernel_size=pks, stride=pool_stride,
+                                          padding=0 if pool_kernel_size < conv2_output_size else 1)
+            pool2_output_size = (
+                                    conv2_output_size - pks + 2 * 0 if pks < conv2_output_size else 1) // pool_stride + 1 if use_pool else conv2_output_size
         else:
             conv2_output_size = conv1_output_size
             pool2_output_size = pool1_output_size
@@ -196,5 +213,3 @@ class RNNModel(nn.Module):
         out = out[:, -1, :]  # Use only the last time step's output
         outputs = self.fc(out)
         return outputs
-
-
