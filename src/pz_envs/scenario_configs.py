@@ -72,6 +72,8 @@ class ScenarioConfigs:
     }
 
     all_event_lists = {}
+    informed_event_lists = {}
+    uninformed_event_lists = {}
     for params in parameter_generator(parameter_space):
 
         visible_baits = params['visible_baits']
@@ -120,6 +122,11 @@ class ScenarioConfigs:
         #print(name, events)
         events = remove_unnecessary_sequences(events)
         all_event_lists[name] = events
+        if visible_baits == 2 and visible_swaps == swaps:
+            informed_event_lists[name] = events
+        if visible_baits == 0 and visible_swaps == 0:
+            uninformed_event_lists[name] = events
+
 
     lack_to_generalized = {
         "moved": "0.2.2",
@@ -142,6 +149,8 @@ class ScenarioConfigs:
 
     for key, value in matching_names.items():
         print(f"For {key}, found matches: {value}")
+
+    print('total lists', len(all_event_lists), 'informed lists', len(informed_event_lists), 'uninformed lists', len(uninformed_event_lists))
 
     standoff = {
         "defaults": {
