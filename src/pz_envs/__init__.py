@@ -4,7 +4,6 @@ from random import randrange
 import random
 import math
 
-from .tutorial import *
 from .standoff import *
 from .ministandoff import *
 from .doorkey import *

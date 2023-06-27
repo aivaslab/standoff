@@ -112,7 +112,7 @@ for i in range(100):
         env.render(mode="human", show_agent_views=True, tile_size=TILE_SIZE)
         #print(np.round(obs['player_0']*10).sum(axis=0).astype(int))
         img = Image.fromarray(obs['p_0'], 'RGB')
-        ImageDraw.Draw(img).text((0, 0), "Step " + str(env.step_count), (255, 255, 255))
+        ImageDraw.Draw(img).text((0, 0), "Step " + str(env.step_count) + '\n' + env.current_event_list_name, (255, 255, 255))
         player_action = human.action_step(np.array(img))
         agent_actions = {'p_0': player_action}
         next_obs, rew, done, info = env.step(agent_actions)

@@ -96,31 +96,7 @@ class StandoffEnv(para_MultiGridEnv):
         self.last_supervised_labels = None
         self.has_released = False
 
-    def hard_reset(self, params=None):
-        """
-        Reset the environment params.
-        """
-        defaults = ScenarioConfigs.standoff["defaults"]
-
-        if params is None:
-            params = {}
-        newParams = copy.deepcopy(params)
-        for k in defaults.keys():
-            if k in params.keys():
-                if isinstance(params[k], list):
-                    newParams[k] = params[k][
-                        self.deterministic_seed % len(params[k])] if self.deterministic else random.choice(params[k])
-            else:
-                if isinstance(defaults[k], list):
-                    newParams[k] = defaults[k][
-                        self.deterministic_seed % len(defaults[k])] if self.deterministic else random.choice(
-                        defaults[k])
-                else:
-                    newParams[k] = defaults[k]
-        self.params = copy.deepcopy(newParams)
-
-        # deal with num_puppets being lower than maximum
-        self.possible_puppets = [f"p_{x + len(self.agents)}" for x in range(self.params["num_puppets"])]
+        self.param_groups = [{'eLists': ScenarioConfigs.all_event_lists, 'params': ScenarioConfigs.standoff['defaults']}, ]
 
     def reset_vision(self):
         """

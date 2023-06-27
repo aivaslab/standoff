@@ -16,6 +16,15 @@ def parameter_generator(space, params={}):
     else:
         yield params
 
+
+def add_bait(events, bait_num, bait_size, uninformed_bait, visible_baits, swap_index='empty'):
+    if bait_num == uninformed_bait or visible_baits == 0:
+        events.extend([['obscure'], ['bait', bait_size, swap_index], ['reveal']])
+        return len(events) - 2
+    else:
+        events.append(['bait', bait_size, swap_index])
+        return len(events) - 1
+
 def add_swap(events, swap_num, swap_indices, uninformed_swap, visible_swaps):
     swap_index, swap_location = swap_indices
     if swap_num == uninformed_swap or visible_swaps == 0:
@@ -41,108 +50,13 @@ def remove_unnecessary_sequences(events):
             count = sum(1 for i in removed_indices if i < event[1])
             event[1] -= count
             if event[2] != 'empty':
+                count = sum(1 for i in removed_indices if i < event[2])
                 event[2] -= count
 
     return events
 
 
 class ScenarioConfigs:
-    tutorial = {
-        "empty": {
-            "num_puppets": 0,
-            "eType": "t",
-            "eVar": "a"
-        },
-        "empty_clutter": {
-            "num_puppets": 0,
-            "eType": "t",
-            "eVar": "b"
-        },
-        "grid": {
-            "num_puppets": 0,
-            "eType": "t",
-            "eVar": "c"
-        },
-        "grid_clutter": {
-            "num_puppets": 0,
-            "eType": "t",
-            "eVar": "d"
-        },
-        "empty_hide": {
-            "num_puppets": 0,
-            "eType": "t",
-            "eVar": "e"
-        },
-        "empty_hide_redherring": {
-            "num_puppets": 0,
-            "eType": "t",
-            "eVar": "f"
-        },
-        "empty_hide_preference": {
-            "num_puppets": 0,
-            "eType": "t",
-            "eVar": "g"
-        },
-        # 2 eVariants are all doorkey
-        # 3 eVariants are also doorkey
-        "nav_no_goal": {
-            "num_puppets": 0,
-            "eType": "n",
-            "eVar": "a"
-        },
-        "nav_simple": {
-            "num_puppets": 0,
-            "eType": "n",
-            "eVar": "b"
-        },
-        # ...
-    }
-
-    env_groups = {'12': ["stage_1", "stage_2"],
-                  '1': ["stage_1"],
-                  '2': ["stage_2"],
-                  '3': ["informedControl",
-                        "partiallyUninformed",
-                        "removedInformed2",
-                        "removedUninformed2",
-                        "moved",
-                        "replaced",
-                        "misinformed",
-                        "swapped",
-                        ],
-                  '3+12b': ["stage_1",
-                            "s2b",
-                            "informedControl",
-                            "partiallyUninformed",
-                            "removedInformed2",
-                            "removedUninformed2",
-                            "moved",
-                            "replaced",
-                            "misinformed",
-                            "swapped",
-                            ],
-                  's2+s2b': ["stage_2", "s2b"],
-                  '1+2b+all': ["all", "s2b", "stage_1"],
-                  'all': ["all"],
-                  's2b': ["s2b"],
-                  'rand': ["random"],
-                  'everything': ["stage_1",
-                                 "s2b",
-                                 "informedControl",
-                                 "partiallyUninformed",
-                                 "removedInformed2",
-                                 "removedUninformed2",
-                                 "moved",
-                                 "replaced",
-                                 "misinformed",
-                                 "swapped",
-                                 "all"
-                                 ],
-                  }
-
-    so2 = {}
-
-    count = 0
 
     parameter_space = {
         "visible_baits": [0, 1, 2],  # x
@@ -157,6 +71,7 @@ class ScenarioConfigs:
         "uninformed_swap": lambda params: [0, 1] if params['swaps'] == 2 and params['visible_swaps'] == 1 else [-1],  # l
     }
 
+    all_event_lists = {}
     for params in parameter_generator(parameter_space):
 
         visible_baits = params['visible_baits']
@@ -175,18 +90,13 @@ class ScenarioConfigs:
         name += "c" if second_swap_to_first_loc else ""
         name += "d" if delay_2nd_bait else ""
         name += "-" + str(1*first_bait_size + 2*(uninformed_bait > 0) + 4*(uninformed_swap > 0) + 8*(first_swap > 0))
-        count += 1
         events = []
 
         bait_index = []
         for bait_num in range(1 if delay_2nd_bait else 2):
             bait_size = first_bait_size if bait_num == 0 else 1 - first_bait_size
-            if bait_num == uninformed_bait or visible_baits == 0:
-                events.extend([['obscure'], ['bait', bait_size, 'empty'], ['reveal']])
-                bait_index.append(len(events) - 2)
-            else:
-                events.append(['bait', bait_size, 'empty'])
-                bait_index.append(len(events) - 1)
+            index = add_bait(events, bait_num, bait_size, uninformed_bait, visible_baits)
+            bait_index.append(index)
 
         first_swap_index = None
         for swap_num in range(1 if delay_2nd_bait else swaps):
@@ -199,24 +109,43 @@ class ScenarioConfigs:
 
         if delay_2nd_bait:
             bait_size = 1 - first_bait_size
-            if uninformed_bait == 1 or visible_baits == 0:
-                events.extend([['obscure'], ['bait', bait_size, first_swap_index], ['reveal']])
-                bait_index.append(len(events) - 2)
-            else:
-                events.append(['bait', bait_size, first_swap_index])
-                bait_index.append(len(events) - 1)
+            index = add_bait(events, 1, bait_size, uninformed_bait, visible_baits, first_swap_index)
+            bait_index.append(index)
 
         for swap_num in range(1 if delay_2nd_bait else 2, swaps):
             swap_index = bait_index[first_swap] if swap_num == 0 else bait_index[1 - first_swap]
             swap_location = first_swap_index if swap_num == 1 and second_swap_to_first_loc else 'empty'
             first_swap_index = add_swap(events, swap_num, (swap_index, swap_location), uninformed_swap, visible_swaps)
 
+        #print(name, events)
         events = remove_unnecessary_sequences(events)
-        print(name, events)
-    print('env count', count)
+        all_event_lists[name] = events
+
+    lack_to_generalized = {
+        "moved": "0.2.2",
+        "partiallyUninformed": "1.0.0",
+        "replaced": "1.1.0d",
+        "informedControl": "2.0.0",
+        "removedUninformed": "2.1.0",
+        "swapped": "2.1.0a",
+        "removedInformed": "2.1.1",
+        "misinformed": "2.2.0c",
+        "misinformed2": "2.2.0ac",
+    }
+
+    matching_names = {}
+    for key, value in lack_to_generalized.items():
+        matching_names[key] = []
+        for name in all_event_lists.keys():
+            if name.startswith(value + "-"):
+                matching_names[key].append(name)
+
+    for key, value in matching_names.items():
+        print(f"For {key}, found matches: {value}")
 
     standoff = {
         "defaults": {
+            "deterministic": False,
             "hidden": True,
             "share_rewards": False,
             "boxes": 5,

@@ -2,6 +2,8 @@
 # Based on MiniGrid: https://github.com/maximecb/gym-minigrid.
 from __future__ import annotations
 
+import copy
+
 import gym
 import numpy as np
 import functools
@@ -580,6 +582,15 @@ class para_MultiGridEnv(ParallelEnv):
         self.supervised_label_dict = {}
         self.has_released = False
 
+        self.current_param_group = 0
+        self.current_param_group_count = 0
+        self.max_param_group_count = -1
+        self.current_event_list = None
+        self.current_event_list_name = None
+        self.param_groups = []
+        self.event_lists = None
+        self.has_reset = False
+
     @functools.lru_cache(maxsize=None)
     def action_space(self, agent):
         return self.action_spaces[agent]
@@ -660,10 +671,26 @@ class para_MultiGridEnv(ParallelEnv):
         Here it sets up the state dictionary which is used by step() and the observations dictionary which is used by step() and observe()
         """
 
-        if hasattr(self, "hard_reset"):
-            self.hard_reset(self.configs[self.config_name])
+        if self.max_param_group_count > -1 or not self.has_reset:
+            self.current_param_group_count += 1
+            self.has_reset = True
+            if self.current_param_group_count > self.max_param_group_count:
+                self.current_param_group_count = 0
+                self.current_param_group = (self.current_param_group + 1) % len(self.param_groups)
+                self.event_lists = self.param_groups[self.current_param_group]['eLists']
+                self.params = self.param_groups[self.current_param_group]['params']
+                print('dd', len(self.event_lists), self.params)
+
+            # deal with num_puppets being lower than maximum
+            self.possible_puppets = [f"p_{x + len(self.agents)}" for x in range(self.params["num_puppets"])]
+
+        # get event list from event lists
+        if self.params['deterministic']:
+            self.current_event_list_name, self.params['events'] = list(self.event_lists.items())[self.current_param_group_count % len(self.event_lists)]
         else:
-            print("No hard reset function found")
+            self.current_event_list_name, self.params['events'] = copy.deepcopy(random.choice(list(self.event_lists.items())))
+
+        #print(self.current_event_list_name, self.params, self.param_groups[self.current_param_group]['eLists'][self.current_event_list_name])
 
         self.agents = self.possible_agents[:]
         self.puppets = self.possible_puppets[:]
@@ -699,8 +726,7 @@ class para_MultiGridEnv(ParallelEnv):
         else:
             valid_params = ['sub_valence', 'dom_valence', 'num_puppets', 'subject_is_dominant', 'events',
                             'hidden', 'boxes']
-            params2 = {x: self.params[x] for x in valid_params}
-            last_timer = self._gen_grid(**params2)
+            last_timer = self._gen_grid(**{x: self.params[x] for x in valid_params})
             # gen_grid also generates timers
             self.prev_puppet_mask = np.zeros((self.grid.height, self.grid.width))
             '''flag = 0
