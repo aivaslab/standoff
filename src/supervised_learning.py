@@ -5,6 +5,8 @@ import numpy as np
 import sys
 import os
 
+from .utils.evaluation import get_relative_direction
+
 sys.path.append(os.getcwd())
 
 from .objects import *
@@ -29,7 +31,7 @@ def one_hot(size, data):
 def gen_data(configNames, num_timesteps=2500, labels=[]):
     env_config = {
         "env_class": "MiniStandoffEnv",
-        "max_steps": 15,
+        "max_steps": 25,
         "respawn": True,
         "ghost_mode": False,
         "reward_decay": False,
@@ -57,6 +59,8 @@ def gen_data(configNames, num_timesteps=2500, labels=[]):
         # "move_type": 1,
         # "view_type": 1,
     }
+
+    frames = 10
 
     for configName in configNames:
         configs = ScenarioConfigs().standoff
@@ -108,25 +112,33 @@ def gen_data(configNames, num_timesteps=2500, labels=[]):
             this_ob = np.zeros((10, *obs['p_0'].shape))
             pos = 0
 
-            while True:
+            while pos < frames:
                 next_obs, rew, done, info = env.step({'p_0': 2})
                 this_ob[pos, :, :, :] = next_obs['p_0']
                 if not any([np.array_equal(this_ob, x) for x in data_obs]):
                     # if True:
                     data_obs.append(copy.copy(this_ob))
-                    #print(info['p_0'])
                     for label in labels + prior_metrics:
                         if label == "correctSelection" or label == 'incorrectSelection':
                             data_labels[label].append(one_hot(5, info['p_0'][label]))
                         else:
                             data_labels[label].append(info['p_0'][label])
 
-                    # next we save this env, run 5 paths as in gtrs, save all posterior metrics
                     tq.update(1)
-
                 pos += 1
-                if done['p_0']:
-                    break
+
+
+            all_paths = env.get_all_paths(env.grid.volatile, env.instance_from_name['p_0'].pos)
+            # save the current env position...
+
+            for k, path in enumerate(all_paths):
+                _env = copy.deepcopy(env)
+                a = _env.instance_from_name['p_0']
+                while True:
+                    act = get_relative_direction(a, path)
+                    _, _, done, info = _env.step({'p_0': act})
+                    if done['p_0']:
+                        break
         np.save('supervised/' + data_name + '-obs', np.array(data_obs))
         for label in labels:
             np.save('supervised/' + data_name + '-label-' + label, np.array(data_labels[label]))

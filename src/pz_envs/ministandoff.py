@@ -63,6 +63,7 @@ class MiniStandoffEnv(para_MultiGridEnv):
                          gaze_highlighting=gaze_highlighting,
                          persistent_gaze_highlighting=persistent_gaze_highlighting,
                          supervised_model=supervised_model)
+        self.stop_on_release = False
         self.new_target = None
         if agent_spawn_kwargs is None:
             agent_spawn_kwargs = {'top': (0, 0), 'size': (2, self.width)}
@@ -96,8 +97,8 @@ class MiniStandoffEnv(para_MultiGridEnv):
         self.last_supervised_labels = None
         self.has_released = False
 
-        self.param_groups = [{'eLists': ScenarioConfigs.all_event_lists, 'params': ScenarioConfigs.standoff['defaults']}, ]
-
+        self.param_groups = [
+            {'eLists': ScenarioConfigs.all_event_lists, 'params': ScenarioConfigs.standoff['defaults']}, ]
 
     def reset_vision(self):
         """
@@ -125,13 +126,13 @@ class MiniStandoffEnv(para_MultiGridEnv):
                   subject_is_dominant=False,
                   events=[],
                   hidden=False,
-                  boxes=5,
+                  boxes=5
                   ):
 
         startRoom = 1
         self.boxes = boxes
         if self.use_box_colors:
-            self.box_color_order = list(range(boxes))
+            self.box_color_order = list(range(5))
             random.shuffle(self.box_color_order)
 
         self.hidden = hidden
@@ -139,7 +140,7 @@ class MiniStandoffEnv(para_MultiGridEnv):
         self.box_reward = 1
         self.released_tiles = [[] for _ in range(4)]
         self.curtain_tiles = []
-        release_gap = 6
+        release_gap = 5
         self.width = 8
         self.height = 8
         self.grid = MultiGrid((self.width, self.height))
@@ -164,7 +165,8 @@ class MiniStandoffEnv(para_MultiGridEnv):
             h = 1 if agent == "p_0" else self.height - 1  # todo: make this work with dominance properly
             d = 1 if agent == "p_0" else 3
             if self.random_subject_spawn:
-                bb = 1 + self.deterministic_seed % (self.boxes - 2) if self.deterministic else 1 + random.choice(range(boxes - 2))
+                bb = 1 + self.deterministic_seed % (self.boxes - 2) if self.deterministic else 1 + random.choice(
+                    range(boxes - 2))
                 xx = bb + 1
             else:
                 xx = self.boxes // 2 + 1
@@ -199,7 +201,7 @@ class MiniStandoffEnv(para_MultiGridEnv):
             self.released_tiles[1] += [(xx_spawn, self.height - startRoom - 2)]
             self.curtain_tiles += [(xx_spawn, self.height - startRoom - 1)]
             if (xx_spawn, self.height - startRoom - 1) not in all_door_poses:
-                #self.put_obj(Wall(), xx_spawn, self.height - startRoom - 1)
+                # self.put_obj(Wall(), xx_spawn, self.height - startRoom - 1)
                 pass
             else:
                 self.put_obj(Block(init_state=0, color="blue"), xx_spawn, self.height - startRoom - 1)
@@ -256,11 +258,11 @@ class MiniStandoffEnv(para_MultiGridEnv):
                             len(available_spots)) if not self.deterministic else self.get_deterministic_seed() % len(
                             available_spots))
                     elif isinstance(event[x], int) and event[0] != 'b':
-                        #print(x, event[x], self.current_event_list_name, events, self.event_lists[self.current_event_list_name])
+                        # print(x, event[x], self.current_event_list_name, events, self.event_lists[self.current_event_list_name])
                         event[x] = events[event[x]][1]  # get first location
 
                 if event_type == "b":
-                    event_args[k] = bait_args[event[1]] # get the size of the treat
+                    event_args[k] = bait_args[event[1]]  # get the size of the treat
                 elif event_type == "rem":
                     empty_buckets.append(event[1])
                 elif event_type == "ob" or event_type == "re":
@@ -289,22 +291,21 @@ class MiniStandoffEnv(para_MultiGridEnv):
             if len(self.small_food_locations) == 0 or (self.small_food_locations[-1] != loc):
                 self.small_food_locations.append(loc)
 
-    def get_all_paths(self, maze, position, offset=1):
+    def get_all_paths(self, maze, position, offset=0):
         maze = np.array(maze).astype(int)
-        if not self.deterministic:
-            return None
+
         y = self.height // 2 + offset
         paths = []
         for box in range(self.boxes):
             x = box * 1 + 1
 
-            pgrid = maze
+            pgrid = copy.copy(maze)
             for _x in range(self.width):
                 if _x != x:
                     pgrid[_x, y] = True
                     pgrid[_x, y + 1] = True
 
-            path = pathfind(maze, position[0:2], (x, y), self.cached_paths)
+            path = pathfind(pgrid, tuple(position[0:2]), (x, y), self.cached_paths)
             paths += [path, ]
         return paths
 
@@ -316,9 +317,10 @@ class MiniStandoffEnv(para_MultiGridEnv):
             for obj in self.objs_to_hide:
                 pos = obj.pos
                 if self.use_box_colors:
-                    col = self.box_color_order[pos[0]-1]
+                    col = self.box_color_order[pos[0] - 1]
                     self.put_obj(
-                        Box(color=self.color_list[col], state=col, contains=obj, reward=obj.reward, show_contains=self.persistent_treat_images),
+                        Box(color=self.color_list[col], state=col, contains=obj, reward=obj.reward,
+                            show_contains=self.persistent_treat_images),
                         pos[0], pos[1],
                         update_vis=False)
                 else:
@@ -330,7 +332,8 @@ class MiniStandoffEnv(para_MultiGridEnv):
             for box in range(self.boxes):
                 x = box * 1 + 1
                 if self.use_box_colors:
-                    self.put_obj(Box(color=self.color_list[self.box_color_order[box]], state=self.box_color_order[box]), x, y)
+                    self.put_obj(Box(color=self.color_list[self.box_color_order[box]], state=self.box_color_order[box]),
+                                 x, y)
                 else:
                     self.put_obj(Box(color="orange"), x, y)
             if self.record_info:
@@ -400,7 +403,7 @@ class MiniStandoffEnv(para_MultiGridEnv):
             if arg == 0:
                 for x, y in self.curtain_tiles:
                     self.put_obj(Curtain(color='red'), x, y, update_vis=False)
-            if self.record_supervised_labels and self.supervised_model is None:
+            if self.stop_on_release is True:
                 self.dones['p_0'] = True
             self.has_released = True
 
@@ -449,9 +452,9 @@ class MiniStandoffEnv(para_MultiGridEnv):
                 for _x in range(self.width):
                     if _x != x:
                         pgrid[_x, y] = True
-                        pgrid[_x, y+1] = True
+                        pgrid[_x, y + 1] = True
                 path = pathfind(pgrid, a.pos, (x, y), self.cached_paths)
-                #print('path', path)
+                # print('path', path)
                 self.infos[target_agent]["path"] = path
                 # tile = self.grid.get(x, y)
                 # we cannot track shouldAvoidBig etc here because the treat location might change
@@ -481,9 +484,9 @@ class MiniStandoffEnv(para_MultiGridEnv):
                 for reward in all_rewards_seen
             ]
             self.infos['p_0']["exist"] = [1 if self.bigReward in real_box_rewards else 0,
-                                               1 if self.smallReward in real_box_rewards else 0]
+                                          1 if self.smallReward in real_box_rewards else 0]
             self.infos['p_0']["b-exist"] = [1 if self.bigReward in all_rewards_seen else 0,
-                                                 1 if self.smallReward in all_rewards_seen else 0]
+                                            1 if self.smallReward in all_rewards_seen else 0]
         if self.record_info:
             if name == "rel":
                 # if agent's goal of player_1 matches big treat location, then shouldAvoidBig is True
