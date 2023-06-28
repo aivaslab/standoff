@@ -256,6 +256,7 @@ class MiniStandoffEnv(para_MultiGridEnv):
                             len(available_spots)) if not self.deterministic else self.get_deterministic_seed() % len(
                             available_spots))
                     elif isinstance(event[x], int) and event[0] != 'b':
+                        #print(x, event[x], self.current_event_list_name, events, self.event_lists[self.current_event_list_name])
                         event[x] = events[event[x]][1]  # get first location
 
                 if event_type == "b":
@@ -340,8 +341,8 @@ class MiniStandoffEnv(para_MultiGridEnv):
                 self.infos['p_0']['incorrectSelection'] = -1
                 self.infos['p_0']['minibatch'] = self.minibatch
                 self.infos['p_0']['timestep'] = self.total_step_count
-        elif name == 'bait':
-            x = event[1] * 1 + 1
+        elif name == 'b':
+            x = event[2] * 1 + 1
             obj = Goal(reward=arg, size=arg * 0.01, color='green', hide=self.hidden)
             if not self.has_baited:
                 self.has_baited = True
@@ -349,7 +350,7 @@ class MiniStandoffEnv(para_MultiGridEnv):
                     self.infos['p_0']['firstBaitReward'] = arg
             self.put_obj(obj, x, y)
             self.objs_to_hide.append(obj)
-        elif name == "remove":
+        elif name == "rem":
             x = event[1] * 1 + 1
             tile = self.grid.get(x, y)
             if tile is not None:

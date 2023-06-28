@@ -22,7 +22,7 @@ def add_bait(events, bait_num, bait_size, uninformed_bait, visible_baits, swap_i
         events.extend([['ob'], ['b', bait_size, swap_index], ['re']])
         return len(events) - 2
     else:
-        events.append(['bait', bait_size, swap_index])
+        events.append(['b', bait_size, swap_index])
         return len(events) - 1
 
 def add_swap(events, swap_num, swap_indices, uninformed_swap, visible_swaps):

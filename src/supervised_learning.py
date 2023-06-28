@@ -98,7 +98,7 @@ def gen_data(configNames, num_timesteps=2500, labels=[]):
         data_name = f'{configName}-{num_timesteps}'
         data_obs = []
         data_labels = {}
-        for label in labels:
+        for label in labels + prior_metrics + posterior_metrics:
             data_labels[label] = []
 
         five_path_labels = {}
@@ -114,8 +114,9 @@ def gen_data(configNames, num_timesteps=2500, labels=[]):
                 if not any([np.array_equal(this_ob, x) for x in data_obs]):
                     # if True:
                     data_obs.append(copy.copy(this_ob))
+                    #print(info['p_0'])
                     for label in labels + prior_metrics:
-                        if label == "correctSelection" or 'incorrectSelection':
+                        if label == "correctSelection" or label == 'incorrectSelection':
                             data_labels[label].append(one_hot(5, info['p_0'][label]))
                         else:
                             data_labels[label].append(info['p_0'][label])
