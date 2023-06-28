@@ -218,35 +218,35 @@ class MiniStandoffEnv(para_MultiGridEnv):
             event_type = event[0]
 
             if event_type == "random":
-                event_list = ["bait"]
+                event_list = ["b"]
                 if baited:
-                    event_list += ["swap"]
+                    event_list += ["sw"]
                 if obscured:
-                    event_list += ["reveal"]
+                    event_list += ["re"]
                 else:
-                    event_list += ["obscure"]
+                    event_list += ["ob"]
                 event_type = random.choice(event_list)
-                if event_type == "bait":
-                    event = ["bait", random.randrange(boxes)]
+                if event_type == "b":
+                    event = ["b", random.randrange(boxes)]
                     baited = True
                     event_args[k] = random.choice(bait_args)
-                elif event_type == "obscure":
-                    event = ["obscure", "p_1"]
+                elif event_type == "ob":
+                    event = ["ob", "p_1"]
                     obscured = True
                     event_args[k] = event[1]
-                elif event_type == "reveal":
-                    event = ["reveal", "p_1"]
+                elif event_type == "re":
+                    event = ["re", "p_1"]
                     obscured = False
                     event_args[k] = event[1]
-                elif event_type == "swap":
-                    event = ["swap", random.randrange(boxes), random.randrange(boxes)]
+                elif event_type == "sw":
+                    event = ["sw", random.randrange(boxes), random.randrange(boxes)]
                     event_args[k] = event[1:]
                 events[k] = event
 
             else:
                 for x in range(len(event)):
 
-                    if event[x] == "empty":
+                    if event[x] == "e":
                         event[x] = empty_buckets.pop(random.randrange(
                             len(empty_buckets)) if not self.deterministic else self.get_deterministic_seed() % len(
                             empty_buckets))
@@ -258,11 +258,11 @@ class MiniStandoffEnv(para_MultiGridEnv):
                     elif isinstance(event[x], int) and event[0] != 'bait':
                         event[x] = events[event[x]][1]  # get first location
 
-                if event_type == "bait":
+                if event_type == "b":
                     event_args[k] = bait_args[event[1]] # get the size of the treat
-                elif event_type == "remove":
+                elif event_type == "rem":
                     empty_buckets.append(event[1])
-                elif event_type == "obscure" or event_type == "reveal":
+                elif event_type == "ob" or event_type == "re":
                     # hardcoded, will not work for multiple conspecifics
                     event_args[k] = "p_1"
                 # could also add functionality for moving empty buckets which are swapped, but that is not used in any tasks
@@ -274,8 +274,8 @@ class MiniStandoffEnv(para_MultiGridEnv):
         for k, event in enumerate(events):
             self.add_timer(event, curTime, arg=event_args[k])
             curTime += 1
-        self.add_timer(["release"], curTime, arg=0)
-        self.add_timer(["release"], curTime + release_gap + 1, arg=1)
+        self.add_timer(["rel"], curTime, arg=0)
+        self.add_timer(["rel"], curTime + release_gap + 1, arg=1)
 
         # returns the final timer, the release of the sub, could be made dynamic so just max of timers
         return curTime + release_gap
@@ -360,19 +360,19 @@ class MiniStandoffEnv(para_MultiGridEnv):
                     # this is a special case of removedUninformed1 where there is no correct solution.
 
             self.del_obj(x, y)
-        elif name == "obscure" or name == "reveal":
+        elif name == "ob" or name == "re":
             b = self.grid.get(*self.agent_door_pos[arg])
-            if name == "obscure":
+            if name == "ob":
                 b.state = 1
                 b.see_behind = lambda: False
                 self.currently_visible = False
-            elif name == "reveal":
+            elif name == "re":
                 b.state = 0
                 b.see_behind = lambda: True
                 self.currently_visible = True
             for box in range(self.boxes):
-                self.can_see[arg + str(box)] = False if "obscure" in name else True
-        elif name == "swap":
+                self.can_see[arg + str(box)] = False if "ob" in name else True
+        elif name == "sw":
             b1 = self.grid.get(event[1] * 1 + 1, y)
             b2 = self.grid.get(event[2] * 1 + 1, y)
             if self.use_box_colors:
@@ -390,7 +390,7 @@ class MiniStandoffEnv(para_MultiGridEnv):
                 self.put_obj(obj2, event[2] * 1 + 1, y)
                 self.objs_to_hide.append(obj1)
                 self.objs_to_hide.append(obj2)
-        elif name == "release":
+        elif name == "rel":
             if self.record_info:
                 self.infos['p_0']['eventVisibility'] = ''.join(
                     ['1' if x else '0' for x in self.visible_event_list])
@@ -413,7 +413,7 @@ class MiniStandoffEnv(para_MultiGridEnv):
             self.append_food_locs(obj, loc)  # appends to self.big_food_locations and self.small_food_locations
 
         # oracle food location memory for puppet ai
-        if name == "bait" or name == "swap" or name == "remove" or (self.hidden is True and name == "reveal"):
+        if name == "b" or name == "sw" or name == "rem" or (self.hidden is True and name == "re"):
             for box in range(self.boxes):
                 x = box * 1 + 1
                 for agent in self.agents_and_puppets():
@@ -484,7 +484,7 @@ class MiniStandoffEnv(para_MultiGridEnv):
             self.infos['p_0']["b-exist"] = [1 if self.bigReward in all_rewards_seen else 0,
                                                  1 if self.smallReward in all_rewards_seen else 0]
         if self.record_info:
-            if name == "release":
+            if name == "rel":
                 # if agent's goal of player_1 matches big treat location, then shouldAvoidBig is True
                 if len(self.puppets):
                     self.infos['p_0']['puppet_goal'] = self.agent_goal[self.puppets[-1]]

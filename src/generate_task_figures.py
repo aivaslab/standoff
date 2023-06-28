@@ -34,8 +34,8 @@ def update_line_state(line, update, all_positions):
         if symbol['char'] == 'o':
             symbol['char'] = 'x'
         symbol['prev'] = i
-    if update_type == 'bait':
-        if update_arg == 'empty':
+    if update_type == 'b':
+        if update_arg == 'e':
             # find first item in line where char is x
             for i, symbol in enumerate(line):
                 if symbol['char'] == '.':
@@ -51,11 +51,11 @@ def update_line_state(line, update, all_positions):
         index = all_positions[update_arg]
         line[index]['char'] = ' '
         line[index]['prev'] = None
-    elif update_type == 'swap':
+    elif update_type == 'sw':
         index1 = all_positions[update_arg]
         if update_arg2 == 'else':
             index2 = (index1 + 2) % 5
-        elif update_arg2 == 'empty':
+        elif update_arg2 == 'e':
             for i, symbol in enumerate(line):
                 if symbol['char'] == '.':
                     index2 = i
@@ -66,7 +66,7 @@ def update_line_state(line, update, all_positions):
         # update prev to be position of previous data before swap
         line[index1]['prev'] = index2
         line[index2]['prev'] = index1
-    elif update_type == 'release':
+    elif update_type == 'rel':
         # change all empty strings to .s, all prevs to index
         for i, symbol in enumerate(line):
             if symbol['char'] == ' ':
@@ -131,9 +131,9 @@ for i, (updates, name) in enumerate(zip(updateses, names)):
     for update in updates:
         timestep += 1
         cur_line, pos = update_line_state(cur_line, update, all_positions)
-        if update[0] == 'obscure':
+        if update[0] == 'ob':
             obscured = True
-        if update[0] == 'reveal' or update[0] == 'release':
+        if update[0] == 're' or update[0] == 'rel':
             obscured = False
 
         all_positions.append(pos)
