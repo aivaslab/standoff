@@ -255,7 +255,7 @@ class MiniStandoffEnv(para_MultiGridEnv):
                         event[x] = available_spots.pop(random.randrange(
                             len(available_spots)) if not self.deterministic else self.get_deterministic_seed() % len(
                             available_spots))
-                    elif isinstance(event[x], int) and event[0] != 'bait':
+                    elif isinstance(event[x], int) and event[0] != 'b':
                         event[x] = events[event[x]][1]  # get first location
 
                 if event_type == "b":
