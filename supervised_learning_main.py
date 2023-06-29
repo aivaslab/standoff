@@ -7,43 +7,38 @@ import os
 sys.path.append(os.getcwd())
 
 from src.objects import *
-from src.agents import GridAgentInterface
-from src.pz_envs import env_from_config
-from src.pz_envs.scenario_configs import ScenarioConfigs
-# import src.pz_envs
 from torch.utils.data import Dataset, DataLoader
 import tqdm
-import copy
 import torch.nn as nn
-import torch.nn.functional as F
 import random
 import torch
 from sklearn.model_selection import train_test_split
 from matplotlib import pyplot as plt
 from src.supervised_learning import RNNModel, CustomDataset, gen_data
-from matplotlib import cm
 import traceback
 
 
 def train_model(data_name, label, additional_val_sets, path='supervised/', dsize=2500, epochs=100, model_kwargs=None):
     data = np.load(path + data_name + '-obs.npy')
     labels = np.load(path + data_name + '-label-' + label + '.npy')
+    params = np.load(path + data_name + '-params.npy')
 
-    train_data, val_data, train_labels, val_labels = train_test_split(
-        data, labels, test_size=0.2, random_state=42
+    train_data, val_data, train_labels, val_labels, train_params, val_params = train_test_split(
+        data, labels, params, test_size=0.2, random_state=42
     )
 
     batch_size = 64
-    train_dataset = CustomDataset(train_data, train_labels)
-    val_dataset = CustomDataset(val_data, val_labels)
+    train_dataset = CustomDataset(train_data, train_labels, train_params)
+    val_dataset = CustomDataset(val_data, val_labels, val_params)
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
 
     additional_val_loaders = []
     for val_set_name in additional_val_sets:
-        val_data = np.load(path + val_set_name + '-' + str(dsize) + '-obs.npy')
-        val_labels = np.load(path + val_set_name + '-' + str(dsize) + '-label-' + label + '.npy')
-        val_dataset = CustomDataset(val_data, val_labels)
+        val_data = np.load(path + val_set_name + '-obs.npy')
+        val_labels = np.load(path + val_set_name + '-label-' + label + '.npy')
+        val_labels = np.load(path + val_set_name + '-params.npy')
+        val_dataset = CustomDataset(val_data, val_labels, val_params)
         additional_val_loaders.append(DataLoader(val_dataset, batch_size=batch_size, shuffle=False))
 
     model_kwargs['output_len'] = np.prod(train_labels.shape[1:])
@@ -59,7 +54,7 @@ def train_model(data_name, label, additional_val_sets, path='supervised/', dsize
     val_losses = [[] for _ in range(len(additional_val_loaders) + 1)]
     for epoch in tqdm.trange(num_epochs):
         train_loss = 0
-        for i, (inputs, target_labels) in enumerate(train_loader):
+        for i, (inputs, target_labels, _) in enumerate(train_loader):
             #inputs = inputs.view(-1, 10, input_size)
             #print(inputs.shape)
             outputs = model(inputs)
@@ -75,7 +70,7 @@ def train_model(data_name, label, additional_val_sets, path='supervised/', dsize
             with torch.no_grad():
                 val_loss = 0
                 val_samples_processed = 0
-                for inputs, labels in _val_loader:
+                for inputs, labels, _ in _val_loader:
                     #inputs = inputs.view(-1, 10, input_size)
                     outputs = model(inputs)
                     loss = criterion(outputs, torch.argmax(labels, dim=1))
@@ -109,13 +104,14 @@ def plot_losses(data_name, label, train_losses, val_losses, val_set_names, speci
 # train_model('random-2500', 'exist')
 if __name__ == '__main__':
     #sets = ScenarioConfigs.env_groups['3'] + ['all'] #use stage_2 and random for the other thing
-    sets = ['all']
+    sets = ['296']
     dsize = 6000
     labels = ['correctSelection']
-    gen_data(sets, dsize, labels)
+    #gen_data(sets, dsize, labels)
+    #exit()
     #labels = ['loc', 'exist', 'vision', 'b-loc', 'b-exist', 'target', 'correctSelection']
 
-    data_name = 'all'
+    data_name = '296'
     model_kwargs_base = {'hidden_size': [6, 8, 12, 16, 32],
                     'num_layers': [1, 2, 3],
                     'kernels': [4, 8, 16, 24, 32],
@@ -129,7 +125,6 @@ if __name__ == '__main__':
                     'use_pool': [True, False],
                     'use_conv2': [True, False],
                     'kernels2': [8, 16, 32, 48],
-
                     }
 
 
@@ -137,7 +132,6 @@ if __name__ == '__main__':
     test_loss_means = {}
     test_loss_stds = {}
     test_names = []
-
 
     num_random_tests = 48
     repetitions = 3
@@ -161,7 +155,7 @@ if __name__ == '__main__':
             first_v_loss = []
             for label in labels:
                 for repetition in range(repetitions):
-                    t_loss, v_loss, = train_model(data_name + '-' + str(dsize), label, unused_sets, epochs=epochs, dsize=dsize, model_kwargs=model_kwargs)
+                    t_loss, v_loss, = train_model(data_name, label, unused_sets, epochs=epochs, dsize=dsize, model_kwargs=model_kwargs)
                     #plot_losses(data_name, label, t_loss, v_loss, [data_name] + unused_sets)
                     first_v_loss.append(v_loss[0])
                     # add losses elementwise

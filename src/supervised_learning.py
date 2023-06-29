@@ -102,18 +102,18 @@ def gen_data(configNames, num_timesteps=2500, labels=[]):
         posterior_metrics = ['selection', 'selectedBig', 'selectedSmall', 'selectedNeither',
                    'selectedPrevBig', 'selectedPrevSmall', 'selectedPrevNeither',
                    'selectedSame', ]
+        all_event_lists = list(ScenarioConfigs.all_event_lists.items())
 
-        data_name = f'{configName}-{num_timesteps}'
+        data_name = f'{len(all_event_lists)}'
         data_obs = []
         data_labels = {}
         for label in labels + prior_metrics + posterior_metrics:
             data_labels[label] = []
+        data_params = []
 
-
-        all_event_lists = list(ScenarioConfigs.all_event_lists.items())
         all_obs_and_labels = pd.DataFrame(columns=['name', 'obs', 'label'])
 
-        env.target_param_group_count = 2
+        env.target_param_group_count = 20
         env.param_groups = [ {'eLists': {all_event_lists[n][0]: all_event_lists[n][1]}, 'params': ScenarioConfigs.standoff['defaults']} for n in range(len(all_event_lists)) ]
         print(env.param_groups[0])
         #while len(data_obs) < num_timesteps:
@@ -123,6 +123,7 @@ def gen_data(configNames, num_timesteps=2500, labels=[]):
         tq = tqdm.tqdm(range(len(env.param_groups)))
 
         total_groups = len(env.param_groups)
+
 
         while env.current_param_group < total_groups:
 
@@ -140,13 +141,15 @@ def gen_data(configNames, num_timesteps=2500, labels=[]):
                 this_ob[pos, :, :, :] = next_obs['p_0']
                 #if not any([np.array_equal(this_ob, x) for x in data_obs]):
                 if pos == frames - 1 or env.has_released:
-                    #data_obs.append(copy.copy(this_ob))
-                    for label in labels + prior_metrics:
+                    data_obs.append(copy.copy(this_ob))
+                    data_params.append(eName)
+                    for label in set(labels) or set(prior_metrics):
                         if label == "correctSelection" or label == 'incorrectSelection':
                             data = one_hot(5, info['p_0'][label])
                         else:
                             data = info['p_0'][label]
-                        all_obs_and_labels = all_obs_and_labels.append({'name': eName, 'obs': copy.copy(this_ob), 'label': data}, ignore_index=True)
+                        data_labels[label].append(copy.copy(data))
+                        #all_obs_and_labels = all_obs_and_labels.append({'name': eName, 'obs': copy.copy(this_ob), 'label': data}, ignore_index=True)
                     break
 
                 pos += 1
@@ -169,25 +172,25 @@ def gen_data(configNames, num_timesteps=2500, labels=[]):
                 # normally the while loop won't break because reset has a modulus
                 break
 
-        all_obs_and_labels.to_csv('train_data.csv', index=False)
-        all_path_infos.to_csv('extra_data.csv', index=False)
-        #np.save('supervised/' + data_name + '-obs', np.array(data_obs))
-        #for label in labels:
-        #    np.save('supervised/' + data_name + '-label-' + label, np.array(data_labels[label]))
+        #all_obs_and_labels.to_csv('train_data.csv', index=False)
+        #all_path_infos.to_csv('extra_data.csv', index=False)
+        np.save('supervised/' + data_name + '-obs', np.array(data_obs))
+        np.save('supervised/' + data_name + '-params', np.array(data_params))
+        for label in labels:
+            np.save('supervised/' + data_name + '-label-' + label, np.array(data_labels[label]))
 
 
 class CustomDataset(Dataset):
-    def __init__(self, data, labels):
+    def __init__(self, data, labels, params):
         self.data = data
         self.labels = labels
+        self.params = params
 
     def __len__(self):
         return len(self.data)
 
     def __getitem__(self, idx):
-        # Flatten the labels
-        flat_labels = torch.tensor(self.labels[idx].flatten(), dtype=torch.float32)
-        return torch.tensor(self.data[idx], dtype=torch.float32), flat_labels
+        return torch.tensor(self.data[idx], dtype=torch.int8), torch.tensor(self.labels[idx].flatten(), dtype=torch.int8), self.params[idx]
 
 
 class RNNModel(nn.Module):
