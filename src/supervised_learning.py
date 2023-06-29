@@ -5,6 +5,8 @@ import numpy as np
 import sys
 import os
 
+import pandas as pd
+
 from .utils.evaluation import get_relative_direction
 
 sys.path.append(os.getcwd())
@@ -61,6 +63,8 @@ def gen_data(configNames, num_timesteps=2500, labels=[]):
     }
 
     frames = 10
+    all_path_infos = pd.DataFrame()
+    record_extra_data = False
 
     for configName in configNames:
         configs = ScenarioConfigs().standoff
@@ -105,43 +109,71 @@ def gen_data(configNames, num_timesteps=2500, labels=[]):
         for label in labels + prior_metrics + posterior_metrics:
             data_labels[label] = []
 
-        five_path_labels = {}
-        tq = tqdm.tqdm(range(int(num_timesteps)))
-        while len(data_obs) < num_timesteps:
+
+        all_event_lists = list(ScenarioConfigs.all_event_lists.items())
+        all_obs_and_labels = pd.DataFrame(columns=['name', 'obs', 'label'])
+
+        env.target_param_group_count = 2
+        env.param_groups = [ {'eLists': {all_event_lists[n][0]: all_event_lists[n][1]}, 'params': ScenarioConfigs.standoff['defaults']} for n in range(len(all_event_lists)) ]
+        print(env.param_groups[0])
+        #while len(data_obs) < num_timesteps:
+        #tq = tqdm.tqdm(range(int(num_timesteps)))
+        prev_param_group = -1
+        eName = ''
+        tq = tqdm.tqdm(range(len(env.param_groups)))
+
+        total_groups = len(env.param_groups)
+
+        while env.current_param_group < total_groups:
+
             obs = env.reset()
+            if env.current_param_group != prev_param_group:
+                tq.update(1)
+                eName = env.current_event_list_name
+            prev_param_group = env.current_param_group
+            #print(env.current_param_group, env.event_lists)
             this_ob = np.zeros((10, *obs['p_0'].shape))
             pos = 0
 
             while pos < frames:
-                next_obs, rew, done, info = env.step({'p_0': 2})
+                next_obs, _, _, info = env.step({'p_0': 2})
                 this_ob[pos, :, :, :] = next_obs['p_0']
-                if not any([np.array_equal(this_ob, x) for x in data_obs]):
-                    # if True:
-                    data_obs.append(copy.copy(this_ob))
+                #if not any([np.array_equal(this_ob, x) for x in data_obs]):
+                if pos == frames - 1 or env.has_released:
+                    #data_obs.append(copy.copy(this_ob))
                     for label in labels + prior_metrics:
                         if label == "correctSelection" or label == 'incorrectSelection':
-                            data_labels[label].append(one_hot(5, info['p_0'][label]))
+                            data = one_hot(5, info['p_0'][label])
                         else:
-                            data_labels[label].append(info['p_0'][label])
+                            data = info['p_0'][label]
+                        all_obs_and_labels = all_obs_and_labels.append({'name': eName, 'obs': copy.copy(this_ob), 'label': data}, ignore_index=True)
+                    break
 
-                    tq.update(1)
                 pos += 1
 
+            if record_extra_data:
+                all_paths = env.get_all_paths(env.grid.volatile, env.instance_from_name['p_0'].pos)
 
-            all_paths = env.get_all_paths(env.grid.volatile, env.instance_from_name['p_0'].pos)
-            # save the current env position...
+                for k, path in enumerate(all_paths):
 
-            for k, path in enumerate(all_paths):
-                _env = copy.deepcopy(env)
-                a = _env.instance_from_name['p_0']
-                while True:
-                    act = get_relative_direction(a, path)
-                    _, _, done, info = _env.step({'p_0': act})
-                    if done['p_0']:
-                        break
-        np.save('supervised/' + data_name + '-obs', np.array(data_obs))
-        for label in labels:
-            np.save('supervised/' + data_name + '-label-' + label, np.array(data_labels[label]))
+                    _env = copy.deepcopy(env)
+                    a = _env.instance_from_name['p_0']
+                    while True:
+                        _, _, done, info = _env.step({'p_0': get_relative_direction(a, path)})
+                        if done['p_0']:
+                            all_path_infos = all_path_infos.append(info['p_0'], ignore_index=True)
+                            break
+                del _env, a
+
+            if env.current_param_group == total_groups - 1:
+                # normally the while loop won't break because reset has a modulus
+                break
+
+        all_obs_and_labels.to_csv('train_data.csv', index=False)
+        all_path_infos.to_csv('extra_data.csv', index=False)
+        #np.save('supervised/' + data_name + '-obs', np.array(data_obs))
+        #for label in labels:
+        #    np.save('supervised/' + data_name + '-label-' + label, np.array(data_labels[label]))
 
 
 class CustomDataset(Dataset):

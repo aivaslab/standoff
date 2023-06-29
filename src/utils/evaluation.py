@@ -26,7 +26,7 @@ def get_relative_direction(agent, path):
     if sname in path.keys():
         direction = path[sname]
     else:
-        print('unknown', sname, path.keys())
+        print('off path', sname, path.keys())
         direction = agent.dir  # random.choice([0, 1, 2, 3])
     relative_dir = (agent.dir - direction) % 4
     if relative_dir == 3 or relative_dir == 2:

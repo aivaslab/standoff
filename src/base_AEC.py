@@ -584,7 +584,7 @@ class para_MultiGridEnv(ParallelEnv):
 
         self.current_param_group = 0
         self.current_param_group_count = 0
-        self.max_param_group_count = -1
+        self.target_param_group_count = -1
         self.current_event_list = None
         self.current_event_list_name = None
         self.param_groups = []
@@ -670,16 +670,15 @@ class para_MultiGridEnv(ParallelEnv):
 
         Here it sets up the state dictionary which is used by step() and the observations dictionary which is used by step() and observe()
         """
-
-        if self.max_param_group_count > -1 or not self.has_reset:
-            self.current_param_group_count += 1
-            self.has_reset = True
-            if self.current_param_group_count > self.max_param_group_count:
+        if self.target_param_group_count > -1 or not self.has_reset:
+            if self.current_param_group_count > self.target_param_group_count or not self.has_reset:
                 self.current_param_group_count = 0
                 self.current_param_group = (self.current_param_group + 1) % len(self.param_groups)
                 self.event_lists = self.param_groups[self.current_param_group]['eLists']
                 self.params = self.param_groups[self.current_param_group]['params']
-                print('dd', len(self.event_lists), self.params)
+
+            self.current_param_group_count += 1
+            self.has_reset = True
 
             # deal with num_puppets being lower than maximum
             self.possible_puppets = [f"p_{x + len(self.agents)}" for x in range(self.params["num_puppets"])]

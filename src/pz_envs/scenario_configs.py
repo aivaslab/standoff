@@ -25,6 +25,7 @@ def add_bait(events, bait_num, bait_size, uninformed_bait, visible_baits, swap_i
         events.append(['b', bait_size, swap_index])
         return len(events) - 1
 
+
 def add_swap(events, swap_num, swap_indices, uninformed_swap, visible_swaps):
     swap_index, swap_location = swap_indices
     if swap_num == uninformed_swap or visible_swaps == 0:
@@ -33,6 +34,7 @@ def add_swap(events, swap_num, swap_indices, uninformed_swap, visible_swaps):
     else:
         events.append(['sw', swap_index, swap_location])
         return len(events) - 1
+
 
 def remove_unnecessary_sequences(events):
     removed_indices = []
@@ -57,7 +59,6 @@ def remove_unnecessary_sequences(events):
 
 
 class ScenarioConfigs:
-
     parameter_space = {
         # baits and swaps main
         "visible_baits": [0, 1, 2],  # x
@@ -65,9 +66,11 @@ class ScenarioConfigs:
         "visible_swaps": lambda params: range(params['swaps'] + 1),  # z
 
         # baits and swaps special
-        "first_swap_is_both": lambda params: [True, False] if params['swaps'] > 0 else [False],  # ab
-        "delay_2nd_bait": lambda params: [True, False] if params['swaps'] > 0 and params['first_swap_is_both'] is False else [False],  # d
-        "second_swap_to_first_loc": lambda params: [True, False] if params['swaps'] == 2 and params['delay_2nd_bait'] is False else [False],  # c
+        "first_swap_is_both": lambda params: [True, False] if params['swaps'] > 0 else [False],
+        "delay_2nd_bait": lambda params: [True, False] if params['swaps'] > 0 and params[
+            'first_swap_is_both'] is False else [False],
+        "second_swap_to_first_loc": lambda params: [True, False] if params['swaps'] == 2 and params[
+            'delay_2nd_bait'] is False else [False],
 
         # opponent and preferences
         "num_opponents": [0, 1],
@@ -78,12 +81,12 @@ class ScenarioConfigs:
         # we do not also use subject_prefers_small because small here just means different pref, not meaningful size
         "encourage_sharing": lambda params: [0, 1] if params["num_opponents"] > 0 else [0],
 
-
         # baits and swaps ordering (randomized during all training)
         "first_bait_size": [0, 1],  # i
-        "first_swap": lambda params: [0, 1] if params['swaps'] > 0 and params['delay_2nd_bait'] is False and params['first_swap_is_both'] is False else [0],  # j
-        "uninformed_bait": lambda params: [0, 1] if params['visible_baits'] == 1 else [-1],  # k
-        "uninformed_swap": lambda params: [0, 1] if params['swaps'] == 2 and params['visible_swaps'] == 1 else [-1],  # l
+        "first_swap_index": lambda params: [0, 1] if params['swaps'] > 0 and params['delay_2nd_bait'] is False and
+                                                     params['first_swap_is_both'] is False else [0],
+        "uninformed_bait": lambda params: [0, 1] if params['visible_baits'] == 1 else [-1],
+        "uninformed_swap": lambda params: [0, 1] if params['swaps'] == 2 and params['visible_swaps'] == 1 else [-1],
     }
 
     all_event_lists = {}
@@ -106,18 +109,18 @@ class ScenarioConfigs:
 
         first_bait_size = params['first_bait_size']
         uninformed_bait = params['uninformed_bait']
-        first_swap = params['first_swap']
+        first_swap = params['first_swap_index']
         uninformed_swap = params['uninformed_swap']
 
-
-        name = f"b{visible_baits}s{swaps}v{visible_swaps}"
+        name = f"b{visible_baits}w{swaps}v{visible_swaps}"
         name += "f" if first_swap_is_both else ""
         name += "s" if second_swap_to_first_loc else ""
         name += "d" if delay_2nd_bait else ""
-        #name += "u" if subject_is_dominant else ""
-        #name += "p" if opponent_prefers_small else ""
-        #name += "h" if encourage_sharing else ""
-        name += "-" + str(1*first_bait_size + 2*(uninformed_bait > 0) + 4*(uninformed_swap > 0) + 8*(first_swap > 0))
+        # name += "u" if subject_is_dominant else ""
+        # name += "p" if opponent_prefers_small else ""
+        # name += "h" if encourage_sharing else ""
+        name += "-" + str(
+            1 * first_bait_size + 2 * (uninformed_bait > 0) + 4 * (uninformed_swap > 0) + 8 * (first_swap > 0))
         events = []
 
         bait_index = []
@@ -129,11 +132,13 @@ class ScenarioConfigs:
         first_swap_index = None
         for swap_num in range(1 if delay_2nd_bait else swaps):
             if swap_num == 0 and first_swap_is_both:
-                first_swap_index = add_swap(events, swap_num, (bait_index[0], bait_index[1]), uninformed_swap, visible_swaps)
+                first_swap_index = add_swap(events, swap_num, (bait_index[0], bait_index[1]), uninformed_swap,
+                                            visible_swaps)
             else:
                 swap_index = bait_index[first_swap] if swap_num == 0 else bait_index[1 - first_swap]
                 swap_location = first_swap_index if swap_num == 1 and second_swap_to_first_loc else 'e'
-                first_swap_index = add_swap(events, swap_num, (swap_index, swap_location), uninformed_swap, visible_swaps)
+                first_swap_index = add_swap(events, swap_num, (swap_index, swap_location), uninformed_swap,
+                                            visible_swaps)
 
         if delay_2nd_bait:
             bait_size = 1 - first_bait_size
@@ -151,8 +156,7 @@ class ScenarioConfigs:
             informed_event_lists[name] = events
         if visible_baits == 0 and visible_swaps == 0:
             uninformed_event_lists[name] = events
-        #print(name, events)
-
+        # print(name, events)
 
     lack_to_generalized = {
         "moved": "0.2.2",
@@ -176,7 +180,8 @@ class ScenarioConfigs:
     for key, value in matching_names.items():
         print(f"For {key}, found matches: {value}")
 
-    print('total lists', len(all_event_lists), 'informed lists', len(informed_event_lists), 'uninformed lists', len(uninformed_event_lists))
+    print('total lists', len(all_event_lists), 'informed lists', len(informed_event_lists), 'uninformed lists',
+          len(uninformed_event_lists))
 
     standoff = {
         "defaults": {
