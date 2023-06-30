@@ -4,6 +4,8 @@ import numpy as np
 import sys
 import os
 
+import pandas as pd
+
 sys.path.append(os.getcwd())
 
 from src.objects import *
@@ -17,6 +19,40 @@ from matplotlib import pyplot as plt
 from src.supervised_learning import RNNModel, CustomDataset, gen_data
 import traceback
 
+
+def decode_event_name(name):
+    # Split the name into the main part and the numerical suffix
+    main_part, numerical_suffix = name.split('-')
+
+    # Extract individual parameters
+    visible_baits = int(main_part[main_part.index('b') + 1:main_part.index('w')])
+    swaps = int(main_part[main_part.index('w') + 1:main_part.index('v')])
+    visible_swaps = int(main_part[main_part.index('v') + 1])
+    first_swap_is_both = 1 if 'f' in main_part else 0
+    second_swap_to_first_loc = 1 if 's' in main_part else 0
+    delay_2nd_bait = 1 if 'd' in main_part else 0
+
+    # Convert the numerical suffix to binary and pad with zeroes to ensure 4 bits
+    binary_suffix = format(int(numerical_suffix), '04b')
+
+    # Extract parameters from the binary suffix
+    first_bait_size = int(binary_suffix[0])
+    uninformed_bait = int(binary_suffix[1])
+    uninformed_swap = int(binary_suffix[2])
+    first_swap = int(binary_suffix[3])
+
+    return pd.Series({
+        "visible_baits": visible_baits,
+        "swaps": swaps,
+        "visible_swaps": visible_swaps,
+        "first_swap_is_both": first_swap_is_both,
+        "second_swap_to_first_loc": second_swap_to_first_loc,
+        "delay_2nd_bait": delay_2nd_bait,
+        "first_bait_size": first_bait_size,
+        "uninformed_bait": uninformed_bait,
+        "uninformed_swap": uninformed_swap,
+        "first_swap": first_swap
+    })
 
 def train_model(data_name, label, additional_val_sets, path='supervised/', dsize=2500, epochs=100, model_kwargs=None):
     data = np.load(path + data_name + '-obs.npy')
@@ -46,12 +82,16 @@ def train_model(data_name, label, additional_val_sets, path='supervised/', dsize
 
     model = RNNModel(**model_kwargs)
     criterion = nn.CrossEntropyLoss() #nn.MSELoss()
+    special_criterion = nn.CrossEntropyLoss(reduction='none')
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 
     max_val_samples = 500
     num_epochs = epochs
     train_losses = []
     val_losses = [[] for _ in range(len(additional_val_loaders) + 1)]
+
+    #param_losses = pd.DataFrame(columns=['param', 'epoch', 'loss'])
+    param_losses_list = []
     for epoch in tqdm.trange(num_epochs):
         train_loss = 0
         for i, (inputs, target_labels, _) in enumerate(train_loader):
@@ -70,19 +110,71 @@ def train_model(data_name, label, additional_val_sets, path='supervised/', dsize
             with torch.no_grad():
                 val_loss = 0
                 val_samples_processed = 0
-                for inputs, labels, _ in _val_loader:
+                for inputs, labels, params in _val_loader:
                     #inputs = inputs.view(-1, 10, input_size)
                     outputs = model(inputs)
                     loss = criterion(outputs, torch.argmax(labels, dim=1))
                     val_loss += loss.item()
                     val_samples_processed += inputs.size(0)
-                    if val_samples_processed >= max_val_samples:
-                        break
+                    #if val_samples_processed >= max_val_samples:
+                    #    break
+
+                # broken part:
+                if True:
+                    for inputs, labels, params in _val_loader:
+                        outputs = model(inputs)
+                        losses = special_criterion(outputs, torch.argmax(labels, dim=1))
+                        _, predicted = torch.max(outputs, 1)
+                        corrects = (predicted == torch.argmax(labels, dim=1)).float()
+                        for input, label, param, loss, correct in zip(inputs, labels, params, losses, corrects):
+                            param_losses_list.append(
+                                {'param': param, 'epoch': epoch, 'loss': loss.item(), 'accuracy': correct.item()})
+                            #param_losses = param_losses.append({'param': param, 'epoch': epoch, 'loss': loss.item(), 'accuracy': accuracy}, ignore_index=True)
+
+
             val_loss /= val_samples_processed / batch_size
             val_losses[idx].append(val_loss)
         model.train()
     # save model
     torch.save([model.kwargs, model.state_dict()], f'{path}{data_name}-{label}-model.pt')
+
+    pd.DataFrame(param_losses_list).to_csv(path + 'param_losses.csv')
+
+
+    df = pd.read_csv('supervised/param_losses.csv')
+    # Apply the decoding function to each row
+    df = df.join(df['param'].apply(decode_event_name))
+
+    params = ['visible_baits', 'swaps', 'visible_swaps', 'first_swap_is_both',
+              'second_swap_to_first_loc', 'delay_2nd_bait', 'first_bait_size',
+              'uninformed_bait', 'uninformed_swap', 'first_swap']
+
+    avg_loss = {}
+    entropy = {}
+    std_dev = {}
+
+    df['log_loss'] = np.log(df['loss'])
+    # Calculate average loss and entropy for each parameter individually
+    for param in params:
+        avg_loss[param] = df.groupby([param, 'epoch'])['accuracy'].mean().reset_index()
+        std_dev[param] = df.groupby([param, 'epoch'])['accuracy'].std().reset_index()
+        entropy[param] = df.groupby([param, 'epoch'])['log_loss'].apply(
+            lambda x: -np.sum(x * df.loc[x.index, 'loss'])).reset_index()
+
+    # Now, you can plot the curves for each parameter
+    for param in params:
+        plt.figure(figsize=(10, 6))
+        for value in df[param].unique():
+            sub_df = avg_loss[param][avg_loss[param][param] == value]
+            std_dev_sub_df = std_dev[param][std_dev[param][param] == value]
+            plt.plot(sub_df['epoch'], sub_df['accuracy'], label=f'{param} = {value}')
+            plt.fill_between(sub_df['epoch'], sub_df['accuracy'] - std_dev_sub_df['accuracy'],
+                             sub_df['accuracy'] + std_dev_sub_df['accuracy'], alpha=0.2)
+            plt.title(f'Average accuracy vs Epoch for {param}')
+            plt.xlabel('Epoch')
+            plt.ylabel('Average accuracy')
+            plt.legend()
+        plt.show()
 
     return train_losses, val_losses
 
