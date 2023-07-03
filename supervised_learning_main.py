@@ -53,13 +53,13 @@ def decode_event_name(name):
         "visible_baits": visible_baits,
         "swaps": swaps,
         "visible_swaps": visible_swaps,
-        "first_swap_is_both": first_swap_is_both if swaps_gt_0 else 'N/A',
-        "second_swap_to_first_loc": second_swap_to_first_loc if swaps_eq_2 and delay_2nd_bait_false else 'N/A',
-        "delay_2nd_bait": delay_2nd_bait if swaps_gt_0 and first_swap_is_both_false else 'N/A',
+        "first_swap_is_both": first_swap_is_both if swaps_gt_0 else 'N/A (swaps==0)',
+        "second_swap_to_first_loc": second_swap_to_first_loc if swaps_eq_2 and delay_2nd_bait_false else 'N/A (swaps<2 or 2nd bait delayed)',
+        "delay_2nd_bait": delay_2nd_bait if swaps_gt_0 and first_swap_is_both_false else 'N/A (swaps==0 or first swap both)',
         "first_bait_size": first_bait_size,
-        "uninformed_bait": uninformed_bait if visible_baits_eq_1 else 'N/A',
-        "uninformed_swap": uninformed_swap if swaps_eq_2 and visible_swaps_eq_1 else 'N/A',
-        "first_swap": first_swap if swaps_gt_0 and not delay_2nd_bait and not first_swap_is_both else 'N/A'
+        "uninformed_bait": uninformed_bait if visible_baits_eq_1 else 'N/A (informed baits != 1)',
+        "uninformed_swap": uninformed_swap if swaps_eq_2 and visible_swaps_eq_1 else 'N/A (swaps<2 or informed swaps != 1)',
+        "first_swap": first_swap if swaps_gt_0 and not delay_2nd_bait and not first_swap_is_both else 'N/A (2nd bait delayed or first swap both)'
     })
 
 def train_model(data_name, label, additional_val_sets, path='supervised/', dsize=2500, epochs=100, model_kwargs=None):
