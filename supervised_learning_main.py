@@ -41,17 +41,25 @@ def decode_event_name(name):
     uninformed_swap = int(binary_suffix[2])
     first_swap = int(binary_suffix[3])
 
+    # Calculate conditions for special parameters
+    swaps_gt_0 = swaps > 0
+    first_swap_is_both_false = not first_swap_is_both
+    delay_2nd_bait_false = not delay_2nd_bait
+    swaps_eq_2 = swaps == 2
+    visible_baits_eq_1 = visible_baits == 1
+    visible_swaps_eq_1 = visible_swaps == 1
+
     return pd.Series({
         "visible_baits": visible_baits,
         "swaps": swaps,
         "visible_swaps": visible_swaps,
-        "first_swap_is_both": first_swap_is_both,
-        "second_swap_to_first_loc": second_swap_to_first_loc,
-        "delay_2nd_bait": delay_2nd_bait,
+        "first_swap_is_both": first_swap_is_both if swaps_gt_0 else 'N/A',
+        "second_swap_to_first_loc": second_swap_to_first_loc if swaps_eq_2 and delay_2nd_bait_false else 'N/A',
+        "delay_2nd_bait": delay_2nd_bait if swaps_gt_0 and first_swap_is_both_false else 'N/A',
         "first_bait_size": first_bait_size,
-        "uninformed_bait": uninformed_bait,
-        "uninformed_swap": uninformed_swap,
-        "first_swap": first_swap
+        "uninformed_bait": uninformed_bait if visible_baits_eq_1 else 'N/A',
+        "uninformed_swap": uninformed_swap if swaps_eq_2 and visible_swaps_eq_1 else 'N/A',
+        "first_swap": first_swap if swaps_gt_0 and not delay_2nd_bait and not first_swap_is_both else 'N/A'
     })
 
 def train_model(data_name, label, additional_val_sets, path='supervised/', dsize=2500, epochs=100, model_kwargs=None):
@@ -227,7 +235,7 @@ if __name__ == '__main__':
 
     num_random_tests = 48
     repetitions = 3
-    epochs = 100
+    epochs = 20
     colors = plt.cm.jet(np.linspace(0,1,num_random_tests))
 
     test = 0
