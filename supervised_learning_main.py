@@ -146,45 +146,17 @@ def train_model(data_name, label, additional_val_sets, path='supervised/', dsize
     # save model
     torch.save([model.kwargs, model.state_dict()], f'{path}{data_name}-{label}-model.pt')
 
-    pd.DataFrame(param_losses_list).to_csv(path + 'param_losses.csv')
-
-
-    df = pd.read_csv('supervised/param_losses.csv')
+    #pd.DataFrame(param_losses_list).to_csv(path + 'param_losses.csv')
+    #df = pd.read_csv('supervised/param_losses.csv')
     # Apply the decoding function to each row
+
+    df = pd.DataFrame(param_losses_list)
+
     df = df.join(df['param'].apply(decode_event_name))
 
-    params = ['visible_baits', 'swaps', 'visible_swaps', 'first_swap_is_both',
-              'second_swap_to_first_loc', 'delay_2nd_bait', 'first_bait_size',
-              'uninformed_bait', 'uninformed_swap', 'first_swap']
 
-    avg_loss = {}
-    entropy = {}
-    std_dev = {}
 
-    df['log_loss'] = np.log(df['loss'])
-    # Calculate average loss and entropy for each parameter individually
-    for param in params:
-        avg_loss[param] = df.groupby([param, 'epoch'])['accuracy'].mean().reset_index()
-        std_dev[param] = df.groupby([param, 'epoch'])['accuracy'].std().reset_index()
-        entropy[param] = df.groupby([param, 'epoch'])['log_loss'].apply(
-            lambda x: -np.sum(x * df.loc[x.index, 'loss'])).reset_index()
-
-    # Now, you can plot the curves for each parameter
-    for param in params:
-        plt.figure(figsize=(10, 6))
-        for value in df[param].unique():
-            sub_df = avg_loss[param][avg_loss[param][param] == value]
-            std_dev_sub_df = std_dev[param][std_dev[param][param] == value]
-            plt.plot(sub_df['epoch'], sub_df['accuracy'], label=f'{param} = {value}')
-            plt.fill_between(sub_df['epoch'], sub_df['accuracy'] - std_dev_sub_df['accuracy'],
-                             sub_df['accuracy'] + std_dev_sub_df['accuracy'], alpha=0.2)
-            plt.title(f'Average accuracy vs Epoch for {param}')
-            plt.xlabel('Epoch')
-            plt.ylabel('Average accuracy')
-            plt.legend()
-        plt.show()
-
-    return train_losses, val_losses
+    return train_losses, val_losses, df
 
 
 def plot_losses(data_name, label, train_losses, val_losses, val_set_names, specific_name=None):
@@ -235,7 +207,7 @@ if __name__ == '__main__':
 
     num_random_tests = 48
     repetitions = 3
-    epochs = 20
+    epochs = 500
     colors = plt.cm.jet(np.linspace(0,1,num_random_tests))
 
     test = 0
@@ -254,8 +226,10 @@ if __name__ == '__main__':
             v_loss_sum = []
             first_v_loss = []
             for label in labels:
+                df_list = []
                 for repetition in range(repetitions):
-                    t_loss, v_loss, = train_model(data_name, label, unused_sets, epochs=epochs, dsize=dsize, model_kwargs=model_kwargs)
+                    t_loss, v_loss, df = train_model(data_name, label, unused_sets, epochs=epochs, dsize=dsize, model_kwargs=model_kwargs)
+                    df_list.append(df)
                     #plot_losses(data_name, label, t_loss, v_loss, [data_name] + unused_sets)
                     first_v_loss.append(v_loss[0])
                     # add losses elementwise
@@ -268,6 +242,40 @@ if __name__ == '__main__':
 
 
                     test_losses[model_name][repetition] = v_loss[0]
+
+                combined_df = pd.concat(df_list, ignore_index=True)
+                params = ['visible_baits', 'swaps', 'visible_swaps', 'first_swap_is_both',
+                          'second_swap_to_first_loc', 'delay_2nd_bait', 'first_bait_size',
+                          'uninformed_bait', 'uninformed_swap', 'first_swap']
+
+                avg_loss = {}
+                entropy = {}
+                std_dev = {}
+
+                df['log_loss'] = np.log(df['loss'])
+                # Calculate average loss and entropy for each parameter individually
+                for param in params:
+                    avg_loss[param] = df.groupby([param, 'epoch'])['accuracy'].mean().reset_index()
+                    std_dev[param] = df.groupby([param, 'epoch'])['accuracy'].std().reset_index()
+                    entropy[param] = df.groupby([param, 'epoch'])['log_loss'].apply(
+                        lambda x: -np.sum(x * df.loc[x.index, 'loss'])).reset_index()
+
+                # Now, you can plot the curves for each parameter
+                for param in params:
+                    plt.figure(figsize=(10, 6))
+                    for value in df[param].unique():
+                        sub_df = avg_loss[param][avg_loss[param][param] == value]
+                        std_dev_sub_df = std_dev[param][std_dev[param][param] == value]
+                        plt.plot(sub_df['epoch'], sub_df['accuracy'], label=f'{param} = {value}' if not isinstance(value, str) or value[0:3] != "N/A" else value)
+                        plt.fill_between(sub_df['epoch'], sub_df['accuracy'] - std_dev_sub_df['accuracy'],
+                                         sub_df['accuracy'] + std_dev_sub_df['accuracy'], alpha=0.2)
+                        plt.title(f'Average accuracy vs Epoch for {param}')
+                        plt.xlabel('Epoch')
+                        plt.ylabel('Average accuracy')
+                        plt.legend()
+                    #plt.show()
+                    plt.savefig(f'supervised/{param}.png')
+
             test_loss_means[model_name] = np.asarray(np.mean(test_losses[model_name], axis=0))
             test_loss_stds[model_name] = np.asarray(np.std(test_losses[model_name], axis=0))
 
