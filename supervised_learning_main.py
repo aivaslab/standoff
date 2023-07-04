@@ -1,10 +1,15 @@
 import copy
+import itertools
 
 import numpy as np
 import sys
 import os
 
 import pandas as pd
+import heapq
+
+import scipy.stats as stats
+from scipy.stats import norm, sem, t
 
 sys.path.append(os.getcwd())
 
@@ -55,14 +60,14 @@ def decode_event_name(name):
         "visible_swaps": visible_swaps,
         "first_swap_is_both": first_swap_is_both if swaps_gt_0 else 'N/A (swaps==0)',
         "second_swap_to_first_loc": second_swap_to_first_loc if swaps_eq_2 and delay_2nd_bait_false else 'N/A (swaps<2 or 2nd bait delayed)',
-        "delay_2nd_bait": delay_2nd_bait if swaps_gt_0 and first_swap_is_both_false else 'N/A (swaps==0 or first swap both)',
+        "delay_2nd_bait": delay_2nd_bait if swaps_gt_0 and first_swap_is_both_false else 'N/A (swaps=0 or first swap both)',
         "first_bait_size": first_bait_size,
-        "uninformed_bait": uninformed_bait if visible_baits_eq_1 else 'N/A (informed baits != 1)',
-        "uninformed_swap": uninformed_swap if swaps_eq_2 and visible_swaps_eq_1 else 'N/A (swaps<2 or informed swaps != 1)',
-        "first_swap": first_swap if swaps_gt_0 and not delay_2nd_bait and not first_swap_is_both else 'N/A (2nd bait delayed or first swap both)'
+        "uninformed_bait": uninformed_bait if visible_baits_eq_1 else 'N/A (informed baits!=1)',
+        "uninformed_swap": uninformed_swap if swaps_eq_2 and visible_swaps_eq_1 else 'N/A (swaps<2 or informed swaps!=1)',
+        "first_swap": first_swap if swaps_gt_0 and not delay_2nd_bait and not first_swap_is_both else 'N/A (swaps=0 or 2nd bait delayed or first swap both)'
     })
 
-def train_model(data_name, label, additional_val_sets, path='supervised/', dsize=2500, epochs=100, model_kwargs=None):
+def train_model(data_name, label, additional_val_sets, path='supervised/', dsize=2500, epochs=100, model_kwargs=None, lr=0.001):
     data = np.load(path + data_name + '-obs.npy')
     labels = np.load(path + data_name + '-label-' + label + '.npy')
     params = np.load(path + data_name + '-params.npy')
@@ -91,7 +96,7 @@ def train_model(data_name, label, additional_val_sets, path='supervised/', dsize
     model = RNNModel(**model_kwargs)
     criterion = nn.CrossEntropyLoss() #nn.MSELoss()
     special_criterion = nn.CrossEntropyLoss(reduction='none')
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
     max_val_samples = 500
     num_epochs = epochs
@@ -159,6 +164,18 @@ def train_model(data_name, label, additional_val_sets, path='supervised/', dsize
     return train_losses, val_losses, df
 
 
+def calculate_ci(group):
+    confidence = 0.95
+    group_arr = group.values
+    n = group_arr.shape[0]
+    m = np.mean(group_arr)
+    std_err = sem(group_arr)
+    h = std_err * t.ppf((1 + confidence) / 2, n - 1)
+
+    return pd.Series({'lower': m - h, 'upper': m + h, 'mean': m})
+
+
+
 def plot_losses(data_name, label, train_losses, val_losses, val_set_names, specific_name=None):
     plt.figure()
     plt.plot(train_losses, label=data_name + ' train loss')
@@ -206,9 +223,10 @@ if __name__ == '__main__':
     test_names = []
 
     num_random_tests = 48
-    repetitions = 3
-    epochs = 500
+    repetitions = 1
+    epochs = 10
     colors = plt.cm.jet(np.linspace(0,1,num_random_tests))
+    lr = 0.003
 
     test = 0
     while test < num_random_tests:
@@ -228,7 +246,7 @@ if __name__ == '__main__':
             for label in labels:
                 df_list = []
                 for repetition in range(repetitions):
-                    t_loss, v_loss, df = train_model(data_name, label, unused_sets, epochs=epochs, dsize=dsize, model_kwargs=model_kwargs)
+                    t_loss, v_loss, df = train_model(data_name, label, unused_sets, epochs=epochs, dsize=dsize, model_kwargs=model_kwargs, lr=lr)
                     df_list.append(df)
                     #plot_losses(data_name, label, t_loss, v_loss, [data_name] + unused_sets)
                     first_v_loss.append(v_loss[0])
@@ -251,30 +269,118 @@ if __name__ == '__main__':
                 avg_loss = {}
                 entropy = {}
                 std_dev = {}
+                lower, upper = {}, {}
 
                 df['log_loss'] = np.log(df['loss'])
-                # Calculate average loss and entropy for each parameter individually
-                for param in params:
-                    avg_loss[param] = df.groupby([param, 'epoch'])['accuracy'].mean().reset_index()
-                    std_dev[param] = df.groupby([param, 'epoch'])['accuracy'].std().reset_index()
-                    entropy[param] = df.groupby([param, 'epoch'])['log_loss'].apply(
-                        lambda x: -np.sum(x * df.loc[x.index, 'loss'])).reset_index()
 
-                # Now, you can plot the curves for each parameter
+
+
+                # Find the most interesting pairs of param/values
+                last_epoch_df = combined_df[combined_df['epoch'] == combined_df['epoch'].max()]
+                param_pairs = itertools.combinations(params, 2)  # Get all pairs of parameters
+                variances = {}
+                ranges = {} # pair ranges
+                range_dict = {} # pair ranges with fixed values
+
+                # Calculate average loss and entropy for each parameter individually
+
+                for param in params:
+                    ci_df = df.groupby([param, 'epoch'])['accuracy'].apply(calculate_ci).reset_index()
+                    avg_loss[param] = ci_df
+
+                for param1, param2 in param_pairs:
+                    ci_df = df.groupby([param1, param2, 'epoch'])['accuracy'].apply(calculate_ci).reset_index()
+                    avg_loss[(param1, param2)] = ci_df
+
+
+                    #entropy[(param1, param2)] = df.groupby([param1, param2, 'epoch'])['log_loss'].apply(
+                    #    lambda x: -np.sum(x * df.loc[x.index, 'loss'])).reset_index()
+
+                    grouped = last_epoch_df.groupby([param1, param2])['accuracy']
+                    variance = grouped.var().mean()  # Calculate the average variance across groups
+                    variances[(param1, param2)] = variance
+                    param_range = grouped.max() - grouped.min()  # Calculate the range across groups
+                    ranges[(param1, param2)] = param_range.mean()
+
+                    df[param2] = pd.to_numeric(df[param2], errors='coerce')
+
+                    for value1 in df[param1].unique():
+                        subset = df[df[param1] == value1]
+                        means = subset.groupby(param2)['accuracy'].mean()
+                        range_val = means.max() - means.min()
+                        range_dict[(param1, value1, param2)] = range_val
+
+                top_pairs = sorted(ranges.items(), key=lambda x: x[1], reverse=True)[:5]
+                print('saving double figs')
+                for (param1, param2), _ in top_pairs:
+                    plt.figure(figsize=(10, 6))
+                    for value1 in combined_df[param1].unique():
+                        for value2 in combined_df[param2].unique():
+                            sub_df = avg_loss[(param1, param2)][
+                                (avg_loss[(param1, param2)][param1] == value1) & (
+                                            avg_loss[(param1, param2)][param2] == value2)]
+
+                            plt.plot(sub_df['epoch'], sub_df['mean'],
+                                     label=f'{param1} = {value1}, {param2} = {value2}')
+                            plt.fill_between(sub_df['epoch'], sub_df['lower'], sub_df['upper'], alpha=0.2)
+
+                    plt.title(f'Average accuracy vs Epoch for {param1} and {param2}')
+                    plt.xlabel('Epoch')
+                    plt.ylabel('Average accuracy')
+                    plt.legend()
+                    plt.ylim(0, 1)
+                    os.makedirs('supervised/doubleparams', exist_ok=True)
+                    plt.savefig(f'supervised/doubleparams/{param1}{param2}.png')
+                    print('saved at', f'supervised/doubleparams/{param1}{param2}.png')
+                    plt.close()
+
+                print('saving single figs')
                 for param in params:
                     plt.figure(figsize=(10, 6))
                     for value in df[param].unique():
                         sub_df = avg_loss[param][avg_loss[param][param] == value]
-                        std_dev_sub_df = std_dev[param][std_dev[param][param] == value]
-                        plt.plot(sub_df['epoch'], sub_df['accuracy'], label=f'{param} = {value}' if not isinstance(value, str) or value[0:3] != "N/A" else value)
-                        plt.fill_between(sub_df['epoch'], sub_df['accuracy'] - std_dev_sub_df['accuracy'],
-                                         sub_df['accuracy'] + std_dev_sub_df['accuracy'], alpha=0.2)
+                        #std_dev_sub_df = std_dev[param][std_dev[param][param] == value]
+                        q1_sub_df = lower[param][lower[param][param] == value]
+                        q3_sub_df = upper[param][upper[param][param] == value]
+                        print(f"Q1 min value: {q1_sub_df['accuracy'].min()}, max value: {q1_sub_df['accuracy'].max()}")
+                        print(f"Q3 min value: {q3_sub_df['accuracy'].min()}, max value: {q3_sub_df['accuracy'].max()}")
+
+                        plt.plot(sub_df['epoch'], sub_df['mean'], label=f'{param} = {value}' if not isinstance(value, str) or value[0:3] != "N/A" else value)
+                        plt.fill_between(sub_df['epoch'], sub_df['lower'], sub_df['upper'], alpha=0.2)
                         plt.title(f'Average accuracy vs Epoch for {param}')
                         plt.xlabel('Epoch')
                         plt.ylabel('Average accuracy')
                         plt.legend()
                     #plt.show()
-                    plt.savefig(f'supervised/{param}.png')
+                    plt.ylim(0, 1)
+                    os.makedirs('supervised/singleparams', exist_ok=True)
+                    plt.savefig(f'supervised/singleparams/{param}.png')
+                    print('saved at', f'supervised/singleparams/{param}.png')
+                    plt.close()
+
+                # Get the param1/value1/param2 combination with the highest range
+                top_n_ranges = heapq.nlargest(5, range_dict, key=range_dict.get)
+
+                # Plot the values of param2 for the specific value of param1
+                print('saving combo figs')
+                for combo in top_n_ranges:
+                    param1, value1, param2 = combo
+                    subset = df[df[param1] == value1]
+                    plt.figure(figsize=(10, 6))
+                    for value2 in subset[param2].unique():
+                        sub_df = avg_loss[param2][avg_loss[param2][param2] == value2]
+                        plt.plot(sub_df['epoch'], sub_df['mean'],
+                                 label=f'{param2} = {value}' if not isinstance(value2, str) or value2[0:3] != "N/A" else value2)
+                        plt.fill_between(sub_df['epoch'], sub_df['lower'], sub_df['upper'], alpha=0.2)
+                    plt.title(f'Average accuracy vs Epoch for {param2} given {param1} = {value1}')
+                    plt.xlabel('Epoch')
+                    plt.ylabel('Average accuracy')
+                    plt.legend()
+                    plt.ylim(0, 1)
+                    os.makedirs('supervised/fixeddoubleparams', exist_ok=True)
+                    plt.savefig(f'supervised/fixeddoubleparams/{param1}{value1}{param2}.png')
+                    print('saved at', f'supervised/fixeddoubleparams/{param1}{value1}{param2}.png')
+                    plt.close()
 
             test_loss_means[model_name] = np.asarray(np.mean(test_losses[model_name], axis=0))
             test_loss_stds[model_name] = np.asarray(np.std(test_losses[model_name], axis=0))
@@ -297,7 +403,7 @@ if __name__ == '__main__':
             handles = [handles[i] for i in last_items_sorted]
             _labels = [_labels[i] for i in last_items_sorted]
             plt.legend(handles, _labels, loc='center left', bbox_to_anchor=(1, 1))
-            plt.ylim(bottom=0)
+            plt.ylim(0, 1)
             plt.tight_layout()
             plt.savefig(f'supervised/test-losses.png')
 
