@@ -9,6 +9,7 @@ import pandas as pd
 import heapq
 
 import scipy.stats as stats
+from PIL import Image
 from scipy.stats import norm, sem, t
 
 sys.path.append(os.getcwd())
@@ -172,7 +173,8 @@ def calculate_ci(group):
     std_err = sem(group_arr)
     h = std_err * t.ppf((1 + confidence) / 2, n - 1)
 
-    return pd.Series({'lower': m - h, 'upper': m + h, 'mean': m})
+    return pd.DataFrame({'lower': [m - h], 'upper': [m + h], 'mean': [m]},
+                         columns=['lower', 'upper', 'mean'])
 
 
 
@@ -224,7 +226,7 @@ if __name__ == '__main__':
 
     num_random_tests = 48
     repetitions = 1
-    epochs = 10
+    epochs = 100
     colors = plt.cm.jet(np.linspace(0,1,num_random_tests))
     lr = 0.003
 
@@ -292,7 +294,6 @@ if __name__ == '__main__':
                     ci_df = df.groupby([param1, param2, 'epoch'])['accuracy'].apply(calculate_ci).reset_index()
                     avg_loss[(param1, param2)] = ci_df
 
-
                     #entropy[(param1, param2)] = df.groupby([param1, param2, 'epoch'])['log_loss'].apply(
                     #    lambda x: -np.sum(x * df.loc[x.index, 'loss'])).reset_index()
 
@@ -312,6 +313,7 @@ if __name__ == '__main__':
 
                 top_pairs = sorted(ranges.items(), key=lambda x: x[1], reverse=True)[:5]
                 print('saving double figs')
+                os.makedirs('supervised/doubleparams', exist_ok=True)
                 for (param1, param2), _ in top_pairs:
                     plt.figure(figsize=(10, 6))
                     for value1 in combined_df[param1].unique():
@@ -329,21 +331,17 @@ if __name__ == '__main__':
                     plt.ylabel('Average accuracy')
                     plt.legend()
                     plt.ylim(0, 1)
-                    os.makedirs('supervised/doubleparams', exist_ok=True)
-                    plt.savefig(f'supervised/doubleparams/{param1}{param2}.png')
+                    plt.savefig(os.path.join(os.getcwd(), f'supervised/doubleparams/{param1}{param2}.png'))
                     print('saved at', f'supervised/doubleparams/{param1}{param2}.png')
                     plt.close()
 
                 print('saving single figs')
+                os.makedirs('supervised/singleparams', exist_ok=True)
+                print('path is', os.getcwd())
                 for param in params:
                     plt.figure(figsize=(10, 6))
                     for value in df[param].unique():
                         sub_df = avg_loss[param][avg_loss[param][param] == value]
-                        #std_dev_sub_df = std_dev[param][std_dev[param][param] == value]
-                        q1_sub_df = lower[param][lower[param][param] == value]
-                        q3_sub_df = upper[param][upper[param][param] == value]
-                        print(f"Q1 min value: {q1_sub_df['accuracy'].min()}, max value: {q1_sub_df['accuracy'].max()}")
-                        print(f"Q3 min value: {q3_sub_df['accuracy'].min()}, max value: {q3_sub_df['accuracy'].max()}")
 
                         plt.plot(sub_df['epoch'], sub_df['mean'], label=f'{param} = {value}' if not isinstance(value, str) or value[0:3] != "N/A" else value)
                         plt.fill_between(sub_df['epoch'], sub_df['lower'], sub_df['upper'], alpha=0.2)
@@ -353,9 +351,11 @@ if __name__ == '__main__':
                         plt.legend()
                     #plt.show()
                     plt.ylim(0, 1)
-                    os.makedirs('supervised/singleparams', exist_ok=True)
-                    plt.savefig(f'supervised/singleparams/{param}.png')
-                    print('saved at', f'supervised/singleparams/{param}.png')
+                    file_path = os.path.join(os.getcwd(), 'supervised', 'singleparams', f'{param}.png')
+                    plt.savefig(file_path)
+                    #img = Image.open(file_path)
+                    #img.show()
+                    print('saved at', file_path)
                     plt.close()
 
                 # Get the param1/value1/param2 combination with the highest range
@@ -363,6 +363,7 @@ if __name__ == '__main__':
 
                 # Plot the values of param2 for the specific value of param1
                 print('saving combo figs')
+                os.makedirs('supervised/fixeddoubleparams', exist_ok=True)
                 for combo in top_n_ranges:
                     param1, value1, param2 = combo
                     subset = df[df[param1] == value1]
@@ -370,15 +371,14 @@ if __name__ == '__main__':
                     for value2 in subset[param2].unique():
                         sub_df = avg_loss[param2][avg_loss[param2][param2] == value2]
                         plt.plot(sub_df['epoch'], sub_df['mean'],
-                                 label=f'{param2} = {value}' if not isinstance(value2, str) or value2[0:3] != "N/A" else value2)
+                                 label=f'{param2} = {value2}' if not isinstance(value2, str) or value2[0:3] != "N/A" else value2)
                         plt.fill_between(sub_df['epoch'], sub_df['lower'], sub_df['upper'], alpha=0.2)
                     plt.title(f'Average accuracy vs Epoch for {param2} given {param1} = {value1}')
                     plt.xlabel('Epoch')
                     plt.ylabel('Average accuracy')
                     plt.legend()
                     plt.ylim(0, 1)
-                    os.makedirs('supervised/fixeddoubleparams', exist_ok=True)
-                    plt.savefig(f'supervised/fixeddoubleparams/{param1}{value1}{param2}.png')
+                    plt.savefig(os.path.join(os.getcwd(), f'supervised/fixeddoubleparams/{param1}{value1}{param2}.png'))
                     print('saved at', f'supervised/fixeddoubleparams/{param1}{value1}{param2}.png')
                     plt.close()
 
