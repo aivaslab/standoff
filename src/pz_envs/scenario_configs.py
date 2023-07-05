@@ -1,5 +1,7 @@
 from itertools import product
 
+import numpy as np
+
 
 def parameter_generator(space, params={}):
     if space:
@@ -46,9 +48,9 @@ def remove_unnecessary_sequences(events):
     if events and events[-1] == ['re']:
         events.pop()
 
-    # deal with swap indices being removed before swaps
+    # deal with swap indices being removed before swaps or delayed baits
     for event in events:
-        if event[0] == 'sw':
+        if event[0] == 'sw' or event[0] == 'b':
             count = sum(1 for i in removed_indices if i < event[1])
             event[1] -= count
             if event[2] != 'e':
@@ -56,6 +58,22 @@ def remove_unnecessary_sequences(events):
                 event[2] -= count
 
     return events
+
+def count_permutations(event_list):
+    permutations = []
+    num_locations = 5
+    for event in event_list:
+        if len(event) == 3 and event[2] == 'e':
+            if event[0] == 'b':
+                permutations.append(num_locations)
+                num_locations -= 1
+            elif event[0] == 'sw':
+                permutations.append(num_locations)
+        else:
+            if event[0] == 'b': # baits to specific locations still remove empty buckets
+                num_locations -= 1
+            permutations.append(1)
+    return permutations
 
 
 class ScenarioConfigs:
@@ -151,6 +169,7 @@ class ScenarioConfigs:
             first_swap_index = add_swap(events, swap_num, (swap_index, swap_location), uninformed_swap, visible_swaps)
 
         events = remove_unnecessary_sequences(events)
+
         all_event_lists[name] = events
         if visible_baits == 2 and visible_swaps == swaps:
             informed_event_lists[name] = events
@@ -183,9 +202,19 @@ class ScenarioConfigs:
     print('total lists', len(all_event_lists), 'informed lists', len(informed_event_lists), 'uninformed lists',
           len(uninformed_event_lists))
 
+    all_event_permutations = {}
+    total_products = 0
+    for event_name in all_event_lists:
+        all_event_permutations[event_name] = count_permutations(all_event_lists[event_name])
+        product = np.product(all_event_permutations[event_name])
+        #print(event_name, all_event_permutations[event_name], product)
+        total_products += product
+    print('total permutations', total_products)
+
+
     standoff = {
         "defaults": {
-            "deterministic": False,
+            "deterministic": True,
             "hidden": True,
             "share_rewards": False,
             "boxes": 5,

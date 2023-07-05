@@ -676,6 +676,8 @@ class para_MultiGridEnv(ParallelEnv):
                 self.current_param_group = (self.current_param_group + 1) % len(self.param_groups)
                 self.event_lists = self.param_groups[self.current_param_group]['eLists']
                 self.params = self.param_groups[self.current_param_group]['params']
+                self.perms = self.param_groups[self.current_param_group]['perms']
+
 
             self.current_param_group_count += 1
             self.has_reset = True
@@ -683,9 +685,11 @@ class para_MultiGridEnv(ParallelEnv):
             # deal with num_puppets being lower than maximum
             self.possible_puppets = [f"p_{x + len(self.agents)}" for x in range(self.params["num_puppets"])]
 
-        # get event list from event lists
+        # get event list and perm list from event lists
         if self.params['deterministic']:
-            self.current_event_list_name, self.params['events'] = list(self.event_lists.items())[self.current_param_group_count % len(self.event_lists)]
+            self.current_event_list_name, self.params['events'] = copy.deepcopy(list(self.event_lists.items())[self.current_param_group_count % len(self.event_lists)])
+            _, self.params['perms'] = list(self.perms.items())[self.current_param_group_count % len(self.perms)]
+            self.target_param_group_count = np.product(self.params['perms'])
         else:
             self.current_event_list_name, self.params['events'] = copy.deepcopy(random.choice(list(self.event_lists.items())))
 
@@ -724,7 +728,8 @@ class para_MultiGridEnv(ParallelEnv):
             last_timer = 40
         else:
             valid_params = ['sub_valence', 'dom_valence', 'num_puppets', 'subject_is_dominant', 'events',
-                            'hidden', 'boxes']
+                            'hidden', 'boxes', 'perms']
+            #print('generating grid with events:', self.deterministic_seed, self.current_event_list_name, self.params['events'])
             last_timer = self._gen_grid(**{x: self.params[x] for x in valid_params})
             # gen_grid also generates timers
             self.prev_puppet_mask = np.zeros((self.grid.height, self.grid.width))

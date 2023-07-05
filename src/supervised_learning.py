@@ -69,7 +69,7 @@ def gen_data(configNames, num_timesteps=2500, labels=[]):
     for configName in configNames:
         configs = ScenarioConfigs().standoff
 
-        reset_configs = {**configs["defaults"], **configs[configName]}
+        reset_configs = {**configs["defaults"]}
 
         if isinstance(reset_configs["num_agents"], list):
             reset_configs["num_agents"] = reset_configs["num_agents"][0]
@@ -103,6 +103,7 @@ def gen_data(configNames, num_timesteps=2500, labels=[]):
                    'selectedPrevBig', 'selectedPrevSmall', 'selectedPrevNeither',
                    'selectedSame', ]
         all_event_lists = list(ScenarioConfigs.all_event_lists.items())
+        all_event_perms = list(ScenarioConfigs.all_event_permutations.items())
 
         data_name = f'{len(all_event_lists)}'
         data_obs = []
@@ -114,8 +115,12 @@ def gen_data(configNames, num_timesteps=2500, labels=[]):
         all_obs_and_labels = pd.DataFrame(columns=['name', 'obs', 'label'])
 
         env.target_param_group_count = 20
-        env.param_groups = [ {'eLists': {all_event_lists[n][0]: all_event_lists[n][1]}, 'params': ScenarioConfigs.standoff['defaults']} for n in range(len(all_event_lists)) ]
-        print(env.param_groups[0])
+        env.param_groups = [ {'eLists': {all_event_lists[n][0]: all_event_lists[n][1]},
+                              'params': ScenarioConfigs.standoff['defaults'],
+                              'perms': {all_event_perms[n][0]: all_event_perms[n][1]}
+                              }
+                             for n in range(len(all_event_lists)) ]
+        print('first param group', env.param_groups[0])
         #while len(data_obs) < num_timesteps:
         #tq = tqdm.tqdm(range(int(num_timesteps)))
         prev_param_group = -1
@@ -124,8 +129,10 @@ def gen_data(configNames, num_timesteps=2500, labels=[]):
 
         total_groups = len(env.param_groups)
 
+        env.deterministic = True
 
         while env.current_param_group < total_groups:
+            env.deterministic_seed = env.current_param_group_count
 
             obs = env.reset()
             if env.current_param_group != prev_param_group:
@@ -174,6 +181,7 @@ def gen_data(configNames, num_timesteps=2500, labels=[]):
 
         #all_obs_and_labels.to_csv('train_data.csv', index=False)
         #all_path_infos.to_csv('extra_data.csv', index=False)
+        print('len obs', len(data_obs))
         np.save('supervised/' + data_name + '-obs', np.array(data_obs))
         np.save('supervised/' + data_name + '-params', np.array(data_params))
         for label in labels:

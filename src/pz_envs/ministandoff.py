@@ -7,6 +7,12 @@ from ..puppets import pathfind
 import copy
 from ..pz_envs.scenario_configs import ScenarioConfigs
 
+def index_permutations(permutations, seed):
+    result = [-1] * len(permutations)
+    for i in range(len(permutations)-1, -1, -1):
+        seed, r = divmod(seed, permutations[i])
+        result[i] = r
+    return result
 
 class MiniStandoffEnv(para_MultiGridEnv):
     mission = "get the best food before your opponent"
@@ -88,7 +94,7 @@ class MiniStandoffEnv(para_MultiGridEnv):
         self.only_highlight_treats = True
 
         self.fill_spawn_holes = False
-        self.random_subject_spawn = True
+        self.random_subject_spawn = False # turned off for AAAI
         self.odd_spawns = True
         self.random_odd_spawns = True  # overrides self.odd_spawns when true
         self.record_supervised_labels = False
@@ -98,7 +104,7 @@ class MiniStandoffEnv(para_MultiGridEnv):
         self.has_released = False
 
         self.param_groups = [
-            {'eLists': ScenarioConfigs.all_event_lists, 'params': ScenarioConfigs.standoff['defaults']}, ]
+            {'eLists': ScenarioConfigs.all_event_lists, 'params': ScenarioConfigs.standoff['defaults'], 'perms': ScenarioConfigs.all_event_permutations}, ]
 
     def reset_vision(self):
         """
@@ -126,7 +132,8 @@ class MiniStandoffEnv(para_MultiGridEnv):
                   subject_is_dominant=False,
                   events=[],
                   hidden=False,
-                  boxes=5
+                  boxes=5,
+                  perms=[]
                   ):
 
         startRoom = 1
@@ -216,6 +223,8 @@ class MiniStandoffEnv(para_MultiGridEnv):
 
         baited = False
         obscured = False
+        counter = 1
+        instantiated_perms = index_permutations(perms, self.current_param_group_count)
         for k, event in enumerate(events):
             event_type = event[0]
 
@@ -246,23 +255,43 @@ class MiniStandoffEnv(para_MultiGridEnv):
                 events[k] = event
 
             else:
+                was_empty = False
                 for x in range(len(event)):
 
                     if event[x] == "e":
+                        was_empty = True
+                        counter *= len(empty_buckets)
+                        # used for both empty baits and swap locations
                         event[x] = empty_buckets.pop(random.randrange(
-                            len(empty_buckets)) if not self.deterministic else self.get_deterministic_seed() % len(
-                            empty_buckets))
+                            len(empty_buckets)) if not self.deterministic else instantiated_perms[k])
+
+                        # if we are swapping to an empty bucket, and the prev bucket was not empty, make it empty
+                        if event[0] == 'sw' and x == 2:
+                            if event[1] not in empty_buckets:
+                                empty_buckets.append(event[1])
+
                     elif event[x] == "else":
                         available_spots = [i for i in range(boxes) if i != event[x - 1]]
                         event[x] = available_spots.pop(random.randrange(
-                            len(available_spots)) if not self.deterministic else self.get_deterministic_seed() % len(
-                            available_spots))
+                            len(available_spots)) if not self.deterministic else instantiated_perms[k])
+
+                        # if we are swapping to an empty bucket, and the prev bucket was not empty, make it empty
+                        if event[0] == 'sw' and x == 2 and event[1] not in empty_buckets and event[2] in empty_buckets:
+                            empty_buckets.append(event[1])
+                            empty_buckets.remove(event[2])
                     elif isinstance(event[x], int) and event[0] != 'b':
                         # print(x, event[x], self.current_event_list_name, events, self.event_lists[self.current_event_list_name])
-                        event[x] = events[event[x]][1]  # get first location
+                        event[x] = events[event[x]][2]  # get a location from an index
+
+
+
 
                 if event_type == "b":
                     event_args[k] = bait_args[event[1]]  # get the size of the treat
+                    # remove empty bucket for cases where event[x] wasn't e
+                    if not was_empty:
+                        #print(event, empty_buckets, instantiated_perms, k, instantiated_perms[k], len(empty_buckets))
+                        empty_buckets.pop(instantiated_perms[k])
                 elif event_type == "rem":
                     empty_buckets.append(event[1])
                 elif event_type == "ob" or event_type == "re":

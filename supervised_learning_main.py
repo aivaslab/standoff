@@ -276,14 +276,14 @@ def save_single_param_figures(params, df, avg_loss):
 
             plt.plot(sub_df['epoch'], sub_df['mean'], label=f'{param} = {value}' if not isinstance(value, str) or value[0:3] != "N/A" else value)
             plt.fill_between(sub_df['epoch'], sub_df['lower'], sub_df['upper'], alpha=0.2)
-            plt.title(f'Average accuracy vs Epoch for {param}')
-            plt.xlabel('Epoch')
-            plt.ylabel('Average accuracy')
-            plt.legend()
-            plt.ylim(0, 1)
-            file_path = os.path.join(os.getcwd(), 'supervised', 'singleparams', f'{param}.png')
-            plt.savefig(file_path)
-            plt.close()
+        plt.title(f'Average accuracy vs Epoch for {param}')
+        plt.xlabel('Epoch')
+        plt.ylabel('Average accuracy')
+        plt.legend()
+        plt.ylim(0, 1)
+        file_path = os.path.join(os.getcwd(), 'supervised', 'singleparams', f'{param}.png')
+        plt.savefig(file_path)
+        plt.close()
 
 def save_fixed_double_param_figures(top_n_ranges, df, avg_loss):
     os.makedirs('supervised/fixeddoubleparams', exist_ok=True)
@@ -330,7 +330,7 @@ if __name__ == '__main__':
     sets = ['296']
     dsize = 6000
     labels = ['correctSelection']
-    #gen_data(sets, dsize, labels)
+    gen_data(sets, dsize, labels)
     #labels = ['loc', 'exist', 'vision', 'b-loc', 'b-exist', 'target', 'correctSelection']
 
     data_name = '296'
