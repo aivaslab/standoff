@@ -181,7 +181,7 @@ def calculate_statistics(df, params):
     range_dict = {}
     range_dict3 = {}
 
-    print('0')
+    print('calculating statistics...')
 
     last_epoch_df = df[df['epoch'] == df['epoch'].max()]
     param_pairs = itertools.combinations(params, 2)
@@ -200,8 +200,8 @@ def calculate_statistics(df, params):
         ranges[(param1, param2)] = means['accuracy'].max() - means['accuracy'].min()
 
         for value1 in df[param1].unique():
+            subset = last_epoch_df[last_epoch_df[param1] == value1]
             if len(subset[param2].unique()) > 1:
-                subset = last_epoch_df[last_epoch_df[param1] == value1]
                 new_means = subset.groupby(param2)['accuracy'].mean()
                 range_dict[(param1, value1, param2)] = new_means.max() - new_means.min()
 
@@ -211,8 +211,8 @@ def calculate_statistics(df, params):
 
         for value1 in df[param1].unique():
             for value2 in df[param2].unique():
+                subset = last_epoch_df[(last_epoch_df[param2] == value2) & (last_epoch_df[param1] == param1)]
                 if len(subset[param3].unique()) > 1:
-                    subset = last_epoch_df[(last_epoch_df[param2] == value2) & (last_epoch_df[param1] == param1)]
                     new_means = subset.groupby(param3)['accuracy'].mean()
                     range_dict3[(param1, value1, param2, value2, param3)] = new_means.max() - new_means.min()
 
