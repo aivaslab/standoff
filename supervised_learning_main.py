@@ -92,8 +92,9 @@ def train_model(data_name, label, test_sets, path='supervised/', epochs=100, mod
         val_dataset = CustomDataset(val_data, val_labels, val_params)
         test_loaders.append(DataLoader(val_dataset, batch_size=batch_size, shuffle=False))
 
-    model_kwargs['output_len'] = np.prod(labels.shape[1:])
-    model_kwargs['channels'] = np.prod(params.shape[2])
+    # broken rn
+    model_kwargs['output_len'] = 5#np.prod(labels.shape[1:])
+    model_kwargs['channels'] = 4#np.prod(params.shape[2])
 
     model = RNNModel(**model_kwargs)
     criterion = nn.CrossEntropyLoss() #nn.MSELoss()
@@ -331,7 +332,7 @@ if __name__ == '__main__':
     #gen_data(labels)
     #labels = ['loc', 'exist', 'vision', 'b-loc', 'b-exist', 'target', 'correctSelection']
 
-    data_name = 's1i-24'
+    data_name = 's3a-296'
     eval_name = 's3a-296'
     model_kwargs_base = {'hidden_size': [6, 8, 12, 16, 32],
                     'num_layers': [1, 2, 3],
@@ -353,14 +354,15 @@ if __name__ == '__main__':
 
     num_random_tests = 48
     repetitions = 1
-    epochs = 200
+    epochs = 25
     colors = plt.cm.jet(np.linspace(0,1,num_random_tests))
     lr = 0.002
 
     test = 0
     while test < num_random_tests:
         try:
-            model_kwargs = {x: random.choice(model_kwargs_base[x]) for x in model_kwargs_base.keys()}
+            #model_kwargs = {x: random.choice(model_kwargs_base[x]) for x in model_kwargs_base.keys()}
+            model_kwargs = {'hidden_size': 16, 'num_layers': 2, 'output_len': 5, 'pool_kernel_size': 3, 'pool_stride': 2, 'channels': 4, 'kernels': 8, 'padding1': 1, 'padding2': 0, 'use_pool': False, 'stride1': 1, 'use_conv2': True, 'kernel_size1': 3, 'kernels2': 16, 'kernel_size2': 3}
             model_name = "".join([str(x) + "," for x in model_kwargs.values()])
 
             #unused_sets = [s for s in sets if s != data_name]

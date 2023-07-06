@@ -223,7 +223,7 @@ class ScenarioConfigs:
         's2i': {'events': informed_event_lists, 'params': 'defaults'},
         's2iu': {'events': dict(uninformed_event_lists, **informed_event_lists), 'params': 'defaults'},
 
-        's3': {'events': all_event_lists, 'params': 'defaults'},
+        's3a': {'events': all_event_lists, 'params': 'defaults'},
     }
 
 

@@ -208,7 +208,7 @@ class RNNModel(nn.Module):
         self.kwargs = {'hidden_size': hidden_size, 'num_layers': num_layers,
                        'output_len': output_len, 'pool_kernel_size': pool_kernel_size,
                        'pool_stride': pool_stride, 'channels': channels, 'kernels': kernels,
-                       'padding': padding1, 'padding2': padding2, 'pool': use_pool, 'stride': stride1,
+                       'padding1': padding1, 'padding2': padding2, 'use_pool': use_pool, 'stride1': stride1,
                        'use_conv2': use_conv2, 'kernel_size1': kernel_size1,
                        'kernels2': kernels2, 'kernel_size2': kernel_size2}
 
