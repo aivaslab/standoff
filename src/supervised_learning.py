@@ -30,7 +30,7 @@ def one_hot(size, data):
     return np.eye(size)[data]
 
 
-def gen_data(configNames, num_timesteps=2500, labels=[]):
+def gen_data(labels=[]):
     env_config = {
         "env_class": "MiniStandoffEnv",
         "max_steps": 25,
@@ -66,10 +66,13 @@ def gen_data(configNames, num_timesteps=2500, labels=[]):
     all_path_infos = pd.DataFrame()
     record_extra_data = False
 
-    for configName in configNames:
+    for configName in ScenarioConfigs.stages:
         configs = ScenarioConfigs().standoff
+        events = ScenarioConfigs.stages[configName]['events']
+        params = configs[ScenarioConfigs.stages[configName]['params']]
+        print(configName)
 
-        reset_configs = {**configs["defaults"]}
+        reset_configs = {**params}
 
         if isinstance(reset_configs["num_agents"], list):
             reset_configs["num_agents"] = reset_configs["num_agents"][0]
@@ -81,8 +84,6 @@ def gen_data(configNames, num_timesteps=2500, labels=[]):
                                 range(reset_configs['num_agents'])]
         env_config['puppets'] = [GridAgentInterface(**puppet_interface_config) for _ in
                                  range(reset_configs['num_puppets'])]
-        # env_config['num_agents'] = reset_configs['num_agents']
-        # env_config['num_puppets'] = reset_configs['num_puppets']
 
         difficulty = 3
         env_config['opponent_visible_decs'] = (difficulty < 1)
@@ -102,24 +103,22 @@ def gen_data(configNames, num_timesteps=2500, labels=[]):
         posterior_metrics = ['selection', 'selectedBig', 'selectedSmall', 'selectedNeither',
                    'selectedPrevBig', 'selectedPrevSmall', 'selectedPrevNeither',
                    'selectedSame', ]
-        all_event_lists = list(ScenarioConfigs.all_event_lists.items())
-        all_event_perms = list(ScenarioConfigs.all_event_permutations.items())
+        all_event_lists = list(events.items())
+        all_event_perms = ScenarioConfigs.all_event_permutations
 
-        data_name = f'{len(all_event_lists)}'
+        data_name = f'{configName}-{len(all_event_lists)}'
         data_obs = []
         data_labels = {}
         for label in labels + prior_metrics + posterior_metrics:
             data_labels[label] = []
         data_params = []
 
-        all_obs_and_labels = pd.DataFrame(columns=['name', 'obs', 'label'])
-
         env.target_param_group_count = 20
-        env.param_groups = [ {'eLists': {all_event_lists[n][0]: all_event_lists[n][1]},
-                              'params': ScenarioConfigs.standoff['defaults'],
-                              'perms': {all_event_perms[n][0]: all_event_perms[n][1]}
+        env.param_groups = [ {'eLists': {n: events[n]},
+                              'params': params,
+                              'perms': {n: ScenarioConfigs.all_event_permutations[n]}
                               }
-                             for n in range(len(all_event_lists)) ]
+                             for n in events ]
         print('first param group', env.param_groups[0])
         #while len(data_obs) < num_timesteps:
         #tq = tqdm.tqdm(range(int(num_timesteps)))

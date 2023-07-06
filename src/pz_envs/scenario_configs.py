@@ -216,14 +216,12 @@ class ScenarioConfigs:
     # generate 'stages' for train and test, where a stage is a list of event lists and parameters
     stages = {
         's1a': {'events': all_event_lists, 'params': 'no-op'},
+
         's1i': {'events': informed_event_lists, 'params': 'no-op'},
         's1iu': {'events': dict(uninformed_event_lists, **informed_event_lists), 'params': 'no-op'},
 
         's2i': {'events': informed_event_lists, 'params': 'defaults'},
         's2iu': {'events': dict(uninformed_event_lists, **informed_event_lists), 'params': 'defaults'},
-
-        's2bi': {'events': informed_event_lists, 'params': 'some-op'},
-        's2biu': {'events': dict(uninformed_event_lists, **informed_event_lists), 'params': 'some-op'},
 
         's3': {'events': all_event_lists, 'params': 'defaults'},
     }
@@ -251,18 +249,6 @@ class ScenarioConfigs:
             "dom_valence": 1,
             "subject_is_dominant": False,  # subordinate has delayed release. for subordinate first, use negative
             "num_puppets": 0,
-            "num_agents": 1,
-            "events": [[['bait', 'empty'], ['bait', 'empty']]]  # list, event, args
-        },
-        "some-op": {
-            "deterministic": True,
-            "hidden": True,
-            "share_rewards": False,
-            "boxes": 5,
-            "sub_valence": 1,
-            "dom_valence": 1,
-            "subject_is_dominant": False,  # subordinate has delayed release. for subordinate first, use negative
-            "num_puppets": [0, 1],
             "num_agents": 1,
             "events": [[['bait', 'empty'], ['bait', 'empty']]]  # list, event, args
         },

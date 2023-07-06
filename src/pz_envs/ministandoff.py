@@ -394,7 +394,7 @@ class MiniStandoffEnv(para_MultiGridEnv):
 
             self.del_obj(x, y)
         elif name == "ob" or name == "re":
-            b = self.grid.get(*self.agent_door_pos[arg])
+            b = self.grid.get(*self.agent_door_pos[arg]) if arg in self.agent_door_pos.keys() else self.grid.get(3, self.height-3) # default for obscuring when no opponent
             if name == "ob":
                 b.state = 1
                 b.see_behind = lambda: False

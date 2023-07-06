@@ -9,6 +9,8 @@ import heapq
 
 from scipy.stats import sem, t
 
+from src.pz_envs import ScenarioConfigs
+
 sys.path.append(os.getcwd())
 
 from src.objects import *
@@ -65,31 +67,33 @@ def decode_event_name(name):
         "first_swap": first_swap if swaps_gt_0 and not delay_2nd_bait and not first_swap_is_both else 'N/A (swaps=0 or 2nd bait delayed or first swap both)'
     })
 
-def train_model(data_name, label, additional_val_sets, path='supervised/', dsize=2500, epochs=100, model_kwargs=None, lr=0.001):
+def train_model(data_name, label, test_sets, path='supervised/', epochs=100, model_kwargs=None, lr=0.001):
     data = np.load(path + data_name + '-obs.npy')
     labels = np.load(path + data_name + '-label-' + label + '.npy')
     params = np.load(path + data_name + '-params.npy')
+    batch_size = 64
 
-    train_data, val_data, train_labels, val_labels, train_params, val_params = train_test_split(
+    # not useful unless test set is same as train
+    '''train_data, val_data, train_labels, val_labels, train_params, val_params = train_test_split(
         data, labels, params, test_size=0.2, random_state=42
     )
-
-    batch_size = 64
     train_dataset = CustomDataset(train_data, train_labels, train_params)
     val_dataset = CustomDataset(val_data, val_labels, val_params)
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)'''
+    train_dataset = CustomDataset(data, labels, params)
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 
-    additional_val_loaders = []
-    for val_set_name in additional_val_sets:
+    test_loaders = []
+    for val_set_name in test_sets:
         val_data = np.load(path + val_set_name + '-obs.npy')
         val_labels = np.load(path + val_set_name + '-label-' + label + '.npy')
-        val_labels = np.load(path + val_set_name + '-params.npy')
+        val_params = np.load(path + val_set_name + '-params.npy')
         val_dataset = CustomDataset(val_data, val_labels, val_params)
-        additional_val_loaders.append(DataLoader(val_dataset, batch_size=batch_size, shuffle=False))
+        test_loaders.append(DataLoader(val_dataset, batch_size=batch_size, shuffle=False))
 
-    model_kwargs['output_len'] = np.prod(train_labels.shape[1:])
-    model_kwargs['channels'] = np.prod(train_data.shape[2])
+    model_kwargs['output_len'] = np.prod(labels.shape[1:])
+    model_kwargs['channels'] = np.prod(params.shape[2])
 
     model = RNNModel(**model_kwargs)
     criterion = nn.CrossEntropyLoss() #nn.MSELoss()
@@ -99,7 +103,7 @@ def train_model(data_name, label, additional_val_sets, path='supervised/', dsize
     max_val_samples = 500
     num_epochs = epochs
     train_losses = []
-    val_losses = [[] for _ in range(len(additional_val_loaders) + 1)]
+    val_losses = [[] for _ in range(len(test_loaders) + 1)]
 
     #param_losses = pd.DataFrame(columns=['param', 'epoch', 'loss'])
     param_losses_list = []
@@ -117,34 +121,32 @@ def train_model(data_name, label, additional_val_sets, path='supervised/', dsize
 
         train_losses.append(train_loss / len(train_loader))
         model.eval()
-        for idx, _val_loader in enumerate([val_loader] + additional_val_loaders):
+        for idx, _val_loader in enumerate(test_loaders):
             with torch.no_grad():
                 val_loss = 0
                 val_samples_processed = 0
-                for inputs, labels, params in _val_loader:
+                '''for inputs, labels, params in _val_loader:
                     #inputs = inputs.view(-1, 10, input_size)
                     outputs = model(inputs)
                     loss = criterion(outputs, torch.argmax(labels, dim=1))
                     val_loss += loss.item()
                     val_samples_processed += inputs.size(0)
                     #if val_samples_processed >= max_val_samples:
-                    #    break
+                    #    break'''
 
-                # broken part:
-                if True:
-                    for inputs, labels, params in _val_loader:
-                        outputs = model(inputs)
-                        losses = special_criterion(outputs, torch.argmax(labels, dim=1))
-                        _, predicted = torch.max(outputs, 1)
-                        corrects = (predicted == torch.argmax(labels, dim=1)).float()
-                        for input, label, param, loss, correct in zip(inputs, labels, params, losses, corrects):
-                            param_losses_list.append(
-                                {'param': param, 'epoch': epoch, 'loss': loss.item(), 'accuracy': correct.item()})
-                            #param_losses = param_losses.append({'param': param, 'epoch': epoch, 'loss': loss.item(), 'accuracy': accuracy}, ignore_index=True)
+                for inputs, labels, params in _val_loader:
+                    outputs = model(inputs)
+                    losses = special_criterion(outputs, torch.argmax(labels, dim=1))
+                    _, predicted = torch.max(outputs, 1)
+                    corrects = (predicted == torch.argmax(labels, dim=1)).float()
+                    for input, label, param, loss, correct in zip(inputs, labels, params, losses, corrects):
+                        param_losses_list.append(
+                            {'param': param, 'epoch': epoch, 'loss': loss.item(), 'accuracy': correct.item()})
+                        #param_losses = param_losses.append({'param': param, 'epoch': epoch, 'loss': loss.item(), 'accuracy': accuracy}, ignore_index=True)
 
 
-            val_loss /= val_samples_processed / batch_size
-            val_losses[idx].append(val_loss)
+            #val_loss /= val_samples_processed / batch_size
+            #val_losses[idx].append(val_loss)
         model.train()
     # save model
     torch.save([model.kwargs, model.state_dict()], f'{path}{data_name}-{label}-model.pt')
@@ -152,12 +154,8 @@ def train_model(data_name, label, additional_val_sets, path='supervised/', dsize
     #pd.DataFrame(param_losses_list).to_csv(path + 'param_losses.csv')
     #df = pd.read_csv('supervised/param_losses.csv')
     # Apply the decoding function to each row
-
     df = pd.DataFrame(param_losses_list)
-
     df = df.join(df['param'].apply(decode_event_name))
-
-
 
     return train_losses, val_losses, df
 
@@ -328,13 +326,13 @@ def save_fixed_triple_param_figures(top_n_ranges, df, avg_loss):
 
 # train_model('random-2500', 'exist')
 if __name__ == '__main__':
-    sets = ['296']
-    dsize = 6000
     labels = ['correctSelection']
-    #gen_data(sets, dsize, labels)
+    sets = ScenarioConfigs.stages.keys()
+    #gen_data(labels)
     #labels = ['loc', 'exist', 'vision', 'b-loc', 'b-exist', 'target', 'correctSelection']
 
-    data_name = '296'
+    data_name = 's1i-24'
+    eval_name = 's3a-296'
     model_kwargs_base = {'hidden_size': [6, 8, 12, 16, 32],
                     'num_layers': [1, 2, 3],
                     'kernels': [4, 8, 16, 24, 32],
@@ -365,15 +363,14 @@ if __name__ == '__main__':
             model_kwargs = {x: random.choice(model_kwargs_base[x]) for x in model_kwargs_base.keys()}
             model_name = "".join([str(x) + "," for x in model_kwargs.values()])
 
-            unused_sets = [s for s in sets if s != data_name]
+            #unused_sets = [s for s in sets if s != data_name]
             # sum losses
             t_loss_sum, v_loss_sum, first_v_loss = [], [], []
             for label in labels:
                 df_list = []
                 for repetition in range(repetitions):
-                    t_loss, v_loss, df = train_model(data_name, label, unused_sets, epochs=epochs, dsize=dsize, model_kwargs=model_kwargs, lr=lr)
+                    t_loss, v_loss, df = train_model(data_name, label, [eval_name], epochs=epochs, model_kwargs=model_kwargs, lr=lr)
                     df_list.append(df)
-                    #plot_losses(data_name, label, t_loss, v_loss, [data_name] + unused_sets)
                     first_v_loss.append(v_loss[0])
                     if len(t_loss_sum) == 0:
                         t_loss_sum = t_loss
