@@ -52,7 +52,9 @@ def remove_unnecessary_sequences(events):
     for event in events:
         if event[0] == 'sw' or event[0] == 'b':
             count = sum(1 for i in removed_indices if i < event[1])
-            event[1] -= count
+            if event[0] != 'b':
+                # event[1] for baits is the size, not an index/location
+                event[1] -= count
             if event[2] != 'e':
                 count = sum(1 for i in removed_indices if i < event[2])
                 event[2] -= count
