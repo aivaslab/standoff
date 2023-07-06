@@ -186,12 +186,10 @@ def calculate_statistics(df, params):
     last_epoch_df = df[df['epoch'] == df['epoch'].max()]
     param_pairs = itertools.combinations(params, 2)
     param_triples = itertools.combinations(params, 3)
-    print('1')
 
     for param in params:
         ci_df = df.groupby([param, 'epoch'])['accuracy'].apply(calculate_ci).reset_index()
         avg_loss[param] = ci_df
-    print('2')
 
     for param1, param2 in param_pairs:
         ci_df = df.groupby([param1, param2, 'epoch'])['accuracy'].apply(calculate_ci).reset_index()
@@ -202,10 +200,10 @@ def calculate_statistics(df, params):
         ranges[(param1, param2)] = means['accuracy'].max() - means['accuracy'].min()
 
         for value1 in df[param1].unique():
-            subset = last_epoch_df[last_epoch_df[param1] == value1]
-            new_means = subset.groupby(param2)['accuracy'].mean()
-            range_dict[(param1, value1, param2)] = new_means.max() - new_means.min()
-    print('3')
+            if len(subset[param2].unique()) > 1:
+                subset = last_epoch_df[last_epoch_df[param1] == value1]
+                new_means = subset.groupby(param2)['accuracy'].mean()
+                range_dict[(param1, value1, param2)] = new_means.max() - new_means.min()
 
     for param1, param2, param3 in param_triples:
         ci_df = df.groupby([param1, param2, param3, 'epoch'])['accuracy'].apply(calculate_ci).reset_index()
@@ -213,10 +211,10 @@ def calculate_statistics(df, params):
 
         for value1 in df[param1].unique():
             for value2 in df[param2].unique():
-                subset = last_epoch_df[(last_epoch_df[param2] == value2) & (last_epoch_df[param1] == param1)]
-                new_means = subset.groupby(param3)['accuracy'].mean()
-                range_dict3[(param1, value1, param2, value2, param3)] = new_means.max() - new_means.min()
-    print('4')
+                if len(subset[param3].unique()) > 1:
+                    subset = last_epoch_df[(last_epoch_df[param2] == value2) & (last_epoch_df[param1] == param1)]
+                    new_means = subset.groupby(param3)['accuracy'].mean()
+                    range_dict3[(param1, value1, param2, value2, param3)] = new_means.max() - new_means.min()
 
     return avg_loss, variances, ranges, range_dict, range_dict3
 
@@ -234,7 +232,7 @@ def plot_losses(data_name, label, train_losses, val_losses, val_set_names, speci
     plt.savefig(f'supervised/{data_name}-{label}-losses.png')
 
 
-def save_figures(df, avg_loss, ranges, range_dict, range_dict3, params, num=5):
+def save_figures(df, avg_loss, ranges, range_dict, range_dict3, params, num=10):
     top_pairs = sorted(ranges.items(), key=lambda x: x[1], reverse=True)[:num]
     top_n_ranges = heapq.nlargest(num, range_dict, key=range_dict.get)
     top_n_ranges3 = heapq.nlargest(num, range_dict3, key=range_dict3.get)
@@ -357,9 +355,9 @@ if __name__ == '__main__':
 
     num_random_tests = 48
     repetitions = 1
-    epochs = 5
+    epochs = 200
     colors = plt.cm.jet(np.linspace(0,1,num_random_tests))
-    lr = 0.003
+    lr = 0.002
 
     test = 0
     while test < num_random_tests:
@@ -391,7 +389,7 @@ if __name__ == '__main__':
 
                 avg_loss, variances, ranges, range_dict, range_dict3 = calculate_statistics(combined_df, params)
 
-                save_figures(combined_df, avg_loss, ranges, range_dict, range_dict3, params, num=5)
+                save_figures(combined_df, avg_loss, ranges, range_dict, range_dict3, params, num=12)
 
             test_names.append(model_name)
             test += 1
