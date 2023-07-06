@@ -181,13 +181,17 @@ def calculate_statistics(df, params):
     range_dict = {}
     range_dict3 = {}
 
+    print('0')
+
     last_epoch_df = df[df['epoch'] == df['epoch'].max()]
     param_pairs = itertools.combinations(params, 2)
     param_triples = itertools.combinations(params, 3)
+    print('1')
 
     for param in params:
         ci_df = df.groupby([param, 'epoch'])['accuracy'].apply(calculate_ci).reset_index()
         avg_loss[param] = ci_df
+    print('2')
 
     for param1, param2 in param_pairs:
         ci_df = df.groupby([param1, param2, 'epoch'])['accuracy'].apply(calculate_ci).reset_index()
@@ -201,21 +205,18 @@ def calculate_statistics(df, params):
             subset = last_epoch_df[last_epoch_df[param1] == value1]
             new_means = subset.groupby(param2)['accuracy'].mean()
             range_dict[(param1, value1, param2)] = new_means.max() - new_means.min()
+    print('3')
 
     for param1, param2, param3 in param_triples:
         ci_df = df.groupby([param1, param2, param3, 'epoch'])['accuracy'].apply(calculate_ci).reset_index()
-        avg_loss[(param1, param2)] = ci_df
-
-        means = last_epoch_df.groupby([param1, param2, param3]).mean(numeric_only=True)
-        #variances[(param1, param2)] = grouped.var().mean()
-        #ranges[(param1, param2, param3)] = means.max() - means.min()
+        avg_loss[(param1, param2, param3)] = ci_df
 
         for value1 in df[param1].unique():
-            subset = last_epoch_df[last_epoch_df[param1] == value1]
             for value2 in df[param2].unique():
-                subsubset = subset[subset[param2] == value2]
-                new_means = subsubset.groupby(param3)['accuracy'].mean()
+                subset = last_epoch_df[(last_epoch_df[param2] == value2) & (last_epoch_df[param1] == param1)]
+                new_means = subset.groupby(param3)['accuracy'].mean()
                 range_dict3[(param1, value1, param2, value2, param3)] = new_means.max() - new_means.min()
+    print('4')
 
     return avg_loss, variances, ranges, range_dict, range_dict3
 
@@ -292,7 +293,7 @@ def save_fixed_double_param_figures(top_n_ranges, df, avg_loss):
         subset = df[df[param1] == value1]
         plt.figure(figsize=(10, 6))
         for value2 in subset[param2].unique():
-            sub_df = avg_loss[param2][avg_loss[param2][param2] == value2]
+            sub_df = avg_loss[(param1, param2)][(avg_loss[(param1, param2)][param2] == value2) & (avg_loss[(param1, param2)][param1] == value1)]
             plt.plot(sub_df['epoch'], sub_df['mean'],
                      label=f'{param2} = {value2}' if not isinstance(value2, str) or value2[0:3] != "N/A" else value2)
             plt.fill_between(sub_df['epoch'], sub_df['lower'], sub_df['upper'], alpha=0.2)
@@ -312,7 +313,9 @@ def save_fixed_triple_param_figures(top_n_ranges, df, avg_loss):
         subset = df[(df[param1] == value1) & (df[param2] == value2)]
         plt.figure(figsize=(10, 6))
         for value3 in subset[param3].unique():
-            sub_df = avg_loss[param3][avg_loss[param3][param3] == value3]
+            sub_df = avg_loss[(param1, param2, param3)][(avg_loss[(param1, param2, param3)][param1] == value1) &
+                                                        (avg_loss[(param1, param2, param3)][param2] == value2) &
+                                                        (avg_loss[(param1, param2, param3)][param3] == value3)]
             plt.plot(sub_df['epoch'], sub_df['mean'],
                      label=f'{param3} = {value3}' if not isinstance(value3, str) or value3[0:3] != "N/A" else value3)
             plt.fill_between(sub_df['epoch'], sub_df['lower'], sub_df['upper'], alpha=0.2)
@@ -330,7 +333,7 @@ if __name__ == '__main__':
     sets = ['296']
     dsize = 6000
     labels = ['correctSelection']
-    gen_data(sets, dsize, labels)
+    #gen_data(sets, dsize, labels)
     #labels = ['loc', 'exist', 'vision', 'b-loc', 'b-exist', 'target', 'correctSelection']
 
     data_name = '296'
@@ -354,7 +357,7 @@ if __name__ == '__main__':
 
     num_random_tests = 48
     repetitions = 1
-    epochs = 10
+    epochs = 5
     colors = plt.cm.jet(np.linspace(0,1,num_random_tests))
     lr = 0.003
 
