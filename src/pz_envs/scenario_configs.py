@@ -179,7 +179,7 @@ class ScenarioConfigs:
             uninformed_event_lists[name] = events
         # print(name, events)
 
-    lack_to_generalized = {
+    '''lack_to_generalized = {
         "moved": "0.2.2",
         "partiallyUninformed": "1.0.0",
         "replaced": "1.1.0d",
@@ -199,7 +199,7 @@ class ScenarioConfigs:
                 matching_names[key].append(name)
 
     for key, value in matching_names.items():
-        print(f"For {key}, found matches: {value}")
+        print(f"For {key}, found matches: {value}")'''
 
     print('total lists', len(all_event_lists), 'informed lists', len(informed_event_lists), 'uninformed lists',
           len(uninformed_event_lists))
@@ -212,6 +212,21 @@ class ScenarioConfigs:
         #print(event_name, all_event_permutations[event_name], product)
         total_products += product
     print('total permutations', total_products)
+
+    # generate 'stages' for train and test, where a stage is a list of event lists and parameters
+    stages = {
+        's1a': {'events': all_event_lists, 'params': 'no-op'},
+        's1i': {'events': informed_event_lists, 'params': 'no-op'},
+        's1iu': {'events': dict(uninformed_event_lists, **informed_event_lists), 'params': 'no-op'},
+
+        's2i': {'events': informed_event_lists, 'params': 'defaults'},
+        's2iu': {'events': dict(uninformed_event_lists, **informed_event_lists), 'params': 'defaults'},
+
+        's2bi': {'events': informed_event_lists, 'params': 'some-op'},
+        's2biu': {'events': dict(uninformed_event_lists, **informed_event_lists), 'params': 'some-op'},
+
+        's3': {'events': all_event_lists, 'params': 'defaults'},
+    }
 
 
     standoff = {
@@ -227,85 +242,28 @@ class ScenarioConfigs:
             "num_agents": 1,
             "events": [[['bait', 'empty'], ['bait', 'empty']]]  # list, event, args
         },
-        "random": {
-            "num_puppets": [1],
-            "events": [[['random']] * n for n in range(2, 6)]
+        "no-op": {
+            "deterministic": True,
+            "hidden": True,
+            "share_rewards": False,
+            "boxes": 5,
+            "sub_valence": 1,
+            "dom_valence": 1,
+            "subject_is_dominant": False,  # subordinate has delayed release. for subordinate first, use negative
+            "num_puppets": 0,
+            "num_agents": 1,
+            "events": [[['bait', 'empty'], ['bait', 'empty']]]  # list, event, args
         },
-        "stage_1": {
-            "num_puppets": [0],
-            "boxes": [5],
+        "some-op": {
+            "deterministic": True,
+            "hidden": True,
+            "share_rewards": False,
+            "boxes": 5,
+            "sub_valence": 1,
+            "dom_valence": 1,
+            "subject_is_dominant": False,  # subordinate has delayed release. for subordinate first, use negative
+            "num_puppets": [0, 1],
+            "num_agents": 1,
+            "events": [[['bait', 'empty'], ['bait', 'empty']]]  # list, event, args
         },
-        "stage_2": {
-            "num_puppets": [1],
-            "boxes": [5],
-        },
-        "s2b": {
-            "num_puppets": [1, 0],
-        },
-        "informedControl": {
-            "events": [[['bait', 'empty'], ['bait', 'empty']]]  # optimal: Small
-        },
-        "partiallyUninformed": {  # optimal: if big bait obscured, Big, else Small
-            "events": [[['bait', 'empty'], ['obscure'], ['bait', 'empty']],
-                       [['obscure'], ['bait', 'empty'], ['reveal'], ['bait', 'empty']]]
-        },
-        "removedInformed1": {  # optimal: Neither (minor reward preference over copying dominant's decision)
-            "events": [[['bait', 'empty'], ['bait', 'empty'], ['remove', x]] for x in [0, 1]]
-        },
-        "removedUninformed1": {  # optimal: if Big is removed, Small, else Neither
-            "events": [[['bait', 'empty'], ['bait', 'empty'], ['obscure'], ['remove', x]] for x in [0, 1]]
-        },
-        "removedInformed2": {  # optimal: small
-            "events": [[['bait', 'empty'], ['bait', 'empty'], ['swap', x, 'empty']] for x in [0, 1]]
-        },
-        "removedUninformed2": {  # optimal: if Big is swapped, big, else small
-            "events": [[['bait', 'empty'], ['bait', 'empty'], ['obscure'], ['swap', x, 'empty']] for x in [0, 1]]
-        },
-        "moved": {  # optimal: Small
-            "events": [[['obscure'], ['bait', 'empty'], ['bait', 'empty'], ['reveal'], ['swap', 1, 'empty'],
-                        ['swap', 2, 'empty']]]
-        },
-        "replaced": {  # optimal: if first bait is big, Big, else Small
-            "events": [[['bait', 'empty'], ['obscure'], ['swap', 0, 'empty'], ['bait', 0]]]
-        },
-        "misinformed": {
-            # optimal: if big is swapped with empty, Big. If big swapped with small, also big. If small swapped with empty, small. If small swapped with big, big.
-            "events": [[['bait', 'empty'], ['bait', 'empty'], ['obscure'], ['swap', x, 'else'], ['swap', x, 'empty']]
-                       for x in [0, 1]]
-        },
-        "swapped": {  # optimal: Big
-            "events": [[['bait', 'empty'], ['bait', 'empty'], ['obscure'], ['swap', 0, 1]]]
-        },
-        "all": {
-            "events": [[['bait', 'empty'], ['bait', 'empty']],
-                       [['bait', 'empty'], ['obscure'], ['bait', 'empty']],
-                       [['obscure'], ['bait', 'empty'], ['reveal'], ['bait', 'empty']],
-                       # [['bait', 'empty'], ['bait', 'empty'], ['remove', 0]],
-                       # [['bait', 'empty'], ['bait', 'empty'], ['remove', 1]],
-                       [['bait', 'empty'], ['bait', 'empty'], ['swap', 0, 'empty']],
-                       [['bait', 'empty'], ['bait', 'empty'], ['swap', 1, 'empty']],
-
-                       # [['bait', 'empty'], ['bait', 'empty'], ['obscure'], ['remove', 0]],
-                       # [['bait', 'empty'], ['bait', 'empty'], ['obscure'], ['remove', 1]],
-                       [['bait', 'empty'], ['bait', 'empty'], ['obscure'], ['swap', 0, 'empty']],
-                       [['bait', 'empty'], ['bait', 'empty'], ['obscure'], ['swap', 1, 'empty']],
-                       [['obscure'], ['bait', 'empty'], ['bait', 'empty'], ['reveal'], ['swap', 1, 'empty'],
-                        ['swap', 2, 'empty']],
-                       [['bait', 'empty'], ['obscure'], ['swap', 0, 'empty'], ['bait', 0]],
-                       [['bait', 'empty'], ['bait', 'empty'], ['obscure'], ['swap', 0, 'else'], ['swap', 0, 'empty']],
-                       [['bait', 'empty'], ['bait', 'empty'], ['obscure'], ['swap', 1, 'else'], ['swap', 1, 'empty']],
-                       [['bait', 'empty'], ['bait', 'empty'], ['obscure'], ['swap', 0, 1]]]
-        }
-    }
-    standoff_optimal_policies = {
-        "stage_1": 'big',
-        "swapped": 'big',
-        "partiallyUninformed": 'b-s',
-        "replaced": 'b-s',
-        "misinformed": 'b-s',
-        "stage_2": 'small',
-        "informedControl": 'small',
-        "moved": 'small',
-        "removedUninformed": 's-n',
-        "removedInformed": 'none',
     }
