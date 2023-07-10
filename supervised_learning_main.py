@@ -10,6 +10,8 @@ import heapq
 from scipy.stats import sem, t
 
 from src.pz_envs import ScenarioConfigs
+from src.utils.plotting import save_double_param_figures, save_single_param_figures, save_fixed_double_param_figures, \
+    save_fixed_triple_param_figures
 
 sys.path.append(os.getcwd())
 
@@ -17,11 +19,9 @@ from src.objects import *
 from torch.utils.data import DataLoader
 import tqdm
 import torch.nn as nn
-import random
 import torch
-from sklearn.model_selection import train_test_split
 from matplotlib import pyplot as plt
-from src.supervised_learning import RNNModel, CustomDataset, gen_data
+from src.supervised_learning import RNNModel, CustomDataset
 import traceback
 
 
@@ -173,22 +173,27 @@ def calculate_ci(group):
                          columns=['lower', 'upper', 'mean'])
 
 
-def calculate_statistics(df, params):
+def calculate_statistics(df, params, skip_3x=False):
     avg_loss = {}
     variances = {}
-    ranges = {}
+    ranges_1 = {}
+    ranges_2 = {}
     range_dict = {}
     range_dict3 = {}
 
     print('calculating statistics...')
 
     last_epoch_df = df[df['epoch'] == df['epoch'].max()]
+    #hist_data = last_epoch_df.groupby('param').mean(numeric_only=True)
+
     param_pairs = itertools.combinations(params, 2)
     param_triples = itertools.combinations(params, 3)
 
     for param in params:
         ci_df = df.groupby([param, 'epoch'])['accuracy'].apply(calculate_ci).reset_index()
         avg_loss[param] = ci_df
+        means = last_epoch_df.groupby([param]).mean(numeric_only=True)
+        ranges_1[param] = means['accuracy'].max() - means['accuracy'].min()
 
     for param1, param2 in param_pairs:
         ci_df = df.groupby([param1, param2, 'epoch'])['accuracy'].apply(calculate_ci).reset_index()
@@ -196,7 +201,7 @@ def calculate_statistics(df, params):
 
         means = last_epoch_df.groupby([param1, param2]).mean(numeric_only=True)
         #variances[(param1, param2)] = grouped.var().mean()
-        ranges[(param1, param2)] = means['accuracy'].max() - means['accuracy'].min()
+        ranges_2[(param1, param2)] = means['accuracy'].max() - means['accuracy'].min()
 
         for value1 in df[param1].unique():
             subset = last_epoch_df[last_epoch_df[param1] == value1]
@@ -204,126 +209,80 @@ def calculate_statistics(df, params):
                 new_means = subset.groupby(param2)['accuracy'].mean()
                 range_dict[(param1, value1, param2)] = new_means.max() - new_means.min()
 
-    for param1, param2, param3 in param_triples:
-        ci_df = df.groupby([param1, param2, param3, 'epoch'])['accuracy'].apply(calculate_ci).reset_index()
-        avg_loss[(param1, param2, param3)] = ci_df
+    if not skip_3x:
+        for param1, param2, param3 in param_triples:
+            ci_df = df.groupby([param1, param2, param3, 'epoch'])['accuracy'].apply(calculate_ci).reset_index()
+            avg_loss[(param1, param2, param3)] = ci_df
 
-        for value1 in df[param1].unique():
-            for value2 in df[param2].unique():
-                subset = last_epoch_df[(last_epoch_df[param2] == value2) & (last_epoch_df[param1] == param1)]
-                if len(subset[param3].unique()) > 1:
-                    new_means = subset.groupby(param3)['accuracy'].mean()
-                    range_dict3[(param1, value1, param2, value2, param3)] = new_means.max() - new_means.min()
+            for value1 in df[param1].unique():
+                for value2 in df[param2].unique():
+                    subset = last_epoch_df[(last_epoch_df[param2] == value2) & (last_epoch_df[param1] == param1)]
+                    if len(subset[param3].unique()) > 1:
+                        new_means = subset.groupby(param3)['accuracy'].mean()
+                        range_dict3[(param1, value1, param2, value2, param3)] = new_means.max() - new_means.min()
 
-    return avg_loss, variances, ranges, range_dict, range_dict3
-
-def plot_losses(data_name, label, train_losses, val_losses, val_set_names, specific_name=None):
-    plt.figure()
-    plt.plot(train_losses, label=data_name + ' train loss')
-    for val_set_name, val_loss in zip(val_set_names, val_losses):
-        if specific_name == None or val_set_name == specific_name:
-            plt.plot(val_loss, label=val_set_name + ' val loss')
-    plt.legend(loc='upper left', bbox_to_anchor=(1.0, 1.0))
-    plt.xlabel('Epoch')
-    plt.ylabel('Loss')
-    plt.ylim(bottom=0)
-    plt.tight_layout()
-    plt.savefig(f'supervised/{data_name}-{label}-losses.png')
+    return avg_loss, variances, ranges_1, ranges_2, range_dict, range_dict3, last_epoch_df
 
 
-def save_figures(df, avg_loss, ranges, range_dict, range_dict3, params, num=10):
+def save_figures(df, avg_loss, ranges, range_dict, range_dict3, params, last_epoch_df, num=10):
     top_pairs = sorted(ranges.items(), key=lambda x: x[1], reverse=True)[:num]
     top_n_ranges = heapq.nlargest(num, range_dict, key=range_dict.get)
     top_n_ranges3 = heapq.nlargest(num, range_dict3, key=range_dict3.get)
 
-    save_double_param_figures(top_pairs, df, avg_loss)
-    save_single_param_figures(params, df, avg_loss)
-    save_fixed_double_param_figures(top_n_ranges, df, avg_loss)
-    save_fixed_triple_param_figures(top_n_ranges3, df, avg_loss)
+    save_double_param_figures(top_pairs, df, avg_loss, last_epoch_df)
+    save_single_param_figures(params, df, avg_loss, last_epoch_df)
+    save_fixed_double_param_figures(top_n_ranges, df, avg_loss, last_epoch_df)
+    save_fixed_triple_param_figures(top_n_ranges3, df, avg_loss, last_epoch_df)
 
-def save_double_param_figures(top_pairs, df, avg_loss):
-    os.makedirs('supervised/doubleparams', exist_ok=True)
-    for (param1, param2), _ in top_pairs:
-        plt.figure(figsize=(10, 6))
-        for value1 in df[param1].unique():
-            for value2 in df[param2].unique():
-                sub_df = avg_loss[(param1, param2)][
-                    (avg_loss[(param1, param2)][param1] == value1) & (
-                                avg_loss[(param1, param2)][param2] == value2)]
+def write_metrics_to_file(filepath, df, ranges, params):
+    df2 = df[df['epoch'] == df['epoch'].max()]
+    with open(filepath, 'w') as f:
+        mean_accuracy = df2['accuracy'].mean()
+        std_accuracy = df2['accuracy'].std()
+        f.write(f"Average accuracy: {mean_accuracy} ({std_accuracy})\n")
 
-                str1 = f'{param1} = {value1}' if not isinstance(value1, str) or value1[0:3] != "N/A" else value1
-                str2 = f'{param2} = {value2}' if not isinstance(value2, str) or value2[0:3] != "N/A" else value2
-                plt.plot(sub_df['epoch'], sub_df['mean'],
-                         label=f'{str1}, {str2}')
-                plt.fill_between(sub_df['epoch'], sub_df['lower'], sub_df['upper'], alpha=0.2)
+        param_stats = df2.groupby('param')['accuracy'].agg(['mean', 'std', 'count'])
+        top_10 = param_stats.nlargest(10, 'mean')
+        bottom_10 = param_stats.nsmallest(10, 'mean')
 
-        plt.title(f'Average accuracy vs Epoch for {param1} and {param2}')
-        plt.xlabel('Epoch')
-        plt.ylabel('Average accuracy')
-        plt.legend()
-        plt.ylim(0, 1)
-        plt.savefig(os.path.join(os.getcwd(), f'supervised/doubleparams/{param1}{param2}.png'))
-        plt.close()
+        f.write("Top 10 tasks based on average accuracy:\n")
+        for param, row in top_10.iterrows():
+            f.write(f"Task: {param} (n={row['count']}), Mean accuracy: {row['mean']}, Std deviation: {row['std']}\n")
+        f.write("\nBottom 10 tasks based on average accuracy:\n")
+        for param, row in bottom_10.iterrows():
+            f.write(f"Task: {param} (n={row['count']}), Mean accuracy: {row['mean']}, Std deviation: {row['std']}\n")
 
-def save_single_param_figures(params, df, avg_loss):
-    os.makedirs('supervised/singleparams', exist_ok=True)
-    for param in params:
-        plt.figure(figsize=(10, 6))
-        for value in df[param].unique():
-            sub_df = avg_loss[param][avg_loss[param][param] == value]
+        sorted_ranges = sorted(ranges.items(), key=lambda x: x[1], reverse=True)
+        f.write("Top 10 parameters based on sensitivity to accuracy across values:\n")
+        for i in range(10):
+            f.write(f"Parameter: {sorted_ranges[i][0]}, Range: {sorted_ranges[i][1]}\n")
 
-            plt.plot(sub_df['epoch'], sub_df['mean'], label=f'{param} = {value}' if not isinstance(value, str) or value[0:3] != "N/A" else value)
-            plt.fill_between(sub_df['epoch'], sub_df['lower'], sub_df['upper'], alpha=0.2)
-        plt.title(f'Average accuracy vs Epoch for {param}')
-        plt.xlabel('Epoch')
-        plt.ylabel('Average accuracy')
-        plt.legend()
-        plt.ylim(0, 1)
-        file_path = os.path.join(os.getcwd(), 'supervised', 'singleparams', f'{param}.png')
-        plt.savefig(file_path)
-        plt.close()
+        f.write("\nBottom 10 parameters based on sensitivity to accuracy across values:\n")
+        for i in range(10):
+            f.write(f"Parameter: {sorted_ranges[-(i+1)][0]}, Range: {sorted_ranges[-(i+1)][1]}\n")
 
-def save_fixed_double_param_figures(top_n_ranges, df, avg_loss):
-    os.makedirs('supervised/fixeddoubleparams', exist_ok=True)
-    for combo in top_n_ranges:
-        param1, value1, param2 = combo
-        subset = df[df[param1] == value1]
-        plt.figure(figsize=(10, 6))
-        for value2 in subset[param2].unique():
-            sub_df = avg_loss[(param1, param2)][(avg_loss[(param1, param2)][param2] == value2) & (avg_loss[(param1, param2)][param1] == value1)]
-            plt.plot(sub_df['epoch'], sub_df['mean'],
-                     label=f'{param2} = {value2}' if not isinstance(value2, str) or value2[0:3] != "N/A" else value2)
-            plt.fill_between(sub_df['epoch'], sub_df['lower'], sub_df['upper'], alpha=0.2)
-        plt.title(f'Average accuracy vs Epoch for {param2} given {param1} = {value1}')
-        plt.xlabel('Epoch')
-        plt.ylabel('Average accuracy')
-        plt.legend()
-        plt.ylim(0, 1)
-        name = f'{param1}{str(value1)[:3]}{param2}'.replace('/', '-')
-        plt.savefig(os.path.join(os.getcwd(), f'supervised/fixeddoubleparams/{name}.png'))
-        plt.close()
+        param_value_stats = []
+        for param in params:
+            param_stats_mean = df2.groupby(param)['accuracy'].mean().reset_index().values
+            param_stats_std = df2.groupby(param)['accuracy'].std().reset_index().values
+            # Include the parameter's name in the values
+            param_stats_with_name = [(param, value, mean, std) for (value, mean), (_, std) in
+                                     zip(param_stats_mean, param_stats_std)]
+            param_value_stats.extend(param_stats_with_name)
 
-def save_fixed_triple_param_figures(top_n_ranges, df, avg_loss):
-    os.makedirs('supervised/fixedtripleparams', exist_ok=True)
-    for combo in top_n_ranges:
-        param1, value1, param2, value2, param3 = combo
-        subset = df[(df[param1] == value1) & (df[param2] == value2)]
-        plt.figure(figsize=(10, 6))
-        for value3 in subset[param3].unique():
-            sub_df = avg_loss[(param1, param2, param3)][(avg_loss[(param1, param2, param3)][param1] == value1) &
-                                                        (avg_loss[(param1, param2, param3)][param2] == value2) &
-                                                        (avg_loss[(param1, param2, param3)][param3] == value3)]
-            plt.plot(sub_df['epoch'], sub_df['mean'],
-                     label=f'{param3} = {value3}' if not isinstance(value3, str) or value3[0:3] != "N/A" else value3)
-            plt.fill_between(sub_df['epoch'], sub_df['lower'], sub_df['upper'], alpha=0.2)
-        plt.title(f'Average accuracy vs Epoch for {param3} given {param1}={value1} and {param2}={value2}')
-        plt.xlabel('Epoch')
-        plt.ylabel('Average accuracy')
-        plt.legend()
-        plt.ylim(0, 1)
-        name = f'{param1}{str(value1)[:3]}{param2}{str(value2)[:3]}{param3}'.replace('/', '-')
-        plt.savefig(os.path.join(os.getcwd(), f'supervised/fixedtripleparams/{name}.png'))
-        plt.close()
+        param_value_stats.sort(key=lambda x: x[2], reverse=True)  # sort by mean accuracy
+        top_10_values = param_value_stats[:10]
+        bottom_10_values = param_value_stats[-10:]
+
+        f.write("Top 10 parameter values based on average accuracy:\n")
+        for param, value, mean_accuracy, std_dev in top_10_values:
+            f.write(f"Parameter: {param}, Value: {value}, Mean accuracy: {mean_accuracy}, Std. deviation: {std_dev}\n")
+
+        f.write("\nBottom 10 parameter values based on average accuracy:\n")
+        for param, value, mean_accuracy, std_dev in bottom_10_values:
+            f.write(f"Parameter: {param}, Value: {value}, Mean accuracy: {mean_accuracy}, Std. deviation: {std_dev}\n")
+
+
 
 # train_model('random-2500', 'exist')
 if __name__ == '__main__':
@@ -386,9 +345,12 @@ if __name__ == '__main__':
                           'second_swap_to_first_loc', 'delay_2nd_bait', 'first_bait_size',
                           'uninformed_bait', 'uninformed_swap', 'first_swap']
 
-                avg_loss, variances, ranges, range_dict, range_dict3 = calculate_statistics(combined_df, params)
+                avg_loss, variances, ranges_1, ranges_2, range_dict, range_dict3, last_epoch_df = calculate_statistics(combined_df, params, skip_3x=True)
 
-                save_figures(combined_df, avg_loss, ranges, range_dict, range_dict3, params, num=12)
+                filepath = 'supervised/metrics.txt'
+                write_metrics_to_file(filepath, combined_df, ranges_1, params)
+
+                save_figures(combined_df, avg_loss, ranges_2, range_dict, range_dict3, params, last_epoch_df, num=12)
 
             test_names.append(model_name)
             test += 1

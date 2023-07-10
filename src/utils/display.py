@@ -183,6 +183,55 @@ def get_transfer_matrix_row(path, column, config_names, config_names_old, only_l
 
     return return_matrix, timesteps, train_name
 
+#import seaborn as sns
+    #import pandas as pd
+    import matplotlib.pyplot as plt
+    import matplotlib.gridspec as gridspec
+    import numpy as np
+
+    # The hierarchical parameter values
+    visible_baits = [0, 1, 2]
+    swaps = [0, 1, 2]
+    visible_swaps = {0: [0], 1: [0, 1], 2: [0, 1, 2]}
+    first_bait_size = {0: [0], 1: [0, 1], 2: [0, 1]}
+    first_swap = {0: [0], 1: [0, 1], 2: [0, 1]}
+
+    fig = plt.figure(figsize=(16, 16))
+    gs = gridspec.GridSpec(len(visible_baits), len(swaps), figure=fig)
+
+    for i, vb in enumerate(visible_baits):
+        for j, s in enumerate(swaps):
+            swap_values = range(s + 1)
+            fsib_values = [True, False] if s > 0 else [False]
+            d2b_values = [True, False] if s > 0 else [False]
+            sstfl_values = [True, False] if s == 2 else [False]
+
+            gs000 = gridspec.GridSpecFromSubplotSpec(len(swap_values),
+                                                     len(fsib_values) * len(d2b_values) * len(sstfl_values),
+                                                     subplot_spec=gs[i, j])
+            for m, vs in enumerate(swap_values):
+                for n, (fsib, d2b, sstfl) in enumerate(product(fsib_values, d2b_values, sstfl_values)):
+                    rows, cols = gs000.get_geometry()
+                    if m < rows and n < cols:
+                        ax = fig.add_subplot(gs000[m, n])
+                        ax.text(0.5, 0.5, f"vb={vb}, s={s}, vs={vs}, fsib={fsib}, d2b={d2b}, sstfl={sstfl}",
+                                ha='center', va='center', fontsize=6)
+                        ax.set_xticks([])
+                        ax.set_yticks([])
+
+    for i, vb in enumerate(visible_baits):
+        ax = fig.add_subplot(gs[i, 0])
+        ax.text(0.5, 0.5, f"Visible Baits = {vb}", ha='center', va='center', fontsize=8, rotation='vertical')
+        ax.set_xticks([])
+        ax.set_yticks([])
+
+    for j, s in enumerate(swaps):
+        ax = fig.add_subplot(gs[0, j])
+        ax.text(0.5, 0.5, f"Swaps = {s}", ha='center', va='center', fontsize=8)
+        ax.set_xticks([])
+        ax.set_yticks([])
+
+    plt.show()
 
 def get_transfer_matrix_row_legacy(path, column, only_last=False):
     grouped_df, _, _, _ = process_csv(path, gtr=False)

@@ -4,6 +4,7 @@ from stable_baselines3.common.results_plotter import load_results, ts2xy
 import os
 import pandas as pd
 import json
+import seaborn as sns
 from stable_baselines3.common.monitor import get_monitor_files
 
 
@@ -330,3 +331,180 @@ def plot_tsne(data, labels, index, color):
 
     # for i, name in enumerate(labels[index[0]:index[1]]):
     #    plt.annotate(name, (data[i + index[0], 0], data[i + index[0], 1]), textcoords="offset points", xytext=(-10, 5), ha='center')
+
+
+def save_double_param_figures(top_pairs, df, avg_loss, last_epoch_df):
+    os.makedirs('supervised/doubleparams', exist_ok=True)
+    for (param1, param2), _ in top_pairs:
+        plt.figure(figsize=(10, 6))
+        for value1 in df[param1].unique():
+            for value2 in df[param2].unique():
+                sub_df = avg_loss[(param1, param2)][
+                    (avg_loss[(param1, param2)][param1] == value1) & (
+                                avg_loss[(param1, param2)][param2] == value2)]
+
+                str1 = f'{param1} = {value1}' if not isinstance(value1, str) or value1[0:3] != "N/A" else value1
+                str2 = f'{param2} = {value2}' if not isinstance(value2, str) or value2[0:3] != "N/A" else value2
+                plt.plot(sub_df['epoch'], sub_df['mean'],
+                         label=f'{str1}, {str2}')
+                plt.fill_between(sub_df['epoch'], sub_df['lower'], sub_df['upper'], alpha=0.2)
+
+
+        plt.title(f'Average accuracy vs Epoch for {param1} and {param2}')
+        plt.xlabel('Epoch')
+        plt.ylabel('Average accuracy')
+        plt.legend()
+        plt.ylim(0, 1)
+        plt.savefig(os.path.join(os.getcwd(), f'supervised/doubleparams/{param1}{param2}.png'))
+        plt.close()
+
+        # Creating the histogram
+        plt.figure(figsize=(10, 6))
+        hist_data = []
+        labels = []
+        for value1 in df[param1].unique():
+            for value2 in df[param2].unique():
+                value_df = last_epoch_df[(last_epoch_df[param2] == value2) & (last_epoch_df[param1] == value1)]
+                mean_acc = value_df.groupby('param')['accuracy'].mean()
+                hist_data.append(mean_acc.values)
+                labels.append(f'{param2} = {value2}, {param1} = {value1}')
+        plt.hist(hist_data, bins=np.arange(0, 1, 0.05), stacked=True, label=labels, alpha=0.5)
+
+        plt.title(f'Histogram of accuracy for {param2} and {param1}')
+        plt.xlabel('Accuracy')
+        plt.ylabel('Count')
+        plt.legend(loc='upper left')
+        plt.savefig(os.path.join(os.getcwd(), f'supervised/fixeddoubleparams/hist_{param1}{param2}.png'))
+        plt.close()
+
+
+
+def save_single_param_figures(params, df, avg_loss, last_epoch_df):
+    os.makedirs('supervised/singleparams', exist_ok=True)
+    for param in params:
+        plt.figure(figsize=(10, 6))
+        for value in df[param].unique():
+            sub_df = avg_loss[param][avg_loss[param][param] == value]
+
+            plt.plot(sub_df['epoch'], sub_df['mean'], label=f'{param} = {value}' if not isinstance(value, str) or value[0:3] != "N/A" else value)
+            plt.fill_between(sub_df['epoch'], sub_df['lower'], sub_df['upper'], alpha=0.2)
+        plt.title(f'Average accuracy vs Epoch for {param}')
+        plt.xlabel('Epoch')
+        plt.ylabel('Average accuracy')
+        plt.legend()
+        plt.ylim(0, 1)
+        file_path = os.path.join(os.getcwd(), 'supervised', 'singleparams', f'{param}.png')
+        plt.savefig(file_path)
+        plt.close()
+
+        # Creating the histogram
+        plt.figure(figsize=(10, 6))
+        hist_data = []
+        labels = []
+        for value in df[param].unique():
+            value_df = last_epoch_df[last_epoch_df[param] == value]
+            mean_acc = value_df.groupby('param')['accuracy'].mean()
+            hist_data.append(mean_acc.values)
+            labels.append(f'{param} = {value}')
+        plt.hist(hist_data, bins=np.arange(0, 1, 0.05), stacked=True, label=labels, alpha=0.5)
+
+        plt.title(f'Histogram of accuracy for last epoch for {param}')
+        plt.xlabel('Accuracy')
+        plt.ylabel('Count')
+        plt.legend(loc='upper left')
+        plt.savefig(os.path.join(os.getcwd(), f'supervised/singleparams/hist_{param}.png'))
+        plt.close()
+
+
+def save_fixed_double_param_figures(top_n_ranges, df, avg_loss, last_epoch_df):
+    os.makedirs('supervised/fixeddoubleparams', exist_ok=True)
+    for combo in top_n_ranges:
+        param1, value1, param2 = combo
+        subset = df[df[param1] == value1]
+        plt.figure(figsize=(10, 6))
+        for value2 in subset[param2].unique():
+            sub_df = avg_loss[(param1, param2)][(avg_loss[(param1, param2)][param2] == value2) & (avg_loss[(param1, param2)][param1] == value1)]
+            plt.plot(sub_df['epoch'], sub_df['mean'],
+                     label=f'{param2} = {value2}' if not isinstance(value2, str) or value2[0:3] != "N/A" else value2)
+            plt.fill_between(sub_df['epoch'], sub_df['lower'], sub_df['upper'], alpha=0.2)
+        plt.title(f'Average accuracy vs Epoch for {param2} given {param1} = {value1}')
+        plt.xlabel('Epoch')
+        plt.ylabel('Average accuracy')
+        plt.legend()
+        plt.ylim(0, 1)
+        name = f'{param1}{str(value1)[:3]}{param2}'.replace('/', '-')
+        plt.savefig(os.path.join(os.getcwd(), f'supervised/fixeddoubleparams/{name}.png'))
+        plt.close()
+
+        # Creating the histogram
+        plt.figure(figsize=(10, 6))
+        hist_data = []
+        labels = []
+        for value2 in subset[param2].unique():
+            value_df = last_epoch_df[(last_epoch_df[param2] == value2) & (last_epoch_df[param1] == value1)]
+            mean_acc = value_df.groupby('param')['accuracy'].mean()
+            hist_data.append(mean_acc.values)
+            labels.append(f'{param2} = {value2}')
+        plt.hist(hist_data, bins=np.arange(0, 1, 0.05), stacked=True, label=labels, alpha=0.5)
+
+        plt.title(f'Histogram of accuracy for {param2} given {param1} = {value1}')
+        plt.xlabel('Accuracy')
+        plt.ylabel('Count')
+        plt.legend(loc='upper left')
+        plt.savefig(os.path.join(os.getcwd(), f'supervised/fixeddoubleparams/hist_{name}.png'))
+        plt.close()
+
+
+def save_fixed_triple_param_figures(top_n_ranges, df, avg_loss, last_epoch_df):
+    os.makedirs('supervised/fixedtripleparams', exist_ok=True)
+    for combo in top_n_ranges:
+        param1, value1, param2, value2, param3 = combo
+        subset = df[(df[param1] == value1) & (df[param2] == value2)]
+        plt.figure(figsize=(10, 6))
+        for value3 in subset[param3].unique():
+            sub_df = avg_loss[(param1, param2, param3)][(avg_loss[(param1, param2, param3)][param1] == value1) &
+                                                        (avg_loss[(param1, param2, param3)][param2] == value2) &
+                                                        (avg_loss[(param1, param2, param3)][param3] == value3)]
+            plt.plot(sub_df['epoch'], sub_df['mean'],
+                     label=f'{param3} = {value3}' if not isinstance(value3, str) or value3[0:3] != "N/A" else value3)
+            plt.fill_between(sub_df['epoch'], sub_df['lower'], sub_df['upper'], alpha=0.2)
+        plt.title(f'Average accuracy vs Epoch for {param3} given {param1}={value1} and {param2}={value2}')
+        plt.xlabel('Epoch')
+        plt.ylabel('Average accuracy')
+        plt.legend()
+        plt.ylim(0, 1)
+        name = f'{param1}{str(value1)[:3]}{param2}{str(value2)[:3]}{param3}'.replace('/', '-')
+        plt.savefig(os.path.join(os.getcwd(), f'supervised/fixedtripleparams/{name}.png'))
+        plt.close()
+
+        # Creating the histogram
+        plt.figure(figsize=(10, 6))
+        hist_data = []
+        labels = []
+        for value3 in subset[param3].unique():
+            value_df = last_epoch_df[(last_epoch_df[param2] == value2) & (last_epoch_df[param1] == value1) & (last_epoch_df[param3] == value3)]
+            mean_acc = value_df.groupby('param')['accuracy'].mean()
+            hist_data.append(mean_acc.values)
+            labels.append(f'{param3} = {value3}')
+        plt.hist(hist_data, bins=np.arange(0, 1, 0.05), stacked=True, label=labels, alpha=0.5)
+
+        plt.title(f'Histogram of accuracy for {param3} given {param1} = {value1} and {param2} = {value2}')
+        plt.xlabel('Accuracy')
+        plt.ylabel('Count')
+        plt.legend(loc='upper left')
+        plt.savefig(os.path.join(os.getcwd(), f'supervised/fixeddoubleparams/hist_{name}.png'))
+        plt.close()
+
+
+def plot_losses(data_name, label, train_losses, val_losses, val_set_names, specific_name=None):
+    plt.figure()
+    plt.plot(train_losses, label=data_name + ' train loss')
+    for val_set_name, val_loss in zip(val_set_names, val_losses):
+        if specific_name == None or val_set_name == specific_name:
+            plt.plot(val_loss, label=val_set_name + ' val loss')
+    plt.legend(loc='upper left', bbox_to_anchor=(1.0, 1.0))
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.ylim(bottom=0)
+    plt.tight_layout()
+    plt.savefig(f'supervised/{data_name}-{label}-losses.png')
