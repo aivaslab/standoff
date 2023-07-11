@@ -41,10 +41,12 @@ def decode_event_name(name):
     binary_suffix = format(int(numerical_suffix), '04b')
 
     # Extract parameters from the binary suffix
-    first_bait_size = int(binary_suffix[0])
-    uninformed_bait = int(binary_suffix[1])
-    uninformed_swap = int(binary_suffix[2])
-    first_swap = int(binary_suffix[3])
+    first_bait_size = int(binary_suffix[3])
+    uninformed_bait = int(binary_suffix[2])
+    uninformed_swap = int(binary_suffix[1])
+    first_swap = int(binary_suffix[0])
+
+    #print(numerical_suffix, first_bait_size)
 
     # Calculate conditions for special parameters
     swaps_gt_0 = swaps > 0
@@ -67,10 +69,11 @@ def decode_event_name(name):
         "first_swap": first_swap if swaps_gt_0 and not delay_2nd_bait and not first_swap_is_both else 'N/A (swaps=0 or 2nd bait delayed or first swap both)'
     })
 
-def train_model(data_name, label, test_sets, path='supervised/', epochs=100, model_kwargs=None, lr=0.001):
-    data = np.load(path + data_name + '-obs.npy')
-    labels = np.load(path + data_name + '-label-' + label + '.npy')
-    params = np.load(path + data_name + '-params.npy')
+def train_model(data_name, label, test_sets, load_path='supervised/', save_path='', epochs=100, model_kwargs=None, lr=0.001):
+
+    data = np.load(os.path.join(load_path, data_name + '-obs.npy'))
+    labels = np.load(os.path.join(load_path, data_name + '-label-' + label + '.npy'))
+    params = np.load(os.path.join(load_path, data_name + '-params.npy'))
     batch_size = 64
 
     # not useful unless test set is same as train
@@ -86,9 +89,9 @@ def train_model(data_name, label, test_sets, path='supervised/', epochs=100, mod
 
     test_loaders = []
     for val_set_name in test_sets:
-        val_data = np.load(path + val_set_name + '-obs.npy')
-        val_labels = np.load(path + val_set_name + '-label-' + label + '.npy')
-        val_params = np.load(path + val_set_name + '-params.npy')
+        val_data = np.load(os.path.join(load_path, val_set_name + '-obs.npy'))
+        val_labels = np.load(os.path.join(load_path, val_set_name + '-label-' + label + '.npy'))
+        val_params = np.load(os.path.join(load_path, val_set_name + '-params.npy'))
         val_dataset = CustomDataset(val_data, val_labels, val_params)
         test_loaders.append(DataLoader(val_dataset, batch_size=batch_size, shuffle=False))
 
@@ -150,7 +153,8 @@ def train_model(data_name, label, test_sets, path='supervised/', epochs=100, mod
             #val_losses[idx].append(val_loss)
         model.train()
     # save model
-    torch.save([model.kwargs, model.state_dict()], f'{path}{data_name}-{label}-model.pt')
+    os.makedirs(save_path, exist_ok=True)
+    torch.save([model.kwargs, model.state_dict()], os.path.join(save_path, f'{data_name}-{label}-model.pt'))
 
     #pd.DataFrame(param_losses_list).to_csv(path + 'param_losses.csv')
     #df = pd.read_csv('supervised/param_losses.csv')
@@ -224,7 +228,7 @@ def calculate_statistics(df, params, skip_3x=False):
     return avg_loss, variances, ranges_1, ranges_2, range_dict, range_dict3, last_epoch_df
 
 
-def save_figures(df, avg_loss, ranges, range_dict, range_dict3, params, last_epoch_df, num=10):
+def save_figures(path, df, avg_loss, ranges, range_dict, range_dict3, params, last_epoch_df, num=10):
     top_pairs = sorted(ranges.items(), key=lambda x: x[1], reverse=True)[:num]
     top_n_ranges = heapq.nlargest(num, range_dict, key=range_dict.get)
     top_n_ranges3 = heapq.nlargest(num, range_dict3, key=range_dict3.get)
@@ -313,15 +317,22 @@ if __name__ == '__main__':
 
     num_random_tests = 48
     repetitions = 1
-    epochs = 25
+    epochs = 3
     colors = plt.cm.jet(np.linspace(0,1,num_random_tests))
     lr = 0.002
+    load_path = 'supervised'
+    save_path = 'data/x'
 
     test = 0
     while test < num_random_tests:
         try:
             #model_kwargs = {x: random.choice(model_kwargs_base[x]) for x in model_kwargs_base.keys()}
-            model_kwargs = {'hidden_size': 16, 'num_layers': 2, 'output_len': 5, 'pool_kernel_size': 3, 'pool_stride': 2, 'channels': 4, 'kernels': 8, 'padding1': 1, 'padding2': 0, 'use_pool': False, 'stride1': 1, 'use_conv2': True, 'kernel_size1': 3, 'kernels2': 16, 'kernel_size2': 3}
+            #model_kwargs = {'hidden_size': 16, 'num_layers': 2, 'output_len': 5, 'pool_kernel_size': 3, 'pool_stride': 2, 'channels': 4, 'kernels': 8, 'padding1': 1, 'padding2': 0, 'use_pool': False, 'stride1': 1, 'use_conv2': True, 'kernel_size1': 3, 'kernels2': 16, 'kernel_size2': 3}
+            model_kwargs = {'hidden_size': 6, 'num_layers': 1, 'output_len': 5, 'pool_kernel_size': 3,
+                            'pool_stride': 2, 'channels': 4, 'kernels': 8, 'padding1': 1, 'padding2': 0,
+                            'use_pool': False, 'stride1': 1, 'use_conv2': True, 'kernel_size1': 3, 'kernels2': 8,
+                            'kernel_size2': 3}
+
             model_name = "".join([str(x) + "," for x in model_kwargs.values()])
 
             #unused_sets = [s for s in sets if s != data_name]
@@ -330,7 +341,7 @@ if __name__ == '__main__':
             for label in labels:
                 df_list = []
                 for repetition in range(repetitions):
-                    t_loss, v_loss, df = train_model(data_name, label, [eval_name], epochs=epochs, model_kwargs=model_kwargs, lr=lr)
+                    t_loss, v_loss, df = train_model(data_name, label, [eval_name], load_path=load_path, save_path=save_path, epochs=epochs, model_kwargs=model_kwargs, lr=lr)
                     df_list.append(df)
                     first_v_loss.append(v_loss[0])
                     if len(t_loss_sum) == 0:
@@ -347,10 +358,9 @@ if __name__ == '__main__':
 
                 avg_loss, variances, ranges_1, ranges_2, range_dict, range_dict3, last_epoch_df = calculate_statistics(combined_df, params, skip_3x=True)
 
-                filepath = 'supervised/metrics.txt'
-                write_metrics_to_file(filepath, combined_df, ranges_1, params)
+                write_metrics_to_file(os.path.join(save_path, 'metrics.txt'), combined_df, ranges_1, params)
 
-                save_figures(combined_df, avg_loss, ranges_2, range_dict, range_dict3, params, last_epoch_df, num=12)
+                save_figures(os.path.join(save_path, 'figs'), combined_df, avg_loss, ranges_2, range_dict, range_dict3, params, last_epoch_df, num=12)
 
             test_names.append(model_name)
             test += 1

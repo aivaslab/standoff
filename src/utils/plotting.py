@@ -406,6 +406,10 @@ def save_single_param_figures(params, df, avg_loss, last_epoch_df):
             mean_acc = value_df.groupby('param')['accuracy'].mean()
             hist_data.append(mean_acc.values)
             labels.append(f'{param} = {value}')
+            print(param, value, len(mean_acc.values))
+
+        print('lenny', len(hist_data))
+        hist_data = np.asarray(hist_data, dtype=object)
         plt.hist(hist_data, bins=np.arange(0, 1, 0.05), stacked=True, label=labels, alpha=0.5)
 
         plt.title(f'Histogram of accuracy for last epoch for {param}')
