@@ -369,7 +369,7 @@ def save_double_param_figures(top_pairs, df, avg_loss, last_epoch_df):
                 hist_data.append(mean_acc.values)
                 labels.append(f'{param2} = {value2}, {param1} = {value1}')
         hist_data = np.asarray(hist_data, dtype=object)
-        plt.hist(hist_data, bins=np.arange(0, 1, 0.05), stacked=True, label=labels, alpha=0.5)
+        plt.hist(hist_data, bins=np.arange(0, 1.01, 0.05), stacked=True, label=labels, alpha=0.5)
 
         plt.title(f'Histogram of accuracy for {param2} and {param1}')
         plt.xlabel('Accuracy')
@@ -407,11 +407,11 @@ def save_single_param_figures(params, df, avg_loss, last_epoch_df):
             mean_acc = value_df.groupby('param')['accuracy'].mean()
             hist_data.append(mean_acc.values)
             labels.append(f'{param} = {value}')
-            print(param, value, len(mean_acc.values))
+            print(param, value, len(mean_acc.values), mean_acc.values)
 
         #print('lenny', len(hist_data))
         hist_data = np.asarray(hist_data, dtype=object)
-        plt.hist(hist_data, bins=np.arange(0, 1, 0.05), stacked=True, label=labels, alpha=0.5)
+        plt.hist(hist_data, bins=np.arange(0, 1.01, 0.05), stacked=True, label=labels, alpha=0.5)
 
         plt.title(f'Histogram of accuracy for last epoch for {param}')
         plt.xlabel('Accuracy')
@@ -451,7 +451,7 @@ def save_fixed_double_param_figures(top_n_ranges, df, avg_loss, last_epoch_df):
             hist_data.append(mean_acc.values)
             labels.append(f'{param2} = {value2}')
         hist_data = np.asarray(hist_data, dtype=object)
-        plt.hist(hist_data, bins=np.arange(0, 1, 0.05), stacked=True, label=labels, alpha=0.5)
+        plt.hist(hist_data, bins=np.arange(0, 1.01, 0.05), stacked=True, label=labels, alpha=0.5)
 
         plt.title(f'Histogram of accuracy for {param2} given {param1} = {value1}')
         plt.xlabel('Accuracy')
@@ -493,7 +493,7 @@ def save_fixed_triple_param_figures(top_n_ranges, df, avg_loss, last_epoch_df):
             hist_data.append(mean_acc.values)
             labels.append(f'{param3} = {value3}')
         hist_data = np.asarray(hist_data, dtype=object)
-        plt.hist(hist_data, bins=np.arange(0, 1, 0.05), stacked=True, label=labels, alpha=0.5)
+        plt.hist(hist_data, bins=np.arange(0, 1.01, 0.05), stacked=True, label=labels, alpha=0.5)
 
         plt.title(f'Histogram of accuracy for {param3} given {param1} = {value1} and {param2} = {value2}')
         plt.xlabel('Accuracy')
