@@ -235,10 +235,10 @@ def save_figures(path, df, avg_loss, ranges, range_dict, range_dict3, params, la
     top_n_ranges = heapq.nlargest(num, range_dict, key=range_dict.get)
     top_n_ranges3 = heapq.nlargest(num, range_dict3, key=range_dict3.get)
 
-    save_double_param_figures(top_pairs, df, avg_loss, last_epoch_df)
-    save_single_param_figures(params, df, avg_loss, last_epoch_df)
-    save_fixed_double_param_figures(top_n_ranges, df, avg_loss, last_epoch_df)
-    save_fixed_triple_param_figures(top_n_ranges3, df, avg_loss, last_epoch_df)
+    save_double_param_figures(path, top_pairs, df, avg_loss, last_epoch_df)
+    save_single_param_figures(path, params, df, avg_loss, last_epoch_df)
+    save_fixed_double_param_figures(path, top_n_ranges, df, avg_loss, last_epoch_df)
+    save_fixed_triple_param_figures(path, top_n_ranges3, df, avg_loss, last_epoch_df)
 
 def write_metrics_to_file(filepath, df, ranges, params):
     df2 = df[df['epoch'] == df['epoch'].max()]
@@ -294,7 +294,7 @@ def write_metrics_to_file(filepath, df, ranges, params):
 if __name__ == '__main__':
     labels = ['correctSelection']
     sets = ScenarioConfigs.stages.keys()
-    gen_data(labels)
+    #gen_data(labels)
     #labels = ['loc', 'exist', 'vision', 'b-loc', 'b-exist', 'target', 'correctSelection']
 
     data_name = 's3a-296'
@@ -319,7 +319,7 @@ if __name__ == '__main__':
 
     num_random_tests = 48
     repetitions = 1
-    epochs = 25
+    epochs = 3
     colors = plt.cm.jet(np.linspace(0,1,num_random_tests))
     lr = 0.002
     load_path = 'supervised'
@@ -329,11 +329,11 @@ if __name__ == '__main__':
     while test < num_random_tests:
         try:
             #model_kwargs = {x: random.choice(model_kwargs_base[x]) for x in model_kwargs_base.keys()}
-            #model_kwargs = {'hidden_size': 16, 'num_layers': 2, 'output_len': 5, 'pool_kernel_size': 3, 'pool_stride': 2, 'channels': 4, 'kernels': 8, 'padding1': 1, 'padding2': 0, 'use_pool': False, 'stride1': 1, 'use_conv2': True, 'kernel_size1': 3, 'kernels2': 16, 'kernel_size2': 3}
-            model_kwargs = {'hidden_size': 6, 'num_layers': 1, 'output_len': 5, 'pool_kernel_size': 3,
+            model_kwargs = {'hidden_size': 16, 'num_layers': 2, 'output_len': 5, 'pool_kernel_size': 3, 'pool_stride': 2, 'channels': 4, 'kernels': 8, 'padding1': 1, 'padding2': 0, 'use_pool': False, 'stride1': 1, 'use_conv2': True, 'kernel_size1': 3, 'kernels2': 16, 'kernel_size2': 3}
+            '''model_kwargs = {'hidden_size': 6, 'num_layers': 1, 'output_len': 5, 'pool_kernel_size': 3,
                             'pool_stride': 2, 'channels': 4, 'kernels': 8, 'padding1': 1, 'padding2': 0,
                             'use_pool': False, 'stride1': 1, 'use_conv2': True, 'kernel_size1': 3, 'kernels2': 8,
-                            'kernel_size2': 3}
+                            'kernel_size2': 3}'''
 
             model_name = "".join([str(x) + "," for x in model_kwargs.values()])
 
