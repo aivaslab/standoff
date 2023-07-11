@@ -21,7 +21,7 @@ import tqdm
 import torch.nn as nn
 import torch
 from matplotlib import pyplot as plt
-from src.supervised_learning import RNNModel, CustomDataset
+from src.supervised_learning import RNNModel, CustomDataset, gen_data
 import traceback
 
 
@@ -75,6 +75,8 @@ def train_model(data_name, label, test_sets, load_path='supervised/', save_path=
     labels = np.load(os.path.join(load_path, data_name + '-label-' + label + '.npy'))
     params = np.load(os.path.join(load_path, data_name + '-params.npy'))
     batch_size = 64
+
+    print('total data', data.shape, params.shape)
 
     # not useful unless test set is same as train
     '''train_data, val_data, train_labels, val_labels, train_params, val_params = train_test_split(
@@ -292,7 +294,7 @@ def write_metrics_to_file(filepath, df, ranges, params):
 if __name__ == '__main__':
     labels = ['correctSelection']
     sets = ScenarioConfigs.stages.keys()
-    #gen_data(labels)
+    gen_data(labels)
     #labels = ['loc', 'exist', 'vision', 'b-loc', 'b-exist', 'target', 'correctSelection']
 
     data_name = 's3a-296'
@@ -317,7 +319,7 @@ if __name__ == '__main__':
 
     num_random_tests = 48
     repetitions = 1
-    epochs = 3
+    epochs = 25
     colors = plt.cm.jet(np.linspace(0,1,num_random_tests))
     lr = 0.002
     load_path = 'supervised'

@@ -129,14 +129,17 @@ def gen_data(labels=[]):
         total_groups = len(env.param_groups)
 
         env.deterministic = True
+        print('total_groups', total_groups)
 
-        while env.current_param_group < total_groups:
+        while True:
             env.deterministic_seed = env.current_param_group_count
 
             obs = env.reset()
+            # after first reset, current param group and param group count are both 1
+            #print('reset', env.current_param_group, env.current_param_group_count)
             if env.current_param_group != prev_param_group:
-                tq.update(1)
                 eName = env.current_event_list_name
+                tq.update(1)
             prev_param_group = env.current_param_group
             #print(env.current_param_group, env.event_lists)
             this_ob = np.zeros((10, *obs['p_0'].shape))
@@ -174,7 +177,8 @@ def gen_data(labels=[]):
                             break
                 del _env, a
 
-            if env.current_param_group == total_groups - 1:
+            #print(env.current_param_group_count, env.current_param_group)
+            if env.current_param_group == total_groups - 1 and env.current_param_group_count == env.target_param_group_count - 1:
                 # normally the while loop won't break because reset has a modulus
                 break
 

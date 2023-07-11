@@ -1,0 +1,70 @@
+Average accuracy: 0.7340425531914894 (0.4418514877523857)
+Top 10 tasks based on average accuracy:
+Task: b0w1v0d-0 (n=20.0), Mean accuracy: 1.0, Std deviation: 0.0
+Task: b0w1v1d-0 (n=20.0), Mean accuracy: 1.0, Std deviation: 0.0
+Task: b0w2v1-13 (n=180.0), Mean accuracy: 1.0, Std deviation: 0.0
+Task: b0w2v1-4 (n=180.0), Mean accuracy: 1.0, Std deviation: 0.0
+Task: b0w2v1-5 (n=180.0), Mean accuracy: 1.0, Std deviation: 0.0
+Task: b0w2v1d-4 (n=60.0), Mean accuracy: 1.0, Std deviation: 0.0
+Task: b0w2v1d-5 (n=60.0), Mean accuracy: 1.0, Std deviation: 0.0
+Task: b0w2v1f-5 (n=60.0), Mean accuracy: 1.0, Std deviation: 0.0
+Task: b0w2v2d-1 (n=60.0), Mean accuracy: 1.0, Std deviation: 0.0
+Task: b1w0v0-2 (n=20.0), Mean accuracy: 1.0, Std deviation: 0.0
+
+Bottom 10 tasks based on average accuracy:
+Task: b0w2v1fs-5 (n=20.0), Mean accuracy: 0.0, Std deviation: 0.0
+Task: b1w1v1-10 (n=60.0), Mean accuracy: 0.0, Std deviation: 0.0
+Task: b1w2v0fs-1 (n=20.0), Mean accuracy: 0.0, Std deviation: 0.0
+Task: b1w2v1fs-5 (n=20.0), Mean accuracy: 0.0, Std deviation: 0.0
+Task: b1w2v1fs-7 (n=20.0), Mean accuracy: 0.0, Std deviation: 0.0
+Task: b2w2v1fs-5 (n=20.0), Mean accuracy: 0.0, Std deviation: 0.0
+Task: b1w1v0-9 (n=60.0), Mean accuracy: 0.03333333333333333, Std deviation: 0.18102033471939255
+Task: b0w1v1-8 (n=60.0), Mean accuracy: 0.05, Std deviation: 0.21978417765108277
+Task: b2w1v1-8 (n=60.0), Mean accuracy: 0.08333333333333333, Std deviation: 0.27871780678530217
+Task: b0w2v1s-13 (n=60.0), Mean accuracy: 0.1, Std deviation: 0.3025316904537665
+Top 10 parameters based on sensitivity to accuracy across values:
+Parameter: uninformed_swap, Range: 0.25161290322580643
+Parameter: second_swap_to_first_loc, Range: 0.1751488095238095
+Parameter: first_swap_is_both, Range: 0.14861111111111103
+Parameter: first_swap, Range: 0.14189814814814816
+Parameter: delay_2nd_bait, Range: 0.14119456627680305
+Parameter: visible_swaps, Range: 0.10100230414746547
+Parameter: swaps, Range: 0.08515624999999993
+Parameter: visible_baits, Range: 0.058865248226950384
+Parameter: first_bait_size, Range: 0.012056737588652444
+Parameter: uninformed_bait, Range: 0.007446808510638281
+
+Bottom 10 parameters based on sensitivity to accuracy across values:
+Parameter: uninformed_bait, Range: 0.007446808510638281
+Parameter: first_bait_size, Range: 0.012056737588652444
+Parameter: visible_baits, Range: 0.058865248226950384
+Parameter: swaps, Range: 0.08515624999999993
+Parameter: visible_swaps, Range: 0.10100230414746547
+Parameter: delay_2nd_bait, Range: 0.14119456627680305
+Parameter: first_swap, Range: 0.14189814814814816
+Parameter: first_swap_is_both, Range: 0.14861111111111103
+Parameter: second_swap_to_first_loc, Range: 0.1751488095238095
+Parameter: uninformed_swap, Range: 0.25161290322580643
+Top 10 parameter values based on average accuracy:
+Parameter: uninformed_swap, Value: 1, Mean accuracy: 0.9090725806451613, Std. deviation: 0.2875348541857856
+Parameter: second_swap_to_first_loc, Value: 0, Mean accuracy: 0.7968005952380952, Std. deviation: 0.40239465005585395
+Parameter: first_swap, Value: 0, Mean accuracy: 0.7814814814814814, Std. deviation: 0.413264978804143
+Parameter: visible_baits, Value: 2.0, Mean accuracy: 0.7670212765957447, Std. deviation: 0.42276628034519936
+Parameter: delay_2nd_bait, Value: 0, Mean accuracy: 0.7629050925925925, Std. deviation: 0.42531327341157465
+Parameter: swaps, Value: 0.0, Mean accuracy: 0.7625, Std. deviation: 0.42688722679709656
+Parameter: first_swap_is_both, Value: N/A (swaps==0), Mean accuracy: 0.7625, Std. deviation: 0.42688722679709656
+Parameter: visible_swaps, Value: 1.0, Mean accuracy: 0.7578571428571429, Std. deviation: 0.4283994399327634
+Parameter: visible_swaps, Value: 0.0, Mean accuracy: 0.7521875, Std. deviation: 0.4317760931595909
+Parameter: first_swap_is_both, Value: 0, Mean accuracy: 0.7515368852459017, Std. deviation: 0.4321328058545461
+
+Bottom 10 parameter values based on average accuracy:
+Parameter: uninformed_swap, Value: N/A (swaps<2 or informed swaps!=1), Mean accuracy: 0.6954113924050633, Std. deviation: 0.4602511776318996
+Parameter: swaps, Value: 1.0, Mean accuracy: 0.67734375, Std. deviation: 0.4675837876530444
+Parameter: delay_2nd_bait, Value: 1, Mean accuracy: 0.6638392857142857, Std. deviation: 0.47250011266973796
+Parameter: second_swap_to_first_loc, Value: N/A (swaps<2 or 2nd bait delayed), Mean accuracy: 0.6607758620689655, Std. deviation: 0.4734970338038335
+Parameter: uninformed_swap, Value: 0, Mean accuracy: 0.6574596774193548, Std. deviation: 0.47460706238865014
+Parameter: visible_swaps, Value: 2.0, Mean accuracy: 0.6568548387096774, Std. deviation: 0.47480734155215715
+Parameter: first_swap, Value: N/A (swaps=0 or 2nd bait delayed or first swap both), Mean accuracy: 0.6395833333333333, Std. deviation: 0.4801668040925758
+Parameter: delay_2nd_bait, Value: N/A (swaps=0 or first swap both), Mean accuracy: 0.6217105263157895, Std. deviation: 0.4850401398203778
+Parameter: second_swap_to_first_loc, Value: 1, Mean accuracy: 0.6216517857142857, Std. deviation: 0.48502923101820383
+Parameter: first_swap_is_both, Value: 1, Mean accuracy: 0.6138888888888889, Std. deviation: 0.4869411169968863
