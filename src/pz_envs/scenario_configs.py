@@ -215,15 +215,15 @@ class ScenarioConfigs:
 
     # generate 'stages' for train and test, where a stage is a list of event lists and parameters
     stages = {
-        's1a': {'events': all_event_lists, 'params': 'no-op'},
+        'a0': {'events': all_event_lists, 'params': 'no-op'},
 
-        's1i': {'events': informed_event_lists, 'params': 'no-op'},
-        's1iu': {'events': dict(uninformed_event_lists, **informed_event_lists), 'params': 'no-op'},
+        'i0': {'events': informed_event_lists, 'params': 'no-op'},
+        'u0': {'events': uninformed_event_lists, 'params': 'no-op'},
 
-        's2i': {'events': informed_event_lists, 'params': 'defaults'},
-        's2iu': {'events': dict(uninformed_event_lists, **informed_event_lists), 'params': 'defaults'},
+        'i1': {'events': informed_event_lists, 'params': 'defaults'},
+        'u1': {'events': uninformed_event_lists, 'params': 'defaults'},
 
-        's3a': {'events': all_event_lists, 'params': 'defaults'},
+        'a1': {'events': all_event_lists, 'params': 'defaults'},
     }
 
 

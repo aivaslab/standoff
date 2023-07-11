@@ -1,4 +1,3 @@
-
 import itertools
 
 import sys
@@ -9,7 +8,6 @@ import heapq
 
 from scipy.stats import sem, t
 
-from src.pz_envs import ScenarioConfigs
 from src.utils.plotting import save_double_param_figures, save_single_param_figures, save_fixed_double_param_figures, \
     save_fixed_triple_param_figures
 
@@ -20,7 +18,6 @@ from torch.utils.data import DataLoader
 import tqdm
 import torch.nn as nn
 import torch
-from matplotlib import pyplot as plt
 from src.supervised_learning import RNNModel, CustomDataset, gen_data
 import traceback
 
@@ -46,7 +43,7 @@ def decode_event_name(name):
     uninformed_swap = int(binary_suffix[1])
     first_swap = int(binary_suffix[0])
 
-    #print(numerical_suffix, first_bait_size)
+    # print(numerical_suffix, first_bait_size)
 
     # Calculate conditions for special parameters
     swaps_gt_0 = swaps > 0
@@ -69,12 +66,19 @@ def decode_event_name(name):
         "first_swap": first_swap if swaps_gt_0 and not delay_2nd_bait and not first_swap_is_both else 'N/A (swaps=0 or 2nd bait delayed or first swap both)'
     })
 
-def train_model(data_name, label, test_sets, load_path='supervised/', save_path='', epochs=100, model_kwargs=None, lr=0.001):
 
-    data = np.load(os.path.join(load_path, data_name + '-obs.npy'))
-    labels = np.load(os.path.join(load_path, data_name + '-label-' + label + '.npy'))
-    params = np.load(os.path.join(load_path, data_name + '-params.npy'))
+def train_model(train_sets, label, test_sets, load_path='supervised/', save_path='', epochs=100, model_kwargs=None,
+                lr=0.001):
+    data, labels, params = [], [], []
+    for data_name in train_sets:
+        data.append(np.load(os.path.join(load_path, data_name + '-obs.npy')))
+        labels.append(np.load(os.path.join(load_path, data_name + '-label-' + label + '.npy')))
+        params.append(np.load(os.path.join(load_path, data_name + '-params.npy')))
     batch_size = 64
+
+    data = np.concatenate(data, axis=0)
+    labels = np.concatenate(labels, axis=0)
+    params = np.concatenate(params, axis=0)
 
     print('total data', data.shape, params.shape)
 
@@ -98,11 +102,11 @@ def train_model(data_name, label, test_sets, load_path='supervised/', save_path=
         test_loaders.append(DataLoader(val_dataset, batch_size=batch_size, shuffle=False))
 
     # broken rn
-    model_kwargs['output_len'] = 5#np.prod(labels.shape[1:])
-    model_kwargs['channels'] = 4#np.prod(params.shape[2])
+    model_kwargs['output_len'] = 5  # np.prod(labels.shape[1:])
+    model_kwargs['channels'] = 4  # np.prod(params.shape[2])
 
     model = RNNModel(**model_kwargs)
-    criterion = nn.CrossEntropyLoss() #nn.MSELoss()
+    criterion = nn.CrossEntropyLoss()  # nn.MSELoss()
     special_criterion = nn.CrossEntropyLoss(reduction='none')
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
@@ -111,13 +115,13 @@ def train_model(data_name, label, test_sets, load_path='supervised/', save_path=
     train_losses = []
     val_losses = [[] for _ in range(len(test_loaders) + 1)]
 
-    #param_losses = pd.DataFrame(columns=['param', 'epoch', 'loss'])
+    # param_losses = pd.DataFrame(columns=['param', 'epoch', 'loss'])
     param_losses_list = []
     for epoch in tqdm.trange(num_epochs):
         train_loss = 0
         for i, (inputs, target_labels, _) in enumerate(train_loader):
-            #inputs = inputs.view(-1, 10, input_size)
-            #print(inputs.shape)
+            # inputs = inputs.view(-1, 10, input_size)
+            # print(inputs.shape)
             outputs = model(inputs)
             loss = criterion(outputs, torch.argmax(target_labels, dim=1))
             optimizer.zero_grad()
@@ -148,18 +152,17 @@ def train_model(data_name, label, test_sets, load_path='supervised/', save_path=
                     for input, label, param, loss, correct in zip(inputs, labels, params, losses, corrects):
                         param_losses_list.append(
                             {'param': param, 'epoch': epoch, 'loss': loss.item(), 'accuracy': correct.item()})
-                        #param_losses = param_losses.append({'param': param, 'epoch': epoch, 'loss': loss.item(), 'accuracy': accuracy}, ignore_index=True)
+                        # param_losses = param_losses.append({'param': param, 'epoch': epoch, 'loss': loss.item(), 'accuracy': accuracy}, ignore_index=True)
 
-
-            #val_loss /= val_samples_processed / batch_size
-            #val_losses[idx].append(val_loss)
+            # val_loss /= val_samples_processed / batch_size
+            # val_losses[idx].append(val_loss)
         model.train()
     # save model
     os.makedirs(save_path, exist_ok=True)
     torch.save([model.kwargs, model.state_dict()], os.path.join(save_path, f'{data_name}-{label}-model.pt'))
 
-    #pd.DataFrame(param_losses_list).to_csv(path + 'param_losses.csv')
-    #df = pd.read_csv('supervised/param_losses.csv')
+    # pd.DataFrame(param_losses_list).to_csv(path + 'param_losses.csv')
+    # df = pd.read_csv('supervised/param_losses.csv')
     # Apply the decoding function to each row
     df = pd.DataFrame(param_losses_list)
     df = df.join(df['param'].apply(decode_event_name))
@@ -176,7 +179,7 @@ def calculate_ci(group):
     h = std_err * t.ppf((1 + confidence) / 2, n - 1)
 
     return pd.DataFrame({'lower': [m - h], 'upper': [m + h], 'mean': [m]},
-                         columns=['lower', 'upper', 'mean'])
+                        columns=['lower', 'upper', 'mean'])
 
 
 def calculate_statistics(df, params, skip_3x=False):
@@ -190,7 +193,7 @@ def calculate_statistics(df, params, skip_3x=False):
     print('calculating statistics...')
 
     last_epoch_df = df[df['epoch'] == df['epoch'].max()]
-    #hist_data = last_epoch_df.groupby('param').mean(numeric_only=True)
+    # hist_data = last_epoch_df.groupby('param').mean(numeric_only=True)
 
     param_pairs = itertools.combinations(params, 2)
     param_triples = itertools.combinations(params, 3)
@@ -206,7 +209,7 @@ def calculate_statistics(df, params, skip_3x=False):
         avg_loss[(param1, param2)] = ci_df
 
         means = last_epoch_df.groupby([param1, param2]).mean(numeric_only=True)
-        #variances[(param1, param2)] = grouped.var().mean()
+        # variances[(param1, param2)] = grouped.var().mean()
         ranges_2[(param1, param2)] = means['accuracy'].max() - means['accuracy'].min()
 
         for value1 in df[param1].unique():
@@ -240,6 +243,7 @@ def save_figures(path, df, avg_loss, ranges, range_dict, range_dict3, params, la
     save_fixed_double_param_figures(path, top_n_ranges, df, avg_loss, last_epoch_df)
     save_fixed_triple_param_figures(path, top_n_ranges3, df, avg_loss, last_epoch_df)
 
+
 def write_metrics_to_file(filepath, df, ranges, params):
     df2 = df[df['epoch'] == df['epoch'].max()]
     with open(filepath, 'w') as f:
@@ -265,7 +269,7 @@ def write_metrics_to_file(filepath, df, ranges, params):
 
         f.write("\nBottom 10 parameters based on sensitivity to accuracy across values:\n")
         for i in range(10):
-            f.write(f"Parameter: {sorted_ranges[-(i+1)][0]}, Range: {sorted_ranges[-(i+1)][1]}\n")
+            f.write(f"Parameter: {sorted_ranges[-(i + 1)][0]}, Range: {sorted_ranges[-(i + 1)][1]}\n")
 
         param_value_stats = []
         for param in params:
@@ -289,47 +293,41 @@ def write_metrics_to_file(filepath, df, ranges, params):
             f.write(f"Parameter: {param}, Value: {value}, Mean accuracy: {mean_accuracy}, Std. deviation: {std_dev}\n")
 
 
-
 # train_model('random-2500', 'exist')
-if __name__ == '__main__':
+def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, eval_name='3a-296',
+                           load_path='supervised'):
     labels = ['correctSelection']
-    sets = ScenarioConfigs.stages.keys()
-    #gen_data(labels)
-    #labels = ['loc', 'exist', 'vision', 'b-loc', 'b-exist', 'target', 'correctSelection']
+    # gen_data(labels)
+    # labels = ['loc', 'exist', 'vision', 'b-loc', 'b-exist', 'target', 'correctSelection']
 
-    data_name = 's3a-296'
-    eval_name = 's3a-296'
     model_kwargs_base = {'hidden_size': [6, 8, 12, 16, 32],
-                    'num_layers': [1, 2, 3],
-                    'kernels': [4, 8, 16, 24, 32],
-                    'kernel_size1': [1, 3, 5],
-                    'kernel_size2': [1, 3, 5],
-                    'stride1': [1, 2],
-                    'pool_kernel_size': [2, 3],
-                    'pool_stride': [1, 2],
-                    'padding1': [0, 1],
-                    'padding2': [0, 1],
-                    'use_pool': [True, False],
-                    'use_conv2': [True, False],
-                    'kernels2': [8, 16, 32, 48],
-                    }
-
+                         'num_layers': [1, 2, 3],
+                         'kernels': [4, 8, 16, 24, 32],
+                         'kernel_size1': [1, 3, 5],
+                         'kernel_size2': [1, 3, 5],
+                         'stride1': [1, 2],
+                         'pool_kernel_size': [2, 3],
+                         'pool_stride': [1, 2],
+                         'padding1': [0, 1],
+                         'padding2': [0, 1],
+                         'use_pool': [True, False],
+                         'use_conv2': [True, False],
+                         'kernels2': [8, 16, 32, 48],
+                         }
 
     test_names = []
 
     num_random_tests = 48
-    repetitions = 1
-    epochs = 3
-    colors = plt.cm.jet(np.linspace(0,1,num_random_tests))
     lr = 0.002
-    load_path = 'supervised'
-    save_path = 'data/x'
 
     test = 0
     while test < num_random_tests:
         try:
-            #model_kwargs = {x: random.choice(model_kwargs_base[x]) for x in model_kwargs_base.keys()}
-            model_kwargs = {'hidden_size': 16, 'num_layers': 2, 'output_len': 5, 'pool_kernel_size': 3, 'pool_stride': 2, 'channels': 4, 'kernels': 8, 'padding1': 1, 'padding2': 0, 'use_pool': False, 'stride1': 1, 'use_conv2': True, 'kernel_size1': 3, 'kernels2': 16, 'kernel_size2': 3}
+            # model_kwargs = {x: random.choice(model_kwargs_base[x]) for x in model_kwargs_base.keys()}
+            model_kwargs = {'hidden_size': 16, 'num_layers': 2, 'output_len': 5, 'pool_kernel_size': 3,
+                            'pool_stride': 2, 'channels': 4, 'kernels': 8, 'padding1': 1, 'padding2': 0,
+                            'use_pool': False, 'stride1': 1, 'use_conv2': True, 'kernel_size1': 3, 'kernels2': 16,
+                            'kernel_size2': 3}
             '''model_kwargs = {'hidden_size': 6, 'num_layers': 1, 'output_len': 5, 'pool_kernel_size': 3,
                             'pool_stride': 2, 'channels': 4, 'kernels': 8, 'padding1': 1, 'padding2': 0,
                             'use_pool': False, 'stride1': 1, 'use_conv2': True, 'kernel_size1': 3, 'kernels2': 8,
@@ -337,35 +335,98 @@ if __name__ == '__main__':
 
             model_name = "".join([str(x) + "," for x in model_kwargs.values()])
 
-            #unused_sets = [s for s in sets if s != data_name]
-            # sum losses
-            t_loss_sum, v_loss_sum, first_v_loss = [], [], []
             for label in labels:
                 df_list = []
                 for repetition in range(repetitions):
-                    t_loss, v_loss, df = train_model(data_name, label, [eval_name], load_path=load_path, save_path=save_path, epochs=epochs, model_kwargs=model_kwargs, lr=lr)
+                    t_loss, v_loss, df = train_model(train_sets, label, [eval_name], load_path=load_path,
+                                                     save_path=save_path, epochs=epochs, model_kwargs=model_kwargs,
+                                                     lr=lr)
                     df_list.append(df)
-                    first_v_loss.append(v_loss[0])
-                    if len(t_loss_sum) == 0:
-                        t_loss_sum = t_loss
-                        v_loss_sum = v_loss
-                    else:
-                        t_loss_sum = [x + y for x, y in zip(t_loss_sum, t_loss)]
-                        v_loss_sum = [x + y for x, y in zip(v_loss_sum, v_loss)]
 
                 combined_df = pd.concat(df_list, ignore_index=True)
                 params = ['visible_baits', 'swaps', 'visible_swaps', 'first_swap_is_both',
                           'second_swap_to_first_loc', 'delay_2nd_bait', 'first_bait_size',
                           'uninformed_bait', 'uninformed_swap', 'first_swap']
 
-                avg_loss, variances, ranges_1, ranges_2, range_dict, range_dict3, last_epoch_df = calculate_statistics(combined_df, params, skip_3x=True)
+                avg_loss, variances, ranges_1, ranges_2, range_dict, range_dict3, last_epoch_df = calculate_statistics(
+                    combined_df, params, skip_3x=True)
 
                 write_metrics_to_file(os.path.join(save_path, 'metrics.txt'), combined_df, ranges_1, params)
 
-                save_figures(os.path.join(save_path, 'figs'), combined_df, avg_loss, ranges_2, range_dict, range_dict3, params, last_epoch_df, num=12)
+                save_figures(os.path.join(save_path, 'figs'), combined_df, avg_loss, ranges_2, range_dict, range_dict3,
+                             params, last_epoch_df, num=12)
 
             test_names.append(model_name)
             test += 1
         except BaseException as e:
             print(e)
             traceback.print_exc()
+
+
+def experiments():
+    """What is the overall performance of naive, off-the-shelf models on this task? Which parameters of competitive
+    feeding settings are the most sensitive to overall model performance? To what extent are different models
+    sensitive to different parameters? """
+
+    regimes = [
+        ('situational', ['a1']),
+        ('informed', ['i0', 'i1']),
+        ('contrastive', ['i0', 'u0', 'i1', 'u1']),
+        ('complete', ['a0', 'i1']),
+        ('comprehensive', ['a0', 'i1', 'u1'])
+    ]
+    default_regime = regimes[1]
+    pref_types = [
+        ('same', ''),
+        ('different', 'd'),
+        ('varying', 'v'),
+    ]
+    role_types = [
+        ('subordinate', ''),
+        ('dominant', 'D'),
+        ('varying', 'V'),
+    ]
+
+    # generate data
+    gen_data(['correctSelection'])
+
+    # Experiment 1
+    print('Running experiment 1: varied models training directly on the test set')
+    # todo: add hparam search for many models, comparison between them?
+    run_supervised_session(save_path=os.path.join('supervised', 'exp_1'),
+                           repetitions=3,
+                           epochs=50,
+                           train_sets=['a1'])
+
+    # Experiment 2
+    print('Running experiment 2: varied train regimes')
+    for regime, train_sets in regimes:
+        # todo: add hparam search for each regime. for test set accuracy?
+        run_supervised_session(save_path=os.path.join('supervised', 'exp_2', regime),
+                               repetitions=3,
+                               epochs=50,
+                               train_sets=train_sets)
+
+    # Experiment 3
+    print('Running experiment 3: varied preferences')
+    for pref_type, pref_suffix in pref_types:
+        for regime, train_sets in [default_regime]:
+            new_train_sets = [x + pref_suffix for x in train_sets]
+            run_supervised_session(save_path=os.path.join('supervised', 'exp_3', pref_type, regime),
+                                   repetitions=3,
+                                   epochs=50,
+                                   train_sets=new_train_sets)
+
+    # Experiment 4
+    print('Running experiment 4: varied role')
+    for role_type, role_suffix in role_types:
+        for pref_type, pref_suffix in pref_types:
+            for regime, train_sets in [default_regime]:
+                new_train_sets = [x + pref_suffix + role_suffix for x in train_sets]
+                run_supervised_session(save_path=os.path.join('supervised', 'exp_4', role_type, pref_type, regime),
+                                       repetitions=3,
+                                       epochs=50,
+                                       train_sets=new_train_sets)
+
+    # Experiment 5
+    print('Running experiment 5: varied collaboration')
