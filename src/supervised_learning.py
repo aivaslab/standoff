@@ -106,7 +106,7 @@ def gen_data(labels=[]):
         all_event_lists = list(events.items())
         all_event_perms = ScenarioConfigs.all_event_permutations
 
-        data_name = f'{configName}-{len(all_event_lists)}'
+        data_name = f'{configName}'
         data_obs = []
         data_labels = {}
         for label in labels + prior_metrics + posterior_metrics:
