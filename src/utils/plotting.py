@@ -333,8 +333,9 @@ def plot_tsne(data, labels, index, color):
     #    plt.annotate(name, (data[i + index[0], 0], data[i + index[0], 1]), textcoords="offset points", xytext=(-10, 5), ha='center')
 
 
-def save_double_param_figures(top_pairs, df, avg_loss, last_epoch_df):
-    os.makedirs('supervised/doubleparams', exist_ok=True)
+def save_double_param_figures(save_dir, top_pairs, df, avg_loss, last_epoch_df):
+    this_save_dir = os.path.join(save_dir, 'doubleparams')
+    os.makedirs(this_save_dir, exist_ok=True)
     for (param1, param2), _ in top_pairs:
         plt.figure(figsize=(10, 6))
         for value1 in df[param1].unique():
@@ -355,7 +356,7 @@ def save_double_param_figures(top_pairs, df, avg_loss, last_epoch_df):
         plt.ylabel('Average accuracy')
         plt.legend()
         plt.ylim(0, 1)
-        plt.savefig(os.path.join(os.getcwd(), f'supervised/doubleparams/{param1}{param2}.png'))
+        plt.savefig(os.path.join(os.getcwd(), os.path.join(this_save_dir, f'{param1}{param2}.png')))
         plt.close()
 
         # Creating the histogram
@@ -375,13 +376,14 @@ def save_double_param_figures(top_pairs, df, avg_loss, last_epoch_df):
         plt.xlabel('Accuracy')
         plt.ylabel('Count')
         plt.legend(loc='upper left')
-        plt.savefig(os.path.join(os.getcwd(), f'supervised/fixeddoubleparams/hist_{param1}{param2}.png'))
+        plt.savefig(os.path.join(os.getcwd(), os.path.join(this_save_dir, 'hist_{param1}{param2}.png')))
         plt.close()
 
 
 
-def save_single_param_figures(params, df, avg_loss, last_epoch_df):
-    os.makedirs('supervised/singleparams', exist_ok=True)
+def save_single_param_figures(save_dir, params, df, avg_loss, last_epoch_df):
+    this_save_dir = os.path.join(save_dir, 'singleparams')
+    os.makedirs(this_save_dir, exist_ok=True)
     for param in params:
         plt.figure(figsize=(10, 6))
         for value in df[param].unique():
@@ -394,7 +396,7 @@ def save_single_param_figures(params, df, avg_loss, last_epoch_df):
         plt.ylabel('Average accuracy')
         plt.legend()
         plt.ylim(0, 1)
-        file_path = os.path.join(os.getcwd(), 'supervised', 'singleparams', f'{param}.png')
+        file_path = os.path.join(os.getcwd(), this_save_dir, f'{param}.png')
         plt.savefig(file_path)
         plt.close()
 
@@ -417,12 +419,13 @@ def save_single_param_figures(params, df, avg_loss, last_epoch_df):
         plt.xlabel('Accuracy')
         plt.ylabel('Count')
         plt.legend(loc='upper left')
-        plt.savefig(os.path.join(os.getcwd(), f'supervised/singleparams/hist_{param}.png'))
+        file_path = os.path.join(os.getcwd(), this_save_dir, f'hist_{param}.png')
         plt.close()
 
 
-def save_fixed_double_param_figures(top_n_ranges, df, avg_loss, last_epoch_df):
-    os.makedirs('supervised/fixeddoubleparams', exist_ok=True)
+def save_fixed_double_param_figures(save_dir, top_n_ranges, df, avg_loss, last_epoch_df):
+    this_save_dir = os.path.join(save_dir, 'fixeddoubleparams')
+    os.makedirs(this_save_dir, exist_ok=True)
     for combo in top_n_ranges:
         param1, value1, param2 = combo
         subset = df[df[param1] == value1]
@@ -438,7 +441,7 @@ def save_fixed_double_param_figures(top_n_ranges, df, avg_loss, last_epoch_df):
         plt.legend()
         plt.ylim(0, 1)
         name = f'{param1}{str(value1)[:3]}{param2}'.replace('/', '-')
-        plt.savefig(os.path.join(os.getcwd(), f'supervised/fixeddoubleparams/{name}.png'))
+        plt.savefig(os.path.join(os.getcwd(), os.path.join(this_save_dir, f'{name}.png')))
         plt.close()
 
         # Creating the histogram
@@ -457,12 +460,13 @@ def save_fixed_double_param_figures(top_n_ranges, df, avg_loss, last_epoch_df):
         plt.xlabel('Accuracy')
         plt.ylabel('Count')
         plt.legend(loc='upper left')
-        plt.savefig(os.path.join(os.getcwd(), f'supervised/fixeddoubleparams/hist_{name}.png'))
+        plt.savefig(os.path.join(os.getcwd(), os.path.join(this_save_dir, f'hist_{name}.png')))
         plt.close()
 
 
-def save_fixed_triple_param_figures(top_n_ranges, df, avg_loss, last_epoch_df):
-    os.makedirs('supervised/fixedtripleparams', exist_ok=True)
+def save_fixed_triple_param_figures(save_dir, top_n_ranges, df, avg_loss, last_epoch_df):
+    this_save_dir = os.path.join(save_dir, 'fixedtripleparams')
+    os.makedirs(this_save_dir, exist_ok=True)
     for combo in top_n_ranges:
         param1, value1, param2, value2, param3 = combo
         subset = df[(df[param1] == value1) & (df[param2] == value2)]
@@ -480,7 +484,7 @@ def save_fixed_triple_param_figures(top_n_ranges, df, avg_loss, last_epoch_df):
         plt.legend()
         plt.ylim(0, 1)
         name = f'{param1}{str(value1)[:3]}{param2}{str(value2)[:3]}{param3}'.replace('/', '-')
-        plt.savefig(os.path.join(os.getcwd(), f'supervised/fixedtripleparams/{name}.png'))
+        plt.savefig(os.path.join(os.getcwd(), os.path.join(save_dir,f'{name}.png')))
         plt.close()
 
         # Creating the histogram
@@ -499,7 +503,7 @@ def save_fixed_triple_param_figures(top_n_ranges, df, avg_loss, last_epoch_df):
         plt.xlabel('Accuracy')
         plt.ylabel('Count')
         plt.legend(loc='upper left')
-        plt.savefig(os.path.join(os.getcwd(), f'supervised/fixeddoubleparams/hist_{name}.png'))
+        plt.savefig(os.path.join(os.getcwd(), os.path.join(save_dir,f'hist_{name}.png')))
         plt.close()
 
 
