@@ -376,7 +376,7 @@ def save_double_param_figures(save_dir, top_pairs, df, avg_loss, last_epoch_df):
         plt.xlabel('Accuracy')
         plt.ylabel('Count')
         plt.legend(loc='upper left')
-        plt.savefig(os.path.join(os.getcwd(), os.path.join(this_save_dir, 'hist_{param1}{param2}.png')))
+        plt.savefig(os.path.join(os.getcwd(), os.path.join(this_save_dir, f'hist_{param1}{param2}.png')))
         plt.close()
 
 
@@ -409,7 +409,7 @@ def save_single_param_figures(save_dir, params, df, avg_loss, last_epoch_df):
             mean_acc = value_df.groupby('param')['accuracy'].mean()
             hist_data.append(mean_acc.values)
             labels.append(f'{param} = {value}')
-            print(param, value, len(mean_acc.values), mean_acc.values)
+            #print(param, value, len(mean_acc.values), mean_acc.values)
 
         #print('lenny', len(hist_data))
         hist_data = np.asarray(hist_data, dtype=object)
@@ -420,6 +420,7 @@ def save_single_param_figures(save_dir, params, df, avg_loss, last_epoch_df):
         plt.ylabel('Count')
         plt.legend(loc='upper left')
         file_path = os.path.join(os.getcwd(), this_save_dir, f'hist_{param}.png')
+        plt.savefig(file_path)
         plt.close()
 
 
@@ -484,7 +485,7 @@ def save_fixed_triple_param_figures(save_dir, top_n_ranges, df, avg_loss, last_e
         plt.legend()
         plt.ylim(0, 1)
         name = f'{param1}{str(value1)[:3]}{param2}{str(value2)[:3]}{param3}'.replace('/', '-')
-        plt.savefig(os.path.join(os.getcwd(), os.path.join(save_dir,f'{name}.png')))
+        plt.savefig(os.path.join(os.getcwd(), os.path.join(save_dir, f'{name}.png')))
         plt.close()
 
         # Creating the histogram
@@ -503,7 +504,7 @@ def save_fixed_triple_param_figures(save_dir, top_n_ranges, df, avg_loss, last_e
         plt.xlabel('Accuracy')
         plt.ylabel('Count')
         plt.legend(loc='upper left')
-        plt.savefig(os.path.join(os.getcwd(), os.path.join(save_dir,f'hist_{name}.png')))
+        plt.savefig(os.path.join(os.getcwd(), os.path.join(save_dir, f'hist_{name}.png')))
         plt.close()
 
 
