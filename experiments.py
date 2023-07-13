@@ -20,11 +20,12 @@ def add_label_and_combine_dfs(df_list, params, label):
 def create_combined_histogram(df, param, folder):
     plt.figure(figsize=(10, 6))
     for value in df[param].unique():
-        sub_df = df[param][df[param][param] == value]
+        value_df = df[df[param] == value]
+        mean_acc_per_epoch = value_df.groupby('epoch')['accuracy'].mean()
 
-        plt.plot(sub_df['epoch'], sub_df['mean'],
+        plt.plot(mean_acc_per_epoch.index, mean_acc_per_epoch.values,
                  label=f'{param} = {value}' if not isinstance(value, str) or value[0:3] != "N/A" else value)
-        plt.fill_between(sub_df['epoch'], sub_df['lower'], sub_df['upper'], alpha=0.2)
+        #plt.fill_between(sub_df['epoch'], sub_df['lower'], sub_df['upper'], alpha=0.2)
     plt.title(f'Average accuracy vs Epoch for {param}')
     plt.xlabel('Epoch')
     plt.ylabel('Average accuracy')
@@ -104,14 +105,17 @@ def experiments(todo, repetitions, epochs):
     if 2 in todo:
         print('Running experiment 2: varied train regimes')
         df_list = []
+        avg_list = []
         for regime, train_sets in regimes[1:]:
             print('regime:', regime)
-            df = run_supervised_session(save_path=os.path.join('supervised', 'exp_2', regime),
+            avg, df = run_supervised_session(save_path=os.path.join('supervised', 'exp_2', regime),
                                         repetitions=repetitions,
                                         epochs=epochs,
                                         train_sets=train_sets)
             df_list.append(df)
+            avg_list.append(avg)
         combined_df = add_label_and_combine_dfs(df_list, [regime for regime, _ in regimes[1:]], 'regime')
+        #combined_avg = add_label_and_combine_dfs(avg_list, [regime for regime, _ in regimes[1:]], 'regime')
         create_combined_histogram(combined_df, 'regime', os.path.join('supervised', 'exp_2'))
 
     # Experiment 3
@@ -152,4 +156,4 @@ def experiments(todo, repetitions, epochs):
 
 
 if __name__ == '__main__':
-    experiments([2], 1, 3)
+    experiments([2], 1, 2)
