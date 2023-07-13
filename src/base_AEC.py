@@ -530,9 +530,9 @@ class para_MultiGridEnv(ParallelEnv):
 
         if self.observation_style == 'rich':
             self.rich_observation_layers = [
-                lambda k, mapping: (mapping[k].type == 'Agent' + mapping[k].valence if hasattr(mapping[k], 'type') else False),
+                lambda k, mapping: (((mapping[k].type == 'Agent') + mapping[k].valence) if hasattr(mapping[k], 'valence') else False),
                 lambda k, mapping: (mapping[k].type == 'Box' * mapping[k].state if hasattr(mapping[k], 'type') else False) if self.use_box_colors
-                else lambda k, mapping: (mapping[k].type == 'Box' if hasattr(mapping[k], 'type') else False),
+                else (mapping[k].type == 'Box' if hasattr(mapping[k], 'type') else False),
             ]
             if self.use_separate_reward_layers:
                 # big and small refer to the numbers shown here, which are always what the opponent sees

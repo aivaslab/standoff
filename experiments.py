@@ -1,10 +1,62 @@
 import os
 
+import numpy as np
+import pandas as pd
+from matplotlib import pyplot as plt
+
 from src.supervised_learning import gen_data
 from supervised_learning_main import run_supervised_session
 
 
-def experiments(repetitions, epochs, todo):
+def add_label_and_combine_dfs(df_list, params, label):
+    # Add 'regime' column to each DataFrame and combine them
+    for i, df in enumerate(df_list):
+        df[label] = params[i]
+    combined_df = pd.concat(df_list)
+
+    return combined_df
+
+
+def create_combined_histogram(df, param, folder):
+    plt.figure(figsize=(10, 6))
+    for value in df[param].unique():
+        sub_df = df[param][df[param][param] == value]
+
+        plt.plot(sub_df['epoch'], sub_df['mean'],
+                 label=f'{param} = {value}' if not isinstance(value, str) or value[0:3] != "N/A" else value)
+        plt.fill_between(sub_df['epoch'], sub_df['lower'], sub_df['upper'], alpha=0.2)
+    plt.title(f'Average accuracy vs Epoch for {param}')
+    plt.xlabel('Epoch')
+    plt.ylabel('Average accuracy')
+    plt.legend()
+    plt.ylim(0, 1)
+    file_path = os.path.join(os.getcwd(), folder, f'{param}.png')
+    plt.savefig(file_path)
+    plt.close()
+
+    # Creating the histogram
+    plt.figure(figsize=(10, 6))
+    hist_data = []
+    labels = []
+    for value in df[param].unique():
+        value_df = df[df[param] == value]
+        mean_acc = value_df.groupby('param')['accuracy'].mean()
+        hist_data.append(mean_acc.values)
+        labels.append(f'{param} = {value}')
+
+    hist_data = np.asarray(hist_data, dtype=object)
+    plt.hist(hist_data, bins=np.arange(0, 1.01, 0.05), stacked=True, label=labels, alpha=0.5)
+
+    plt.title(f'Histogram of accuracy for last epoch for {param}')
+    plt.xlabel('Accuracy')
+    plt.ylabel('Count')
+    plt.legend(loc='upper left')
+    file_path = os.path.join(os.getcwd(), folder, f'hist_{param}.png')
+    plt.savefig(file_path)
+    plt.close()
+
+
+def experiments(todo, repetitions, epochs):
     """What is the overall performance of naive, off-the-shelf models on this task? Which parameters of competitive
     feeding settings are the most sensitive to overall model performance? To what extent are different models
     sensitive to different parameters? """
@@ -30,6 +82,7 @@ def experiments(repetitions, epochs, todo):
 
     # generate supervised data
     if 0 in todo:
+        print('Generating datasets')
         for pref_type, pref_suffix in pref_types:
             for role_type, role_suffix in role_types:
                 gen_data(['correctSelection'], path='supervised', pref_type=pref_suffix, role_type=role_suffix)
@@ -37,11 +90,9 @@ def experiments(repetitions, epochs, todo):
     if 'h' in todo:
         print('Running hyperparameter search on all regimes, pref_types, role_types')
 
-
     # Experiment 1
     if 1 in todo:
         print('Running experiment 1: varied models training directly on the test set')
-
 
         # todo: add hparam search for many models, comparison between them?
         run_supervised_session(save_path=os.path.join('supervised', 'exp_1'),
@@ -52,13 +103,16 @@ def experiments(repetitions, epochs, todo):
     # Experiment 2
     if 2 in todo:
         print('Running experiment 2: varied train regimes')
-        for regime, train_sets in regimes:
-            # todo: add hparam search for each regime. for test set accuracy?
+        df_list = []
+        for regime, train_sets in regimes[1:]:
             print('regime:', regime)
-            run_supervised_session(save_path=os.path.join('supervised', 'exp_2', regime),
-                                   repetitions=repetitions,
-                                   epochs=epochs,
-                                   train_sets=train_sets)
+            df = run_supervised_session(save_path=os.path.join('supervised', 'exp_2', regime),
+                                        repetitions=repetitions,
+                                        epochs=epochs,
+                                        train_sets=train_sets)
+            df_list.append(df)
+        combined_df = add_label_and_combine_dfs(df_list, [regime for regime, _ in regimes[1:]], 'regime')
+        create_combined_histogram(combined_df, 'regime', os.path.join('supervised', 'exp_2'))
 
     # Experiment 3
     if 3 in todo:
@@ -98,4 +152,4 @@ def experiments(repetitions, epochs, todo):
 
 
 if __name__ == '__main__':
-    experiments(1, 30, [2])
+    experiments([2], 1, 3)

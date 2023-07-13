@@ -103,7 +103,7 @@ def train_model(train_sets, label, test_sets, load_path='supervised/', save_path
 
     # broken rn
     model_kwargs['output_len'] = 5  # np.prod(labels.shape[1:])
-    model_kwargs['channels'] = 4  # np.prod(params.shape[2])
+    #model_kwargs['channels'] = 4  # np.prod(params.shape[2])
 
     model = RNNModel(**model_kwargs)
     criterion = nn.CrossEntropyLoss()  # nn.MSELoss()
@@ -325,7 +325,7 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
         try:
             # model_kwargs = {x: random.choice(model_kwargs_base[x]) for x in model_kwargs_base.keys()}
             model_kwargs = {'hidden_size': 16, 'num_layers': 2, 'output_len': 5, 'pool_kernel_size': 3,
-                            'pool_stride': 2, 'channels': 4, 'kernels': 8, 'padding1': 1, 'padding2': 0,
+                            'pool_stride': 2, 'channels': 7, 'kernels': 8, 'padding1': 1, 'padding2': 0,
                             'use_pool': False, 'stride1': 1, 'use_conv2': True, 'kernel_size1': 3, 'kernels2': 16,
                             'kernel_size2': 3}
             '''model_kwargs = {'hidden_size': 6, 'num_layers': 1, 'output_len': 5, 'pool_kernel_size': 3,
