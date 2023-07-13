@@ -361,4 +361,4 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
         except BaseException as e:
             print(e)
             traceback.print_exc()
-    return avg_loss, last_epoch_df
+    return combined_df, last_epoch_df

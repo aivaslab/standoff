@@ -17,10 +17,10 @@ def add_label_and_combine_dfs(df_list, params, label):
     return combined_df
 
 
-def create_combined_histogram(df, param, folder):
+def create_combined_histogram(df, combined_avg, param, folder):
     plt.figure(figsize=(10, 6))
-    for value in df[param].unique():
-        value_df = df[df[param] == value]
+    for value in combined_avg[param].unique():
+        value_df = combined_avg[combined_avg[param] == value]
         mean_acc_per_epoch = value_df.groupby('epoch')['accuracy'].mean()
 
         plt.plot(mean_acc_per_epoch.index, mean_acc_per_epoch.values,
@@ -42,10 +42,10 @@ def create_combined_histogram(df, param, folder):
     for value in df[param].unique():
         value_df = df[df[param] == value]
         mean_acc = value_df.groupby('param')['accuracy'].mean()
-        hist_data.append(mean_acc.values)
+        hist_data.append(list(mean_acc))
         labels.append(f'{param} = {value}')
 
-    hist_data = np.asarray(hist_data, dtype=object)
+    #hist_data = np.asarray(hist_data, dtype=object)
     plt.hist(hist_data, bins=np.arange(0, 1.01, 0.05), stacked=True, label=labels, alpha=0.5)
 
     plt.title(f'Histogram of accuracy for last epoch for {param}')
@@ -108,15 +108,15 @@ def experiments(todo, repetitions, epochs):
         avg_list = []
         for regime, train_sets in regimes[1:]:
             print('regime:', regime)
-            avg, df = run_supervised_session(save_path=os.path.join('supervised', 'exp_2', regime),
+            combined_df, df = run_supervised_session(save_path=os.path.join('supervised', 'exp_2', regime),
                                         repetitions=repetitions,
                                         epochs=epochs,
                                         train_sets=train_sets)
             df_list.append(df)
-            avg_list.append(avg)
+            avg_list.append(combined_df)
         combined_df = add_label_and_combine_dfs(df_list, [regime for regime, _ in regimes[1:]], 'regime')
-        #combined_avg = add_label_and_combine_dfs(avg_list, [regime for regime, _ in regimes[1:]], 'regime')
-        create_combined_histogram(combined_df, 'regime', os.path.join('supervised', 'exp_2'))
+        combined_avg = add_label_and_combine_dfs(avg_list, [regime for regime, _ in regimes[1:]], 'regime')
+        create_combined_histogram(combined_df, combined_avg, 'regime', os.path.join('supervised', 'exp_2'))
 
     # Experiment 3
     if 3 in todo:
