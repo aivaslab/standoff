@@ -324,6 +324,8 @@ class MiniStandoffEnv(para_MultiGridEnv):
         maze = np.array(maze).astype(int)
 
         y = self.height // 2 + offset
+        if self.subject_is_dominant:
+            y -= 1
         paths = []
         for box in range(self.boxes):
             x = box * 1 + 1
@@ -342,6 +344,8 @@ class MiniStandoffEnv(para_MultiGridEnv):
         name = event[0]
         arg = arg
         y = self.height // 2
+        if self.subject_is_dominant:
+            y -= 1
         if self.hidden and len(self.objs_to_hide) > 0:
             for obj in self.objs_to_hide:
                 pos = obj.pos

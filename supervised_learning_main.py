@@ -18,7 +18,7 @@ from torch.utils.data import DataLoader
 import tqdm
 import torch.nn as nn
 import torch
-from src.supervised_learning import RNNModel, CustomDataset, gen_data
+from src.supervised_learning import RNNModel, CustomDataset
 import traceback
 
 
@@ -294,7 +294,7 @@ def write_metrics_to_file(filepath, df, ranges, params):
 
 
 # train_model('random-2500', 'exist')
-def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, eval_name='3a-296',
+def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, eval_name='a1',
                            load_path='supervised'):
     labels = ['correctSelection']
     # gen_data(labels)
@@ -317,8 +317,8 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
 
     test_names = []
 
-    num_random_tests = 48
-    lr = 0.002
+    num_random_tests = 1
+    lr = 0.001
 
     test = 0
     while test < num_random_tests:
@@ -361,72 +361,3 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
         except BaseException as e:
             print(e)
             traceback.print_exc()
-
-
-def experiments():
-    """What is the overall performance of naive, off-the-shelf models on this task? Which parameters of competitive
-    feeding settings are the most sensitive to overall model performance? To what extent are different models
-    sensitive to different parameters? """
-
-    regimes = [
-        ('situational', ['a1']),
-        ('informed', ['i0', 'i1']),
-        ('contrastive', ['i0', 'u0', 'i1', 'u1']),
-        ('complete', ['a0', 'i1']),
-        ('comprehensive', ['a0', 'i1', 'u1'])
-    ]
-    default_regime = regimes[1]
-    pref_types = [
-        ('same', ''),
-        ('different', 'd'),
-        ('varying', 'v'),
-    ]
-    role_types = [
-        ('subordinate', ''),
-        ('dominant', 'D'),
-        ('varying', 'V'),
-    ]
-
-    # generate data
-    gen_data(['correctSelection'])
-
-    # Experiment 1
-    print('Running experiment 1: varied models training directly on the test set')
-    # todo: add hparam search for many models, comparison between them?
-    run_supervised_session(save_path=os.path.join('supervised', 'exp_1'),
-                           repetitions=3,
-                           epochs=50,
-                           train_sets=['a1'])
-
-    # Experiment 2
-    print('Running experiment 2: varied train regimes')
-    for regime, train_sets in regimes:
-        # todo: add hparam search for each regime. for test set accuracy?
-        run_supervised_session(save_path=os.path.join('supervised', 'exp_2', regime),
-                               repetitions=3,
-                               epochs=50,
-                               train_sets=train_sets)
-
-    # Experiment 3
-    print('Running experiment 3: varied preferences')
-    for pref_type, pref_suffix in pref_types:
-        for regime, train_sets in [default_regime]:
-            new_train_sets = [x + pref_suffix for x in train_sets]
-            run_supervised_session(save_path=os.path.join('supervised', 'exp_3', pref_type, regime),
-                                   repetitions=3,
-                                   epochs=50,
-                                   train_sets=new_train_sets)
-
-    # Experiment 4
-    print('Running experiment 4: varied role')
-    for role_type, role_suffix in role_types:
-        for pref_type, pref_suffix in pref_types:
-            for regime, train_sets in [default_regime]:
-                new_train_sets = [x + pref_suffix + role_suffix for x in train_sets]
-                run_supervised_session(save_path=os.path.join('supervised', 'exp_4', role_type, pref_type, regime),
-                                       repetitions=3,
-                                       epochs=50,
-                                       train_sets=new_train_sets)
-
-    # Experiment 5
-    print('Running experiment 5: varied collaboration')

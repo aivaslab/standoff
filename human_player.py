@@ -5,11 +5,12 @@ from src.pz_envs import env_from_config
 from src.pz_envs.scenario_configs import ScenarioConfigs
 from PIL import Image, ImageDraw
 
+
 class HumanPlayer:
     def __init__(self):
         self.player_window = InteractivePlayerWindow(
             caption="standoff player",
-            #display=pyglet.canvas.get_display()
+            # display=pyglet.canvas.get_display()
         )
         self.episode_count = 0
 
@@ -24,7 +25,7 @@ class HumanPlayer:
     def start_episode(self):
         self.cumulative_reward = 0
         self.step_count = 0
-    
+
     def end_episode(self):
         print(
             f"Finished episode {self.episode_count} after {self.step_count} steps."
@@ -32,9 +33,10 @@ class HumanPlayer:
         )
         self.episode_count += 1
 
+
 TILE_SIZE = 16
 
-env_config =  {
+env_config = {
     "env_class": "MiniStandoffEnv",
     "max_steps": 50,
     "respawn": True,
@@ -61,13 +63,18 @@ puppet_interface_config = {
     "observation_style": "rich",
     "see_through_walls": False,
     "color": "red",
-    #"move_type": 1,
-    #"view_type": 1,
+    # "move_type": 1,
+    # "view_type": 1,
 }
 configs = ScenarioConfigs().standoff
 
-configName = 'all'
-reset_configs = {**configs["defaults"],  **configs[configName]}
+# configName = 'all'
+# reset_configs = {**configs["defaults"],  **configs[configName]}
+configName = 'a1'
+configs = ScenarioConfigs().standoff
+events = ScenarioConfigs.stages[configName]['events']
+reset_configs = configs[ScenarioConfigs.stages[configName]['params']]
+params = configs[ScenarioConfigs.stages[configName]['params']]
 
 if isinstance(reset_configs["num_agents"], list):
     reset_configs["num_agents"] = reset_configs["num_agents"][0]
@@ -77,8 +84,8 @@ if isinstance(reset_configs["num_puppets"], list):
 env_config['config_name'] = configName
 env_config['agents'] = [GridAgentInterface(**player_interface_config) for _ in range(reset_configs['num_agents'])]
 env_config['puppets'] = [GridAgentInterface(**puppet_interface_config) for _ in range(reset_configs['num_puppets'])]
-#env_config['num_agents'] = reset_configs['num_agents']
-#env_config['num_puppets'] = reset_configs['num_puppets']
+# env_config['num_agents'] = reset_configs['num_agents']
+# env_config['num_puppets'] = reset_configs['num_puppets']
 
 difficulty = 3
 env_config['opponent_visible_decs'] = (difficulty < 1)
@@ -91,32 +98,38 @@ env_name = 'Standoff-S3-' + configName.replace(" ", "") + '-' + str(difficulty) 
 
 env = env_from_config(env_config)
 env.observation_style = "image"
-#env.record_supervised_labels = True
-if hasattr(env, "hard_reset"):
-    env.hard_reset(reset_configs)
+params['subject_is_dominant'] = True
+params['sub_valence'] = 1
+env.param_groups = [{'eLists': {n: events[n]},
+                     'params': params,
+                     'perms': {n: ScenarioConfigs.all_event_permutations[n]}
+                     } for n in events
+                    ]
 
 human = HumanPlayer()
 human.start_episode()
 
 done = False
 env.record_info = True
-print('recording eval info:', env.record_info) # recording info aside from supervised labels, used at eval
-
+env.deterministic = True
+print('recording eval info:', env.record_info)  # recording info aside from supervised labels, used at eval
 
 for i in range(100):
     obs = env.reset()
-    print(env_name, env.gaze_highlighting, env.persistent_gaze_highlighting, env.opponent_visible_decs, env.subject_visible_decs, env.persistent_treat_images)
+    print(env_name, env.gaze_highlighting, env.persistent_gaze_highlighting, env.opponent_visible_decs,
+          env.subject_visible_decs, env.persistent_treat_images)
 
-    #print(np.round(obs['player_0'] * 10).sum(axis=0).astype(int))
+    # print(np.round(obs['player_0'] * 10).sum(axis=0).astype(int))
     while True:
         env.render(mode="human", show_agent_views=True, tile_size=TILE_SIZE)
-        #print(np.round(obs['player_0']*10).sum(axis=0).astype(int))
+        # print(np.round(obs['player_0']*10).sum(axis=0).astype(int))
         img = Image.fromarray(obs['p_0'], 'RGB')
-        ImageDraw.Draw(img).text((0, 0), "Step " + str(env.step_count) + '\n' + env.current_event_list_name, (255, 255, 255))
+        ImageDraw.Draw(img).text((0, 0), "Step " + str(env.step_count) + '\n' + env.current_event_list_name,
+                                 (255, 255, 255))
         player_action = human.action_step(np.array(img))
         agent_actions = {'p_0': player_action}
         next_obs, rew, done, info = env.step(agent_actions)
-        #print(info)
+        # print(info)
         human.save_step(obs['p_0'], player_action, rew['p_0'], done)
 
         obs = next_obs
@@ -128,6 +141,5 @@ for i in range(100):
     img = Image.fromarray(env.grid.render(15, None) * 0, 'RGB')
     ImageDraw.Draw(img).text((16, 16), "Episode done\n\nReward: " + str(rew['p_0']), (255, 255, 255))
     _ = human.action_step(np.array(img))
-
 
 human.end_episode()

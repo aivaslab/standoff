@@ -216,13 +216,11 @@ class ScenarioConfigs:
     # generate 'stages' for train and test, where a stage is a list of event lists and parameters
     stages = {
         'a0': {'events': all_event_lists, 'params': 'no-op'},
-
         'i0': {'events': informed_event_lists, 'params': 'no-op'},
         'u0': {'events': uninformed_event_lists, 'params': 'no-op'},
 
         'i1': {'events': informed_event_lists, 'params': 'defaults'},
         'u1': {'events': uninformed_event_lists, 'params': 'defaults'},
-
         'a1': {'events': all_event_lists, 'params': 'defaults'},
     }
 
@@ -235,10 +233,10 @@ class ScenarioConfigs:
             "boxes": 5,
             "sub_valence": 1,
             "dom_valence": 1,
-            "subject_is_dominant": False,  # subordinate has delayed release. for subordinate first, use negative
+            "subject_is_dominant": False,
             "num_puppets": 1,
             "num_agents": 1,
-            "events": [[['bait', 'empty'], ['bait', 'empty']]]  # list, event, args
+            "events": [[['bait', 'empty'], ['bait', 'empty']]]
         },
         "no-op": {
             "deterministic": True,
@@ -247,9 +245,9 @@ class ScenarioConfigs:
             "boxes": 5,
             "sub_valence": 1,
             "dom_valence": 1,
-            "subject_is_dominant": False,  # subordinate has delayed release. for subordinate first, use negative
+            "subject_is_dominant": False,
             "num_puppets": 0,
             "num_agents": 1,
-            "events": [[['bait', 'empty'], ['bait', 'empty']]]  # list, event, args
+            "events": [[['bait', 'empty'], ['bait', 'empty']]]
         },
     }
