@@ -46,6 +46,7 @@ class MiniStandoffEnv(para_MultiGridEnv):
             gaze_highlighting=False,
             persistent_gaze_highlighting=False,
             supervised_model=None,
+            use_separate_reward_layers=True,
     ):
         super().__init__(agents,
                          puppets,
@@ -68,7 +69,8 @@ class MiniStandoffEnv(para_MultiGridEnv):
                          persistent_treat_images=persistent_treat_images,
                          gaze_highlighting=gaze_highlighting,
                          persistent_gaze_highlighting=persistent_gaze_highlighting,
-                         supervised_model=supervised_model)
+                         supervised_model=supervised_model,
+                         use_separate_reward_layers=use_separate_reward_layers)
         self.stop_on_release = False
         self.new_target = None
         if agent_spawn_kwargs is None:
@@ -167,6 +169,7 @@ class MiniStandoffEnv(para_MultiGridEnv):
 
         self.bigReward = 100
         self.smallReward = int(self.bigReward / (self.boxes - 2))
+        self.sub_valence = sub_valence
 
         for k, agent in enumerate(self.agents_and_puppets()):
             h = 1 if agent == "p_0" else self.height - 1  # todo: make this work with dominance properly
@@ -379,7 +382,11 @@ class MiniStandoffEnv(para_MultiGridEnv):
                 self.infos['p_0']['timestep'] = self.total_step_count
         elif name == 'b':
             x = event[2] * 1 + 1
-            obj = Goal(reward=arg, size=arg * 0.01, color='green', hide=self.hidden)
+            if self.sub_valence == 1:
+                sub_obs_reward = arg
+            else:
+                sub_obs_reward = 100 if arg == self.smallReward else 33
+            obj = Goal(reward=arg, size=arg * 0.01, color='green', hide=self.hidden, sub_obs_reward=sub_obs_reward)
             if not self.has_baited:
                 self.has_baited = True
                 if self.record_info:
@@ -421,8 +428,11 @@ class MiniStandoffEnv(para_MultiGridEnv):
             else:
                 r1 = b1.reward if hasattr(b1, "reward") else 0
                 r2 = b2.reward if hasattr(b2, "reward") else 0
-                obj1 = Goal(reward=r2, size=r2 * 0.01, color='green', hide=self.hidden)
-                obj2 = Goal(reward=r1, size=r1 * 0.01, color='green', hide=self.hidden)
+                sr1 = b1.sub_obs_reward if hasattr(b1, "sub_obs_reward") else 0
+                sr2 = b2.sub_obs_reward if hasattr(b2, "sub_obs_reward") else 0
+
+                obj1 = Goal(reward=r2, size=r2 * 0.01, color='green', hide=self.hidden, sub_obs_reward=sr2)
+                obj2 = Goal(reward=r1, size=r1 * 0.01, color='green', hide=self.hidden, sub_obs_reward=sr1)
                 self.put_obj(obj1, event[1] * 1 + 1, y)
                 self.put_obj(obj2, event[2] * 1 + 1, y)
                 self.objs_to_hide.append(obj1)

@@ -289,17 +289,21 @@ class BonusTile(WorldObj):
 
 
 class Goal(WorldObj):
-    def __init__(self, reward, size=1.0, hide=False, *args, **kwargs):
+    def __init__(self, reward, size=1.0, hide=False, sub_obs_reward=100, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.reward = reward
         self.size = size
         self.hide = hide
+        self.sub_obs_reward = sub_obs_reward
 
     def can_overlap(self):
         return True
 
     def volatile(self):
         return True
+
+    def get_sub_obs_reward(self):
+        return self.sub_obs_reward
 
     def get_reward(self, agent=None):
         return self.reward

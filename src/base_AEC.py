@@ -443,8 +443,9 @@ class para_MultiGridEnv(ParallelEnv):
             gaze_highlighting=False,
             persistent_gaze_highlighting=False,
             observation_style='rich',
-            dense_obs=True,
-            supervised_model=None
+            dense_obs=False,
+            supervised_model=None,
+            use_separate_reward_layers=True,
     ):
         """
         The init method takes in environment arguments and
@@ -522,26 +523,31 @@ class para_MultiGridEnv(ParallelEnv):
         self.dense_obs = dense_obs
         self.channels = 3
         self.use_box_colors = False
+        self.use_separate_reward_layers = use_separate_reward_layers
 
         if self.use_box_colors:
             self.color_list = list(COLORS)
 
         if self.observation_style == 'rich':
-            if self.use_box_colors:
-                self.rich_observation_layers = [
-                    lambda k, mapping: (mapping[k].type == 'Agent' if hasattr(mapping[k], 'type') else False),
-                    lambda k, mapping: (mapping[k].type == 'Box' * mapping[k].state if hasattr(mapping[k], 'type') else False),
-                    lambda k, mapping: (mapping[k].get_reward() if hasattr(mapping[k], 'get_reward') and
-                                                                   mapping[k].contains is None else 0),
-                ]
+            self.rich_observation_layers = [
+                lambda k, mapping: (mapping[k].type == 'Agent' + mapping[k].valence if hasattr(mapping[k], 'type') else False),
+                lambda k, mapping: (mapping[k].type == 'Box' * mapping[k].state if hasattr(mapping[k], 'type') else False) if self.use_box_colors
+                else lambda k, mapping: (mapping[k].type == 'Box' if hasattr(mapping[k], 'type') else False),
+            ]
+            if self.use_separate_reward_layers:
+                # big and small refer to the numbers shown here, which are always what the opponent sees
+                # if sub_valence is not 1, the observation changes, but not the object reward states
+                # so sub_observed_reward shows the post-valence change reward
+                self.rich_observation_layers.extend([
+                    lambda k, mapping: (mapping[k].get_sub_obs_reward() == 100 if hasattr(mapping[k], 'get_sub_obs_reward') and mapping[k].contains is None else 0),
+                    lambda k, mapping: (mapping[k].get_sub_obs_reward() == 33 if hasattr(mapping[k], 'get_sub_obs_reward') and mapping[k].contains is None else 0),
+                ])
             else:
-                self.rich_observation_layers = [
-                    lambda k, mapping: (mapping[k].type == 'Agent' if hasattr(mapping[k], 'type') else False),
-                    lambda k, mapping: (mapping[k].type == 'Box' if hasattr(mapping[k], 'type') else False),
-                    # only get reward if it's not a box
-                    lambda k, mapping: (mapping[k].get_reward() if hasattr(mapping[k], 'get_reward') and
-                                                                   mapping[k].contains is None else 0),
-                ]
+                self.rich_observation_layers.extend([
+                    lambda k, mapping: (mapping[k].get_reward() if hasattr(mapping[k], 'get_reward') and mapping[k].contains is None else 0)
+                ])
+
+            # handle walls, etc
             if self.dense_obs is False:
                 self.rich_observation_layers.extend([
                     lambda k, mapping: (mapping[k].can_overlap() if hasattr(mapping[k], 'can_overlap') else 1),
@@ -959,7 +965,9 @@ class para_MultiGridEnv(ParallelEnv):
                         # Rewards can be got iff. fwd_cell has a "get_reward" method
                         if hasattr(fwd_cell, 'get_reward'):
                             og_rwd = fwd_cell.get_reward(agent)
-
+                            if agent.valence != 1:
+                                temp = og_rwd
+                                og_rwd = 100 if temp == self.smallReward else self.smallReward
                             # self.grid.set(*fwd_cell.pos, None) # don't remove box
                             # fwd_cell.set_reward(self.penalize_same_selection)
 

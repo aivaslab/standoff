@@ -44,6 +44,7 @@ env_config = {
     "reward_decay": False,
     "width": 9,
     "height": 9,
+    "use_separate_reward_layers": True
 }
 
 player_interface_config = {
@@ -95,11 +96,14 @@ env_config['gaze_highlighting'] = (difficulty < 3)
 env_config['persistent_gaze_highlighting'] = (difficulty < 2)
 
 env_name = 'Standoff-S3-' + configName.replace(" ", "") + '-' + str(difficulty) + '-v1'
+subject_is_dominant = False
+sub_valence = 0
+
 
 env = env_from_config(env_config)
 env.observation_style = "image"
 params['subject_is_dominant'] = True
-params['sub_valence'] = 1
+params['sub_valence'] = 2
 env.param_groups = [{'eLists': {n: events[n]},
                      'params': params,
                      'perms': {n: ScenarioConfigs.all_event_permutations[n]}
