@@ -79,7 +79,7 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
         params = configs[ScenarioConfigs.stages[configName]['params']]
 
         _subject_is_dominant = [False] if role_type == '' else [True] if role_type == 'D' else [True, False]
-        _subject_valence = [1] if pref_type == '' else [True] if pref_type == 'd' else [True, False]
+        _subject_valence = [1] if pref_type == '' else [2] if pref_type == 'd' else [1, 2]
         print(configName, _subject_is_dominant, _subject_valence)
 
         for subject_is_dominant in _subject_is_dominant:
