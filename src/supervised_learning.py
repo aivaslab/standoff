@@ -191,10 +191,12 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
         #all_obs_and_labels.to_csv('train_data.csv', index=False)
         #all_path_infos.to_csv('extra_data.csv', index=False)
         print('len obs', len(data_obs))
-        np.save(os.path.join(path, data_name + suffix + '-obs'), np.array(data_obs))
-        np.save(os.path.join(path, data_name + suffix + '-params'), np.array(data_params))
+        this_path = os.path.join(path, data_name + suffix)
+        os.makedirs(this_path, exist_ok=True)
+        np.save(this_path + 'obs', np.array(data_obs))
+        np.save(this_path + 'params', np.array(data_params))
         for label in labels:
-            np.save(os.path.join(path, data_name + suffix + '-label-' + label), np.array(data_labels[label]))
+            np.save(this_path + 'label-' + label, np.array(data_labels[label]))
 
 
 class CustomDataset(Dataset):

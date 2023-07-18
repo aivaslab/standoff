@@ -82,11 +82,13 @@ def experiments(todo, repetitions, epochs):
     ]
 
     # generate supervised data
+    labels = ['loc', 'exist', 'vision', 'b-loc', 'b-exist', 'target', 'correctSelection']
     if 0 in todo:
-        print('Generating datasets')
+        print('Generating datasets with labels', labels)
+        os.makedirs('supervised')
         for pref_type, pref_suffix in pref_types:
             for role_type, role_suffix in role_types:
-                gen_data(['correctSelection'], path='supervised', pref_type=pref_suffix, role_type=role_suffix)
+                gen_data(labels, path='supervised', pref_type=pref_suffix, role_type=role_suffix)
 
     if 'h' in todo:
         print('Running hyperparameter search on all regimes, pref_types, role_types')
@@ -106,7 +108,8 @@ def experiments(todo, repetitions, epochs):
         print('Running experiment 2: varied train regimes')
         df_list = []
         avg_list = []
-        for regime, train_sets in regimes[1:]:
+        os.makedirs(os.path.join('supervised', 'exp_2'), exist_ok=True)
+        for regime, train_sets in regimes:
             print('regime:', regime)
             combined_df, df = run_supervised_session(save_path=os.path.join('supervised', 'exp_2', regime),
                                         repetitions=repetitions,
@@ -114,8 +117,8 @@ def experiments(todo, repetitions, epochs):
                                         train_sets=train_sets)
             df_list.append(df)
             avg_list.append(combined_df)
-        combined_df = add_label_and_combine_dfs(df_list, [regime for regime, _ in regimes[1:]], 'regime')
-        combined_avg = add_label_and_combine_dfs(avg_list, [regime for regime, _ in regimes[1:]], 'regime')
+        combined_df = add_label_and_combine_dfs(df_list, [regime for regime, _ in regimes], 'regime')
+        combined_avg = add_label_and_combine_dfs(avg_list, [regime for regime, _ in regimes], 'regime')
         create_combined_histogram(combined_df, combined_avg, 'regime', os.path.join('supervised', 'exp_2'))
 
     # Experiment 3
@@ -156,4 +159,4 @@ def experiments(todo, repetitions, epochs):
 
 
 if __name__ == '__main__':
-    experiments([2], 1, 2)
+    experiments([2], 1, 40)

@@ -67,13 +67,14 @@ def decode_event_name(name):
     })
 
 
-def train_model(train_sets, label, test_sets, load_path='supervised/', save_path='', epochs=100, model_kwargs=None,
+def train_model(train_sets, target_label, test_sets, load_path='supervised/', save_path='', epochs=100, model_kwargs=None,
                 lr=0.001):
     data, labels, params = [], [], []
     for data_name in train_sets:
-        data.append(np.load(os.path.join(load_path, data_name + '-obs.npy')))
-        labels.append(np.load(os.path.join(load_path, data_name + '-label-' + label + '.npy')))
-        params.append(np.load(os.path.join(load_path, data_name + '-params.npy')))
+        dir = os.path.join(load_path, data_name)
+        data.append(np.load(dir + 'obs.npy'))
+        labels.append(np.load(dir + 'label-' + target_label + '.npy'))
+        params.append(np.load(dir + 'params.npy'))
     batch_size = 64
 
     data = np.concatenate(data, axis=0)
@@ -297,7 +298,6 @@ def write_metrics_to_file(filepath, df, ranges, params):
 def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, eval_name='a1',
                            load_path='supervised'):
     labels = ['correctSelection']
-    # gen_data(labels)
     # labels = ['loc', 'exist', 'vision', 'b-loc', 'b-exist', 'target', 'correctSelection']
 
     model_kwargs_base = {'hidden_size': [6, 8, 12, 16, 32],
@@ -335,10 +335,10 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
 
             model_name = "".join([str(x) + "," for x in model_kwargs.values()])
 
-            for label in labels:
+            for target_label in labels:
                 df_list = []
                 for repetition in range(repetitions):
-                    t_loss, v_loss, df = train_model(train_sets, label, [eval_name], load_path=load_path,
+                    t_loss, v_loss, df = train_model(train_sets, target_label, [eval_name], load_path=load_path,
                                                      save_path=save_path, epochs=epochs, model_kwargs=model_kwargs,
                                                      lr=lr)
                     df_list.append(df)
