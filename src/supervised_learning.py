@@ -109,7 +109,7 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
                 env_config['persistent_gaze_highlighting'] = (difficulty < 2)
 
                 env = env_from_config(env_config)
-                env.record_supervised_labels = record_extra_data
+                env.record_oracle_labels = True
                 env.record_info = True  # used for correctSelection right now
 
                 data_name = f'{configName}'
@@ -193,36 +193,41 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
         print('len obs', len(data_obs))
         this_path = os.path.join(path, data_name + suffix)
         os.makedirs(this_path, exist_ok=True)
-        np.save(this_path + 'obs', np.array(data_obs))
-        np.save(this_path + 'params', np.array(data_params))
+        np.save(os.path.join(this_path, 'obs'), np.array(data_obs))
+        np.save(os.path.join(this_path,  'params'), np.array(data_params))
         for label in labels:
-            np.save(this_path + 'label-' + label, np.array(data_labels[label]))
+            np.save(os.path.join(this_path, 'label-' + label), np.array(data_labels[label]))
 
 
 class CustomDataset(Dataset):
-    def __init__(self, data, labels, params):
+    def __init__(self, data, labels, params, oracles):
         self.data = data
         self.labels = labels
         self.params = params
+        self.oracles = oracles
 
     def __len__(self):
         return len(self.data)
 
     def __getitem__(self, idx):
-        return torch.tensor(self.data[idx], dtype=torch.int8), torch.tensor(self.labels[idx].flatten(), dtype=torch.int8), self.params[idx]
+        #print(idx, len(self.oracles))
+        return torch.tensor(self.data[idx], dtype=torch.int8), \
+               torch.tensor(self.labels[idx].flatten(), dtype=torch.int8), \
+               self.params[idx], \
+               torch.tensor(self.oracles[idx], dtype=torch.int8)
 
 
 class RNNModel(nn.Module):
     def __init__(self, hidden_size, num_layers, output_len, channels, kernels=8, kernels2=8, kernel_size1=3,
                  kernel_size2=3, stride1=1, pool_kernel_size=2, pool_stride=2, padding1=0, padding2=0, use_pool=True,
-                 use_conv2=False):
+                 use_conv2=False, oracle_len=0):
         super(RNNModel, self).__init__()
         self.kwargs = {'hidden_size': hidden_size, 'num_layers': num_layers,
                        'output_len': output_len, 'pool_kernel_size': pool_kernel_size,
                        'pool_stride': pool_stride, 'channels': channels, 'kernels': kernels,
                        'padding1': padding1, 'padding2': padding2, 'use_pool': use_pool, 'stride1': stride1,
                        'use_conv2': use_conv2, 'kernel_size1': kernel_size1,
-                       'kernels2': kernels2, 'kernel_size2': kernel_size2}
+                       'kernels2': kernels2, 'kernel_size2': kernel_size2, 'oracle_len': oracle_len}
 
         input_size = 7
 
@@ -239,7 +244,6 @@ class RNNModel(nn.Module):
         pool1_output_size = (
                                 conv1_output_size - pool_kernel_size + 2 * 0 if pool_kernel_size < conv1_output_size else 1) // pool_stride + 1 if use_pool else conv1_output_size
 
-        print(self.kwargs, conv1_output_size, pool1_output_size)
 
         if use_conv2:
             conv2_output_size = (pool1_output_size - min(kernel_size2, pool1_output_size) + 2 * padding2) // stride1 + 1
@@ -254,16 +258,15 @@ class RNNModel(nn.Module):
         else:
             conv2_output_size = conv1_output_size
             pool2_output_size = pool1_output_size
-        print(self.kwargs, conv1_output_size, pool1_output_size, conv2_output_size, pool2_output_size)
 
         # input_size = 16 * pool2_output_size * pool2_output_size
         input_size = kernels2 * pool2_output_size * pool2_output_size
 
         self.rnn = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
 
-        self.fc = nn.Linear(hidden_size, int(output_len))
+        self.fc = nn.Linear(hidden_size + oracle_len, int(output_len))
 
-    def forward(self, x):
+    def forward(self, x, oracle_inputs):
         x = torch.tensor(x, dtype=torch.float32)
         conv_outputs = []
         for t in range(10):
@@ -278,5 +281,5 @@ class RNNModel(nn.Module):
 
         out, _ = self.rnn(x)
         out = out[:, -1, :]  # Use only the last time step's output
-        outputs = self.fc(out)
+        outputs = self.fc(torch.cat((out, oracle_inputs), dim=-1))
         return outputs

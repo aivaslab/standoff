@@ -457,7 +457,7 @@ class para_MultiGridEnv(ParallelEnv):
         These attributes should not be changed after initialization.
         """
 
-        self.record_supervised_labels = False
+        self.record_oracle_labels = False
         self.supervised_model = supervised_model
         self.past_observations = None
         self.record_info = False  # set this to true during evaluation
@@ -775,7 +775,7 @@ class para_MultiGridEnv(ParallelEnv):
         if self.supervised_model is not None:
             # if supervised model is 0 we will use ground truth
             if isinstance(self.supervised_model, str):
-                self.record_supervised_labels = True
+                self.record_oracle_labels = True
             else:
                 self.supervised_model.training = False
             self.past_observations = np.zeros((10, *self.prior_observations[self.agents[0]].shape))

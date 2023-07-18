@@ -72,20 +72,20 @@ def experiments(todo, repetitions, epochs):
     default_regime = regimes[1]
     pref_types = [
         ('same', ''),
-        ('different', 'd'),
-        ('varying', 'v'),
+        #('different', 'd'),
+        #('varying', 'v'),
     ]
     role_types = [
         ('subordinate', ''),
-        ('dominant', 'D'),
-        ('varying', 'V'),
+        #('dominant', 'D'),
+        #('varying', 'V'),
     ]
 
     # generate supervised data
     labels = ['loc', 'exist', 'vision', 'b-loc', 'b-exist', 'target', 'correctSelection']
     if 0 in todo:
         print('Generating datasets with labels', labels)
-        os.makedirs('supervised')
+        os.makedirs('supervised', exist_ok=True)
         for pref_type, pref_suffix in pref_types:
             for role_type, role_suffix in role_types:
                 gen_data(labels, path='supervised', pref_type=pref_suffix, role_type=role_suffix)
@@ -101,7 +101,8 @@ def experiments(todo, repetitions, epochs):
         run_supervised_session(save_path=os.path.join('supervised', 'exp_1'),
                                repetitions=repetitions,
                                epochs=epochs,
-                               train_sets=['a1'])
+                               train_sets=['a1'],
+                               oracle_labels=labels[:-1])
 
     # Experiment 2
     if 2 in todo:
@@ -159,4 +160,4 @@ def experiments(todo, repetitions, epochs):
 
 
 if __name__ == '__main__':
-    experiments([2], 1, 40)
+    experiments([1], 1, 40)

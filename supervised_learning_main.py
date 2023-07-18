@@ -72,19 +72,25 @@ def train_model(train_sets, target_label, test_sets, load_path='supervised/', sa
     data, labels, params, oracles = [], [], [], []
     for data_name in train_sets:
         dir = os.path.join(load_path, data_name)
-        data.append(np.load(dir + 'obs.npy'))
-        labels.append(np.load(dir + 'label-' + target_label + '.npy'))
-        params.append(np.load(dir + 'params.npy'))
-        oracles.append({})
+        data.append(np.load(os.path.join(dir, 'obs.npy')))
+        labels.append(np.load(os.path.join(dir, 'label-' + target_label + '.npy')))
+        params.append(np.load(os.path.join(dir, 'params.npy')))
+        oracle_data = []
         for oracle_label in oracle_labels:
-            this_oracle = np.load(dir + 'label-' + oracle_label + '.npy')
-            print('oracle_label', this_oracle)
+            this_oracle = np.load(os.path.join(dir, 'label-' + oracle_label + '.npy'))
+            flattened_oracle = this_oracle.reshape(this_oracle.shape[0], -1)
+            oracle_data.append(flattened_oracle)
+        combined_oracle_data = np.concatenate(oracle_data, axis=-1)
+        oracles.append(combined_oracle_data)
+
+        print(len(data), len(params), len(oracles), data[0].shape, params[0].shape, oracles[0].shape)
 
     batch_size = 64
 
     data = np.concatenate(data, axis=0)
     labels = np.concatenate(labels, axis=0)
     params = np.concatenate(params, axis=0)
+    oracles = np.concatenate(oracles, axis=0)
 
     print('total data', data.shape, params.shape)
 
@@ -96,18 +102,26 @@ def train_model(train_sets, target_label, test_sets, load_path='supervised/', sa
     val_dataset = CustomDataset(val_data, val_labels, val_params)
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)'''
-    train_dataset = CustomDataset(data, labels, params)
+    train_dataset = CustomDataset(data, labels, params, oracles)
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 
     test_loaders = []
     for val_set_name in test_sets:
-        val_data = np.load(os.path.join(load_path, val_set_name + '-obs.npy'))
-        val_labels = np.load(os.path.join(load_path, val_set_name + '-label-' + label + '.npy'))
-        val_params = np.load(os.path.join(load_path, val_set_name + '-params.npy'))
-        val_dataset = CustomDataset(val_data, val_labels, val_params)
+        dir = os.path.join(load_path, val_set_name)
+        val_data = np.load(os.path.join(dir, 'obs.npy'))
+        val_labels = np.load(os.path.join(dir, 'label-' + target_label + '.npy'))
+        val_params = np.load(os.path.join(dir, 'params.npy'))
+        oracle_data = []
+        for oracle_label in oracle_labels:
+            this_oracle = np.load(os.path.join(dir, 'label-' + oracle_label + '.npy'))
+            flattened_oracle = this_oracle.reshape(this_oracle.shape[0], -1)
+            oracle_data.append(flattened_oracle)
+        combined_oracle_data = np.concatenate(oracle_data, axis=-1)
+        val_dataset = CustomDataset(val_data, val_labels, val_params, combined_oracle_data)
         test_loaders.append(DataLoader(val_dataset, batch_size=batch_size, shuffle=False))
 
     # broken rn
+    model_kwargs['oracle_len'] = 0 if len(oracle_labels) == 0 else len(train_dataset.oracles[0])
     model_kwargs['output_len'] = 5  # np.prod(labels.shape[1:])
     #model_kwargs['channels'] = 4  # np.prod(params.shape[2])
 
@@ -125,10 +139,10 @@ def train_model(train_sets, target_label, test_sets, load_path='supervised/', sa
     param_losses_list = []
     for epoch in tqdm.trange(num_epochs):
         train_loss = 0
-        for i, (inputs, target_labels, _) in enumerate(train_loader):
+        for i, (inputs, target_labels, _, oracle_inputs) in enumerate(train_loader):
             # inputs = inputs.view(-1, 10, input_size)
             # print(inputs.shape)
-            outputs = model(inputs)
+            outputs = model(inputs, oracle_inputs)
             loss = criterion(outputs, torch.argmax(target_labels, dim=1))
             optimizer.zero_grad()
             loss.backward()
@@ -150,8 +164,8 @@ def train_model(train_sets, target_label, test_sets, load_path='supervised/', sa
                     #if val_samples_processed >= max_val_samples:
                     #    break'''
 
-                for inputs, labels, params in _val_loader:
-                    outputs = model(inputs)
+                for inputs, labels, params, oracle_inputs in _val_loader:
+                    outputs = model(inputs, oracle_inputs)
                     losses = special_criterion(outputs, torch.argmax(labels, dim=1))
                     _, predicted = torch.max(outputs, 1)
                     corrects = (predicted == torch.argmax(labels, dim=1)).float()

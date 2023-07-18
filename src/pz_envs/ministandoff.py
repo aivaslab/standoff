@@ -99,7 +99,7 @@ class MiniStandoffEnv(para_MultiGridEnv):
         self.random_subject_spawn = False # turned off for AAAI
         self.odd_spawns = True
         self.random_odd_spawns = True  # overrides self.odd_spawns when true
-        self.record_supervised_labels = False
+        self.record_oracle_labels = False
 
         self.supervised_model = supervised_model  # used for generating special supervised labels
         self.last_supervised_labels = None
@@ -501,7 +501,7 @@ class MiniStandoffEnv(para_MultiGridEnv):
                 self.infos[target_agent]["path"] = path
                 # tile = self.grid.get(x, y)
                 # we cannot track shouldAvoidBig etc here because the treat location might change
-        if self.record_supervised_labels:
+        if self.record_oracle_labels:
             target_agent = "p_1"
             one_hot_goal = [0] * self.boxes
             if self.params['num_puppets'] > 0:
