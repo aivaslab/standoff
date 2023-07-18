@@ -83,8 +83,6 @@ def train_model(train_sets, target_label, test_sets, load_path='supervised/', sa
         combined_oracle_data = np.concatenate(oracle_data, axis=-1)
         oracles.append(combined_oracle_data)
 
-        print(len(data), len(params), len(oracles), data[0].shape, params[0].shape, oracles[0].shape)
-
     batch_size = 64
 
     data = np.concatenate(data, axis=0)
@@ -92,7 +90,7 @@ def train_model(train_sets, target_label, test_sets, load_path='supervised/', sa
     params = np.concatenate(params, axis=0)
     oracles = np.concatenate(oracles, axis=0)
 
-    print('total data', data.shape, params.shape)
+    print('total data', data.shape)
 
     # not useful unless test set is same as train
     '''train_data, val_data, train_labels, val_labels, train_params, val_params = train_test_split(

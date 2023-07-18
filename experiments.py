@@ -93,6 +93,7 @@ def experiments(todo, repetitions, epochs):
     if 'h' in todo:
         print('Running hyperparameter search on all regimes, pref_types, role_types')
 
+
     # Experiment 1
     if 1 in todo:
         print('Running experiment 1: varied models training directly on the test set')
@@ -104,12 +105,31 @@ def experiments(todo, repetitions, epochs):
                                train_sets=['a1'],
                                oracle_labels=labels[:-1])
 
-    # Experiment 2
     if 2 in todo:
+        print('Running experiment 2: varied oracle modules')
+        df_list = []
+        avg_list = []
+        #os.makedirs(os.path.join('supervised', 'exp_2'), exist_ok=True)
+
+        for single_oracle in labels[-1]:
+            print('oracle:', single_oracle)
+            combined_df, df = run_supervised_session(save_path=os.path.join('supervised', 'exp_2', 'single_oracle'),
+                                   repetitions=repetitions,
+                                   epochs=epochs,
+                                   train_sets=regimes[3], # complete train regime
+                                   oracle_labels=[single_oracle])
+            df_list.append(df)
+            avg_list.append(combined_df)
+        combined_df = add_label_and_combine_dfs(df_list, [regime for regime, _ in regimes], 'regime')
+        combined_avg = add_label_and_combine_dfs(avg_list, [regime for regime, _ in regimes], 'regime')
+        create_combined_histogram(combined_df, combined_avg, 'regime', os.path.join('supervised', 'exp_2'))
+
+    # Experiment 7
+    if 7 in todo:
         print('Running experiment 2: varied train regimes')
         df_list = []
         avg_list = []
-        os.makedirs(os.path.join('supervised', 'exp_2'), exist_ok=True)
+        os.makedirs(os.path.join('supervised', 'exp_7'), exist_ok=True)
         for regime, train_sets in regimes:
             print('regime:', regime)
             combined_df, df = run_supervised_session(save_path=os.path.join('supervised', 'exp_2', regime),
@@ -149,6 +169,7 @@ def experiments(todo, repetitions, epochs):
     if 5 in todo:
         print('Running experiment 5: varied collaboration')
 
+
     # Experiment 100
     if 100 in todo:
         print('Running experiment -1: testing effect of dense vs sparse inputs')
@@ -160,4 +181,4 @@ def experiments(todo, repetitions, epochs):
 
 
 if __name__ == '__main__':
-    experiments([1], 1, 40)
+    experiments([1], 1, 10)
