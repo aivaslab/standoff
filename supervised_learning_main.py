@@ -68,13 +68,18 @@ def decode_event_name(name):
 
 
 def train_model(train_sets, target_label, test_sets, load_path='supervised/', save_path='', epochs=100, model_kwargs=None,
-                lr=0.001):
-    data, labels, params = [], [], []
+                lr=0.001, oracle_labels=[]):
+    data, labels, params, oracles = [], [], [], []
     for data_name in train_sets:
         dir = os.path.join(load_path, data_name)
         data.append(np.load(dir + 'obs.npy'))
         labels.append(np.load(dir + 'label-' + target_label + '.npy'))
         params.append(np.load(dir + 'params.npy'))
+        oracles.append({})
+        for oracle_label in oracle_labels:
+            this_oracle = np.load(dir + 'label-' + oracle_label + '.npy')
+            print('oracle_label', this_oracle)
+
     batch_size = 64
 
     data = np.concatenate(data, axis=0)
@@ -296,7 +301,7 @@ def write_metrics_to_file(filepath, df, ranges, params):
 
 # train_model('random-2500', 'exist')
 def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, eval_name='a1',
-                           load_path='supervised'):
+                           load_path='supervised', oracle_labels=[]):
     labels = ['correctSelection']
     # labels = ['loc', 'exist', 'vision', 'b-loc', 'b-exist', 'target', 'correctSelection']
 
@@ -340,7 +345,7 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
                 for repetition in range(repetitions):
                     t_loss, v_loss, df = train_model(train_sets, target_label, [eval_name], load_path=load_path,
                                                      save_path=save_path, epochs=epochs, model_kwargs=model_kwargs,
-                                                     lr=lr)
+                                                     lr=lr, oracle_labels=oracle_labels, )
                     df_list.append(df)
 
                 combined_df = pd.concat(df_list, ignore_index=True)
