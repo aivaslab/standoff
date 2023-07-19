@@ -70,25 +70,34 @@ def decode_event_name(name):
 def train_model(train_sets, target_label, test_sets, load_path='supervised/', save_path='', epochs=100, model_kwargs=None,
                 lr=0.001, oracle_labels=[]):
     data, labels, params, oracles = [], [], [], []
+    if oracle_labels[0] == None:
+        oracle_labels = []
     for data_name in train_sets:
         dir = os.path.join(load_path, data_name)
         data.append(np.load(os.path.join(dir, 'obs.npy')))
         labels.append(np.load(os.path.join(dir, 'label-' + target_label + '.npy')))
         params.append(np.load(os.path.join(dir, 'params.npy')))
-        oracle_data = []
-        for oracle_label in oracle_labels:
-            this_oracle = np.load(os.path.join(dir, 'label-' + oracle_label + '.npy'))
-            flattened_oracle = this_oracle.reshape(this_oracle.shape[0], -1)
-            oracle_data.append(flattened_oracle)
-        combined_oracle_data = np.concatenate(oracle_data, axis=-1)
-        oracles.append(combined_oracle_data)
+        if oracle_labels:
+            oracle_data = []
+            for oracle_label in oracle_labels:
+                this_oracle = np.load(os.path.join(dir, 'label-' + oracle_label + '.npy'))
+                print('sum of oracle data', data_name, oracle_label, np.sum(this_oracle))
+                flattened_oracle = this_oracle.reshape(this_oracle.shape[0], -1)
+                oracle_data.append(flattened_oracle)
+            combined_oracle_data = np.concatenate(oracle_data, axis=-1)
+            sum_oracle_data = np.sum(combined_oracle_data, axis=0)
+            print('sum of oracle data', data_name, sum_oracle_data)
+            oracles.append(combined_oracle_data)
 
     batch_size = 64
 
     data = np.concatenate(data, axis=0)
     labels = np.concatenate(labels, axis=0)
     params = np.concatenate(params, axis=0)
-    oracles = np.concatenate(oracles, axis=0)
+    if oracle_labels:
+        oracles = np.concatenate(oracles, axis=0)
+    else:
+        oracles = np.zeros((len(data), 0))
 
     print('total data', data.shape)
 
@@ -109,12 +118,15 @@ def train_model(train_sets, target_label, test_sets, load_path='supervised/', sa
         val_data = np.load(os.path.join(dir, 'obs.npy'))
         val_labels = np.load(os.path.join(dir, 'label-' + target_label + '.npy'))
         val_params = np.load(os.path.join(dir, 'params.npy'))
-        oracle_data = []
-        for oracle_label in oracle_labels:
-            this_oracle = np.load(os.path.join(dir, 'label-' + oracle_label + '.npy'))
-            flattened_oracle = this_oracle.reshape(this_oracle.shape[0], -1)
-            oracle_data.append(flattened_oracle)
-        combined_oracle_data = np.concatenate(oracle_data, axis=-1)
+        if oracle_labels:
+            oracle_data = []
+            for oracle_label in oracle_labels:
+                this_oracle = np.load(os.path.join(dir, 'label-' + oracle_label + '.npy'))
+                flattened_oracle = this_oracle.reshape(this_oracle.shape[0], -1)
+                oracle_data.append(flattened_oracle)
+            combined_oracle_data = np.concatenate(oracle_data, axis=-1)
+        else:
+            combined_oracle_data = np.zeros((len(val_data), 0))
         val_dataset = CustomDataset(val_data, val_labels, val_params, combined_oracle_data)
         test_loaders.append(DataLoader(val_dataset, batch_size=batch_size, shuffle=False))
 

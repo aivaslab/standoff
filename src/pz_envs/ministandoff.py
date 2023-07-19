@@ -326,9 +326,9 @@ class MiniStandoffEnv(para_MultiGridEnv):
     def get_all_paths(self, maze, position, offset=0):
         maze = np.array(maze).astype(int)
 
-        y = self.height // 2 + offset
+        _y = self.height // 2 + offset
         if self.subject_is_dominant:
-            y -= 1
+            _y -= 1
         paths = []
         for box in range(self.boxes):
             x = box * 1 + 1
@@ -336,10 +336,10 @@ class MiniStandoffEnv(para_MultiGridEnv):
             pgrid = copy.copy(maze)
             for _x in range(self.width):
                 if _x != x:
-                    pgrid[_x, y] = True
-                    pgrid[_x, y + 1] = True
+                    pgrid[_x, _y] = True
+                    pgrid[_x, _y + 1] = True
 
-            path = pathfind(pgrid, tuple(position[0:2]), (x, y), self.cached_paths)
+            path = pathfind(pgrid, tuple(position[0:2]), (x, _y), self.cached_paths)
             paths += [path, ]
         return paths
 
@@ -349,6 +349,7 @@ class MiniStandoffEnv(para_MultiGridEnv):
         y = self.height // 2
         if self.subject_is_dominant:
             y -= 1
+
         if self.hidden and len(self.objs_to_hide) > 0:
             for obj in self.objs_to_hide:
                 pos = obj.pos
@@ -441,11 +442,11 @@ class MiniStandoffEnv(para_MultiGridEnv):
             if self.record_info:
                 self.infos['p_0']['eventVisibility'] = ''.join(
                     ['1' if x else '0' for x in self.visible_event_list])
-            for x, y in self.released_tiles[arg]:
-                self.del_obj(x, y)
+            for x, _y in self.released_tiles[arg]:
+                self.del_obj(x, _y)
             if arg == 0:
-                for x, y in self.curtain_tiles:
-                    self.put_obj(Curtain(color='red'), x, y, update_vis=False)
+                for x, _y in self.curtain_tiles:
+                    self.put_obj(Curtain(color='red'), x, _y, update_vis=False)
             if self.stop_on_release is True:
                 self.dones['p_0'] = True
             self.has_released = True
@@ -501,7 +502,8 @@ class MiniStandoffEnv(para_MultiGridEnv):
                 self.infos[target_agent]["path"] = path
                 # tile = self.grid.get(x, y)
                 # we cannot track shouldAvoidBig etc here because the treat location might change
-        if self.record_oracle_labels:
+
+        if self.record_oracle_labels and (self.step_count == 9 or self.has_released):
             target_agent = "p_1"
             one_hot_goal = [0] * self.boxes
             if self.params['num_puppets'] > 0:
@@ -509,7 +511,8 @@ class MiniStandoffEnv(para_MultiGridEnv):
             self.infos['p_0']["target"] = one_hot_goal
             self.infos['p_0']["vision"] = self.visible_event_list[-1] if len(self.visible_event_list) > 0 else [0]
             real_boxes = [self.grid.get(box * 1 + 1, y) for box in range(self.boxes)]
-            real_box_rewards = [box.reward if box is not None and hasattr(box, "reward") else 0 for box in real_boxes]
+
+            real_box_rewards = [box.get_reward() if box is not None and hasattr(box, "get_reward") else 0 for box in real_boxes]
             if self.params['num_puppets'] > 0:
                 all_rewards_seen = [self.last_seen_reward[target_agent + str(box)] for box in range(self.boxes)]
             else:
@@ -530,6 +533,7 @@ class MiniStandoffEnv(para_MultiGridEnv):
                                           1 if self.smallReward in real_box_rewards else 0]
             self.infos['p_0']["b-exist"] = [1 if self.bigReward in all_rewards_seen else 0,
                                             1 if self.smallReward in all_rewards_seen else 0]
+            #print(self.step_count, self.infos['p_0']["exist"], self.infos['p_0']["b-exist"], self.infos['p_0']["target"], self.infos['p_0']["vision"], self.infos['p_0']["loc"], self.infos['p_0']["b-loc"])
         if self.record_info:
             if name == "rel":
                 # if agent's goal of player_1 matches big treat location, then shouldAvoidBig is True

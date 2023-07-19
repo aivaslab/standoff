@@ -77,10 +77,19 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
         configs = ScenarioConfigs().standoff
         events = ScenarioConfigs.stages[configName]['events']
         params = configs[ScenarioConfigs.stages[configName]['params']]
+        print('puppets', params['num_puppets'])
+        if params['num_puppets'] == 0:
+            continue
 
         _subject_is_dominant = [False] if role_type == '' else [True] if role_type == 'D' else [True, False]
         _subject_valence = [1] if pref_type == '' else [2] if pref_type == 'd' else [1, 2]
         print(configName, _subject_is_dominant, _subject_valence)
+        data_name = f'{configName}'
+        data_obs = []
+        data_labels = {}
+        for label in labels + prior_metrics + posterior_metrics:
+            data_labels[label] = []
+        data_params = []
 
         for subject_is_dominant in _subject_is_dominant:
             for subject_valence in _subject_valence:
@@ -89,6 +98,7 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
 
 
                 reset_configs = {**params}
+
 
                 if isinstance(reset_configs["num_agents"], list):
                     reset_configs["num_agents"] = reset_configs["num_agents"][0]
@@ -112,12 +122,6 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
                 env.record_oracle_labels = True
                 env.record_info = True  # used for correctSelection right now
 
-                data_name = f'{configName}'
-                data_obs = []
-                data_labels = {}
-                for label in labels + prior_metrics + posterior_metrics:
-                    data_labels[label] = []
-                data_params = []
 
                 env.target_param_group_count = 20
                 env.param_groups = [ {'eLists': {n: events[n]},
@@ -190,7 +194,7 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
 
         #all_obs_and_labels.to_csv('train_data.csv', index=False)
         #all_path_infos.to_csv('extra_data.csv', index=False)
-        print('len obs', len(data_obs))
+        print('len obs', data_name, suffix, len(data_obs))
         this_path = os.path.join(path, data_name + suffix)
         os.makedirs(this_path, exist_ok=True)
         np.save(os.path.join(this_path, 'obs'), np.array(data_obs))

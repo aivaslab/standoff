@@ -83,6 +83,7 @@ def experiments(todo, repetitions, epochs):
 
     # generate supervised data
     labels = ['loc', 'exist', 'vision', 'b-loc', 'b-exist', 'target', 'correctSelection']
+    oracles = [None] + labels[:-1]
     if 0 in todo:
         print('Generating datasets with labels', labels)
         os.makedirs('supervised', exist_ok=True)
@@ -103,7 +104,7 @@ def experiments(todo, repetitions, epochs):
                                repetitions=repetitions,
                                epochs=epochs,
                                train_sets=['a1'],
-                               oracle_labels=labels[:-1])
+                               )
 
     if 2 in todo:
         print('Running experiment 2: varied oracle modules')
@@ -111,17 +112,18 @@ def experiments(todo, repetitions, epochs):
         avg_list = []
         #os.makedirs(os.path.join('supervised', 'exp_2'), exist_ok=True)
 
-        for single_oracle in labels[-1]:
+        for single_oracle in oracles[2:]:
             print('oracle:', single_oracle)
-            combined_df, df = run_supervised_session(save_path=os.path.join('supervised', 'exp_2', 'single_oracle'),
+            oracle_name = single_oracle if single_oracle else "None"
+            combined_df, df = run_supervised_session(save_path=os.path.join('supervised', 'exp_2', oracle_name),
                                    repetitions=repetitions,
                                    epochs=epochs,
-                                   train_sets=regimes[3], # complete train regime
+                                   train_sets=regimes[0][1], # complete train regime, should be 3 for final
                                    oracle_labels=[single_oracle])
             df_list.append(df)
             avg_list.append(combined_df)
-        combined_df = add_label_and_combine_dfs(df_list, [regime for regime, _ in regimes], 'regime')
-        combined_avg = add_label_and_combine_dfs(avg_list, [regime for regime, _ in regimes], 'regime')
+        combined_df = add_label_and_combine_dfs(df_list, [single_oracle for single_oracle in oracles], 'regime')
+        combined_avg = add_label_and_combine_dfs(avg_list, [single_oracle for single_oracle in oracles], 'regime')
         create_combined_histogram(combined_df, combined_avg, 'regime', os.path.join('supervised', 'exp_2'))
 
     # Experiment 7
@@ -132,7 +134,7 @@ def experiments(todo, repetitions, epochs):
         os.makedirs(os.path.join('supervised', 'exp_7'), exist_ok=True)
         for regime, train_sets in regimes:
             print('regime:', regime)
-            combined_df, df = run_supervised_session(save_path=os.path.join('supervised', 'exp_2', regime),
+            combined_df, df = run_supervised_session(save_path=os.path.join('supervised', 'exp_7', regime),
                                         repetitions=repetitions,
                                         epochs=epochs,
                                         train_sets=train_sets)
@@ -181,4 +183,4 @@ def experiments(todo, repetitions, epochs):
 
 
 if __name__ == '__main__':
-    experiments([1], 1, 10)
+    experiments([0], 1, 15)
