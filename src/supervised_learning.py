@@ -69,9 +69,10 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
         # "view_type": 1,
     }
 
-    frames = 10
+    frames = 9
     all_path_infos = pd.DataFrame()
     suffix = pref_type + role_type
+
 
     for configName in ScenarioConfigs.stages:
         configs = ScenarioConfigs().standoff
@@ -152,7 +153,7 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
                         tq.update(1)
                     prev_param_group = env.current_param_group
                     #print(env.current_param_group, env.event_lists)
-                    this_ob = np.zeros((10, *obs['p_0'].shape))
+                    this_ob = np.zeros((frames, *obs['p_0'].shape))
                     pos = 0
 
                     while pos < frames:
@@ -273,7 +274,7 @@ class RNNModel(nn.Module):
     def forward(self, x, oracle_inputs):
         x = torch.tensor(x, dtype=torch.float32)
         conv_outputs = []
-        for t in range(10):
+        for t in range(8):
             x_t = x[:, t, :, :, :]
 
             x_t = self.pool(F.relu(self.conv1(x_t))) if self.use_pool else F.relu(self.conv1(x_t))
