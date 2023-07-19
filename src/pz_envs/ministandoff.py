@@ -171,6 +171,8 @@ class MiniStandoffEnv(para_MultiGridEnv):
         self.smallReward = int(self.bigReward / (self.boxes - 2))
         self.sub_valence = sub_valence
 
+        self.end_at_frame = -1
+
         for k, agent in enumerate(self.agents_and_puppets()):
             h = 1 if agent == "p_0" else self.height - 1  # todo: make this work with dominance properly
             d = 1 if agent == "p_0" else 3
@@ -503,7 +505,7 @@ class MiniStandoffEnv(para_MultiGridEnv):
                 # tile = self.grid.get(x, y)
                 # we cannot track shouldAvoidBig etc here because the treat location might change
 
-        if self.record_oracle_labels and (self.step_count == 9 or self.has_released):
+        if self.record_oracle_labels and (self.step_count == self.end_at_frame or self.has_released):
             target_agent = "p_1"
             one_hot_goal = [0] * self.boxes
             if self.params['num_puppets'] > 0:
