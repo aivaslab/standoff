@@ -83,7 +83,7 @@ def experiments(todo, repetitions, epochs):
 
     # generate supervised data
     labels = ['loc', 'exist', 'vision', 'b-loc', 'b-exist', 'target', 'correctSelection']
-    oracles = [None] + labels[:-1]
+    oracles = [None] + labels
     if 0 in todo:
         print('Generating datasets with labels', labels)
         os.makedirs('supervised', exist_ok=True)
@@ -183,4 +183,4 @@ def experiments(todo, repetitions, epochs):
 
 
 if __name__ == '__main__':
-    experiments([0], 1, 20)
+    experiments([2], 1, 50)
