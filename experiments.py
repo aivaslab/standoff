@@ -84,6 +84,7 @@ def experiments(todo, repetitions, epochs):
     # generate supervised data
     labels = ['loc', 'exist', 'vision', 'b-loc', 'b-exist', 'target', 'correctSelection']
     oracles = [None] + labels
+    oracle_names = [x if x is not None else "None" for x in oracles]
     if 0 in todo:
         print('Generating datasets with labels', labels)
         os.makedirs('supervised', exist_ok=True)
@@ -112,9 +113,8 @@ def experiments(todo, repetitions, epochs):
         avg_list = []
         #os.makedirs(os.path.join('supervised', 'exp_2'), exist_ok=True)
 
-        for single_oracle in oracles:
+        for single_oracle, oracle_name in zip(oracles, oracle_names):
             print('oracle:', single_oracle)
-            oracle_name = single_oracle if single_oracle else "None"
             combined_df, df = run_supervised_session(save_path=os.path.join('supervised', 'exp_2', oracle_name),
                                    repetitions=repetitions,
                                    epochs=epochs,
@@ -122,8 +122,8 @@ def experiments(todo, repetitions, epochs):
                                    oracle_labels=[single_oracle])
             df_list.append(df)
             avg_list.append(combined_df)
-        combined_df = add_label_and_combine_dfs(df_list, [single_oracle for single_oracle in oracles], 'oracle')
-        combined_avg = add_label_and_combine_dfs(avg_list, [single_oracle for single_oracle in oracles], 'oracle')
+        combined_df = add_label_and_combine_dfs(df_list, [x for x in oracle_names], 'oracle')
+        combined_avg = add_label_and_combine_dfs(avg_list, [x for x in oracle_names], 'oracle')
         create_combined_histogram(combined_df, combined_avg, 'oracle', os.path.join('supervised', 'exp_2'))
 
     # Experiment 7
