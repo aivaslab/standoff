@@ -1,6 +1,13 @@
-from itertools import product
+from itertools import product, combinations
 
 import numpy as np
+
+def generate_fillers(timesteps_to_fill, fill_len):
+    positions = list(range(1, timesteps_to_fill))  
+    for c in combinations(positions, fill_len - 1):
+        split_positions = [0] + list(c) + [timesteps_to_fill]
+        solution = [split_positions[i+1] - split_positions[i] for i in range(fill_len)]
+        yield solution
 
 
 def parameter_generator(space, params={}):
@@ -17,6 +24,10 @@ def parameter_generator(space, params={}):
             yield from parameter_generator(new_space, new_params)
     else:
         yield params
+        
+def count_non_ob_re(data):
+    count = sum(1 for item in data if item not in [['ob'], ['re']])
+    return count
 
 
 def add_bait(events, bait_num, bait_size, uninformed_bait, visible_baits, swap_index='e'):
@@ -203,15 +214,26 @@ class ScenarioConfigs:
 
     print('total lists', len(all_event_lists), 'informed lists', len(informed_event_lists), 'uninformed lists',
           len(uninformed_event_lists))
+          
+          
+    all_event_delays = {}
+    total_fillers = 0
+          
+    for name, listy in all_event_lists.items():
+        non_ob = count_non_ob_re(listy)
+        fillers = list(generate_fillers(9 - (len(listy) - non_ob), non_ob))
+        all_event_delays[name] = fillers
+        total_fillers += len(fillers)
+        print(listy, fillers)
 
     all_event_permutations = {}
     total_products = 0
     for event_name in all_event_lists:
         all_event_permutations[event_name] = count_permutations(all_event_lists[event_name])
         product = np.product(all_event_permutations[event_name])
-        #print(event_name, all_event_permutations[event_name], product)
-        total_products += product
-    print('total permutations', total_products)
+        #print(event_name, len(all_event_lists[event_name]), all_event_permutations[event_name], len(all_event_delays[event_name]), product)
+        total_products += product*len(all_event_delays[event_name])
+    print('total fillers', total_fillers, 'total permutations', total_products)
 
     # generate 'stages' for train and test, where a stage is a list of event lists and parameters
     stages = {
