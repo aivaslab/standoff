@@ -197,12 +197,10 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
         print('len obs', data_name, suffix, len(data_obs))
         this_path = os.path.join(path, data_name + suffix)
         os.makedirs(this_path, exist_ok=True)
-        np.save(os.path.join(this_path, 'obs'), np.array(data_obs))
-        scipy.sparse.save_npz(os.path.join(this_path, 'obsscipy'), np.array(data_obs))
-        np.savez_compressed(os.path.join(this_path, 'obszc'), np.array(data_obs))
-        np.save(os.path.join(this_path,  'params'), np.array(data_params))
+        np.savez_compressed(os.path.join(this_path, 'obs'), np.array(data_obs))
+        np.savez_compressed(os.path.join(this_path,  'params'), np.array(data_params))
         for label in labels:
-            np.save(os.path.join(this_path, 'label-' + label), np.array(data_labels[label]))
+            np.savez_compressed(os.path.join(this_path, 'label-' + label), np.array(data_labels[label]))
 
 
 class CustomDataset(Dataset):

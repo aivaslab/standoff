@@ -739,7 +739,7 @@ class para_MultiGridEnv(ParallelEnv):
             last_timer = 40
         else:
             valid_params = ['sub_valence', 'dom_valence', 'num_puppets', 'subject_is_dominant', 'events',
-                            'hidden', 'boxes', 'perms']
+                            'hidden', 'boxes', 'perms', 'delays']
             #print('generating grid with events:', self.deterministic_seed, self.current_event_list_name, self.params['events'])
             last_timer = self._gen_grid(**{x: self.params[x] for x in valid_params})
             # gen_grid also generates timers

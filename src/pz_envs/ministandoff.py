@@ -136,7 +136,8 @@ class MiniStandoffEnv(para_MultiGridEnv):
                   events=[],
                   hidden=False,
                   boxes=5,
-                  perms=[]
+                  perms=[],
+                  delays=[]
                   ):
 
         startRoom = 1
@@ -309,9 +310,14 @@ class MiniStandoffEnv(para_MultiGridEnv):
         self.timers = {}
         curTime = 1
         self.add_timer(["init"], 1)
+        delay_position = 0
         for k, event in enumerate(events):
             self.add_timer(event, curTime, arg=event_args[k])
-            curTime += 1
+            if event[0] not in ['b', 'sw']:
+                curTime += 1
+            else:
+                curTime += delays[delay_position]
+                delay_position += 1
         self.add_timer(["rel"], curTime, arg=0)
         self.add_timer(["rel"], curTime + release_gap + 1, arg=1)
 

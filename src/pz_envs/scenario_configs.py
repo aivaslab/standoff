@@ -221,7 +221,7 @@ class ScenarioConfigs:
           
     for name, listy in all_event_lists.items():
         non_ob = count_non_ob_re(listy)
-        fillers = list(generate_fillers(9 - (len(listy) - non_ob), non_ob))
+        fillers = list(generate_fillers(8 - (len(listy) - non_ob), non_ob))
         all_event_delays[name] = fillers
         total_fillers += len(fillers)
 
