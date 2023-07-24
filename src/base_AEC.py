@@ -685,7 +685,9 @@ class para_MultiGridEnv(ParallelEnv):
                 self.current_param_group_count = 0
                 self.event_lists = self.param_groups[self.current_param_group]['eLists']
                 self.params = self.param_groups[self.current_param_group]['params']
-                self.perms = self.param_groups[self.current_param_group]['perms']
+                self.perms = list(self.param_groups[self.current_param_group]['perms'].items())[0][1]
+                self.delays = list(self.param_groups[self.current_param_group]['delays'].items())[0][1]
+
             else:
                 self.current_param_group_count += 1
 
@@ -697,12 +699,12 @@ class para_MultiGridEnv(ParallelEnv):
         # get event list and perm list from event lists
         if self.params['deterministic']:
             self.current_event_list_name, self.params['events'] = copy.deepcopy(list(self.event_lists.items())[self.current_param_group_count % len(self.event_lists)])
-            _, self.params['perms'] = list(self.perms.items())[self.current_param_group_count % len(self.perms)]
-            self.target_param_group_count = np.product(self.params['perms'])
+            self.params['perms'] = self.perms
+            self.params['delays'] = self.delays[(self.current_param_group_count) % len(self.delays)]
+            self.target_param_group_count = np.product(self.params['perms'])*len(self.delays)
         else:
             self.current_event_list_name, self.params['events'] = copy.deepcopy(random.choice(list(self.event_lists.items())))
 
-        #print(self.current_event_list_name, self.params, self.param_groups[self.current_param_group]['eLists'][self.current_event_list_name])
 
         self.agents = self.possible_agents[:]
         self.puppets = self.possible_puppets[:]

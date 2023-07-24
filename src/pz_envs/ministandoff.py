@@ -106,7 +106,8 @@ class MiniStandoffEnv(para_MultiGridEnv):
         self.has_released = False
 
         self.param_groups = [
-            {'eLists': ScenarioConfigs.all_event_lists, 'params': ScenarioConfigs.standoff['defaults'], 'perms': ScenarioConfigs.all_event_permutations}, ]
+            {'eLists': ScenarioConfigs.all_event_lists, 'params': ScenarioConfigs.standoff['defaults'], 'perms': ScenarioConfigs.all_event_permutations, 'delays': ScenarioConfigs.all_event_delays},
+        ]
 
     def reset_vision(self):
         """
@@ -229,7 +230,7 @@ class MiniStandoffEnv(para_MultiGridEnv):
         baited = False
         obscured = False
         counter = 1
-        instantiated_perms = index_permutations(perms, self.current_param_group_count)
+        instantiated_perms = index_permutations(perms, (self.current_param_group_count // len(self.delays)))
         for k, event in enumerate(events):
             event_type = event[0]
 

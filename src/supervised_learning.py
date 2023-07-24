@@ -6,6 +6,7 @@ import sys
 import os
 
 import pandas as pd
+import scipy
 
 from .utils.evaluation import get_relative_direction
 
@@ -124,7 +125,8 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
                 env.target_param_group_count = 20
                 env.param_groups = [ {'eLists': {n: events[n]},
                                       'params': params,
-                                      'perms': {n: ScenarioConfigs.all_event_permutations[n]}
+                                      'perms': {n: ScenarioConfigs.all_event_permutations[n]},
+                                      'delays': {n: ScenarioConfigs.all_event_delays[n]}
                                       }
                                      for n in events ]
                 print('first param group', env.param_groups[0])
@@ -196,6 +198,8 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
         this_path = os.path.join(path, data_name + suffix)
         os.makedirs(this_path, exist_ok=True)
         np.save(os.path.join(this_path, 'obs'), np.array(data_obs))
+        scipy.sparse.save_npz(os.path.join(this_path, 'obsscipy'), np.array(data_obs))
+        np.savez_compressed(os.path.join(this_path, 'obszc'), np.array(data_obs))
         np.save(os.path.join(this_path,  'params'), np.array(data_params))
         for label in labels:
             np.save(os.path.join(this_path, 'label-' + label), np.array(data_labels[label]))

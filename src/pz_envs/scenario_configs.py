@@ -224,14 +224,12 @@ class ScenarioConfigs:
         fillers = list(generate_fillers(9 - (len(listy) - non_ob), non_ob))
         all_event_delays[name] = fillers
         total_fillers += len(fillers)
-        print(listy, fillers)
 
     all_event_permutations = {}
     total_products = 0
     for event_name in all_event_lists:
         all_event_permutations[event_name] = count_permutations(all_event_lists[event_name])
         product = np.product(all_event_permutations[event_name])
-        #print(event_name, len(all_event_lists[event_name]), all_event_permutations[event_name], len(all_event_delays[event_name]), product)
         total_products += product*len(all_event_delays[event_name])
     print('total fillers', total_fillers, 'total permutations', total_products)
 

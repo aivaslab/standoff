@@ -183,4 +183,4 @@ def experiments(todo, repetitions, epochs):
 
 
 if __name__ == '__main__':
-    experiments([0, 2], 1, 50)
+    experiments([0], 1, 50)
