@@ -190,7 +190,7 @@ def train_model(train_sets, target_label, test_sets, load_path='supervised/', sa
     # broken rn
     model_kwargs['oracle_len'] = 0 if len(oracle_labels) == 0 else len(train_dataset.oracles[0])
     model_kwargs['output_len'] = 5  # np.prod(labels.shape[1:])
-    #model_kwargs['channels'] = 4  # np.prod(params.shape[2])
+    model_kwargs['channels'] = 5  # np.prod(params.shape[2])
 
     device = torch.device('cuda' if use_cuda else 'cpu')
     model = RNNModel(**model_kwargs).to(device)
