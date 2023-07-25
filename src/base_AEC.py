@@ -702,8 +702,6 @@ class para_MultiGridEnv(ParallelEnv):
             self.params['perms'] = self.perms
             self.params['delays'] = self.delays[(self.current_param_group_pos) % len(self.delays)]
             self.target_param_group_count = np.product(self.params['perms'])*len(self.delays)
-            from .pz_envs import index_permutations
-            print(self.current_param_group_pos, len(self.event_lists), self.params['events'], self.perms, index_permutations(self.perms, (self.current_param_group_pos // len(self.delays))), self.params['delays'])
         else:
             self.current_event_list_name, self.params['events'] = copy.deepcopy(random.choice(list(self.event_lists.items())))
 

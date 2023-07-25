@@ -199,7 +199,9 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
         this_path = os.path.join(path, data_name + suffix)
         os.makedirs(this_path, exist_ok=True)
         write_to_h5py(np.array(data_obs), os.path.join(this_path,'obs.h5'))
-        write_to_h5py(np.array(data_params), os.path.join(this_path,'params.h5'))
+        data_params_array = np.array(data_params, dtype='<U10')
+        data_params_bytes = np.array([s.encode('utf8') for s in data_params_array])
+        write_to_h5py(data_params_bytes, os.path.join(this_path,'params.h5'))
         for label in labels:
             write_to_h5py(np.array(data_labels[label]), os.path.join(this_path,'label-' + label + '.h5'))
 
