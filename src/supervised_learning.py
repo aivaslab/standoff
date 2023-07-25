@@ -251,7 +251,7 @@ class h5Dataset(Dataset):
             with h5py.File(self.oracles_paths[file_index], 'r') as f:
                 oracles = torch.from_numpy(f['data'][local_index]).float()
         else:
-            oracles = torch.tensor([])
+            oracles = np.asarray([])
 
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         data = torch.from_numpy(data).float().to(device)
