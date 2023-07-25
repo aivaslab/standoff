@@ -205,20 +205,26 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
 
 class CustomDataset(Dataset):
     def __init__(self, data, labels, params, oracles):
-        self.data = data
-        self.labels = labels
+        self.data = torch.from_numpy(data.astype(np.int8))
+        self.labels = torch.from_numpy(labels.astype(np.int8)).float()
         self.params = params
-        self.oracles = oracles
+        self.oracles = torch.from_numpy(oracles.astype(np.int8)).float()
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")  # check for GPU
 
     def __len__(self):
         return len(self.data)
 
-    def __getitem__(self, idx):
-        #print(idx, len(self.oracles))
-        return torch.tensor(self.data[idx], dtype=torch.int8), \
-               torch.tensor(self.labels[idx].flatten(), dtype=torch.int8), \
-               self.params[idx], \
-               torch.tensor(self.oracles[idx], dtype=torch.int8)
+    def __getitem__(self, index):
+        data = self.data[index].float()
+        labels = self.labels[index].float()
+        params = self.params[index]
+        oracles = self.oracles[index].float()
+
+        data = data.to(self.device)
+        labels = labels.to(self.device)
+        oracles = oracles.to(self.device)
+
+        return data, labels, params, oracles
 
 
 class RNNModel(nn.Module):
@@ -271,9 +277,9 @@ class RNNModel(nn.Module):
         self.fc = nn.Linear(hidden_size + oracle_len, int(output_len))
 
     def forward(self, x, oracle_inputs):
-        x = torch.tensor(x, dtype=torch.float32)
+        #x = torch.tensor(x, dtype=torch.float32)
         conv_outputs = []
-        for t in range(8):
+        for t in range(9):
             x_t = x[:, t, :, :, :]
 
             x_t = self.pool(F.relu(self.conv1(x_t))) if self.use_pool else F.relu(self.conv1(x_t))
@@ -284,6 +290,6 @@ class RNNModel(nn.Module):
         x = torch.stack(conv_outputs, dim=1)
 
         out, _ = self.rnn(x)
-        out = out[:, -1, :]  # Use only the last time step's output
+        out = out[:, -1, :]  # Use only the last timestep's output
         outputs = self.fc(torch.cat((out, oracle_inputs), dim=-1))
         return outputs

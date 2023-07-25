@@ -91,6 +91,8 @@ def train_model(train_sets, target_label, test_sets, load_path='supervised/', sa
 
     batch_size = 64
 
+    use_cuda = torch.cuda.is_available()
+
     data = np.concatenate(data, axis=0)
     labels = np.concatenate(labels, axis=0)
     params = np.concatenate(params, axis=0)
@@ -101,16 +103,8 @@ def train_model(train_sets, target_label, test_sets, load_path='supervised/', sa
 
     print('total data', data.shape)
 
-    # not useful unless test set is same as train
-    '''train_data, val_data, train_labels, val_labels, train_params, val_params = train_test_split(
-        data, labels, params, test_size=0.2, random_state=42
-    )
-    train_dataset = CustomDataset(train_data, train_labels, train_params)
-    val_dataset = CustomDataset(val_data, val_labels, val_params)
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)'''
     train_dataset = CustomDataset(data, labels, params, oracles)
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=0) #can't use more on windows
 
     test_loaders = []
     for val_set_name in test_sets:
@@ -135,7 +129,8 @@ def train_model(train_sets, target_label, test_sets, load_path='supervised/', sa
     model_kwargs['output_len'] = 5  # np.prod(labels.shape[1:])
     #model_kwargs['channels'] = 4  # np.prod(params.shape[2])
 
-    model = RNNModel(**model_kwargs)
+    device = torch.device('cuda' if use_cuda else 'cpu')
+    model = RNNModel(**model_kwargs).to(device)
     criterion = nn.CrossEntropyLoss()  # nn.MSELoss()
     special_criterion = nn.CrossEntropyLoss(reduction='none')
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
@@ -147,32 +142,29 @@ def train_model(train_sets, target_label, test_sets, load_path='supervised/', sa
 
     # param_losses = pd.DataFrame(columns=['param', 'epoch', 'loss'])
     param_losses_list = []
-    for epoch in tqdm.trange(num_epochs):
+
+    t = tqdm.trange(num_epochs*len(train_loader))
+
+    print(torch.cuda.is_available())
+
+    for epoch in range(num_epochs):
         train_loss = 0
         for i, (inputs, target_labels, _, oracle_inputs) in enumerate(train_loader):
             # inputs = inputs.view(-1, 10, input_size)
-            # print(inputs.shape)
             outputs = model(inputs, oracle_inputs)
             loss = criterion(outputs, torch.argmax(target_labels, dim=1))
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
             train_loss += loss.item()
+            t.update(1)
+            #if i > len(train_loader)//5:
+            #    break
 
         train_losses.append(train_loss / len(train_loader))
         model.eval()
         for idx, _val_loader in enumerate(test_loaders):
             with torch.no_grad():
-                val_loss = 0
-                val_samples_processed = 0
-                '''for inputs, labels, params in _val_loader:
-                    #inputs = inputs.view(-1, 10, input_size)
-                    outputs = model(inputs)
-                    loss = criterion(outputs, torch.argmax(labels, dim=1))
-                    val_loss += loss.item()
-                    val_samples_processed += inputs.size(0)
-                    #if val_samples_processed >= max_val_samples:
-                    #    break'''
 
                 for inputs, labels, params, oracle_inputs in _val_loader:
                     outputs = model(inputs, oracle_inputs)
