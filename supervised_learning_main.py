@@ -70,7 +70,7 @@ def decode_event_name(name):
 def train_model(train_sets, target_label, test_sets, load_path='supervised/', save_path='', epochs=100, model_kwargs=None,
                 lr=0.001, oracle_labels=[]):
     batch_size = 64
-    use_cuda = torch.cuda.is_available()
+    use_cuda = False #torch.cuda.is_available()
     if oracle_labels[0] == None:
         oracle_labels = []
     data, labels, params, oracles = [], [], [], []
@@ -208,7 +208,6 @@ def train_model(train_sets, target_label, test_sets, load_path='supervised/', sa
 
     t = tqdm.trange(num_epochs*len(train_loader))
 
-    print(torch.cuda.is_available())
 
     for epoch in range(num_epochs):
         train_loss = 0
