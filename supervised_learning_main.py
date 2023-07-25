@@ -18,7 +18,7 @@ from torch.utils.data import DataLoader
 import tqdm
 import torch.nn as nn
 import torch
-from src.supervised_learning import RNNModel, CustomDataset, DiskLoadingDataset
+from src.supervised_learning import RNNModel, CustomDataset, DiskLoadingDataset, h5Dataset
 import traceback
 
 
@@ -98,7 +98,45 @@ def train_model(train_sets, target_label, test_sets, load_path='supervised/', sa
         val_dataset = DiskLoadingDataset([val_data_file], [val_label_file], [val_param_file], val_oracle_files)
         test_loaders.append(DataLoader(val_dataset, batch_size=batch_size, shuffle=False))'''
 
+    data_files = []
+    labels_files = []
+    params_files = []
+    oracles_files = []
+
     for data_name in train_sets:
+        dir = os.path.join(load_path, data_name)
+        data_files.append(os.path.join(dir, 'obs.h5'))
+        labels_files.append(os.path.join(dir, 'label-' + target_label + '.h5'))
+        params_files.append(os.path.join(dir, 'params.h5'))
+
+        if oracle_labels:
+            oracle_data_files = []
+            for oracle_label in oracle_labels:
+                oracle_data_files.append(os.path.join(dir, 'label-' + oracle_label + '.h5'))
+            oracles_files.append(oracle_data_files)
+
+    train_dataset = h5Dataset(data_files, labels_files, params_files, oracles_files)
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True,
+                              num_workers=0)  # can't use more on windows
+
+    test_loaders = []
+    for val_set_name in test_sets:
+        dir = os.path.join(load_path, val_set_name)
+        val_data_file = os.path.join(dir, 'obs.h5')
+        val_labels_file = os.path.join(dir, 'label-' + target_label + '.h5')
+        val_params_file = os.path.join(dir, 'params.h5')
+
+        if oracle_labels:
+            oracle_data_files = []
+            for oracle_label in oracle_labels:
+                oracle_data_files.append(os.path.join(dir, 'label-' + oracle_label + '.h5'))
+        else:
+            oracle_data_files = None
+
+        val_dataset = h5Dataset([val_data_file], [val_labels_file], [val_params_file], [oracle_data_files])
+        test_loaders.append(DataLoader(val_dataset, batch_size=batch_size, shuffle=False))
+
+    '''for data_name in train_sets:
         dir = os.path.join(load_path, data_name)
         data.append(np.load(os.path.join(dir, 'obs.npz'), mmap_mode='r')['arr_0'])
         labels.append(np.load(os.path.join(dir, 'label-' + target_label + '.npz'), mmap_mode='r')['arr_0'])
@@ -147,7 +185,7 @@ def train_model(train_sets, target_label, test_sets, load_path='supervised/', sa
         else:
             combined_oracle_data = np.zeros((len(val_data), 0))
         val_dataset = CustomDataset(val_data, val_labels, val_params, combined_oracle_data)
-        test_loaders.append(DataLoader(val_dataset, batch_size=batch_size, shuffle=False))
+        test_loaders.append(DataLoader(val_dataset, batch_size=batch_size, shuffle=False))'''
 
     # broken rn
     model_kwargs['oracle_len'] = 0 if len(oracle_labels) == 0 else len(train_dataset.oracles[0])
