@@ -74,13 +74,13 @@ def train_model(train_sets, target_label, test_sets, load_path='supervised/', sa
         oracle_labels = []
     for data_name in train_sets:
         dir = os.path.join(load_path, data_name)
-        data.append(np.load(os.path.join(dir, 'obs.npz')))
-        labels.append(np.load(os.path.join(dir, 'label-' + target_label + '.npz')))
-        params.append(np.load(os.path.join(dir, 'params.npz')))
+        data.append(np.load(os.path.join(dir, 'obs.npz'))['arr_0'])
+        labels.append(np.load(os.path.join(dir, 'label-' + target_label + '.npz'))['arr_0'])
+        params.append(np.load(os.path.join(dir, 'params.npz'))['arr_0'])
         if oracle_labels:
             oracle_data = []
             for oracle_label in oracle_labels:
-                this_oracle = np.load(os.path.join(dir, 'label-' + oracle_label + '.npz'))
+                this_oracle = np.load(os.path.join(dir, 'label-' + oracle_label + '.npz'))['arr_0']
                 print('sum of oracle data', data_name, oracle_label, np.sum(this_oracle))
                 flattened_oracle = this_oracle.reshape(this_oracle.shape[0], -1)
                 oracle_data.append(flattened_oracle)
@@ -115,13 +115,13 @@ def train_model(train_sets, target_label, test_sets, load_path='supervised/', sa
     test_loaders = []
     for val_set_name in test_sets:
         dir = os.path.join(load_path, val_set_name)
-        val_data = np.load(os.path.join(dir, 'obs.npz'))
-        val_labels = np.load(os.path.join(dir, 'label-' + target_label + '.npz'))
-        val_params = np.load(os.path.join(dir, 'params.npz'))
+        val_data = np.load(os.path.join(dir, 'obs.npz'))['arr_0']
+        val_labels = np.load(os.path.join(dir, 'label-' + target_label + '.npz'))['arr_0']
+        val_params = np.load(os.path.join(dir, 'params.npz'))['arr_0']
         if oracle_labels:
             oracle_data = []
             for oracle_label in oracle_labels:
-                this_oracle = np.load(os.path.join(dir, 'label-' + oracle_label + '.npz'))
+                this_oracle = np.load(os.path.join(dir, 'label-' + oracle_label + '.npz'))['arr_0']
                 flattened_oracle = this_oracle.reshape(this_oracle.shape[0], -1)
                 oracle_data.append(flattened_oracle)
             combined_oracle_data = np.concatenate(oracle_data, axis=-1)
