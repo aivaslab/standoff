@@ -143,7 +143,7 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
                 print('total_groups', total_groups)
 
                 while True:
-                    env.deterministic_seed = env.current_param_group_count
+                    env.deterministic_seed = env.current_param_group_pos
 
                     obs = env.reset()
                     # after first reset, current param group and param group count are both 1
@@ -189,7 +189,7 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
                         del _env, a
 
                     #print(env.current_param_group_count, env.current_param_group)
-                    if env.current_param_group == total_groups - 1 and env.current_param_group_count == env.target_param_group_count - 1:
+                    if env.current_param_group == total_groups - 1 and env.current_param_group_pos == env.target_param_group_count - 1:
                         # normally the while loop won't break because reset uses a modulus
                         break
 

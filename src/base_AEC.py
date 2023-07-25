@@ -589,7 +589,7 @@ class para_MultiGridEnv(ParallelEnv):
         self.has_released = False
 
         self.current_param_group = 0
-        self.current_param_group_count = 0
+        self.current_param_group_pos = 0
         self.target_param_group_count = -1
         self.current_event_list = None
         self.current_event_list_name = None
@@ -677,19 +677,19 @@ class para_MultiGridEnv(ParallelEnv):
         Here it sets up the state dictionary which is used by step() and the observations dictionary which is used by step() and observe()
         """
         if self.target_param_group_count > -1 or not self.has_reset:
-            if (self.current_param_group_count + 1 >= self.target_param_group_count) or not self.has_reset:
+            if (self.current_param_group_pos + 1 >= self.target_param_group_count) or not self.has_reset:
                 if self.has_reset:
                     self.current_param_group = (self.current_param_group + 1) % len(self.param_groups)
                 else:
                     self.current_param_group = 0
-                self.current_param_group_count = 0
+                self.current_param_group_pos = 0
                 self.event_lists = self.param_groups[self.current_param_group]['eLists']
                 self.params = self.param_groups[self.current_param_group]['params']
                 self.perms = list(self.param_groups[self.current_param_group]['perms'].items())[0][1]
                 self.delays = list(self.param_groups[self.current_param_group]['delays'].items())[0][1]
 
             else:
-                self.current_param_group_count += 1
+                self.current_param_group_pos += 1
 
             self.has_reset = True
 
@@ -698,10 +698,12 @@ class para_MultiGridEnv(ParallelEnv):
 
         # get event list and perm list from event lists
         if self.params['deterministic']:
-            self.current_event_list_name, self.params['events'] = copy.deepcopy(list(self.event_lists.items())[self.current_param_group_count % len(self.event_lists)])
+            self.current_event_list_name, self.params['events'] = copy.deepcopy(list(self.event_lists.items())[self.current_param_group_pos % len(self.event_lists)])
             self.params['perms'] = self.perms
-            self.params['delays'] = self.delays[(self.current_param_group_count) % len(self.delays)]
+            self.params['delays'] = self.delays[(self.current_param_group_pos) % len(self.delays)]
             self.target_param_group_count = np.product(self.params['perms'])*len(self.delays)
+            from .pz_envs import index_permutations
+            print(self.current_param_group_pos, len(self.event_lists), self.params['events'], self.perms, index_permutations(self.perms, (self.current_param_group_pos // len(self.delays))), self.params['delays'])
         else:
             self.current_event_list_name, self.params['events'] = copy.deepcopy(random.choice(list(self.event_lists.items())))
 
