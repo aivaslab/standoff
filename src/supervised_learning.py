@@ -202,6 +202,59 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
         for label in labels:
             np.savez_compressed(os.path.join(this_path, 'label-' + label), np.array(data_labels[label]))
 
+class DiskLoadingDataset(Dataset):
+    def __init__(self, data_files, label_files, param_files, oracle_files=None):
+        self.data_files = data_files
+        self.label_files = label_files
+        self.param_files = param_files
+        self.oracle_files = oracle_files
+
+        # Calculate the cumulative size of the previous datasets
+        self.cumulative_sizes = self._calculate_cumulative_sizes()
+
+    def _calculate_cumulative_sizes(self):
+        cumulative_sizes = []
+        total_size = 0
+        for data_file in self.data_files:
+            with np.load(data_file, mmap_mode='r') as data:
+                total_size += data['arr_0'].shape[0]
+            cumulative_sizes.append(total_size)
+        return cumulative_sizes
+
+    def _find_file_index(self, idx):
+        # Binary search can be used here for efficiency if the dataset is large
+        file_index = 0
+        while idx >= self.cumulative_sizes[file_index]:
+            file_index += 1
+        return file_index
+
+    def __len__(self):
+        return self.cumulative_sizes[-1]
+
+    def __getitem__(self, idx):
+        file_index = self._find_file_index(idx)
+
+        # Adjust idx to be relative to the file it is in
+        if file_index != 0:
+            idx -= self.cumulative_sizes[file_index - 1]
+
+        # Load data from the correct file
+        with np.load(self.data_files[file_index], mmap_mode='r') as data:
+            data_point = torch.from_numpy(data['arr_0'][idx]).float()
+
+        with np.load(self.label_files[file_index], mmap_mode='r') as label:
+            label_point = torch.from_numpy(label['arr_0'][idx]).float()
+
+        with np.load(self.param_files[file_index], mmap_mode='r') as param:
+            param_point = param['arr_0'][idx]
+
+        if self.oracle_files:
+            with np.load(self.oracle_files[file_index], mmap_mode='r') as oracle:
+                oracle_point = torch.from_numpy(oracle['arr_0'][idx]).float()
+        else:
+            oracle_point = torch.tensor([])
+
+        return data_point, label_point, param_point, oracle_point
 
 class CustomDataset(Dataset):
     def __init__(self, data, labels, params, oracles):

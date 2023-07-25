@@ -18,7 +18,7 @@ from torch.utils.data import DataLoader
 import tqdm
 import torch.nn as nn
 import torch
-from src.supervised_learning import RNNModel, CustomDataset
+from src.supervised_learning import RNNModel, CustomDataset, DiskLoadingDataset
 import traceback
 
 
@@ -69,14 +69,40 @@ def decode_event_name(name):
 
 def train_model(train_sets, target_label, test_sets, load_path='supervised/', save_path='', epochs=100, model_kwargs=None,
                 lr=0.001, oracle_labels=[]):
-    data, labels, params, oracles = [], [], [], []
+    batch_size = 64
+    use_cuda = torch.cuda.is_available()
     if oracle_labels[0] == None:
         oracle_labels = []
+
+    data_files = [os.path.join(load_path, name, 'obs.npz') for name in train_sets]
+    label_files = [os.path.join(load_path, name, f'label-{target_label}.npz') for name in train_sets]
+    param_files = [os.path.join(load_path, name, 'params.npz') for name in train_sets]
+    oracle_files = [os.path.join(load_path, name, f'label-{oracle_label}.npz') for name in train_sets for oracle_label
+                    in oracle_labels] if oracle_labels else None
+
+    train_dataset = DiskLoadingDataset(data_files, label_files, param_files, oracle_files)
+
+    test_loaders = []
+    for val_set_name in test_sets:
+        dir = os.path.join(load_path, val_set_name)
+        val_data_file = os.path.join(dir, 'obs.npz')
+        val_label_file = os.path.join(dir, f'label-{target_label}.npz')
+        val_param_file = os.path.join(dir, 'params.npz')
+
+        if oracle_labels:
+            val_oracle_files = [os.path.join(dir, f'label-{oracle_label}.npz') for oracle_label in oracle_labels]
+        else:
+            val_oracle_files = None
+
+        val_dataset = DiskLoadingDataset([val_data_file], [val_label_file], [val_param_file], val_oracle_files)
+        test_loaders.append(DataLoader(val_dataset, batch_size=batch_size, shuffle=False))
+
+    '''
     for data_name in train_sets:
         dir = os.path.join(load_path, data_name)
-        data.append(np.load(os.path.join(dir, 'obs.npz'))['arr_0'])
-        labels.append(np.load(os.path.join(dir, 'label-' + target_label + '.npz'))['arr_0'])
-        params.append(np.load(os.path.join(dir, 'params.npz'))['arr_0'])
+        data.append(np.load(os.path.join(dir, 'obs.npz'), mmap_mode='r')['arr_0'])
+        labels.append(np.load(os.path.join(dir, 'label-' + target_label + '.npz'), mmap_mode='r')['arr_0'])
+        params.append(np.load(os.path.join(dir, 'params.npz'), mmap_mode='r')['arr_0'])
         if oracle_labels:
             oracle_data = []
             for oracle_label in oracle_labels:
@@ -89,9 +115,7 @@ def train_model(train_sets, target_label, test_sets, load_path='supervised/', sa
             print('sum of oracle data', data_name, sum_oracle_data)
             oracles.append(combined_oracle_data)
 
-    batch_size = 64
 
-    use_cuda = torch.cuda.is_available()
 
     data = np.concatenate(data, axis=0)
     labels = np.concatenate(labels, axis=0)
@@ -99,19 +123,21 @@ def train_model(train_sets, target_label, test_sets, load_path='supervised/', sa
     if oracle_labels:
         oracles = np.concatenate(oracles, axis=0)
     else:
-        oracles = np.zeros((len(data), 0))
+        oracles = np.zeros((len(data), 0))'''
 
-    print('total data', data.shape)
+    #print('total data', data.shape)
 
-    train_dataset = CustomDataset(data, labels, params, oracles)
+    #train_dataset = CustomDataset(data, labels, params, oracles)
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=0) #can't use more on windows
 
+    '''
     test_loaders = []
     for val_set_name in test_sets:
         dir = os.path.join(load_path, val_set_name)
-        val_data = np.load(os.path.join(dir, 'obs.npz'))['arr_0']
-        val_labels = np.load(os.path.join(dir, 'label-' + target_label + '.npz'))['arr_0']
-        val_params = np.load(os.path.join(dir, 'params.npz'))['arr_0']
+        val_data = np.load(os.path.join(dir, 'obs.npz'), mmap_mode='r')['arr_0']
+        val_labels = np.load(os.path.join(dir, 'label-' + target_label + '.npz'), mmap_mode='r')['arr_0']
+        val_params = np.load(os.path.join(dir, 'params.npz'), mmap_mode='r')['arr_0']
+
         if oracle_labels:
             oracle_data = []
             for oracle_label in oracle_labels:
@@ -122,7 +148,7 @@ def train_model(train_sets, target_label, test_sets, load_path='supervised/', sa
         else:
             combined_oracle_data = np.zeros((len(val_data), 0))
         val_dataset = CustomDataset(val_data, val_labels, val_params, combined_oracle_data)
-        test_loaders.append(DataLoader(val_dataset, batch_size=batch_size, shuffle=False))
+        test_loaders.append(DataLoader(val_dataset, batch_size=batch_size, shuffle=False))'''
 
     # broken rn
     model_kwargs['oracle_len'] = 0 if len(oracle_labels) == 0 else len(train_dataset.oracles[0])
