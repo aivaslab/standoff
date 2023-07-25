@@ -224,7 +224,7 @@ class MiniStandoffEnv(para_MultiGridEnv):
         self.reset_vision()
 
         ## Bucket location allocation for timers
-        empty_buckets = set(range(boxes))
+        empty_buckets = [i for i in range(boxes)]
         event_args = [None for _ in range(len(events))]
         bait_args = [self.smallReward, self.bigReward]
 
@@ -269,13 +269,13 @@ class MiniStandoffEnv(para_MultiGridEnv):
                         was_empty = True
                         counter *= len(empty_buckets)
                         # used for both empty baits and swap locations
-                        event[x] = empty_buckets.remove(random.randrange(
+                        event[x] = empty_buckets.pop(random.randrange(
                             len(empty_buckets)) if not self.deterministic else instantiated_perms[k])
 
                         # if we are swapping to an empty bucket, and the prev bucket was not empty, make it empty
                         if event[0] == 'sw' and x == 2:
                             if event[1] not in empty_buckets:
-                                empty_buckets.add(event[1])
+                                empty_buckets.append(event[1])
 
                     elif event[x] == "else":
                         available_spots = [i for i in range(boxes) if i != event[x - 1]]
@@ -284,7 +284,7 @@ class MiniStandoffEnv(para_MultiGridEnv):
 
                         # if we are swapping to an empty bucket, and the prev bucket was not empty, make it empty
                         if event[0] == 'sw' and x == 2 and event[1] not in empty_buckets and event[2] in empty_buckets:
-                            empty_buckets.add(event[1])
+                            empty_buckets.append(event[1])
                             empty_buckets.remove(event[2])
                     elif isinstance(event[x], int) and event[0] != 'b':
                         # print(x, event[x], self.current_event_list_name, events, self.event_lists[self.current_event_list_name])
@@ -298,9 +298,9 @@ class MiniStandoffEnv(para_MultiGridEnv):
                     # remove empty bucket for cases where event[x] wasn't e
                     if not was_empty:
                         #print(event, empty_buckets, instantiated_perms, k, instantiated_perms[k], len(empty_buckets))
-                        empty_buckets.remove(instantiated_perms[k])
+                        empty_buckets.pop(instantiated_perms[k])
                 elif event_type == "rem":
-                    empty_buckets.add(event[1])
+                    empty_buckets.append(event[1])
                 elif event_type == "ob" or event_type == "re":
                     # hardcoded, will not work for multiple conspecifics
                     event_args[k] = "p_1"
