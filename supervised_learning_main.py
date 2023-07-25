@@ -20,7 +20,8 @@ import torch.nn as nn
 import torch
 from src.supervised_learning import RNNModel, CustomDataset, DiskLoadingDataset, h5Dataset
 import traceback
-
+import torch.multiprocessing as mp
+mp.set_start_method('spawn', force=True)
 
 def decode_event_name(name):
     # Split the name into the main part and the numerical suffix
