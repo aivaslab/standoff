@@ -244,7 +244,7 @@ class h5Dataset(Dataset):
         with h5py.File(self.labels_paths[file_index], 'r') as f:
             labels = f['data'][local_index]
         with h5py.File(self.params_paths[file_index], 'r') as f:
-            params = [p.decode('utf-8') for p in f['data'][local_index]]
+            params = f['data'][local_index].astype(str)
         with h5py.File(self.oracles_paths[file_index], 'r') as f:
             oracles = f['data'][local_index]
 
