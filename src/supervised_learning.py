@@ -205,26 +205,21 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
 
 class CustomDataset(Dataset):
     def __init__(self, data, labels, params, oracles):
-        self.data = torch.from_numpy(data.astype(np.int8))
-        self.labels = torch.from_numpy(labels.astype(np.int8)).float()
-        self.params = params
-        self.oracles = torch.from_numpy(oracles.astype(np.int8)).float()
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")  # check for GPU
+        self.data = torch.from_numpy(data.astype(np.int8)).to(self.device)
+        self.labels = torch.from_numpy(labels.astype(np.int8)).to(self.device)
+        self.params = params
+        self.oracles = torch.from_numpy(oracles.astype(np.int8)).to(self.device)
 
     def __len__(self):
         return len(self.data)
 
     def __getitem__(self, index):
         data = self.data[index].float()
-        labels = self.labels[index].float()
-        params = self.params[index]
-        oracles = self.oracles[index].float()
+        labels = self.labels[index]
+        oracles = self.oracles[index]
 
-        data = data.to(self.device)
-        labels = labels.to(self.device)
-        oracles = oracles.to(self.device)
-
-        return data, labels, params, oracles
+        return data, labels, self.params[index], oracles
 
 
 class RNNModel(nn.Module):
