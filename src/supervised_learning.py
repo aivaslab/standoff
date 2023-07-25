@@ -218,38 +218,41 @@ def write_to_h5py(data, filename, key='data'):
 
 class h5Dataset(Dataset):
     def __init__(self, data_paths, labels_paths, params_paths, oracles_paths):
-        self.data = []
-        self.labels = []
-        self.params = []
-        self.oracles = []
+        self.data_paths = data_paths
+        self.labels_paths = labels_paths
+        self.params_paths = params_paths
+        self.oracles_paths = oracles_paths
 
-        for data_path, labels_path, params_path, oracles_path in zip(data_paths, labels_paths, params_paths,
-                                                                     oracles_paths):
-            data_file = h5py.File(data_path, 'r')
-            labels_file = h5py.File(labels_path, 'r')
-            params_file = h5py.File(params_path, 'r')
-            oracles_file = h5py.File(oracles_path, 'r')
-
-            self.data.append(data_file['data'])
-            self.labels.append(labels_file['labels'])
-            self.params.append(
-                [p.decode('utf-8') for p in params_file['params']])  # decode the byte string to normal string
-            self.oracles.append(oracles_file['oracles'])
-
-        self.data = np.concatenate(self.data, axis=0)
-        self.labels = np.concatenate(self.labels, axis=0)
-        self.params = np.concatenate(self.params, axis=0)
-        self.oracles = np.concatenate(self.oracles, axis=0)
+        # Compute total number of samples and create an index mapping
+        self.total_samples = 0
+        self.index_mapping = []
+        for path in data_paths:
+            with h5py.File(path, 'r') as f:
+                num_samples = f['data'].shape[0]
+                self.index_mapping.extend([(path, i) for i in range(num_samples)])
+            self.total_samples += num_samples
 
     def __len__(self):
-        return len(self.data)
+        return self.total_samples
 
     def __getitem__(self, index):
+        file_path, local_index = self.index_mapping[index]
+        file_index = self.data_paths.index(file_path)
+
+        with h5py.File(file_path, 'r') as f:
+            data = f['data'][local_index]
+        with h5py.File(self.labels_paths[file_index], 'r') as f:
+            labels = f['labels'][local_index]
+        with h5py.File(self.params_paths[file_index], 'r') as f:
+            params = [p.decode('utf-8') for p in f['params'][local_index]]
+        with h5py.File(self.oracles_paths[file_index], 'r') as f:
+            oracles = f['oracles'][local_index]
+
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        data = torch.from_numpy(self.data[index]).float().to(device)
-        labels = torch.from_numpy(self.labels[index]).float().to(device)
-        params = self.params[index]
-        oracles = torch.from_numpy(self.oracles[index]).float().to(device)
+        data = torch.from_numpy(data).float().to(device)
+        labels = torch.from_numpy(labels).float().to(device)
+        oracles = torch.from_numpy(oracles).float().to(device)
+
         return data, labels, params, oracles
 
 class DiskLoadingDataset(Dataset):

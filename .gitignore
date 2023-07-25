@@ -139,3 +139,4 @@ dmypy.json
 *.csv
 *.txt
 *.npz
+*.h5
