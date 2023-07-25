@@ -73,7 +73,8 @@ def train_model(train_sets, target_label, test_sets, load_path='supervised/', sa
     use_cuda = torch.cuda.is_available()
     if oracle_labels[0] == None:
         oracle_labels = []
-
+    data, labels, params, oracles = [], [], [], []
+    '''
     data_files = [os.path.join(load_path, name, 'obs.npz') for name in train_sets]
     label_files = [os.path.join(load_path, name, f'label-{target_label}.npz') for name in train_sets]
     param_files = [os.path.join(load_path, name, 'params.npz') for name in train_sets]
@@ -95,9 +96,8 @@ def train_model(train_sets, target_label, test_sets, load_path='supervised/', sa
             val_oracle_files = None
 
         val_dataset = DiskLoadingDataset([val_data_file], [val_label_file], [val_param_file], val_oracle_files)
-        test_loaders.append(DataLoader(val_dataset, batch_size=batch_size, shuffle=False))
+        test_loaders.append(DataLoader(val_dataset, batch_size=batch_size, shuffle=False))'''
 
-    '''
     for data_name in train_sets:
         dir = os.path.join(load_path, data_name)
         data.append(np.load(os.path.join(dir, 'obs.npz'), mmap_mode='r')['arr_0'])
@@ -123,14 +123,13 @@ def train_model(train_sets, target_label, test_sets, load_path='supervised/', sa
     if oracle_labels:
         oracles = np.concatenate(oracles, axis=0)
     else:
-        oracles = np.zeros((len(data), 0))'''
+        oracles = np.zeros((len(data), 0))
 
-    #print('total data', data.shape)
 
-    #train_dataset = CustomDataset(data, labels, params, oracles)
+    train_dataset = CustomDataset(data, labels, params, oracles)
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=0) #can't use more on windows
 
-    '''
+
     test_loaders = []
     for val_set_name in test_sets:
         dir = os.path.join(load_path, val_set_name)
@@ -148,7 +147,7 @@ def train_model(train_sets, target_label, test_sets, load_path='supervised/', sa
         else:
             combined_oracle_data = np.zeros((len(val_data), 0))
         val_dataset = CustomDataset(val_data, val_labels, val_params, combined_oracle_data)
-        test_loaders.append(DataLoader(val_dataset, batch_size=batch_size, shuffle=False))'''
+        test_loaders.append(DataLoader(val_dataset, batch_size=batch_size, shuffle=False))
 
     # broken rn
     model_kwargs['oracle_len'] = 0 if len(oracle_labels) == 0 else len(train_dataset.oracles[0])

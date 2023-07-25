@@ -1,6 +1,7 @@
 import copy
 import math
 
+import h5py
 import numpy as np
 import sys
 import os
@@ -197,10 +198,20 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
         print('len obs', data_name, suffix, len(data_obs))
         this_path = os.path.join(path, data_name + suffix)
         os.makedirs(this_path, exist_ok=True)
+        write_to_h5py(np.array(data_obs), os.path.join(this_path,'obs.h5'))
+        write_to_h5py(np.array(data_params), os.path.join(this_path,'params.h5'))
+        for label in labels:
+            write_to_h5py(np.array(data_labels[label]), os.path.join(this_path,'label-' + label + '.h5'))
+
+        '''
         np.savez_compressed(os.path.join(this_path, 'obs'), np.array(data_obs))
         np.savez_compressed(os.path.join(this_path,  'params'), np.array(data_params))
         for label in labels:
-            np.savez_compressed(os.path.join(this_path, 'label-' + label), np.array(data_labels[label]))
+            np.savez_compressed(os.path.join(this_path, 'label-' + label), np.array(data_labels[label]))'''
+
+def write_to_h5py(data, filename, key='data'):
+    with h5py.File(filename, 'w') as f:
+        f.create_dataset(key, data=data)
 
 class DiskLoadingDataset(Dataset):
     def __init__(self, data_files, label_files, param_files, oracle_files=None):
@@ -258,19 +269,19 @@ class DiskLoadingDataset(Dataset):
 
 class CustomDataset(Dataset):
     def __init__(self, data, labels, params, oracles):
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")  # check for GPU
-        self.data = torch.from_numpy(data.astype(np.int8)).to(self.device)
-        self.labels = torch.from_numpy(labels.astype(np.int8)).to(self.device)
+        self.data = torch.from_numpy(data.astype(np.int8))
+        self.labels = torch.from_numpy(labels.astype(np.int8))
         self.params = params
-        self.oracles = torch.from_numpy(oracles.astype(np.int8)).to(self.device)
+        self.oracles = torch.from_numpy(oracles.astype(np.int8))
 
     def __len__(self):
         return len(self.data)
 
     def __getitem__(self, index):
-        data = self.data[index].float()
-        labels = self.labels[index]
-        oracles = self.oracles[index]
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        data = self.data[index].float().to(device)
+        labels = self.labels[index].float().to(device)
+        oracles = self.oracles[index].float().to(device)
 
         return data, labels, self.params[index], oracles
 
