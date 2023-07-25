@@ -223,6 +223,8 @@ class h5Dataset(Dataset):
         self.params_paths = params_paths
         self.oracles_paths = oracles_paths
 
+        self.has_oracles = bool(self.oracles_paths)
+
         # Compute total number of samples and create an index mapping
         self.total_samples = 0
         self.index_mapping = []
@@ -245,8 +247,11 @@ class h5Dataset(Dataset):
             labels = f['data'][local_index]
         with h5py.File(self.params_paths[file_index], 'r') as f:
             params = f['data'][local_index].astype(str)
-        with h5py.File(self.oracles_paths[file_index], 'r') as f:
-            oracles = f['data'][local_index]
+        if self.has_oracles:
+            with h5py.File(self.oracles_paths[file_index], 'r') as f:
+                oracles = torch.from_numpy(f['data'][local_index]).float()
+        else:
+            oracles = torch.tensor([])
 
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         data = torch.from_numpy(data).float().to(device)
