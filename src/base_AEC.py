@@ -443,9 +443,9 @@ class para_MultiGridEnv(ParallelEnv):
             gaze_highlighting=False,
             persistent_gaze_highlighting=False,
             observation_style='rich',
-            dense_obs=False,
+            dense_obs=True,
             supervised_model=None,
-            use_separate_reward_layers=True,
+            use_separate_reward_layers=False,
     ):
         """
         The init method takes in environment arguments and
