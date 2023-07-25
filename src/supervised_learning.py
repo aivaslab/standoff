@@ -201,9 +201,9 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
         write_to_h5py(np.array(data_obs), os.path.join(this_path,'obs.h5'))
         data_params_array = np.array(data_params, dtype='<U10')
         data_params_bytes = np.array([s.encode('utf8') for s in data_params_array])
-        write_to_h5py(data_params_bytes, os.path.join(this_path,'params.h5'))
+        write_to_h5py(data_params_bytes, os.path.join(this_path,'params.h5'), key='data') #key could be different
         for label in labels:
-            write_to_h5py(np.array(data_labels[label]), os.path.join(this_path,'label-' + label + '.h5'))
+            write_to_h5py(np.array(data_labels[label]), os.path.join(this_path,'label-' + label + '.h5'), key='data')
 
         '''
         np.savez_compressed(os.path.join(this_path, 'obs'), np.array(data_obs))
@@ -242,11 +242,11 @@ class h5Dataset(Dataset):
         with h5py.File(file_path, 'r') as f:
             data = f['data'][local_index]
         with h5py.File(self.labels_paths[file_index], 'r') as f:
-            labels = f['labels'][local_index]
+            labels = f['data'][local_index]
         with h5py.File(self.params_paths[file_index], 'r') as f:
-            params = [p.decode('utf-8') for p in f['params'][local_index]]
+            params = [p.decode('utf-8') for p in f['data'][local_index]]
         with h5py.File(self.oracles_paths[file_index], 'r') as f:
-            oracles = f['oracles'][local_index]
+            oracles = f['data'][local_index]
 
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         data = torch.from_numpy(data).float().to(device)
