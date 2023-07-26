@@ -518,7 +518,9 @@ class MiniStandoffEnv(para_MultiGridEnv):
             if self.params['num_puppets'] > 0:
                 one_hot_goal[self.agent_goal[target_agent]] = 1
             self.infos['p_0']["target"] = one_hot_goal
-            self.infos['p_0']["vision"] = self.visible_event_list[-1] if len(self.visible_event_list) > 0 else [0]
+            while (len(self.visible_event_list < 9)):
+                self.visible_event_list.insert(0, 0)
+            self.infos['p_0']["vision"] = self.visible_event_list[:9]
             real_boxes = [self.grid.get(box * 1 + 1, y) for box in range(self.boxes)]
 
             real_box_rewards = [box.get_reward() if box is not None and hasattr(box, "get_reward") else 0 for box in real_boxes]

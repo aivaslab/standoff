@@ -383,7 +383,6 @@ class RNNModel(nn.Module):
         self.fc = nn.Linear(hidden_size + oracle_len, int(output_len))
 
     def forward(self, x, oracle_inputs):
-        #x = torch.tensor(x, dtype=torch.float32)
         conv_outputs = []
         for t in range(9):
             x_t = x[:, t, :, :, :]
