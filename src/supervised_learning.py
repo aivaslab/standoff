@@ -232,6 +232,46 @@ def get_h5py_file(filename):
     fapl.set_cache(0, 1000 * 32, int(64 * 1024 * 1024), 0.0)
 
     return h5f
+
+class h5DatasetSlow(Dataset):
+    def __init__(self, data_paths, labels_paths, params_paths, oracles_paths):
+        self.data_paths = data_paths
+        self.labels_paths = labels_paths
+        self.params_paths = params_paths
+        self.oracles_paths = oracles_paths if len(oracles_paths) and oracles_paths[0] else []
+        self.lengths = [len(h5py.File(data_path, 'r')['data']) for data_path in data_paths]
+        self.cumulative_lengths = np.cumsum([0] + self.lengths)
+
+    def __len__(self):
+        return self.cumulative_lengths[-1]
+
+    def __getitem__(self, index):
+        # Determine which file this index belongs to
+        file_index = np.searchsorted(self.cumulative_lengths, index, side='right') - 1
+        # Convert the global index to a local index within this file
+        local_index = index - self.cumulative_lengths[file_index]
+
+        # Now open the corresponding files and read the data, labels, params, oracles for this index
+        with h5py.File(self.data_paths[file_index], 'r') as f:
+            data = torch.from_numpy(f['data'][local_index]).float()
+
+        with h5py.File(self.labels_paths[file_index], 'r') as f:
+            labels = torch.from_numpy(f['data'][local_index]).float()
+
+        with h5py.File(self.params_paths[file_index], 'r') as f:
+            params = f['data'][local_index].astype(str)
+
+        if len(self.oracles_paths):
+            with h5py.File(self.oracles_paths[file_index], 'r') as f:
+                oracles = torch.from_numpy(f['data'][local_index]).float()
+        else:
+            oracles = torch.from_numpy(np.asarray([])).float()
+
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        data = data.to(device)
+        labels = labels.to(device)
+        oracles = oracles.to(device)
+        return data, labels, params, oracles
 class h5Dataset(Dataset):
     def __init__(self, data_paths, labels_paths, params_paths, oracles_paths):
         self.data_files = [get_h5py_file(path) for path in data_paths]
