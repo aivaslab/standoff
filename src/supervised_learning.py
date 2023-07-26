@@ -213,45 +213,50 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
 
 def write_to_h5py(data, filename, key='data'):
     with h5py.File(filename, 'w') as f:
-        f.create_dataset(key, data=data)
+        f.create_dataset(key, data=data, chunk=True)
 
+def get_h5py_file(filename):
+    # Open the file
+    h5f = h5py.File(filename, 'r')
 
+    # Get the file's access property list
+    fapl = h5f.id.get_access_plist()
+
+    # Set the cache parameters
+    #   1) The number of elements in the meta data cache
+    #   2) The maximum number of elements in the raw data chunk cache
+    #   3) The total size of the raw data chunk cache in bytes
+    #   4) The preemption policy (0.0 means fully read/write through,
+    #      and 1.0 means fully read/write back)
+    # We set the cache size to 55.125 MB (in bytes)
+    fapl.set_cache(0, 1000 * 32, int(64 * 1024 * 1024), 0.0)
+
+    return h5f
 class h5Dataset(Dataset):
     def __init__(self, data_paths, labels_paths, params_paths, oracles_paths):
-        self.data_paths = data_paths
-        self.labels_paths = labels_paths
-        self.params_paths = params_paths
-        self.oracles_paths = oracles_paths
-
-        self.has_oracles = bool(self.oracles_paths)
+        self.data_files = [get_h5py_file(path) for path in data_paths]
+        self.labels_files = [get_h5py_file(path) for path in labels_paths]
+        self.params_files = [get_h5py_file(path) for path in params_paths]
+        self.oracles_files = [get_h5py_file(path) for path in oracles_paths] if len(oracles_paths) and oracles_paths[0] else []
 
         # Compute total number of samples and create an index mapping
         self.total_samples = 0
         self.index_mapping = []
-        for path in data_paths:
-            with h5py.File(path, 'r') as f:
-                num_samples = f['data'].shape[0]
-                self.index_mapping.extend([(path, i) for i in range(num_samples)])
+        for i, data_file in enumerate(self.data_files):
+            num_samples = data_file['data'].shape[0]
+            self.index_mapping.extend([(i, j) for j in range(num_samples)])
             self.total_samples += num_samples
 
     def __len__(self):
         return self.total_samples
 
     def __getitem__(self, index):
-        file_path, local_index = self.index_mapping[index]
-        file_index = self.data_paths.index(file_path)
+        file_index, local_index = self.index_mapping[index]
 
-        with h5py.File(file_path, 'r') as f:
-            data = f['data'][local_index]
-        with h5py.File(self.labels_paths[file_index], 'r') as f:
-            labels = f['data'][local_index]
-        with h5py.File(self.params_paths[file_index], 'r') as f:
-            params = f['data'][local_index].astype(str)
-        if self.has_oracles:
-            with h5py.File(self.oracles_paths[file_index], 'r') as f:
-                oracles = torch.from_numpy(f['data'][local_index]).float()
-        else:
-            oracles = np.asarray([])
+        data = self.data_files[file_index]['data'][local_index]
+        labels = self.labels_files[file_index]['data'][local_index]
+        params = self.params_files[file_index]['data'][local_index].astype(str)
+        oracles = self.oracles_files[file_index]['data'][local_index] if self.oracles_files else np.asarray([])
 
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         data = torch.from_numpy(data).float().to(device)
@@ -259,6 +264,16 @@ class h5Dataset(Dataset):
         oracles = torch.from_numpy(oracles).float().to(device)
 
         return data, labels, params, oracles
+
+    def __del__(self):
+        for file in self.data_files:
+            file.close()
+        for file in self.labels_files:
+            file.close()
+        for file in self.params_files:
+            file.close()
+        for file in self.oracles_files:
+            file.close()
 
 class DiskLoadingDataset(Dataset):
     def __init__(self, data_files, label_files, param_files, oracle_files=None):
