@@ -18,7 +18,7 @@ from torch.utils.data import DataLoader
 import tqdm
 import torch.nn as nn
 import torch
-from src.supervised_learning import RNNModel, CustomDataset, DiskLoadingDataset, h5Dataset
+from src.supervised_learning import RNNModel, CustomDataset, DiskLoadingDataset, h5Dataset, h5DatasetSlow
 import traceback
 import torch.multiprocessing as mp
 mp.set_start_method('spawn', force=True)
@@ -116,9 +116,8 @@ def train_model(train_sets, target_label, test_sets, load_path='supervised/', sa
                 oracle_data_files.append(os.path.join(dir, 'label-' + oracle_label + '.h5'))
             oracles_files.append(oracle_data_files)
 
-    train_dataset = h5Dataset(data_files, labels_files, params_files, oracles_files)
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True,
-                              num_workers=0)  # can't use more on windows
+    train_dataset = h5DatasetSlow(data_files, labels_files, params_files, oracles_files)
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=0)  # can't use more on windows , multiprocessing_context='spawn'
 
     test_loaders = []
     for val_set_name in test_sets:
@@ -134,7 +133,7 @@ def train_model(train_sets, target_label, test_sets, load_path='supervised/', sa
         else:
             oracle_data_files = None
 
-        val_dataset = h5Dataset([val_data_file], [val_labels_file], [val_params_file], [oracle_data_files])
+        val_dataset = h5DatasetSlow([val_data_file], [val_labels_file], [val_params_file], [oracle_data_files])
         test_loaders.append(DataLoader(val_dataset, batch_size=batch_size, shuffle=False))
 
     '''for data_name in train_sets:
@@ -146,12 +145,9 @@ def train_model(train_sets, target_label, test_sets, load_path='supervised/', sa
             oracle_data = []
             for oracle_label in oracle_labels:
                 this_oracle = np.load(os.path.join(dir, 'label-' + oracle_label + '.npz'))['arr_0']
-                print('sum of oracle data', data_name, oracle_label, np.sum(this_oracle))
                 flattened_oracle = this_oracle.reshape(this_oracle.shape[0], -1)
                 oracle_data.append(flattened_oracle)
             combined_oracle_data = np.concatenate(oracle_data, axis=-1)
-            sum_oracle_data = np.sum(combined_oracle_data, axis=0)
-            print('sum of oracle data', data_name, sum_oracle_data)
             oracles.append(combined_oracle_data)
 
 
@@ -213,7 +209,6 @@ def train_model(train_sets, target_label, test_sets, load_path='supervised/', sa
     for epoch in range(num_epochs):
         train_loss = 0
         for i, (inputs, target_labels, _, oracle_inputs) in enumerate(train_loader):
-            # inputs = inputs.view(-1, 10, input_size)
             outputs = model(inputs, oracle_inputs)
             loss = criterion(outputs, torch.argmax(target_labels, dim=1))
             optimizer.zero_grad()
