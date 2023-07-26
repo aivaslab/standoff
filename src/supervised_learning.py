@@ -201,7 +201,7 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
         write_to_h5py(np.array(data_obs), os.path.join(this_path,'obs.h5'))
         data_params_array = np.array(data_params, dtype='<U10')
         data_params_bytes = np.array([s.encode('utf8') for s in data_params_array])
-        write_to_h5py(data_params_bytes, os.path.join(this_path,'params.h5'), key='data') #key could be different
+        write_to_h5py(data_params_bytes, os.path.join(this_path,'params.h5'), key='data')
         for label in labels:
             write_to_h5py(np.array(data_labels[label]), os.path.join(this_path,'label-' + label + '.h5'), key='data')
 
@@ -213,7 +213,7 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
 
 def write_to_h5py(data, filename, key='data'):
     with h5py.File(filename, 'w') as f:
-        f.create_dataset(key, data=data, chunk=True)
+        f.create_dataset(key, data=data, chunks=True)
 
 def get_h5py_file(filename):
     # Open the file
