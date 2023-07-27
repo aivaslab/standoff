@@ -18,7 +18,8 @@ from torch.utils.data import DataLoader
 import tqdm
 import torch.nn as nn
 import torch
-from src.supervised_learning import RNNModel, CustomDataset, DiskLoadingDataset, h5Dataset, h5DatasetSlow
+from src.supervised_learning import RNNModel, CustomDataset, DiskLoadingDataset, h5Dataset, h5DatasetSlow, \
+    CustomDatasetBig
 import traceback
 import torch.multiprocessing as mp
 mp.set_start_method('spawn', force=True)
@@ -99,10 +100,6 @@ def train_model(train_sets, target_label, test_sets, load_path='supervised/', sa
         val_dataset = DiskLoadingDataset([val_data_file], [val_label_file], [val_param_file], val_oracle_files)
         test_loaders.append(DataLoader(val_dataset, batch_size=batch_size, shuffle=False))'''
 
-    data_files = []
-    labels_files = []
-    params_files = []
-    oracles_files = []
     '''
     for data_name in train_sets:
         dir = os.path.join(load_path, data_name)
@@ -136,31 +133,33 @@ def train_model(train_sets, target_label, test_sets, load_path='supervised/', sa
         val_dataset = h5Dataset([val_data_file], [val_labels_file], [val_params_file], [oracle_data_files])
         test_loaders.append(DataLoader(val_dataset, batch_size=batch_size, shuffle=False))'''
 
+
     for data_name in train_sets:
         dir = os.path.join(load_path, data_name)
-        data.append(np.load(os.path.join(dir, 'obs.npz'))['arr_0'])
-        labels.append(np.load(os.path.join(dir, 'label-' + target_label + '.npz'))['arr_0'])
-        params.append(np.load(os.path.join(dir, 'params.npz'))['arr_0'])
+        data.append(np.load(os.path.join(dir, 'obs.npz'), mmap_mode='r')['arr_0'])
+        labels.append(np.load(os.path.join(dir, 'label-' + target_label + '.npz'), mmap_mode='r')['arr_0'])
+        params.append(np.load(os.path.join(dir, 'params.npz'), mmap_mode='r')['arr_0'])
         if oracle_labels:
             oracle_data = []
             for oracle_label in oracle_labels:
-                this_oracle = np.load(os.path.join(dir, 'label-' + oracle_label + '.npz'))['arr_0']
+                this_oracle = np.load(os.path.join(dir, 'label-' + oracle_label + '.npz'), mmap_mode='r')['arr_0']
                 flattened_oracle = this_oracle.reshape(this_oracle.shape[0], -1)
                 oracle_data.append(flattened_oracle)
             combined_oracle_data = np.concatenate(oracle_data, axis=-1)
             oracles.append(combined_oracle_data)
 
 
-    data = np.concatenate(data, axis=0)
+    '''data = np.concatenate(data, axis=0)
     labels = np.concatenate(labels, axis=0)
     params = np.concatenate(params, axis=0)
     if oracle_labels:
         oracles = np.concatenate(oracles, axis=0)
     else:
-        oracles = np.zeros((len(data), 0))
+        oracles = np.zeros((len(data), 0))'''
 
 
-    train_dataset = CustomDataset(data, labels, params, oracles)
+    train_dataset = CustomDatasetBig(data, labels, params, oracles)
+    del data, labels, params, oracles
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=0) #can't use more on windows
 
 
@@ -184,7 +183,7 @@ def train_model(train_sets, target_label, test_sets, load_path='supervised/', sa
         test_loaders.append(DataLoader(val_dataset, batch_size=batch_size, shuffle=False))
 
     # broken rn
-    model_kwargs['oracle_len'] = 0 if len(oracle_labels) == 0 else len(train_dataset.oracles[0])
+    model_kwargs['oracle_len'] = 0 if len(oracle_labels) == 0 else len(train_dataset.oracles_list[0][0])
     model_kwargs['output_len'] = 5  # np.prod(labels.shape[1:])
     model_kwargs['channels'] = 5  # np.prod(params.shape[2])
 
@@ -203,6 +202,7 @@ def train_model(train_sets, target_label, test_sets, load_path='supervised/', sa
     param_losses_list = []
 
     t = tqdm.trange(num_epochs*len(train_loader))
+
 
 
     for epoch in range(num_epochs):

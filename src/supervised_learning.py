@@ -1,5 +1,4 @@
-import copy
-import math
+
 import pickle
 
 import h5py
@@ -17,7 +16,7 @@ from .agents import GridAgentInterface
 from .pz_envs import env_from_config
 from .pz_envs.scenario_configs import ScenarioConfigs
 # import src.pz_envs
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset
 import tqdm
 import copy
 import torch.nn as nn
@@ -364,7 +363,41 @@ class CustomDataset(Dataset):
         oracles = self.oracles[index].float().to(device)
 
         return data, labels, self.params[index], oracles
+class CustomDatasetBig(Dataset):
+    def __init__(self, data_list, labels_list, params_list, oracles_list):
+        self.data_list = data_list
+        self.labels_list = labels_list
+        self.params_list = params_list
+        self.oracles_list = oracles_list
 
+        self.cumulative_sizes = self._cumulative_sizes()
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    def _cumulative_sizes(self):
+        sizes = [len(x) for x in self.data_list]
+        return np.cumsum(sizes)
+
+    def _find_list_index(self, global_index):
+        # find which list the global index belongs to, and the local index within that list
+        list_index = np.searchsorted(self.cumulative_sizes, global_index + 1)
+        if list_index > 0:
+            local_index = global_index - self.cumulative_sizes[list_index - 1]
+        else:
+            local_index = global_index
+        return list_index, local_index
+
+    def __len__(self):
+        return self.cumulative_sizes[-1]
+
+    def __getitem__(self, index):
+
+        list_index, local_index = self._find_list_index(index)
+
+        data = torch.from_numpy(pickle.loads(self.data_list[list_index][local_index])).float().to(self.device)
+        labels = torch.from_numpy(self.labels_list[list_index][local_index].astype(np.int8)).to(self.device)
+        oracles = torch.from_numpy(self.oracles_list[list_index][local_index].astype(np.int8)).to(self.device) if len(self.oracles_list) else torch.tensor([]).to(self.device)
+
+        return data, labels, self.params_list[list_index][local_index], oracles
 
 class RNNModel(nn.Module):
     def __init__(self, hidden_size, num_layers, output_len, channels, kernels=8, kernels2=8, kernel_size1=3,
