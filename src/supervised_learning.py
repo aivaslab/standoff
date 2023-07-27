@@ -3,13 +3,10 @@ import math
 import pickle
 
 import h5py
-import numpy as np
 import sys
 import os
 
 import pandas as pd
-import scipy
-from scipy import sparse
 
 from .utils.evaluation import get_relative_direction
 
@@ -26,8 +23,6 @@ import copy
 import torch.nn as nn
 import torch.nn.functional as F
 import torch
-from sklearn.model_selection import train_test_split
-from matplotlib import pyplot as plt
 
 
 def one_hot(size, data):
@@ -163,7 +158,7 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
                         this_ob[pos, :, :, :] = next_obs['p_0']
                         #if not any([np.array_equal(this_ob, x) for x in data_obs]):
                         if pos == frames - 1 or env.has_released:
-                            data_obs.append(copy.copy(this_ob))
+                            data_obs.append(serialize_data(this_ob))
                             data_params.append(eName)
                             for label in set(labels) or set(prior_metrics):
                                 if label == "correctSelection" or label == 'incorrectSelection':
@@ -200,19 +195,15 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
         print('len obs', data_name, suffix, len(data_obs))
         this_path = os.path.join(path, data_name + suffix)
         os.makedirs(this_path, exist_ok=True)
-        '''write_to_h5py(np.array(data_obs), os.path.join(this_path,'obs.h5'))
-        data_params_array = np.array(data_params, dtype='<U10')
-        data_params_bytes = np.array([s.encode('utf8') for s in data_params_array])
-        write_to_h5py(data_params_bytes, os.path.join(this_path,'params.h5'), key='data')
-        for label in labels:
-            write_to_h5py(np.array(data_labels[label]), os.path.join(this_path,'label-' + label + '.h5'), key='data')'''
 
-        sparse_data = [pickle.dumps(datapoint) for datapoint in data_obs]
-        np.savez_compressed(os.path.join(this_path, 'obs'), np.array(sparse_data))
+
+        np.savez_compressed(os.path.join(this_path, 'obs'), np.array(data_obs))
         np.savez_compressed(os.path.join(this_path,  'params'), np.array(data_params))
         for label in labels:
             np.savez_compressed(os.path.join(this_path, 'label-' + label), np.array(data_labels[label]))
 
+def serialize_data(datapoint):
+    return pickle.dumps(datapoint)
 def write_to_h5py(data, filename, key='data'):
     with h5py.File(filename, 'w') as f:
         f.create_dataset(key, data=data, chunks=True)
