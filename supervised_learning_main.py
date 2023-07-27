@@ -103,7 +103,7 @@ def train_model(train_sets, target_label, test_sets, load_path='supervised/', sa
     labels_files = []
     params_files = []
     oracles_files = []
-
+    '''
     for data_name in train_sets:
         dir = os.path.join(load_path, data_name)
         data_files.append(os.path.join(dir, 'obs.h5'))
@@ -134,13 +134,13 @@ def train_model(train_sets, target_label, test_sets, load_path='supervised/', sa
             oracle_data_files = None
 
         val_dataset = h5Dataset([val_data_file], [val_labels_file], [val_params_file], [oracle_data_files])
-        test_loaders.append(DataLoader(val_dataset, batch_size=batch_size, shuffle=False))
+        test_loaders.append(DataLoader(val_dataset, batch_size=batch_size, shuffle=False))'''
 
-    '''for data_name in train_sets:
+    for data_name in train_sets:
         dir = os.path.join(load_path, data_name)
-        data.append(np.load(os.path.join(dir, 'obs.npz'), mmap_mode='r')['arr_0'])
-        labels.append(np.load(os.path.join(dir, 'label-' + target_label + '.npz'), mmap_mode='r')['arr_0'])
-        params.append(np.load(os.path.join(dir, 'params.npz'), mmap_mode='r')['arr_0'])
+        data.append(np.load(os.path.join(dir, 'obs.npz'))['arr_0'])
+        labels.append(np.load(os.path.join(dir, 'label-' + target_label + '.npz'))['arr_0'])
+        params.append(np.load(os.path.join(dir, 'params.npz'))['arr_0'])
         if oracle_labels:
             oracle_data = []
             for oracle_label in oracle_labels:
@@ -149,7 +149,6 @@ def train_model(train_sets, target_label, test_sets, load_path='supervised/', sa
                 oracle_data.append(flattened_oracle)
             combined_oracle_data = np.concatenate(oracle_data, axis=-1)
             oracles.append(combined_oracle_data)
-
 
 
     data = np.concatenate(data, axis=0)
@@ -182,7 +181,7 @@ def train_model(train_sets, target_label, test_sets, load_path='supervised/', sa
         else:
             combined_oracle_data = np.zeros((len(val_data), 0))
         val_dataset = CustomDataset(val_data, val_labels, val_params, combined_oracle_data)
-        test_loaders.append(DataLoader(val_dataset, batch_size=batch_size, shuffle=False))'''
+        test_loaders.append(DataLoader(val_dataset, batch_size=batch_size, shuffle=False))
 
     # broken rn
     model_kwargs['oracle_len'] = 0 if len(oracle_labels) == 0 else len(train_dataset.oracles[0])

@@ -1,5 +1,6 @@
 import copy
 import math
+import pickle
 
 import h5py
 import numpy as np
@@ -8,6 +9,7 @@ import os
 
 import pandas as pd
 import scipy
+from scipy import sparse
 
 from .utils.evaluation import get_relative_direction
 
@@ -198,18 +200,18 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
         print('len obs', data_name, suffix, len(data_obs))
         this_path = os.path.join(path, data_name + suffix)
         os.makedirs(this_path, exist_ok=True)
-        write_to_h5py(np.array(data_obs), os.path.join(this_path,'obs.h5'))
+        '''write_to_h5py(np.array(data_obs), os.path.join(this_path,'obs.h5'))
         data_params_array = np.array(data_params, dtype='<U10')
         data_params_bytes = np.array([s.encode('utf8') for s in data_params_array])
         write_to_h5py(data_params_bytes, os.path.join(this_path,'params.h5'), key='data')
         for label in labels:
-            write_to_h5py(np.array(data_labels[label]), os.path.join(this_path,'label-' + label + '.h5'), key='data')
+            write_to_h5py(np.array(data_labels[label]), os.path.join(this_path,'label-' + label + '.h5'), key='data')'''
 
-        '''
-        np.savez_compressed(os.path.join(this_path, 'obs'), np.array(data_obs))
+        sparse_data = [pickle.dumps(sparse.csr_matrix(datapoint)) for datapoint in data]
+        np.savez_compressed(os.path.join(this_path, 'obs'), np.array(sparse_data))
         np.savez_compressed(os.path.join(this_path,  'params'), np.array(data_params))
         for label in labels:
-            np.savez_compressed(os.path.join(this_path, 'label-' + label), np.array(data_labels[label]))'''
+            np.savez_compressed(os.path.join(this_path, 'label-' + label), np.array(data_labels[label]))
 
 def write_to_h5py(data, filename, key='data'):
     with h5py.File(filename, 'w') as f:
@@ -371,7 +373,7 @@ class DiskLoadingDataset(Dataset):
 
 class CustomDataset(Dataset):
     def __init__(self, data, labels, params, oracles):
-        self.data = torch.from_numpy(data.astype(np.int8))
+        self.data = data
         self.labels = torch.from_numpy(labels.astype(np.int8))
         self.params = params
         self.oracles = torch.from_numpy(oracles.astype(np.int8))
@@ -381,7 +383,7 @@ class CustomDataset(Dataset):
 
     def __getitem__(self, index):
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        data = self.data[index].float().to(device)
+        data = torch.from_numpy(pickle.loads(self.data[index]).todense()).float().to(device)
         labels = self.labels[index].float().to(device)
         oracles = self.oracles[index].float().to(device)
 
