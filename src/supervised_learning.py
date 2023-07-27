@@ -93,20 +93,16 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
                 params['subject_is_dominant'] = subject_is_dominant
                 params['sub_valence'] = subject_valence
 
-
-                reset_configs = {**params}
-
-
-                if isinstance(reset_configs["num_agents"], list):
-                    reset_configs["num_agents"] = reset_configs["num_agents"][0]
-                if isinstance(reset_configs["num_puppets"], list):
-                    reset_configs["num_puppets"] = reset_configs["num_puppets"][0]
+                if isinstance(params["num_agents"], list):
+                    params["num_agents"] = params["num_agents"][0]
+                if isinstance(params["num_puppets"], list):
+                    params["num_puppets"] = params["num_puppets"][0]
 
                 env_config['config_name'] = configName
                 env_config['agents'] = [GridAgentInterface(**player_interface_config) for _ in
-                                        range(reset_configs['num_agents'])]
+                                        range(params['num_agents'])]
                 env_config['puppets'] = [GridAgentInterface(**puppet_interface_config) for _ in
-                                         range(reset_configs['num_puppets'])]
+                                         range(params['num_puppets'])]
 
                 difficulty = 3
                 env_config['opponent_visible_decs'] = (difficulty < 1)
@@ -119,7 +115,6 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
                 env.record_oracle_labels = True
                 env.record_info = True  # used for correctSelection right now
 
-
                 env.target_param_group_count = 20
                 env.param_groups = [ {'eLists': {n: events[n]},
                                       'params': params,
@@ -128,10 +123,8 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
                                       }
                                      for n in events ]
                 print('first param group', env.param_groups[0])
-                #while len(data_obs) < num_timesteps:
-                #tq = tqdm.tqdm(range(int(num_timesteps)))
+
                 prev_param_group = -1
-                eName = ''
                 tq = tqdm.tqdm(range(len(env.param_groups)))
 
                 total_groups = len(env.param_groups)
@@ -143,20 +136,16 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
                     env.deterministic_seed = env.current_param_group_pos
 
                     obs = env.reset()
-                    # after first reset, current param group and param group count are both 1
-                    #print('reset', env.current_param_group, env.current_param_group_count)
                     if env.current_param_group != prev_param_group:
                         eName = env.current_event_list_name
                         tq.update(1)
                     prev_param_group = env.current_param_group
-                    #print(env.current_param_group, env.event_lists)
                     this_ob = np.zeros((frames, *obs['p_0'].shape))
                     pos = 0
 
                     while pos < frames:
                         next_obs, _, _, info = env.step({'p_0': 2})
                         this_ob[pos, :, :, :] = next_obs['p_0']
-                        #if not any([np.array_equal(this_ob, x) for x in data_obs]):
                         if pos == frames - 1 or env.has_released:
                             data_obs.append(serialize_data(this_ob))
                             data_params.append(eName)
@@ -166,7 +155,6 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
                                 else:
                                     data = info['p_0'][label]
                                 data_labels[label].append(copy.copy(data))
-                                #all_obs_and_labels = all_obs_and_labels.append({'name': eName, 'obs': copy.copy(this_ob), 'label': data}, ignore_index=True)
                             break
 
                         pos += 1
@@ -185,13 +173,10 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
                                     break
                         del _env, a
 
-                    #print(env.current_param_group_count, env.current_param_group)
                     if env.current_param_group == total_groups - 1 and env.current_param_group_pos == env.target_param_group_count - 1:
                         # normally the while loop won't break because reset uses a modulus
                         break
 
-        #all_obs_and_labels.to_csv('train_data.csv', index=False)
-        #all_path_infos.to_csv('extra_data.csv', index=False)
         print('len obs', data_name, suffix, len(data_obs))
         this_path = os.path.join(path, data_name + suffix)
         os.makedirs(this_path, exist_ok=True)
