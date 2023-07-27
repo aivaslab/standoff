@@ -70,7 +70,7 @@ def decode_event_name(name):
 
 
 def train_model(train_sets, target_label, test_sets, load_path='supervised/', save_path='', epochs=100, model_kwargs=None,
-                lr=0.001, oracle_labels=[]):
+                lr=0.001, oracle_labels=[], repetition=0):
     batch_size = 64
     use_cuda = torch.cuda.is_available()
     if oracle_labels[0] == None:
@@ -193,17 +193,16 @@ def train_model(train_sets, target_label, test_sets, load_path='supervised/', sa
     special_criterion = nn.CrossEntropyLoss(reduction='none')
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
-    max_val_samples = 500
+    #max_val_samples = 500
     num_epochs = epochs
     train_losses = []
-    val_losses = [[] for _ in range(len(test_loaders) + 1)]
+    #val_losses = [[] for _ in range(len(test_loaders) + 1)]
+    df_paths = []
 
     # param_losses = pd.DataFrame(columns=['param', 'epoch', 'loss'])
     param_losses_list = []
 
     t = tqdm.trange(num_epochs*len(train_loader))
-
-
 
     for epoch in range(num_epochs):
         train_loss = 0
@@ -213,12 +212,12 @@ def train_model(train_sets, target_label, test_sets, load_path='supervised/', sa
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-            train_loss += loss.item()
+            #train_loss += loss.item()
             t.update(1)
             #if i > len(train_loader)//5:
             #    break
 
-        train_losses.append(train_loss / len(train_loader))
+        #train_losses.append(train_loss / len(train_loader))
         model.eval()
         for idx, _val_loader in enumerate(test_loaders):
             with torch.no_grad():
@@ -233,9 +232,15 @@ def train_model(train_sets, target_label, test_sets, load_path='supervised/', sa
                         for param, loss, correct in zip(params, losses, corrects)]
                     param_losses_list.extend(batch_param_losses)
 
+        # save dfs periodically to free up ram:
+        os.makedirs(save_path, exist_ok=True)
+        df = pd.DataFrame(param_losses_list)
+        df = df.join(df['param'].apply(decode_event_name))
+        df.to_csv(os.path.join(save_path, f'param_losses_{epoch}_{repetition}.csv'))
+        df_paths.append(os.path.join(save_path, f'param_losses_{epoch}_{repetition}.csv'))
+        param_losses_list = []
+        del df
 
-            # val_loss /= val_samples_processed / batch_size
-            # val_losses[idx].append(val_loss)
         model.train()
     # save model
     os.makedirs(save_path, exist_ok=True)
@@ -245,11 +250,8 @@ def train_model(train_sets, target_label, test_sets, load_path='supervised/', sa
     # pd.DataFrame(param_losses_list).to_csv(path + 'param_losses.csv')
     # df = pd.read_csv('supervised/param_losses.csv')
     # Apply the decoding function to each row
-    print('joining df')
-    df = pd.DataFrame(param_losses_list)
-    df = df.join(df['param'].apply(decode_event_name))
 
-    return train_losses, val_losses, df
+    return df_paths
 
 
 def calculate_ci(group):
@@ -416,17 +418,17 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
 
             model_name = "".join([str(x) + "," for x in model_kwargs.values()])
 
+            dfs_paths = []
             for target_label in labels:
-                df_list = []
                 for repetition in range(repetitions):
-                    t_loss, v_loss, df = train_model(train_sets, target_label, [eval_name], load_path=load_path,
+                    train_df_paths = train_model(train_sets, target_label, [eval_name], load_path=load_path,
                                                      save_path=save_path, epochs=epochs, model_kwargs=model_kwargs,
-                                                     lr=lr, oracle_labels=oracle_labels, )
-                    print('appending')
-                    df_list.append(df)
+                                                     lr=lr, oracle_labels=oracle_labels, repetition=repetition)
+                    dfs_paths.extend(train_df_paths)
 
+                print('concatenating, etc')
 
-                print('concatenating')
+                df_list = [pd.read_csv(df_path) for df_path in dfs_paths]
                 combined_df = pd.concat(df_list, ignore_index=True)
                 params = ['visible_baits', 'swaps', 'visible_swaps', 'first_swap_is_both',
                           'second_swap_to_first_loc', 'delay_2nd_bait', 'first_bait_size',

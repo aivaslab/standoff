@@ -5,7 +5,7 @@ import pandas as pd
 from matplotlib import pyplot as plt
 
 from src.supervised_learning import gen_data
-from supervised_learning_main import run_supervised_session
+from supervised_learning_main import run_supervised_session, calculate_statistics, write_metrics_to_file, save_figures
 
 
 def add_label_and_combine_dfs(df_list, params, label):
@@ -126,6 +126,8 @@ def experiments(todo, repetitions, epochs):
         combined_avg = add_label_and_combine_dfs(avg_list, [x for x in oracle_names], 'oracle')
         create_combined_histogram(combined_df, combined_avg, 'oracle', os.path.join('supervised', 'exp_2'))
 
+
+
     # Experiment 7
     if 7 in todo:
         print('Running experiment 2: varied train regimes')
@@ -183,4 +185,4 @@ def experiments(todo, repetitions, epochs):
 
 
 if __name__ == '__main__':
-    experiments([0], 1, 50)
+    experiments([2], 1, 2)
