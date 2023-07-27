@@ -421,6 +421,8 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
                                                      lr=lr, oracle_labels=oracle_labels, )
                     df_list.append(df)
 
+
+                print('concatenating')
                 combined_df = pd.concat(df_list, ignore_index=True)
                 params = ['visible_baits', 'swaps', 'visible_swaps', 'first_swap_is_both',
                           'second_swap_to_first_loc', 'delay_2nd_bait', 'first_bait_size',
