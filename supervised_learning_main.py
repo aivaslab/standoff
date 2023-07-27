@@ -228,21 +228,24 @@ def train_model(train_sets, target_label, test_sets, load_path='supervised/', sa
                     losses = special_criterion(outputs, torch.argmax(labels, dim=1))
                     _, predicted = torch.max(outputs, 1)
                     corrects = (predicted == torch.argmax(labels, dim=1)).float()
-                    for input, label, param, loss, correct in zip(inputs, labels, params, losses, corrects):
-                        param_losses_list.append(
-                            {'param': param, 'epoch': epoch, 'loss': loss.item(), 'accuracy': correct.item()})
-                        # param_losses = param_losses.append({'param': param, 'epoch': epoch, 'loss': loss.item(), 'accuracy': accuracy}, ignore_index=True)
+                    batch_param_losses = [
+                        {'param': param, 'epoch': epoch, 'loss': loss.item(), 'accuracy': correct.item()}
+                        for param, loss, correct in zip(params, losses, corrects)]
+                    param_losses_list.extend(batch_param_losses)
+
 
             # val_loss /= val_samples_processed / batch_size
             # val_losses[idx].append(val_loss)
         model.train()
     # save model
     os.makedirs(save_path, exist_ok=True)
-    torch.save([model.kwargs, model.state_dict()], os.path.join(save_path, f'{data_name}-{label}-model.pt'))
+    print('saving model')
+    torch.save([model.kwargs, model.state_dict()], os.path.join(save_path, f'{data_name}-model.pt'))
 
     # pd.DataFrame(param_losses_list).to_csv(path + 'param_losses.csv')
     # df = pd.read_csv('supervised/param_losses.csv')
     # Apply the decoding function to each row
+    print('joining df')
     df = pd.DataFrame(param_losses_list)
     df = df.join(df['param'].apply(decode_event_name))
 
@@ -419,6 +422,7 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
                     t_loss, v_loss, df = train_model(train_sets, target_label, [eval_name], load_path=load_path,
                                                      save_path=save_path, epochs=epochs, model_kwargs=model_kwargs,
                                                      lr=lr, oracle_labels=oracle_labels, )
+                    print('appending')
                     df_list.append(df)
 
 
