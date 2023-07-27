@@ -207,7 +207,7 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
         for label in labels:
             write_to_h5py(np.array(data_labels[label]), os.path.join(this_path,'label-' + label + '.h5'), key='data')'''
 
-        sparse_data = [pickle.dumps(sparse.csr_matrix(datapoint)) for datapoint in data]
+        sparse_data = [pickle.dumps(sparse.csr_matrix(datapoint)) for datapoint in data_obs]
         np.savez_compressed(os.path.join(this_path, 'obs'), np.array(sparse_data))
         np.savez_compressed(os.path.join(this_path,  'params'), np.array(data_params))
         for label in labels:
