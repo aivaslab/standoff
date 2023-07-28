@@ -114,7 +114,7 @@ def experiments(todo, repetitions, epochs, skip_train=False):
         last_path_list = []
         #os.makedirs(os.path.join('supervised', 'exp_2'), exist_ok=True)
 
-        for single_oracle, oracle_name in zip(oracles, oracle_names):
+        for single_oracle, oracle_name in zip(oracles[:3], oracle_names):
             print('oracle:', single_oracle)
             combined_paths, last_epoch_paths = run_supervised_session(save_path=os.path.join('supervised', 'exp_2', oracle_name),
                                    repetitions=repetitions,
@@ -129,21 +129,25 @@ def experiments(todo, repetitions, epochs, skip_train=False):
 
         print('loading dataframes')
 
-        combined_df = pd.DataFrame()
-        for df_path, oracle_name in zip(combined_path_list, oracle_names):
-            chunks = pd.read_csv(df_path, chunksize=10000)
-            for chunk in chunks:
-                chunk.replace(replace_dict, inplace=True)
-                chunk = chunk.assign(oracle=oracle_name)
-                combined_df = pd.concat([combined_df, chunk], ignore_index=True)
+        df_list = []
+        for df_paths, oracle_name in zip(combined_path_list, oracle_names):
+            for df_path in df_paths:
+                chunks = pd.read_csv(df_path, chunksize=10000)
+                for chunk in chunks:
+                    chunk.replace(replace_dict, inplace=True)
+                    chunk = chunk.assign(oracle=oracle_name)
+                    df_list.append(chunk)
+        combined_df = pd.concat(df_list, ignore_index=True)
 
-        last_epoch_df = pd.DataFrame()
-        for df_path, oracle_name in zip(last_path_list, oracle_names):
-            chunks = pd.read_csv(df_path, chunksize=10000)
-            for chunk in chunks:
-                chunk.replace(replace_dict, inplace=True)
-                chunk = chunk.assign(oracle=oracle_name)
-                last_epoch_df = pd.concat([last_epoch_df, chunk], ignore_index=True)
+        last_df_list = []
+        for df_paths, oracle_name in zip(last_path_list, oracle_names):
+            for df_path in df_paths:
+                chunks = pd.read_csv(df_path, chunksize=10000)
+                for chunk in chunks:
+                    chunk.replace(replace_dict, inplace=True)
+                    chunk = chunk.assign(oracle=oracle_name)
+                    last_df_list.append(chunk)
+        last_epoch_df = pd.concat(last_df_list, ignore_index=True)
 
         params = ['visible_baits', 'swaps', 'visible_swaps', 'first_swap_is_both',
                   'second_swap_to_first_loc', 'delay_2nd_bait', 'first_bait_size',
