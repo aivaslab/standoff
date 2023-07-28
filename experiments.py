@@ -58,7 +58,7 @@ def create_combined_histogram(df, combined_avg, param, folder):
     plt.close()
 
 
-def experiments(todo, repetitions, epochs, skip_train=False):
+def experiments(todo, repetitions, epochs, skip_train=False, batch_size=64):
     """What is the overall performance of naive, off-the-shelf models on this task? Which parameters of competitive
     feeding settings are the most sensitive to overall model performance? To what extent are different models
     sensitive to different parameters? """
@@ -121,7 +121,8 @@ def experiments(todo, repetitions, epochs, skip_train=False):
                                    epochs=epochs,
                                    train_sets=regimes[4][1], # complete train regime, should be 3 for final
                                    oracle_labels=[single_oracle],
-                                   skip_train=skip_train)
+                                   skip_train=skip_train,
+                                    batch_size=batch_size)
             last_path_list.append(last_epoch_paths)
             combined_path_list.append(combined_paths)
 
@@ -224,3 +225,4 @@ def experiments(todo, repetitions, epochs, skip_train=False):
 
 if __name__ == '__main__':
     experiments([2], 1, 3, skip_train=False)
+    experiments([2], 1, 3, skip_train=False, batch_size=256)
