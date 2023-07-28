@@ -42,8 +42,9 @@ def create_combined_histogram(df, combined_avg, param, folder):
     for value in df[param].unique():
         value_df = df[df[param] == value]
         mean_acc = value_df.groupby('param')['accuracy'].mean()
-        hist_data.append(list(mean_acc))
+        hist_data.append(pd.Categorical(mean_acc))
         labels.append(f'{param} = {value}')
+
 
     #hist_data = np.asarray(hist_data, dtype=object)
     plt.hist(hist_data, bins=np.arange(0, 1.01, 0.05), stacked=True, label=labels, alpha=0.5)
@@ -113,13 +114,14 @@ def experiments(todo, repetitions, epochs):
         avg_list = []
         #os.makedirs(os.path.join('supervised', 'exp_2'), exist_ok=True)
 
-        for single_oracle, oracle_name in zip(oracles[:4], oracle_names[:2]):
+        for single_oracle, oracle_name in zip(oracles, oracle_names):
             print('oracle:', single_oracle)
             combined_df, last_epoch_df = run_supervised_session(save_path=os.path.join('supervised', 'exp_2', oracle_name),
                                    repetitions=repetitions,
                                    epochs=epochs,
                                    train_sets=regimes[4][1], # complete train regime, should be 3 for final
-                                   oracle_labels=[single_oracle])
+                                   oracle_labels=[single_oracle],
+                                    skip_train=False)
             df_list.append(last_epoch_df)
             avg_list.append(combined_df)
 
@@ -203,4 +205,4 @@ def experiments(todo, repetitions, epochs):
 
 
 if __name__ == '__main__':
-    experiments([2], 1, 2)
+    experiments([2], 1, 20)
