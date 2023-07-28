@@ -23,7 +23,9 @@ from src.supervised_learning import RNNModel, CustomDataset, DiskLoadingDataset,
     CustomDatasetBig
 import traceback
 import torch.multiprocessing as mp
+
 mp.set_start_method('spawn', force=True)
+
 
 def decode_event_name(name):
     # Split the name into the main part and the numerical suffix
@@ -70,99 +72,18 @@ def decode_event_name(name):
     })
 
 
-def train_model(train_sets, target_label, test_sets, load_path='supervised/', save_path='', epochs=100, model_kwargs=None,
-                lr=0.001, oracle_labels=[], repetition=0):
+def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_path='', oracle_labels=[], repetition=0,
+                   epoch_number=0):
     batch_size = 64
-    use_cuda = torch.cuda.is_available()
-    if oracle_labels[0] == None:
-        oracle_labels = []
-    data, labels, params, oracles = [], [], [], []
-    '''
-    data_files = [os.path.join(load_path, name, 'obs.npz') for name in train_sets]
-    label_files = [os.path.join(load_path, name, f'label-{target_label}.npz') for name in train_sets]
-    param_files = [os.path.join(load_path, name, 'params.npz') for name in train_sets]
-    oracle_files = [os.path.join(load_path, name, f'label-{oracle_label}.npz') for name in train_sets for oracle_label
-                    in oracle_labels] if oracle_labels else None
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    special_criterion = nn.CrossEntropyLoss(reduction='none')
 
-    train_dataset = DiskLoadingDataset(data_files, label_files, param_files, oracle_files)
+    model_kwargs, state_dict = torch.load(os.path.join(model_save_path, f'{repetition}-model_epoch{epoch_number}.pt'))
+    model = RNNModel(**model_kwargs).to(device)
+    model.load_state_dict(state_dict)
+    model.eval()
 
-    test_loaders = []
-    for val_set_name in test_sets:
-        dir = os.path.join(load_path, val_set_name)
-        val_data_file = os.path.join(dir, 'obs.npz')
-        val_label_file = os.path.join(dir, f'label-{target_label}.npz')
-        val_param_file = os.path.join(dir, 'params.npz')
-
-        if oracle_labels:
-            val_oracle_files = [os.path.join(dir, f'label-{oracle_label}.npz') for oracle_label in oracle_labels]
-        else:
-            val_oracle_files = None
-
-        val_dataset = DiskLoadingDataset([val_data_file], [val_label_file], [val_param_file], val_oracle_files)
-        test_loaders.append(DataLoader(val_dataset, batch_size=batch_size, shuffle=False))'''
-
-    '''
-    for data_name in train_sets:
-        dir = os.path.join(load_path, data_name)
-        data_files.append(os.path.join(dir, 'obs.h5'))
-        labels_files.append(os.path.join(dir, 'label-' + target_label + '.h5'))
-        params_files.append(os.path.join(dir, 'params.h5'))
-
-        if oracle_labels:
-            oracle_data_files = []
-            for oracle_label in oracle_labels:
-                oracle_data_files.append(os.path.join(dir, 'label-' + oracle_label + '.h5'))
-            oracles_files.append(oracle_data_files)
-
-    train_dataset = h5Dataset(data_files, labels_files, params_files, oracles_files)
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=0)  # can't use more on windows , multiprocessing_context='spawn'
-
-    test_loaders = []
-    for val_set_name in test_sets:
-        dir = os.path.join(load_path, val_set_name)
-        val_data_file = os.path.join(dir, 'obs.h5')
-        val_labels_file = os.path.join(dir, 'label-' + target_label + '.h5')
-        val_params_file = os.path.join(dir, 'params.h5')
-
-        if oracle_labels:
-            oracle_data_files = []
-            for oracle_label in oracle_labels:
-                oracle_data_files.append(os.path.join(dir, 'label-' + oracle_label + '.h5'))
-        else:
-            oracle_data_files = None
-
-        val_dataset = h5Dataset([val_data_file], [val_labels_file], [val_params_file], [oracle_data_files])
-        test_loaders.append(DataLoader(val_dataset, batch_size=batch_size, shuffle=False))'''
-
-
-    for data_name in train_sets:
-        dir = os.path.join(load_path, data_name)
-        data.append(np.load(os.path.join(dir, 'obs.npz'), mmap_mode='r')['arr_0'])
-        labels.append(np.load(os.path.join(dir, 'label-' + target_label + '.npz'), mmap_mode='r')['arr_0'])
-        params.append(np.load(os.path.join(dir, 'params.npz'), mmap_mode='r')['arr_0'])
-        if oracle_labels:
-            oracle_data = []
-            for oracle_label in oracle_labels:
-                this_oracle = np.load(os.path.join(dir, 'label-' + oracle_label + '.npz'), mmap_mode='r')['arr_0']
-                flattened_oracle = this_oracle.reshape(this_oracle.shape[0], -1)
-                oracle_data.append(flattened_oracle)
-            combined_oracle_data = np.concatenate(oracle_data, axis=-1)
-            oracles.append(combined_oracle_data)
-
-
-    '''data = np.concatenate(data, axis=0)
-    labels = np.concatenate(labels, axis=0)
-    params = np.concatenate(params, axis=0)
-    if oracle_labels:
-        oracles = np.concatenate(oracles, axis=0)
-    else:
-        oracles = np.zeros((len(data), 0))'''
-
-
-    train_dataset = CustomDatasetBig(data, labels, params, oracles)
-    del data, labels, params, oracles
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=0) #can't use more on windows
-
+    param_losses_list = []
 
     test_loaders = []
     for val_set_name in test_sets:
@@ -183,27 +104,70 @@ def train_model(train_sets, target_label, test_sets, load_path='supervised/', sa
         val_dataset = CustomDataset(val_data, val_labels, val_params, combined_oracle_data)
         test_loaders.append(DataLoader(val_dataset, batch_size=batch_size, shuffle=False))
 
-    # broken rn
+    for idx, _val_loader in enumerate(test_loaders):
+        with torch.no_grad():
+
+            for inputs, labels, params, oracle_inputs in _val_loader:
+                outputs = model(inputs, oracle_inputs)
+                losses = special_criterion(outputs, torch.argmax(labels, dim=1))
+                _, predicted = torch.max(outputs, 1)
+                corrects = (predicted == torch.argmax(labels, dim=1)).float()
+                batch_param_losses = [
+                    {'param': param, 'epoch': epoch_number, 'loss': loss.item(), 'accuracy': correct.item()}
+                    for param, loss, correct in zip(params, losses, corrects)]
+                param_losses_list.extend(batch_param_losses)
+
+    # save dfs periodically to free up ram:
+    df_paths = []
+    os.makedirs(model_save_path, exist_ok=True)
+    df = pd.DataFrame(param_losses_list)
+    df = df.join(df['param'].apply(decode_event_name))
+    df.replace(r'N/A.*', 'na', regex=True, inplace=True)  # todo: construct na dict automatically
+    df.to_csv(os.path.join(model_save_path, f'param_losses_{epoch_number}_{repetition}.csv'))
+    df_paths.append(os.path.join(model_save_path, f'param_losses_{epoch_number}_{repetition}.csv'))
+    return df_paths
+
+
+def train_model(train_sets, target_label, test_sets, load_path='supervised/', save_path='', epochs=100,
+                model_kwargs=None,
+                lr=0.001, oracle_labels=[], repetition=0):
+    batch_size = 64
+    use_cuda = torch.cuda.is_available()
+    if oracle_labels[0] == None:
+        oracle_labels = []
+    data, labels, params, oracles = [], [], [], []
+
+    for data_name in train_sets:
+        dir = os.path.join(load_path, data_name)
+        data.append(np.load(os.path.join(dir, 'obs.npz'), mmap_mode='r')['arr_0'])
+        labels.append(np.load(os.path.join(dir, 'label-' + target_label + '.npz'), mmap_mode='r')['arr_0'])
+        params.append(np.load(os.path.join(dir, 'params.npz'), mmap_mode='r')['arr_0'])
+        if oracle_labels:
+            oracle_data = []
+            for oracle_label in oracle_labels:
+                this_oracle = np.load(os.path.join(dir, 'label-' + oracle_label + '.npz'), mmap_mode='r')['arr_0']
+                flattened_oracle = this_oracle.reshape(this_oracle.shape[0], -1)
+                oracle_data.append(flattened_oracle)
+            combined_oracle_data = np.concatenate(oracle_data, axis=-1)
+            oracles.append(combined_oracle_data)
+
+    train_dataset = CustomDatasetBig(data, labels, params, oracles)
+    del data, labels, params, oracles
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True,
+                              num_workers=0)  # can't use more on windows
+
     model_kwargs['oracle_len'] = 0 if len(oracle_labels) == 0 else len(train_dataset.oracles_list[0][0])
     model_kwargs['output_len'] = 5  # np.prod(labels.shape[1:])
     model_kwargs['channels'] = 5  # np.prod(params.shape[2])
 
     device = torch.device('cuda' if use_cuda else 'cpu')
     model = RNNModel(**model_kwargs).to(device)
-    criterion = nn.CrossEntropyLoss()  # nn.MSELoss()
-    special_criterion = nn.CrossEntropyLoss(reduction='none')
+    criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
-    #max_val_samples = 500
     num_epochs = epochs
-    train_losses = []
-    #val_losses = [[] for _ in range(len(test_loaders) + 1)]
-    df_paths = []
 
-    # param_losses = pd.DataFrame(columns=['param', 'epoch', 'loss'])
-    param_losses_list = []
-
-    t = tqdm.trange(num_epochs*len(train_loader))
+    t = tqdm.trange(num_epochs * len(train_loader))
 
     for epoch in range(num_epochs):
         train_loss = 0
@@ -213,47 +177,14 @@ def train_model(train_sets, target_label, test_sets, load_path='supervised/', sa
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-            #train_loss += loss.item()
+            # train_loss += loss.item()
             t.update(1)
-            #if i > len(train_loader)//5:
+            # if i > len(train_loader)//5:
             #    break
 
-        #train_losses.append(train_loss / len(train_loader))
-        model.eval()
-        for idx, _val_loader in enumerate(test_loaders):
-            with torch.no_grad():
-
-                for inputs, labels, params, oracle_inputs in _val_loader:
-                    outputs = model(inputs, oracle_inputs)
-                    losses = special_criterion(outputs, torch.argmax(labels, dim=1))
-                    _, predicted = torch.max(outputs, 1)
-                    corrects = (predicted == torch.argmax(labels, dim=1)).float()
-                    batch_param_losses = [
-                        {'param': param, 'epoch': epoch, 'loss': loss.item(), 'accuracy': correct.item()}
-                        for param, loss, correct in zip(params, losses, corrects)]
-                    param_losses_list.extend(batch_param_losses)
-
-        # save dfs periodically to free up ram:
+        print('saving model')
         os.makedirs(save_path, exist_ok=True)
-        df = pd.DataFrame(param_losses_list)
-        df = df.join(df['param'].apply(decode_event_name))
-        df.replace(r'N/A.*', 'na', regex=True, inplace=True) # todo: construct na dict automatically
-        df.to_csv(os.path.join(save_path, f'param_losses_{epoch}_{repetition}.csv'))
-        df_paths.append(os.path.join(save_path, f'param_losses_{epoch}_{repetition}.csv'))
-        param_losses_list = []
-        del df
-
-        model.train()
-    # save model
-    os.makedirs(save_path, exist_ok=True)
-    print('saving model')
-    torch.save([model.kwargs, model.state_dict()], os.path.join(save_path, f'{data_name}-model.pt'))
-
-    # pd.DataFrame(param_losses_list).to_csv(path + 'param_losses.csv')
-    # df = pd.read_csv('supervised/param_losses.csv')
-    # Apply the decoding function to each row
-
-    return df_paths
+        torch.save([model.kwargs, model.state_dict()], os.path.join(save_path, f'{repetition}-model_epoch{epoch}.pt'))
 
 
 def calculate_ci(group):
@@ -292,7 +223,6 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False):
         'accuracy_correlations': target_correlations,
         'vars': variable_columns
     }
-
 
     for param in params:
         ci_df = df.groupby([param, 'epoch'])['accuracy'].apply(calculate_ci).reset_index()
@@ -401,6 +331,8 @@ def write_metrics_to_file(filepath, df, ranges, params, stats):
 def find_df_paths(directory, file_pattern):
     """Find all CSV files in a directory based on a pattern."""
     return glob.glob(f"{directory}/{file_pattern}")
+
+
 # train_model('random-2500', 'exist')
 def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, eval_name='a1',
                            load_path='supervised', oracle_labels=[], skip_train=True):
@@ -445,11 +377,17 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
             last_epoch_df_paths = []
             if not skip_train:
                 for repetition in range(repetitions):
-                    train_df_paths = train_model(train_sets, 'correctSelection', [eval_name], load_path=load_path,
-                                                     save_path=save_path, epochs=epochs, model_kwargs=model_kwargs,
-                                                     lr=lr, oracle_labels=oracle_labels, repetition=repetition)
-                    dfs_paths.extend(train_df_paths)
-                    last_epoch_df_paths.append(train_df_paths[-1])
+                    train_model(train_sets, 'correctSelection', [eval_name], load_path=load_path,
+                                save_path=save_path, epochs=epochs, model_kwargs=model_kwargs,
+                                lr=lr, oracle_labels=oracle_labels, repetition=repetition)
+                    for epoch in range(epochs):
+                        df_paths = evaluate_model([eval_name], 'correctSelection', load_path=load_path,
+                                                  model_save_path=save_path,
+                                                  oracle_labels=oracle_labels, repetition=repetition,
+                                                  epoch_number=epoch)
+                        dfs_paths.extend(df_paths)
+                        if epoch == epochs - 1:
+                            last_epoch_df_paths.extend(df_paths)
             else:
                 dfs_paths = find_df_paths(save_path, 'param_losses_*_*.csv')
                 max_epoch = max(int(path.split('_')[-2]) for path in dfs_paths)
@@ -466,7 +404,6 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
             params = ['visible_baits', 'swaps', 'visible_swaps', 'first_swap_is_both',
                       'second_swap_to_first_loc', 'delay_2nd_bait', 'first_bait_size',
                       'uninformed_bait', 'uninformed_swap', 'first_swap']
-
 
             avg_loss, variances, ranges_1, ranges_2, range_dict, range_dict3, stats = calculate_statistics(
                 combined_df, last_epoch_df, params, skip_3x=True)

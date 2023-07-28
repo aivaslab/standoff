@@ -223,4 +223,4 @@ def experiments(todo, repetitions, epochs, skip_train=False):
 
 
 if __name__ == '__main__':
-    experiments([2], 1, 20, skip_train=True)
+    experiments([2], 1, 3, skip_train=False)
