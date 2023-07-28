@@ -58,7 +58,7 @@ def create_combined_histogram(df, combined_avg, param, folder):
     plt.close()
 
 
-def experiments(todo, repetitions, epochs):
+def experiments(todo, repetitions, epochs, skip_train=False):
     """What is the overall performance of naive, off-the-shelf models on this task? Which parameters of competitive
     feeding settings are the most sensitive to overall model performance? To what extent are different models
     sensitive to different parameters? """
@@ -110,40 +110,54 @@ def experiments(todo, repetitions, epochs):
 
     if 2 in todo:
         print('Running experiment 2: varied oracle modules')
-        df_list = []
-        avg_list = []
+        combined_path_list = []
+        last_path_list = []
         #os.makedirs(os.path.join('supervised', 'exp_2'), exist_ok=True)
 
         for single_oracle, oracle_name in zip(oracles, oracle_names):
             print('oracle:', single_oracle)
-            combined_df, last_epoch_df = run_supervised_session(save_path=os.path.join('supervised', 'exp_2', oracle_name),
+            combined_paths, last_epoch_paths = run_supervised_session(save_path=os.path.join('supervised', 'exp_2', oracle_name),
                                    repetitions=repetitions,
                                    epochs=epochs,
                                    train_sets=regimes[4][1], # complete train regime, should be 3 for final
                                    oracle_labels=[single_oracle],
-                                    skip_train=False)
-            df_list.append(last_epoch_df)
-            avg_list.append(combined_df)
+                                   skip_train=skip_train)
+            last_path_list.append(last_epoch_paths)
+            combined_path_list.append(combined_paths)
 
-        last_epoch_df_list = [df.assign(oracle=oracle_name) for df, oracle_name in zip(df_list, oracle_names)]
-        avg_list = [df.assign(oracle=oracle_name) for df, oracle_name in zip(avg_list, oracle_names)]
+        replace_dict = {'1': 1, '0': 0}
 
-        last_epoch_df = pd.concat(last_epoch_df_list, ignore_index=True)
-        combined_avg = pd.concat(avg_list, ignore_index=True)
+        print('loading dataframes')
+
+        combined_df = pd.DataFrame()
+        for df_path, oracle_name in zip(combined_path_list, oracle_names):
+            chunks = pd.read_csv(df_path, chunksize=10000)
+            for chunk in chunks:
+                chunk.replace(replace_dict, inplace=True)
+                chunk = chunk.assign(oracle=oracle_name)
+                combined_df = pd.concat([combined_df, chunk], ignore_index=True)
+
+        last_epoch_df = pd.DataFrame()
+        for df_path, oracle_name in zip(last_path_list, oracle_names):
+            chunks = pd.read_csv(df_path, chunksize=10000)
+            for chunk in chunks:
+                chunk.replace(replace_dict, inplace=True)
+                chunk = chunk.assign(oracle=oracle_name)
+                last_epoch_df = pd.concat([last_epoch_df, chunk], ignore_index=True)
 
         params = ['visible_baits', 'swaps', 'visible_swaps', 'first_swap_is_both',
                   'second_swap_to_first_loc', 'delay_2nd_bait', 'first_bait_size',
                   'uninformed_bait', 'uninformed_swap', 'first_swap', 'oracle']  # added 'oracle' here
 
         avg_loss, variances, ranges_1, ranges_2, range_dict, range_dict3, stats = calculate_statistics(
-            combined_avg, last_epoch_df, params, skip_3x=True) #todo: make it definitely save one fixed param eg oracle
+            combined_df, last_epoch_df, params, skip_3x=True) #todo: make it definitely save one fixed param eg oracle
 
-        create_combined_histogram(last_epoch_df, combined_avg, 'oracle', os.path.join('supervised', 'exp_2'))
+        create_combined_histogram(last_epoch_df, combined_df, 'oracle', os.path.join('supervised', 'exp_2'))
 
         combined_path = os.path.join('supervised', 'exp_2', 'c')
         os.makedirs(combined_path, exist_ok=True)
         write_metrics_to_file(os.path.join(combined_path, 'metrics.txt'), last_epoch_df, ranges_1, params, stats)
-        save_figures(os.path.join(combined_path, 'figs'), combined_avg, avg_loss, ranges_2, range_dict, range_dict3,
+        save_figures(os.path.join(combined_path, 'figs'), combined_df, avg_loss, ranges_2, range_dict, range_dict3,
                      params, last_epoch_df, num=12)
 
 
@@ -205,4 +219,4 @@ def experiments(todo, repetitions, epochs):
 
 
 if __name__ == '__main__':
-    experiments([2], 1, 20)
+    experiments([2], 1, 20, skip_train=True)

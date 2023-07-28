@@ -458,12 +458,9 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
             print('loading dfs...')
             df_list = [pd.read_csv(df_path) for df_path in dfs_paths]
             combined_df = pd.concat(df_list, ignore_index=True)
-            combined_df = combined_df.apply(pd.to_numeric, errors='ignore')
             last_df_list = [pd.read_csv(df_path) for df_path in last_epoch_df_paths]
             last_epoch_df = pd.concat(last_df_list, ignore_index=True)
-
             replace_dict = {'1': 1, '0': 0}
-
             combined_df.replace(replace_dict, inplace=True)
             last_epoch_df.replace(replace_dict, inplace=True)
             params = ['visible_baits', 'swaps', 'visible_swaps', 'first_swap_is_both',
@@ -484,7 +481,7 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
         except BaseException as e:
             print(e)
             traceback.print_exc()
-    return combined_df, last_epoch_df
+    return dfs_paths, last_epoch_df_paths
 
 
 def convert_to_int(value):
