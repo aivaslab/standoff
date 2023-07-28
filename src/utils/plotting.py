@@ -18,7 +18,6 @@ def moving_average(values, window):
     weights = np.repeat(1.0, window) / window
     return np.convolve(values, weights, 'valid')
 
-
 def plot_results(log_folder, title='Learning Curve'):
     """
     plot the results
@@ -367,9 +366,9 @@ def save_double_param_figures(save_dir, top_pairs, df, avg_loss, last_epoch_df):
             for value2 in df[param2].unique():
                 value_df = last_epoch_df[(last_epoch_df[param2] == value2) & (last_epoch_df[param1] == value1)]
                 mean_acc = value_df.groupby('param')['accuracy'].mean()
-                hist_data.append(mean_acc.values)
+                hist_data.append(pd.Categorical(mean_acc))
                 labels.append(f'{param2} = {value2}, {param1} = {value1}')
-        hist_data = np.asarray(hist_data, dtype=object)
+        hist_data = [np.array(data) for data in hist_data]
         plt.hist(hist_data, bins=np.arange(0, 1.01, 0.05), stacked=True, label=labels, alpha=0.5)
 
         plt.title(f'Histogram of accuracy for {param2} and {param1}')
@@ -407,13 +406,18 @@ def save_single_param_figures(save_dir, params, df, avg_loss, last_epoch_df):
         for value in df[param].unique():
             value_df = last_epoch_df[last_epoch_df[param] == value]
             mean_acc = value_df.groupby('param')['accuracy'].mean()
-            hist_data.append(mean_acc.values)
+            hist_data.append(pd.Categorical(mean_acc))
             labels.append(f'{param} = {value}')
             #print(param, value, len(mean_acc.values), mean_acc.values)
 
+
         #print('lenny', len(hist_data))
-        hist_data = np.asarray(hist_data, dtype=object)
-        plt.hist(hist_data, bins=np.arange(0, 1.01, 0.05), stacked=True, label=labels, alpha=0.5)
+        #hist_data = np.asarray(hist_data, dtype=object)
+        hist_data = [np.array(data) for data in hist_data]
+
+        plt.hist(hist_data, bins=np.arange(0, 1.01, 0.05), stacked=True, label=labels)
+        #for i, data in enumerate(hist_data):
+        #    plt.hist(data, bins=np.arange(0, 1.01, 0.05), stacked=True, label=labels[i], alpha=0.5)
 
         plt.title(f'Histogram of accuracy for last epoch for {param}')
         plt.xlabel('Accuracy')
@@ -452,9 +456,9 @@ def save_fixed_double_param_figures(save_dir, top_n_ranges, df, avg_loss, last_e
         for value2 in subset[param2].unique():
             value_df = last_epoch_df[(last_epoch_df[param2] == value2) & (last_epoch_df[param1] == value1)]
             mean_acc = value_df.groupby('param')['accuracy'].mean()
-            hist_data.append(mean_acc.values)
+            hist_data.append(pd.Categorical(mean_acc))
             labels.append(f'{param2} = {value2}')
-        hist_data = np.asarray(hist_data, dtype=object)
+        hist_data = [np.array(data) for data in hist_data]
         plt.hist(hist_data, bins=np.arange(0, 1.01, 0.05), stacked=True, label=labels, alpha=0.5)
 
         plt.title(f'Histogram of accuracy for {param2} given {param1} = {value1}')
@@ -495,9 +499,9 @@ def save_fixed_triple_param_figures(save_dir, top_n_ranges, df, avg_loss, last_e
         for value3 in subset[param3].unique():
             value_df = last_epoch_df[(last_epoch_df[param2] == value2) & (last_epoch_df[param1] == value1) & (last_epoch_df[param3] == value3)]
             mean_acc = value_df.groupby('param')['accuracy'].mean()
-            hist_data.append(mean_acc.values)
+            hist_data.append(pd.Categorical(mean_acc))
             labels.append(f'{param3} = {value3}')
-        hist_data = np.asarray(hist_data, dtype=object)
+        hist_data = [np.array(data) for data in hist_data]
         plt.hist(hist_data, bins=np.arange(0, 1.01, 0.05), stacked=True, label=labels, alpha=0.5)
 
         plt.title(f'Histogram of accuracy for {param3} given {param1} = {value1} and {param2} = {value2}')
