@@ -283,6 +283,17 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False):
     param_pairs = itertools.combinations(params, 2)
     param_triples = itertools.combinations(params, 3)
 
+    numeric_columns = last_epoch_df.select_dtypes(include=[np.number]).columns  # select only numeric columns
+    variable_columns = [col for col in numeric_columns if last_epoch_df[col].std() > 0]  # filter out constant columns
+    correlations = last_epoch_df[variable_columns].corr()
+    target_correlations = last_epoch_df.corr()['accuracy'][variable_columns]
+    stats = {
+        'param_correlations': correlations,
+        'accuracy_correlations': target_correlations,
+        'vars': variable_columns
+    }
+
+
     for param in params:
         ci_df = df.groupby([param, 'epoch'])['accuracy'].apply(calculate_ci).reset_index()
         avg_loss[param] = ci_df
@@ -315,7 +326,7 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False):
                         new_means = subset.groupby(param3)['accuracy'].mean()
                         range_dict3[(param1, value1, param2, value2, param3)] = new_means.max() - new_means.min()
 
-    return avg_loss, variances, ranges_1, ranges_2, range_dict, range_dict3, last_epoch_df
+    return avg_loss, variances, ranges_1, ranges_2, range_dict, range_dict3, stats
 
 
 def save_figures(path, df, avg_loss, ranges, range_dict, range_dict3, params, last_epoch_df, num=10):
@@ -329,7 +340,7 @@ def save_figures(path, df, avg_loss, ranges, range_dict, range_dict3, params, la
     save_fixed_triple_param_figures(path, top_n_ranges3, df, avg_loss, last_epoch_df)
 
 
-def write_metrics_to_file(filepath, df, ranges, params):
+def write_metrics_to_file(filepath, df, ranges, params, stats):
     df2 = df[df['epoch'] == df['epoch'].max()]
     with open(filepath, 'w') as f:
         mean_accuracy = df2['accuracy'].mean()
@@ -376,6 +387,15 @@ def write_metrics_to_file(filepath, df, ranges, params):
         f.write("\nBottom 10 parameter values based on average accuracy:\n")
         for param, value, mean_accuracy, std_dev in bottom_10_values:
             f.write(f"Parameter: {param}, Value: {value}, Mean accuracy: {mean_accuracy}, Std. deviation: {std_dev}\n")
+
+        f.write("\nCorrelations between parameters and accuracy:\n")
+        for param in stats['vars']:
+            f.write(f"Correlation between {param} and acc: {stats['accuracy_correlations'][param]}\n")
+
+        f.write("\nCorrelations between parameters:\n")
+        for i in range(len(stats['vars'])):
+            for j in range(i + 1, len(stats['vars'])):
+                f.write(f"Correlation between {params[i]} and {params[j]}: {stats['param_correlations'].iloc[i, j]}\n")
 
 
 def find_df_paths(directory, file_pattern):
@@ -438,16 +458,23 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
             print('loading dfs...')
             df_list = [pd.read_csv(df_path) for df_path in dfs_paths]
             combined_df = pd.concat(df_list, ignore_index=True)
+            combined_df = combined_df.apply(pd.to_numeric, errors='ignore')
             last_df_list = [pd.read_csv(df_path) for df_path in last_epoch_df_paths]
             last_epoch_df = pd.concat(last_df_list, ignore_index=True)
+
+            replace_dict = {'1': 1, '0': 0}
+
+            combined_df.replace(replace_dict, inplace=True)
+            last_epoch_df.replace(replace_dict, inplace=True)
             params = ['visible_baits', 'swaps', 'visible_swaps', 'first_swap_is_both',
                       'second_swap_to_first_loc', 'delay_2nd_bait', 'first_bait_size',
                       'uninformed_bait', 'uninformed_swap', 'first_swap']
 
-            avg_loss, variances, ranges_1, ranges_2, range_dict, range_dict3, last_epoch_df = calculate_statistics(
+
+            avg_loss, variances, ranges_1, ranges_2, range_dict, range_dict3, stats = calculate_statistics(
                 combined_df, last_epoch_df, params, skip_3x=True)
 
-            write_metrics_to_file(os.path.join(save_path, 'metrics.txt'), last_epoch_df, ranges_1, params)
+            write_metrics_to_file(os.path.join(save_path, 'metrics.txt'), last_epoch_df, ranges_1, params, stats)
 
             save_figures(os.path.join(save_path, 'figs'), combined_df, avg_loss, ranges_2, range_dict, range_dict3,
                          params, last_epoch_df, num=12)
@@ -458,3 +485,10 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
             print(e)
             traceback.print_exc()
     return combined_df, last_epoch_df
+
+
+def convert_to_int(value):
+    try:
+        return int(value)
+    except ValueError:
+        return value
