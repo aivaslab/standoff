@@ -1,3 +1,4 @@
+import glob
 import itertools
 
 import sys
@@ -71,7 +72,7 @@ def decode_event_name(name):
 
 def train_model(train_sets, target_label, test_sets, load_path='supervised/', save_path='', epochs=100, model_kwargs=None,
                 lr=0.001, oracle_labels=[], repetition=0):
-    batch_size = 64
+    batch_size = 256
     use_cuda = torch.cuda.is_available()
     if oracle_labels[0] == None:
         oracle_labels = []
@@ -236,6 +237,7 @@ def train_model(train_sets, target_label, test_sets, load_path='supervised/', sa
         os.makedirs(save_path, exist_ok=True)
         df = pd.DataFrame(param_losses_list)
         df = df.join(df['param'].apply(decode_event_name))
+        df.replace(r'N/A.*', 'na', regex=True, inplace=True) # todo: construct na dict automatically
         df.to_csv(os.path.join(save_path, f'param_losses_{epoch}_{repetition}.csv'))
         df_paths.append(os.path.join(save_path, f'param_losses_{epoch}_{repetition}.csv'))
         param_losses_list = []
@@ -266,7 +268,7 @@ def calculate_ci(group):
                         columns=['lower', 'upper', 'mean'])
 
 
-def calculate_statistics(df, params, skip_3x=False):
+def calculate_statistics(df, last_epoch_df, params, skip_3x=False):
     avg_loss = {}
     variances = {}
     ranges_1 = {}
@@ -276,7 +278,6 @@ def calculate_statistics(df, params, skip_3x=False):
 
     print('calculating statistics...')
 
-    last_epoch_df = df[df['epoch'] == df['epoch'].max()]
     # hist_data = last_epoch_df.groupby('param').mean(numeric_only=True)
 
     param_pairs = itertools.combinations(params, 2)
@@ -377,10 +378,12 @@ def write_metrics_to_file(filepath, df, ranges, params):
             f.write(f"Parameter: {param}, Value: {value}, Mean accuracy: {mean_accuracy}, Std. deviation: {std_dev}\n")
 
 
+def find_df_paths(directory, file_pattern):
+    """Find all CSV files in a directory based on a pattern."""
+    return glob.glob(f"{directory}/{file_pattern}")
 # train_model('random-2500', 'exist')
 def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, eval_name='a1',
-                           load_path='supervised', oracle_labels=[]):
-    labels = ['correctSelection']
+                           load_path='supervised', oracle_labels=[], skip_train=True):
     # labels = ['loc', 'exist', 'vision', 'b-loc', 'b-exist', 'target', 'correctSelection']
 
     model_kwargs_base = {'hidden_size': [6, 8, 12, 16, 32],
@@ -419,28 +422,35 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
             model_name = "".join([str(x) + "," for x in model_kwargs.values()])
 
             dfs_paths = []
-            for target_label in labels:
+            last_epoch_df_paths = []
+            if not skip_train:
                 for repetition in range(repetitions):
-                    train_df_paths = train_model(train_sets, target_label, [eval_name], load_path=load_path,
+                    train_df_paths = train_model(train_sets, 'correctSelection', [eval_name], load_path=load_path,
                                                      save_path=save_path, epochs=epochs, model_kwargs=model_kwargs,
                                                      lr=lr, oracle_labels=oracle_labels, repetition=repetition)
                     dfs_paths.extend(train_df_paths)
+                    last_epoch_df_paths.append(train_df_paths[-1])
+            else:
+                dfs_paths = find_df_paths(save_path, 'param_losses_*_*.csv')
+                max_epoch = max(int(path.split('_')[-2]) for path in dfs_paths)
+                last_epoch_df_paths = [path for path in dfs_paths if int(path.split('_')[-2]) == max_epoch]
 
-                print('concatenating, etc')
+            print('loading dfs...')
+            df_list = [pd.read_csv(df_path) for df_path in dfs_paths]
+            combined_df = pd.concat(df_list, ignore_index=True)
+            last_df_list = [pd.read_csv(df_path) for df_path in last_epoch_df_paths]
+            last_epoch_df = pd.concat(last_df_list, ignore_index=True)
+            params = ['visible_baits', 'swaps', 'visible_swaps', 'first_swap_is_both',
+                      'second_swap_to_first_loc', 'delay_2nd_bait', 'first_bait_size',
+                      'uninformed_bait', 'uninformed_swap', 'first_swap']
 
-                df_list = [pd.read_csv(df_path) for df_path in dfs_paths]
-                combined_df = pd.concat(df_list, ignore_index=True)
-                params = ['visible_baits', 'swaps', 'visible_swaps', 'first_swap_is_both',
-                          'second_swap_to_first_loc', 'delay_2nd_bait', 'first_bait_size',
-                          'uninformed_bait', 'uninformed_swap', 'first_swap']
+            avg_loss, variances, ranges_1, ranges_2, range_dict, range_dict3, last_epoch_df = calculate_statistics(
+                combined_df, last_epoch_df, params, skip_3x=True)
 
-                avg_loss, variances, ranges_1, ranges_2, range_dict, range_dict3, last_epoch_df = calculate_statistics(
-                    combined_df, params, skip_3x=True)
+            write_metrics_to_file(os.path.join(save_path, 'metrics.txt'), last_epoch_df, ranges_1, params)
 
-                write_metrics_to_file(os.path.join(save_path, 'metrics.txt'), combined_df, ranges_1, params)
-
-                save_figures(os.path.join(save_path, 'figs'), combined_df, avg_loss, ranges_2, range_dict, range_dict3,
-                             params, last_epoch_df, num=12)
+            save_figures(os.path.join(save_path, 'figs'), combined_df, avg_loss, ranges_2, range_dict, range_dict3,
+                         params, last_epoch_df, num=12)
 
             test_names.append(model_name)
             test += 1

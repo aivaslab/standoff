@@ -122,9 +122,25 @@ def experiments(todo, repetitions, epochs):
                                    oracle_labels=[single_oracle])
             df_list.append(df)
             avg_list.append(combined_df)
-        combined_df = add_label_and_combine_dfs(df_list, [x for x in oracle_names], 'oracle')
-        combined_avg = add_label_and_combine_dfs(avg_list, [x for x in oracle_names], 'oracle')
+
+        df_list = [df.assign(oracle=oracle_name) for df, oracle_name in zip(df_list, oracle_names)]
+        avg_list = [df.assign(oracle=oracle_name) for df, oracle_name in zip(avg_list, oracle_names)]
+
+        combined_df = pd.concat(df_list, ignore_index=True)
+        combined_avg = pd.concat(avg_list, ignore_index=True)
+
+        params = ['visible_baits', 'swaps', 'visible_swaps', 'first_swap_is_both',
+                  'second_swap_to_first_loc', 'delay_2nd_bait', 'first_bait_size',
+                  'uninformed_bait', 'uninformed_swap', 'first_swap', 'oracle']  # added 'oracle' here
+
+        avg_loss, variances, ranges_1, ranges_2, range_dict, range_dict3, last_epoch_df = calculate_statistics(
+            combined_df, params, skip_3x=True) #todo: make it definitely save one fixed param eg oracle
+
         create_combined_histogram(combined_df, combined_avg, 'oracle', os.path.join('supervised', 'exp_2'))
+
+        write_metrics_to_file(os.path.join(os.path.join('supervised', 'exp_2', 'c'), 'metrics.txt'), last_epoch_df, ranges_1, params)
+        save_figures(os.path.join(os.path.join('supervised', 'exp_2', 'c'), 'figs'), combined_df, avg_loss, ranges_2, range_dict, range_dict3,
+                     params, last_epoch_df, num=12)
 
 
 
