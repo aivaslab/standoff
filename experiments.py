@@ -114,7 +114,7 @@ def experiments(todo, repetitions, epochs, skip_train=False, batch_size=64):
         last_path_list = []
         #os.makedirs(os.path.join('supervised', 'exp_2'), exist_ok=True)
 
-        for single_oracle, oracle_name in zip(oracles[:3], oracle_names):
+        for single_oracle, oracle_name in zip(oracles, oracle_names):
             print('oracle:', single_oracle)
             combined_paths, last_epoch_paths = run_supervised_session(save_path=os.path.join('supervised', 'exp_2', oracle_name),
                                    repetitions=repetitions,
@@ -224,5 +224,4 @@ def experiments(todo, repetitions, epochs, skip_train=False, batch_size=64):
 
 
 if __name__ == '__main__':
-    experiments([2], 1, 3, skip_train=False)
-    experiments([2], 1, 3, skip_train=False, batch_size=256)
+    experiments([2], 1, 20, skip_train=False, batch_size=256)
