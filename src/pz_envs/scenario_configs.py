@@ -93,7 +93,7 @@ def count_permutations(event_list):
 
 
 def identify_counterfactuals(events):
-    knowledge = {'eb': False, 'es': False, 'lb': False, 'ls': False}
+    knowledge = {'eb': False, 'es': False, 'lb': False, 'ls': False, 'cflb': False, 'cfls': False}
     vision = True
     treat_sizes = [-1 for _ in range(len(events))]
 
@@ -103,48 +103,63 @@ def identify_counterfactuals(events):
         elif event[0] == 're':
             vision = True
         elif event[0] == 'b':
-            if vision:
-                if event[1] == 1:
+            if event[1] == 1:
+                treat_sizes[k] = 1
+                if vision:
                     knowledge['eb'] = True
-                    treat_sizes[k] = 1
-                else:
+                    knowledge['lb'] = True
+            else:
+                treat_sizes[k] = 0
+                if vision:
                     knowledge['es'] = True
-                    treat_sizes[k] = 0
+                    knowledge['ls'] = True
         elif event[0] == 'sw':
             if vision:
                 size = treat_sizes[event[1]]
                 if size == 1:
                     knowledge['eb'] = True
                     knowledge['lb'] = True
+                    knowledge['cflb'] = False
                     treat_sizes[k] = 1
                 elif size == 0:
                     knowledge['es'] = True
                     knowledge['ls'] = True
+                    knowledge['cfls'] = False
                     treat_sizes[k] = 0
                 if event[2] != 'e':
                     size2 = treat_sizes[event[2]]
                     if size2 == 1:
                         knowledge['eb'] = True
                         knowledge['lb'] = True
+                        knowledge['cflb'] = False
                     elif size2 == 0:
                         knowledge['es'] = True
                         knowledge['ls'] = True
+                        knowledge['cfls'] = False
             else:
                 size = treat_sizes[event[1]]
                 if size == 1:
+                    if knowledge['lb']:
+                        knowledge['cflb'] = True
                     knowledge['lb'] = False
                     treat_sizes[k] = 1
                 elif size == 0:
+                    if knowledge['ls']:
+                        knowledge['cfls'] = True
                     knowledge['ls'] = False
                     treat_sizes[k] = 0
                 if event[2] != 'e':
                     size2 = treat_sizes[event[2]]
                     if size2 == 1:
+                        if knowledge['lb']:
+                            knowledge['cflb'] = True
                         knowledge['lb'] = False
                     elif size2 == 0:
+                        if knowledge['ls']:
+                            knowledge['cfls'] = True
                         knowledge['ls'] = False
 
-    return knowledge['eb'], knowledge['es'], knowledge['lb'], knowledge['ls']
+    return knowledge['eb'], knowledge['es'], knowledge['lb'], knowledge['ls'], knowledge['cflb'], knowledge['cfls']
 
 
 def count_knowledge_combinations(event_lists, knowledges):
@@ -152,12 +167,14 @@ def count_knowledge_combinations(event_lists, knowledges):
 
     # Helper function to convert tuple to a string key
     def tuple_to_key(knowledge_tuple):
-        mapping = ['eb', 'es', 'lb', 'ls']
+        mapping = ['eb', 'es', 'lb', 'ls', 'cflb', 'cfls']
         return '-'.join([mapping[i] for i, val in enumerate(knowledge_tuple) if val])
 
     for name in event_lists:
         key = tuple_to_key(knowledges[name])
         counter[key] = counter.get(key, 0) + 1
+        if key == '':
+            print(name, event_lists[name])
 
     return counter
 
@@ -257,6 +274,7 @@ class ScenarioConfigs:
 
         events = remove_unnecessary_sequences(events)
         event_list_knowledge[name] = identify_counterfactuals(events)
+
 
         all_event_lists[name] = events
         if visible_baits == 2 and visible_swaps == swaps:
