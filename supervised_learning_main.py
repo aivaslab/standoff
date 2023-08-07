@@ -367,10 +367,10 @@ def write_metrics_to_file(filepath, df, ranges, params, stats, key_param):
             for j in range(i + 1, len(stats['vars'])):
                 f.write(f"Correlation between {params[i]} and {params[j]}: {stats['param_correlations'].iloc[i, j]}\n")
 
-        key_param_corr = df2.corr()[key_param].sort_values(key='absolute', ascending=False)
+        '''key_param_corr = df2.corr()[key_param].sort_values(key='absolute', ascending=False)
         f.write("\nCorrelations between key parameter and other parameters:\n")
         for param, corr in key_param_corr.iteritems():
-            f.write(f"Correlation between {key_param} and {param}: {corr}\n")
+            f.write(f"Correlation between {key_param} and {param}: {corr}\n")'''
 def find_df_paths(directory, file_pattern):
     """Find all CSV files in a directory based on a pattern."""
     return glob.glob(f"{directory}/{file_pattern}")
