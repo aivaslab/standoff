@@ -92,17 +92,23 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
         oracle_labels = []
 
     param_losses_list = []
-    prior_metrics_data = []
+    prior_metrics_data = {}
 
     test_loaders = []
+    data, labels, params, oracles = [], [], [], []
+    cumulative_data_size = 0
+    cumulative_metric_size = 0
     for val_set_name in test_sets:
         dir = os.path.join(load_path, val_set_name)
-        val_data = np.load(os.path.join(dir, 'obs.npz'), mmap_mode='r')['arr_0']
-        val_labels = np.load(os.path.join(dir, 'label-' + target_label + '.npz'), mmap_mode='r')['arr_0']
-        val_params = np.load(os.path.join(dir, 'params.npz'), mmap_mode='r')['arr_0']
-        for metric in prior_metrics:
-            prior_metrics_data.append(np.load(os.path.join(dir, 'label-' + metric + '.npz'), mmap_mode='r')['arr_0'])
-        combined_prior_metrics_data = np.stack(prior_metrics_data, axis=-1)
+        data.append(np.load(os.path.join(dir, 'obs.npz'), mmap_mode='r')['arr_0'])
+        labels.append(np.load(os.path.join(dir, 'label-' + target_label + '.npz'), mmap_mode='r')['arr_0'])
+        params.append(np.load(os.path.join(dir, 'params.npz'), mmap_mode='r')['arr_0'])
+        for metric in set(prior_metrics):
+            metric_data = np.load(os.path.join(dir, 'label-' + metric + '.npz'), mmap_mode='r')['arr_0']
+            if metric in prior_metrics_data.keys():
+                prior_metrics_data[metric].append(metric_data)
+            else:
+                prior_metrics_data[metric] = [metric_data]
 
         if oracle_labels:
             oracle_data = []
@@ -111,10 +117,13 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
                 flattened_oracle = this_oracle.reshape(this_oracle.shape[0], -1)
                 oracle_data.append(flattened_oracle)
             combined_oracle_data = np.concatenate(oracle_data, axis=-1)
-        else:
-            combined_oracle_data = np.zeros((len(val_data), 0))
-        val_dataset = CustomDatasetBig(val_data, val_labels, val_params, combined_oracle_data, combined_prior_metrics_data, prior_metrics)
-        test_loaders.append(DataLoader(val_dataset, batch_size=batch_size, shuffle=False))
+            oracles.append(combined_oracle_data)
+
+    for metric, arrays in prior_metrics_data.items():
+        prior_metrics_data[metric] = np.concatenate(arrays, axis=0)
+
+    val_dataset = CustomDatasetBig(data, labels, params, oracles, prior_metrics_data)
+    test_loaders.append(DataLoader(val_dataset, batch_size=batch_size, shuffle=False))
 
     hook = SaveActivations()
     activations = []
@@ -134,15 +143,15 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
                 _, predicted = torch.max(outputs, 1)
                 corrects = (predicted == torch.argmax(labels, dim=1))
 
-                small_food_selected = (outputs == np.argmax(metrics['loc'][:, :, 0]))
-                big_food_selected = (outputs == np.argmax(metrics['loc'][:, :, 1]))
-                neither_food_selected = np.logical_not(np.logical_or(small_food_selected, big_food_selected))
+                small_food_selected = (predicted.cpu() == torch.argmax(metrics['loc'][:, :, 0], dim=1))
+                big_food_selected = (predicted.cpu() == torch.argmax(metrics['loc'][:, :, 1], dim=1))
+                neither_food_selected = ~(small_food_selected | big_food_selected)
 
                 batch_param_losses = [
                     {'param': param, 'epoch': epoch_number, 'loss': loss.item(), 'accuracy': correct.item(),
-                     'small_food_selected': small_food_selected.item(), 'big_food_selected': big_food_selected.item(),
-                     'neither_food_selected': neither_food_selected.item(), **metrics}
-                    for param, loss, correct in zip(params, losses, corrects)]
+                     'small_food_selected': small.item(), 'big_food_selected': big.item(),
+                     'neither_food_selected': neither.item(), **metrics}
+                    for param, loss, correct, small, big, neither in zip(params, losses, corrects, small_food_selected, big_food_selected, neither_food_selected)]
                 param_losses_list.extend(batch_param_losses)
 
     # save dfs periodically to free up ram:

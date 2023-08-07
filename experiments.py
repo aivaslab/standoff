@@ -66,7 +66,7 @@ def experiments(todo, repetitions, epochs, skip_train=False, batch_size=64):
     params = ['visible_baits', 'swaps', 'visible_swaps', 'first_swap_is_both',
               'second_swap_to_first_loc', 'delay_2nd_bait', 'first_bait_size',
               'uninformed_bait', 'uninformed_swap', 'first_swap']
-    prior_metrics = ['eName', 'shouldAvoidBig', 'shouldAvoidSmall', 'correctSelection', 'incorrectSelection',
+    prior_metrics = ['shouldAvoidBig', 'shouldAvoidSmall', 'correctSelection', 'incorrectSelection',
                      'firstBaitReward', 'eventVisibility', 'shouldGetBig', 'shouldGetSmall']
 
     sub_regime_keys = [
@@ -86,6 +86,7 @@ def experiments(todo, repetitions, epochs, skip_train=False, batch_size=64):
     ]
     regimes = {
         'situational': ['sl-' + x + '1' for x in sub_regime_keys],
+        'tiny': ['sl-' + x + '0' for x in ["eb-es"]],
         'informed': ['sl-' + x + '0' for x in ["eb-es-lb-ls"]] + ['sl-' + x + '1' for x in ["eb-es-lb-ls"]],
         'contrastive': ['sl-' + x + '0' for x in ["eb-es-lb-ls", ""]] + ['sl-' + x + '1' for x in ["eb-es-lb-ls", ""]],
         'complete': ['sl-' + x + '0' for x in sub_regime_keys] + ['sl-' + x + '1' for x in ["eb-es-lb-ls"]],
@@ -140,12 +141,12 @@ def experiments(todo, repetitions, epochs, skip_train=False, batch_size=64):
             combined_paths, last_epoch_paths = run_supervised_session(save_path=os.path.join('supervised', 'exp_2', oracle_name),
                                                 repetitions=repetitions,
                                                 epochs=epochs,
-                                                train_sets=regimes['complete'],
+                                                train_sets=regimes['tiny'],
                                                 eval_sets=regimes['situational'],
                                                 oracle_labels=[single_oracle],
                                                 skip_train=skip_train,
                                                 batch_size=batch_size,
-                                                prior_metrics=prior_metrics,
+                                                prior_metrics=list(set(prior_metrics+labels)),
                                                 key_param='oracle'
                                                 )
             last_path_list.append(last_epoch_paths)
@@ -245,4 +246,4 @@ def experiments(todo, repetitions, epochs, skip_train=False, batch_size=64):
 
 
 if __name__ == '__main__':
-    experiments([2], 1, 4, skip_train=False, batch_size=256)
+    experiments([2], 1, 1, skip_train=False, batch_size=256)

@@ -81,7 +81,7 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
         data_name = f'{configName}'
         data_obs = []
         data_labels = {}
-        all_labels = labels + prior_metrics + posterior_metrics
+        all_labels = list(set(labels + prior_metrics + posterior_metrics))
         for label in all_labels:
             data_labels[label] = []
         data_params = []
@@ -145,8 +145,7 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
                         next_obs, _, _, info = env.step({'p_0': 2})
                         this_ob[pos, :, :, :] = next_obs['p_0']
                         if pos == frames - 1 or env.has_released:
-                            this_ob = this_ob.astype(np.uint8)
-                            data_obs.append(serialize_data(this_ob))
+                            data_obs.append(serialize_data(this_ob.astype(np.uint8)))
                             data_params.append(eName)
                             for label in [x for x in all_labels if x not in posterior_metrics]:
                                 if label == "correctSelection" or label == 'incorrectSelection':
@@ -367,16 +366,19 @@ class CustomDataset(Dataset):
         metrics = self.metrics[index] if len(self.metrics) else None
         return data, labels, self.params[index], oracles, metrics
 class CustomDatasetBig(Dataset):
-    def __init__(self, data_list, labels_list, params_list, oracles_list, metrics=None, metric_keys=None):
+    def __init__(self, data_list, labels_list, params_list, oracles_list, metrics=None):
         self.data_list = data_list
         self.labels_list = labels_list
         self.params_list = params_list
         self.oracles_list = oracles_list
         self.metrics = metrics
-        self.metric_keys = metric_keys
 
         self.cumulative_sizes = self._cumulative_sizes()
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+        if self.metrics:
+            for key in self.metrics.keys():
+                print(key, len(self.metrics[key]), len(self))
 
     def _cumulative_sizes(self):
         sizes = [len(x) for x in self.data_list]
@@ -400,8 +402,9 @@ class CustomDatasetBig(Dataset):
 
         data = torch.from_numpy(pickle.loads(self.data_list[list_index][local_index])).float().to(self.device)
         labels = torch.from_numpy(self.labels_list[list_index][local_index].astype(np.int8)).to(self.device)
-        oracles = torch.from_numpy(self.oracles_list[list_index][local_index].astype(np.int8)).to(self.device) if len(self.oracles_list) else torch.tensor([]).to(self.device)
-        metrics = {key: self.metrics[index][key] for key in self.metric_keys} if self.metrics else 0
+        oracles = torch.from_numpy(self.oracles_list[list_index][local_index].astype(np.int8)).to(self.device) if len(self.oracles_list) > 1 else torch.tensor([]).to(self.device)
+
+        metrics = {key: self.metrics[key][index] for key in self.metrics.keys()} if self.metrics else 0
 
         return data, labels, self.params_list[list_index][local_index], oracles, metrics
 
