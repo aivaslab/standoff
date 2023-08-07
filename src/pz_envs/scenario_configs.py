@@ -164,19 +164,22 @@ def identify_counterfactuals(events):
 
 def count_knowledge_combinations(event_lists, knowledges):
     counter = {}
-
-    # Helper function to convert tuple to a string key
     def tuple_to_key(knowledge_tuple):
         mapping = ['eb', 'es', 'lb', 'ls', 'cflb', 'cfls']
         return '-'.join([mapping[i] for i, val in enumerate(knowledge_tuple) if val])
 
+    name_from_knowledge = {}
     for name in event_lists:
         key = tuple_to_key(knowledges[name])
         counter[key] = counter.get(key, 0) + 1
+        if key in name_from_knowledge:
+            name_from_knowledge[key].append(name)
+        else:
+            name_from_knowledge[key] = [name]
         if key == '':
             print(name, event_lists[name])
 
-    return counter
+    return counter, name_from_knowledge
 
 
 class ScenarioConfigs:
@@ -283,11 +286,10 @@ class ScenarioConfigs:
             uninformed_event_lists[name] = events
         # print(name, events)
 
-    counter = count_knowledge_combinations(all_event_lists, event_list_knowledge)
+    counter, name_from_knowledge = count_knowledge_combinations(all_event_lists, event_list_knowledge)
     print(counter)
 
-    print('total lists', len(all_event_lists), 'informed lists', len(informed_event_lists), 'uninformed lists',
-          len(uninformed_event_lists))
+    #print('total lists', len(all_event_lists), 'informed lists', len(informed_event_lists), 'uninformed lists', len(uninformed_event_lists))
 
     all_event_delays = {}
     total_fillers = 0
@@ -307,15 +309,15 @@ class ScenarioConfigs:
     print('total fillers', total_fillers, 'total permutations', total_products)
 
     # generate 'stages' for train and test, where a stage is a list of event lists and parameters
-    stages = {
-        'a0': {'events': all_event_lists, 'params': 'no-op'},
-        'i0': {'events': informed_event_lists, 'params': 'no-op'},
-        'u0': {'events': uninformed_event_lists, 'params': 'no-op'},
-
-        'i1': {'events': informed_event_lists, 'params': 'defaults'},
-        'u1': {'events': uninformed_event_lists, 'params': 'defaults'},
-        'a1': {'events': all_event_lists, 'params': 'defaults'},
+    stage_templates = {
+        '0': {'params': 'no-op'},
+        '1': {'params': 'defaults'}
     }
+    stages = {}
+    for knowledge_key in name_from_knowledge.keys():
+        for stage_key, stage_info in stage_templates.items():
+            new_key = knowledge_key + stage_key
+            stages[new_key] = {'events': name_from_knowledge[knowledge_key], **stage_info}
 
     '''lack_to_generalized = {
         "moved": "0.2.2",
