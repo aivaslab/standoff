@@ -96,8 +96,6 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
 
     test_loaders = []
     data, labels, params, oracles = [], [], [], []
-    cumulative_data_size = 0
-    cumulative_metric_size = 0
     for val_set_name in test_sets:
         dir = os.path.join(load_path, val_set_name)
         data.append(np.load(os.path.join(dir, 'obs.npz'), mmap_mode='r')['arr_0'])
@@ -132,7 +130,7 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
         with torch.no_grad():
             handle = model.rnn.register_forward_hook(hook)
 
-            for i, (inputs, labels, params, oracle_inputs, metrics) in enumerate(_val_loader):
+            for i, (inputs, labels, params, oracle_inputs, metrics) in enumerate(tqdm.tqdm(_val_loader)):
                 if i < num_activation_batches:
                     activations.append(hook.activations)
                     if i == num_activation_batches - 1:
@@ -148,10 +146,17 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
                 neither_food_selected = ~(small_food_selected | big_food_selected)
 
                 batch_param_losses = [
-                    {'param': param, 'epoch': epoch_number, 'loss': loss.item(), 'accuracy': correct.item(),
-                     'small_food_selected': small.item(), 'big_food_selected': big.item(),
-                     'neither_food_selected': neither.item(), **metrics}
-                    for param, loss, correct, small, big, neither in zip(params, losses, corrects, small_food_selected, big_food_selected, neither_food_selected)]
+                    {
+                        'param': param,
+                        'epoch': epoch_number,
+                        'loss': loss.item(),
+                        'accuracy': correct.item(),
+                        'small_food_selected': small.item(),
+                        'big_food_selected': big.item(),
+                        'neither_food_selected': neither.item(),
+                        **{x: v[k].cpu().numpy() for x, v in metrics.items()}
+                    }
+                    for k, (param, loss, correct, small, big, neither) in enumerate(zip(params, losses, corrects, small_food_selected, big_food_selected, neither_food_selected))]
                 param_losses_list.extend(batch_param_losses)
 
     # save dfs periodically to free up ram:
@@ -160,6 +165,7 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
     df = pd.DataFrame(param_losses_list)
     df = df.join(df['param'].apply(decode_event_name))
     df.replace(r'N/A.*', 'na', regex=True, inplace=True)  # todo: construct na dict automatically
+    print('saving csv...')
     df.to_csv(os.path.join(model_save_path, f'param_losses_{epoch_number}_{repetition}.csv'))
     df_paths.append(os.path.join(model_save_path, f'param_losses_{epoch_number}_{repetition}.csv'))
     with open(os.path.join(model_save_path, f'activations_{epoch_number}_{repetition}.pkl'), 'wb') as f:

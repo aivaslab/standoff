@@ -376,10 +376,6 @@ class CustomDatasetBig(Dataset):
         self.cumulative_sizes = self._cumulative_sizes()
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-        if self.metrics:
-            for key in self.metrics.keys():
-                print(key, len(self.metrics[key]), len(self))
-
     def _cumulative_sizes(self):
         sizes = [len(x) for x in self.data_list]
         return np.cumsum(sizes)
