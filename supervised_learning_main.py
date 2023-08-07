@@ -154,7 +154,7 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
                         'small_food_selected': small.item(),
                         'big_food_selected': big.item(),
                         'neither_food_selected': neither.item(),
-                        **{x: v[k].cpu().numpy() for x, v in metrics.items()}
+                        **{x: v[k].numpy() for x, v in metrics.items()}
                     }
                     for k, (param, loss, correct, small, big, neither) in enumerate(zip(params, losses, corrects, small_food_selected, big_food_selected, neither_food_selected))]
                 param_losses_list.extend(batch_param_losses)
