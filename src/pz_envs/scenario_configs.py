@@ -173,11 +173,9 @@ def count_knowledge_combinations(event_lists, knowledges):
         key = tuple_to_key(knowledges[name])
         counter[key] = counter.get(key, 0) + 1
         if key in name_from_knowledge:
-            name_from_knowledge[key].append(name)
+            name_from_knowledge[key].update({name: event_lists[name]})
         else:
-            name_from_knowledge[key] = [name]
-        if key == '':
-            print(name, event_lists[name])
+            name_from_knowledge[key] = {name: event_lists[name]}
 
     return counter, name_from_knowledge
 
@@ -316,7 +314,7 @@ class ScenarioConfigs:
     stages = {}
     for knowledge_key in name_from_knowledge.keys():
         for stage_key, stage_info in stage_templates.items():
-            new_key = knowledge_key + stage_key
+            new_key = 's' + knowledge_key + stage_key
             stages[new_key] = {'events': name_from_knowledge[knowledge_key], **stage_info}
 
     '''lack_to_generalized = {

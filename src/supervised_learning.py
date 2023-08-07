@@ -83,7 +83,8 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
         data_name = f'{configName}'
         data_obs = []
         data_labels = {}
-        for label in labels + prior_metrics + posterior_metrics:
+        all_labels = labels + prior_metrics + posterior_metrics
+        for label in all_labels:
             data_labels[label] = []
         data_params = []
 
@@ -146,9 +147,10 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
                         next_obs, _, _, info = env.step({'p_0': 2})
                         this_ob[pos, :, :, :] = next_obs['p_0']
                         if pos == frames - 1 or env.has_released:
+                            this_ob = this_ob.astype(np.uint8)
                             data_obs.append(serialize_data(this_ob))
                             data_params.append(eName)
-                            for label in set(labels) or set(prior_metrics):
+                            for label in [x for x in all_labels if x not in posterior_metrics]:
                                 if label == "correctSelection" or label == 'incorrectSelection':
                                     data = one_hot(5, info['p_0'][label])
                                 else:
@@ -183,8 +185,9 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
 
         np.savez_compressed(os.path.join(this_path, 'obs'), np.array(data_obs))
         np.savez_compressed(os.path.join(this_path,  'params'), np.array(data_params))
-        for label in labels:
-            np.savez_compressed(os.path.join(this_path, 'label-' + label), np.array(data_labels[label]))
+        for label in all_labels:
+            if len(data_labels[label]) > 0:
+                np.savez_compressed(os.path.join(this_path, 'label-' + label), np.array(data_labels[label]))
 
 def serialize_data(datapoint):
     return pickle.dumps(datapoint)
