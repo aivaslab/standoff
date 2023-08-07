@@ -63,6 +63,12 @@ def experiments(todo, repetitions, epochs, skip_train=False, batch_size=64):
     feeding settings are the most sensitive to overall model performance? To what extent are different models
     sensitive to different parameters? """
 
+    params = ['visible_baits', 'swaps', 'visible_swaps', 'first_swap_is_both',
+              'second_swap_to_first_loc', 'delay_2nd_bait', 'first_bait_size',
+              'uninformed_bait', 'uninformed_swap', 'first_swap']
+    prior_metrics = ['eName', 'shouldAvoidBig', 'shouldAvoidSmall', 'correctSelection', 'incorrectSelection',
+                     'firstBaitReward', 'eventVisibility', 'shouldGetBig', 'shouldGetSmall']
+
     regimes = [
         ('situational', ['a1']),
         ('informed', ['i0', 'i1']),
@@ -91,7 +97,7 @@ def experiments(todo, repetitions, epochs, skip_train=False, batch_size=64):
         os.makedirs('supervised', exist_ok=True)
         for pref_type, pref_suffix in pref_types:
             for role_type, role_suffix in role_types:
-                gen_data(labels, path='supervised', pref_type=pref_suffix, role_type=role_suffix)
+                gen_data(labels, path='supervised', pref_type=pref_suffix, role_type=role_suffix, prior_metrics=prior_metrics)
 
     if 'h' in todo:
         print('Running hyperparameter search on all regimes, pref_types, role_types')
@@ -117,12 +123,15 @@ def experiments(todo, repetitions, epochs, skip_train=False, batch_size=64):
         for single_oracle, oracle_name in zip(oracles, oracle_names):
             print('oracle:', single_oracle)
             combined_paths, last_epoch_paths = run_supervised_session(save_path=os.path.join('supervised', 'exp_2', oracle_name),
-                                   repetitions=repetitions,
-                                   epochs=epochs,
-                                   train_sets=regimes[4][1], # complete train regime, should be 3 for final
-                                   oracle_labels=[single_oracle],
-                                   skip_train=skip_train,
-                                    batch_size=batch_size)
+                                                repetitions=repetitions,
+                                                epochs=epochs,
+                                                train_sets=regimes[4][1], # complete train regime, should be 3 for final
+                                                oracle_labels=[single_oracle],
+                                                skip_train=skip_train,
+                                                batch_size=batch_size,
+                                                prior_metrics=prior_metrics,
+                                                key_param='oracle'
+                                                )
             last_path_list.append(last_epoch_paths)
             combined_path_list.append(combined_paths)
 
@@ -150,12 +159,8 @@ def experiments(todo, repetitions, epochs, skip_train=False, batch_size=64):
                     last_df_list.append(chunk)
         last_epoch_df = pd.concat(last_df_list, ignore_index=True)
 
-        params = ['visible_baits', 'swaps', 'visible_swaps', 'first_swap_is_both',
-                  'second_swap_to_first_loc', 'delay_2nd_bait', 'first_bait_size',
-                  'uninformed_bait', 'uninformed_swap', 'first_swap', 'oracle']  # added 'oracle' here
-
         avg_loss, variances, ranges_1, ranges_2, range_dict, range_dict3, stats = calculate_statistics(
-            combined_df, last_epoch_df, params, skip_3x=True) #todo: make it definitely save one fixed param eg oracle
+            combined_df, last_epoch_df, params + prior_metrics + ['oracle'], skip_3x=True) #todo: make it definitely save one fixed param eg oracle
 
         create_combined_histogram(last_epoch_df, combined_df, 'oracle', os.path.join('supervised', 'exp_2'))
 
@@ -224,4 +229,4 @@ def experiments(todo, repetitions, epochs, skip_train=False, batch_size=64):
 
 
 if __name__ == '__main__':
-    experiments([2], 1, 20, skip_train=False, batch_size=256)
+    experiments([0], 1, 20, skip_train=False, batch_size=256)
