@@ -69,14 +69,29 @@ def experiments(todo, repetitions, epochs, skip_train=False, batch_size=64):
     prior_metrics = ['eName', 'shouldAvoidBig', 'shouldAvoidSmall', 'correctSelection', 'incorrectSelection',
                      'firstBaitReward', 'eventVisibility', 'shouldGetBig', 'shouldGetSmall']
 
-    regimes = [
+    sub_regime_keys = [
+        "",
+        "eb", "es",
+        "eb-lb", "es-ls",
+        "eb-es",
+        "eb-es-lb", "eb-es-ls",
+        "eb-es-lb-ls"
+    ]
+    old_regimes = [
         ('situational', ['a1']),
         ('informed', ['i0', 'i1']),
         ('contrastive', ['i0', 'u0', 'i1', 'u1']),
         ('complete', ['a0', 'i1']),
         ('comprehensive', ['a0', 'i1', 'u1'])
     ]
-    default_regime = regimes[1]
+    regimes = {
+        'situational': ['sl-' + x + '1' for x in sub_regime_keys],
+        'informed': ['sl-' + x + '0' for x in ["eb-es-lb-ls"]] + ['sl-' + x + '1' for x in ["eb-es-lb-ls"]],
+        'contrastive': ['sl-' + x + '0' for x in ["eb-es-lb-ls", ""]] + ['sl-' + x + '1' for x in ["eb-es-lb-ls", ""]],
+        'complete': ['sl-' + x + '0' for x in sub_regime_keys] + ['sl-' + x + '1' for x in ["eb-es-lb-ls"]],
+        'comprehensive': ['sl-' + x + '0' for x in sub_regime_keys] + ['sl-' + x + '1' for x in ["eb-es-lb-ls", ""]],
+    }
+    default_regime = regimes['complete']
     pref_types = [
         ('same', ''),
         #('different', 'd'),
@@ -111,7 +126,7 @@ def experiments(todo, repetitions, epochs, skip_train=False, batch_size=64):
         run_supervised_session(save_path=os.path.join('supervised', 'exp_1'),
                                repetitions=repetitions,
                                epochs=epochs,
-                               train_sets=['a1'],
+                               train_sets=regimes['situational'],
                                )
 
     if 2 in todo:
@@ -125,7 +140,8 @@ def experiments(todo, repetitions, epochs, skip_train=False, batch_size=64):
             combined_paths, last_epoch_paths = run_supervised_session(save_path=os.path.join('supervised', 'exp_2', oracle_name),
                                                 repetitions=repetitions,
                                                 epochs=epochs,
-                                                train_sets=regimes[4][1], # complete train regime, should be 3 for final
+                                                train_sets=regimes['complete'],
+                                                eval_sets=regimes['situational'],
                                                 oracle_labels=[single_oracle],
                                                 skip_train=skip_train,
                                                 batch_size=batch_size,
@@ -225,8 +241,8 @@ def experiments(todo, repetitions, epochs, skip_train=False, batch_size=64):
         run_supervised_session(save_path=os.path.join('supervised', 'exp_100'),
                                repetitions=repetitions,
                                epochs=epochs,
-                               train_sets=['a1'])
+                               train_sets=regimes['situational'])
 
 
 if __name__ == '__main__':
-    experiments([0], 1, 20, skip_train=False, batch_size=256)
+    experiments([2], 1, 4, skip_train=False, batch_size=256)

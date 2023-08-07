@@ -401,7 +401,7 @@ class CustomDatasetBig(Dataset):
         data = torch.from_numpy(pickle.loads(self.data_list[list_index][local_index])).float().to(self.device)
         labels = torch.from_numpy(self.labels_list[list_index][local_index].astype(np.int8)).to(self.device)
         oracles = torch.from_numpy(self.oracles_list[list_index][local_index].astype(np.int8)).to(self.device) if len(self.oracles_list) else torch.tensor([]).to(self.device)
-        metrics = {key: self.metrics[index][key] for key in self.metric_keys} if len(self.metrics) else None
+        metrics = {key: self.metrics[index][key] for key in self.metric_keys} if self.metrics else 0
 
         return data, labels, self.params_list[list_index][local_index], oracles, metrics
 

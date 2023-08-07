@@ -158,7 +158,7 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
     return df_paths
 
 
-def train_model(train_sets, target_label, test_sets, load_path='supervised/', save_path='', epochs=100,
+def train_model(train_sets, target_label, load_path='supervised/', save_path='', epochs=100,
                 model_kwargs=None,
                 lr=0.001, oracle_labels=[], repetition=0, batch_size=64):
     use_cuda = torch.cuda.is_available()
@@ -362,7 +362,7 @@ def find_df_paths(directory, file_pattern):
 
 
 # train_model('random-2500', 'exist')
-def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, eval_name='a1',
+def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, eval_sets=None,
                            load_path='supervised', oracle_labels=[], skip_train=True, batch_size=64,
                            prior_metrics=[], key_param=None):
     # labels = ['loc', 'exist', 'vision', 'b-loc', 'b-exist', 'target', 'correctSelection']
@@ -409,11 +409,11 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
             last_epoch_df_paths = []
             if not skip_train:
                 for repetition in range(repetitions):
-                    train_model(train_sets, 'correctSelection', [eval_name], load_path=load_path,
+                    train_model(train_sets, 'correctSelection', load_path=load_path,
                                 save_path=save_path, epochs=epochs, model_kwargs=model_kwargs,
                                 lr=lr, oracle_labels=oracle_labels, repetition=repetition, batch_size=batch_size)
                     for epoch in range(epochs):
-                        df_paths = evaluate_model([eval_name], 'correctSelection', load_path=load_path,
+                        df_paths = evaluate_model(eval_sets, 'correctSelection', load_path=load_path,
                                                   model_save_path=save_path,
                                                   oracle_labels=oracle_labels, repetition=repetition,
                                                   epoch_number=epoch, batch_size=batch_size,
