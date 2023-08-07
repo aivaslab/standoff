@@ -386,6 +386,8 @@ class MiniStandoffEnv(para_MultiGridEnv):
                 self.infos['p_0']['eName'] = self.current_event_list_name
                 self.infos['p_0']['shouldAvoidBig'] = False
                 self.infos['p_0']['shouldAvoidSmall'] = False
+                self.infos['p_0']['shouldGetBig'] = False
+                self.infos['p_0']['shouldGetSmall'] = False
                 self.infos['p_0']['correctSelection'] = -1
                 self.infos['p_0']['incorrectSelection'] = -1
                 self.infos['p_0']['minibatch'] = self.minibatch
@@ -566,20 +568,26 @@ class MiniStandoffEnv(para_MultiGridEnv):
                 if 'shouldAvoidBig' in self.infos['p_0'].keys() and self.infos['p_0']['shouldAvoidBig']:
                     self.infos['p_0']['correctSelection'] = self.small_food_locations[-1]
                     self.infos['p_0']['incorrectSelection'] = self.big_food_locations[-1]
+                    self.infos['p_0']['shouldGetSmall'] = True
                 else:
                     self.infos['p_0']['correctSelection'] = self.big_food_locations[-1]
                     self.infos['p_0']['incorrectSelection'] = self.small_food_locations[-1]
+                    self.infos['p_0']['shouldGetBig'] = True
             elif len(self.small_food_locations) > 0:
                 if not self.infos['p_0']['shouldAvoidSmall']:
                     self.infos['p_0']['correctSelection'] = self.small_food_locations[-1]
+                    self.infos['p_0']['shouldGetSmall'] = True
                     self.infos['p_0']['incorrectSelection'] = -1
                 else:
                     self.infos['p_0']['correctSelection'] = -1
+                    self.infos['p_0']['shouldGetBig'] = True
                     self.infos['p_0']['incorrectSelection'] = self.small_food_locations[-1]
             elif len(self.big_food_locations) > 0:
                 if not self.infos['p_0']['shouldAvoidBig']:
                     self.infos['p_0']['correctSelection'] = self.big_food_locations[-1]
+                    self.infos['p_0']['shouldGetBig'] = True
                     self.infos['p_0']['incorrectSelection'] = -1
                 else:
                     self.infos['p_0']['correctSelection'] = -1
+                    self.infos['p_0']['shouldGetSmall'] = True
                     self.infos['p_0']['incorrectSelection'] = self.big_food_locations[-1]

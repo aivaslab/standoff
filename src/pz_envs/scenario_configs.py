@@ -159,13 +159,13 @@ def identify_counterfactuals(events):
                             knowledge['cfls'] = True
                         knowledge['ls'] = False
 
-    return knowledge['eb'], knowledge['es'], knowledge['lb'], knowledge['ls'], knowledge['cflb'], knowledge['cfls']
+    return knowledge['eb'], knowledge['es'], knowledge['lb'], knowledge['ls']#, knowledge['cflb'], knowledge['cfls']
 
 
 def count_knowledge_combinations(event_lists, knowledges):
     counter = {}
     def tuple_to_key(knowledge_tuple):
-        mapping = ['eb', 'es', 'lb', 'ls', 'cflb', 'cfls']
+        mapping = ['eb', 'es', 'lb', 'ls']
         return '-'.join([mapping[i] for i, val in enumerate(knowledge_tuple) if val])
 
     name_from_knowledge = {}
@@ -314,7 +314,7 @@ class ScenarioConfigs:
     stages = {}
     for knowledge_key in name_from_knowledge.keys():
         for stage_key, stage_info in stage_templates.items():
-            new_key = 's' + knowledge_key + stage_key
+            new_key = 'sl-' + knowledge_key + stage_key
             stages[new_key] = {'events': name_from_knowledge[knowledge_key], **stage_info}
 
     '''lack_to_generalized = {

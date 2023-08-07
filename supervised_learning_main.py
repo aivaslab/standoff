@@ -1,5 +1,6 @@
 import glob
 import itertools
+import pickle
 
 import sys
 import os
@@ -71,9 +72,14 @@ def decode_event_name(name):
         "first_swap": first_swap if swaps_gt_0 and not delay_2nd_bait and not first_swap_is_both else 'N/A (swaps=0 or 2nd bait delayed or first swap both)'
     })
 
+class SaveActivations:
+    def __init__(self):
+        self.activations = None
 
+    def __call__(self, module, module_in, module_out):
+        self.activations = module_out
 def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_path='', oracle_labels=[], repetition=0,
-                   epoch_number=0, batch_size=64):
+                   epoch_number=0, batch_size=64, prior_metrics=[], num_activation_batches=1):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     special_criterion = nn.CrossEntropyLoss(reduction='none')
 
@@ -86,6 +92,7 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
         oracle_labels = []
 
     param_losses_list = []
+    prior_metrics_data = []
 
     test_loaders = []
     for val_set_name in test_sets:
@@ -93,6 +100,9 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
         val_data = np.load(os.path.join(dir, 'obs.npz'), mmap_mode='r')['arr_0']
         val_labels = np.load(os.path.join(dir, 'label-' + target_label + '.npz'), mmap_mode='r')['arr_0']
         val_params = np.load(os.path.join(dir, 'params.npz'), mmap_mode='r')['arr_0']
+        for metric in prior_metrics:
+            prior_metrics_data.append(np.load(os.path.join(dir, 'label-' + metric + '.npz'), mmap_mode='r')['arr_0'])
+        combined_prior_metrics_data = np.stack(prior_metrics_data, axis=-1)
 
         if oracle_labels:
             oracle_data = []
@@ -103,19 +113,35 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
             combined_oracle_data = np.concatenate(oracle_data, axis=-1)
         else:
             combined_oracle_data = np.zeros((len(val_data), 0))
-        val_dataset = CustomDataset(val_data, val_labels, val_params, combined_oracle_data)
+        val_dataset = CustomDatasetBig(val_data, val_labels, val_params, combined_oracle_data, combined_prior_metrics_data, prior_metrics)
         test_loaders.append(DataLoader(val_dataset, batch_size=batch_size, shuffle=False))
+
+    hook = SaveActivations()
+    activations = []
 
     for idx, _val_loader in enumerate(test_loaders):
         with torch.no_grad():
+            handle = model.rnn.register_forward_hook(hook)
 
-            for inputs, labels, params, oracle_inputs in _val_loader:
+            for i, (inputs, labels, params, oracle_inputs, metrics) in enumerate(_val_loader):
+                if i < num_activation_batches:
+                    activations.append(hook.activations)
+                    if i == num_activation_batches - 1:
+                        handle.remove()
+
                 outputs = model(inputs, oracle_inputs)
                 losses = special_criterion(outputs, torch.argmax(labels, dim=1))
                 _, predicted = torch.max(outputs, 1)
-                corrects = (predicted == torch.argmax(labels, dim=1)).float()
+                corrects = (predicted == torch.argmax(labels, dim=1))
+
+                small_food_selected = (outputs == np.argmax(metrics['loc'][:, :, 0]))
+                big_food_selected = (outputs == np.argmax(metrics['loc'][:, :, 1]))
+                neither_food_selected = np.logical_not(np.logical_or(small_food_selected, big_food_selected))
+
                 batch_param_losses = [
-                    {'param': param, 'epoch': epoch_number, 'loss': loss.item(), 'accuracy': correct.item()}
+                    {'param': param, 'epoch': epoch_number, 'loss': loss.item(), 'accuracy': correct.item(),
+                     'small_food_selected': small_food_selected.item(), 'big_food_selected': big_food_selected.item(),
+                     'neither_food_selected': neither_food_selected.item(), **metrics}
                     for param, loss, correct in zip(params, losses, corrects)]
                 param_losses_list.extend(batch_param_losses)
 
@@ -127,6 +153,8 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
     df.replace(r'N/A.*', 'na', regex=True, inplace=True)  # todo: construct na dict automatically
     df.to_csv(os.path.join(model_save_path, f'param_losses_{epoch_number}_{repetition}.csv'))
     df_paths.append(os.path.join(model_save_path, f'param_losses_{epoch_number}_{repetition}.csv'))
+    with open(os.path.join(model_save_path, f'activations_{epoch_number}_{repetition}.pkl'), 'wb') as f:
+        pickle.dump(activations, f)
     return df_paths
 
 
@@ -171,17 +199,13 @@ def train_model(train_sets, target_label, test_sets, load_path='supervised/', sa
     t = tqdm.trange(num_epochs * len(train_loader))
 
     for epoch in range(num_epochs):
-        train_loss = 0
-        for i, (inputs, target_labels, _, oracle_inputs) in enumerate(train_loader):
+        for i, (inputs, target_labels, _, oracle_inputs, _) in enumerate(train_loader):
             outputs = model(inputs, oracle_inputs)
             loss = criterion(outputs, torch.argmax(target_labels, dim=1))
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-            # train_loss += loss.item()
             t.update(1)
-            # if i > len(train_loader)//5:
-            #    break
 
         print('saving model')
         os.makedirs(save_path, exist_ok=True)
@@ -336,7 +360,8 @@ def find_df_paths(directory, file_pattern):
 
 # train_model('random-2500', 'exist')
 def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, eval_name='a1',
-                           load_path='supervised', oracle_labels=[], skip_train=True, batch_size=64):
+                           load_path='supervised', oracle_labels=[], skip_train=True, batch_size=64,
+                           prior_metrics=[]):
     # labels = ['loc', 'exist', 'vision', 'b-loc', 'b-exist', 'target', 'correctSelection']
 
     model_kwargs_base = {'hidden_size': [6, 8, 12, 16, 32],
@@ -363,7 +388,7 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
     while test < num_random_tests:
         try:
             # model_kwargs = {x: random.choice(model_kwargs_base[x]) for x in model_kwargs_base.keys()}
-            model_kwargs = {'hidden_size': 16, 'num_layers': 2, 'output_len': 5, 'pool_kernel_size': 3,
+            model_kwargs = {'hidden_size': 16, 'num_layers': 1, 'output_len': 5, 'pool_kernel_size': 3,
                             'pool_stride': 2, 'channels': 7, 'kernels': 8, 'padding1': 1, 'padding2': 0,
                             'use_pool': False, 'stride1': 1, 'use_conv2': True, 'kernel_size1': 3, 'kernels2': 16,
                             'kernel_size2': 3}
@@ -385,7 +410,8 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
                         df_paths = evaluate_model([eval_name], 'correctSelection', load_path=load_path,
                                                   model_save_path=save_path,
                                                   oracle_labels=oracle_labels, repetition=repetition,
-                                                  epoch_number=epoch, batch_size=batch_size)
+                                                  epoch_number=epoch, batch_size=batch_size,
+                                                  prior_metrics=prior_metrics)
                         dfs_paths.extend(df_paths)
                         if epoch == epochs - 1:
                             last_epoch_df_paths.extend(df_paths)

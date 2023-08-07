@@ -28,10 +28,8 @@ def one_hot(size, data):
     return np.eye(size)[data]
 
 
-def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_extra_data=False):
+def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_extra_data=False, prior_metrics=[]):
     # labels = ['loc', 'exist', 'vision', 'b-loc', 'b-exist', 'target']
-    prior_metrics = ['eName', 'shouldAvoidBig', 'shouldAvoidSmall', 'correctSelection', 'incorrectSelection',
-                     'firstBaitReward', 'eventVisibility']
     posterior_metrics = ['selection', 'selectedBig', 'selectedSmall', 'selectedNeither',
                          'selectedPrevBig', 'selectedPrevSmall', 'selectedPrevNeither',
                          'selectedSame', ]
@@ -350,11 +348,12 @@ class DiskLoadingDataset(Dataset):
         return data_point, label_point, param_point, oracle_point
 
 class CustomDataset(Dataset):
-    def __init__(self, data, labels, params, oracles):
+    def __init__(self, data, labels, params, oracles, metrics=None):
         self.data = data
         self.labels = torch.from_numpy(labels.astype(np.int8))
         self.params = params
         self.oracles = torch.from_numpy(oracles.astype(np.int8))
+        self.metrics = metrics
 
     def __len__(self):
         return len(self.data)
@@ -365,13 +364,16 @@ class CustomDataset(Dataset):
         labels = self.labels[index].float().to(device)
         oracles = self.oracles[index].float().to(device)
 
-        return data, labels, self.params[index], oracles
+        metrics = self.metrics[index] if len(self.metrics) else None
+        return data, labels, self.params[index], oracles, metrics
 class CustomDatasetBig(Dataset):
-    def __init__(self, data_list, labels_list, params_list, oracles_list):
+    def __init__(self, data_list, labels_list, params_list, oracles_list, metrics=None, metric_keys=None):
         self.data_list = data_list
         self.labels_list = labels_list
         self.params_list = params_list
         self.oracles_list = oracles_list
+        self.metrics = metrics
+        self.metric_keys = metric_keys
 
         self.cumulative_sizes = self._cumulative_sizes()
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -399,8 +401,9 @@ class CustomDatasetBig(Dataset):
         data = torch.from_numpy(pickle.loads(self.data_list[list_index][local_index])).float().to(self.device)
         labels = torch.from_numpy(self.labels_list[list_index][local_index].astype(np.int8)).to(self.device)
         oracles = torch.from_numpy(self.oracles_list[list_index][local_index].astype(np.int8)).to(self.device) if len(self.oracles_list) else torch.tensor([]).to(self.device)
+        metrics = {key: self.metrics[index][key] for key in self.metric_keys} if len(self.metrics) else None
 
-        return data, labels, self.params_list[list_index][local_index], oracles
+        return data, labels, self.params_list[list_index][local_index], oracles, metrics
 
 class RNNModel(nn.Module):
     def __init__(self, hidden_size, num_layers, output_len, channels, kernels=8, kernels2=8, kernel_size1=3,
