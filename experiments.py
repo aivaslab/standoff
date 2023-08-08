@@ -177,11 +177,11 @@ def experiments(todo, repetitions, epochs, skip_train=False, batch_size=64):
         last_epoch_df = pd.concat(last_df_list, ignore_index=True)
 
         avg_loss, variances, ranges_1, ranges_2, range_dict, range_dict3, stats = calculate_statistics(
-            combined_df, last_epoch_df, params + prior_metrics + ['oracle'], skip_3x=True) #todo: make it definitely save one fixed param eg oracle
+            combined_df, last_epoch_df, list(set(params + prior_metrics + ['oracle'])), skip_3x=True) #todo: make it definitely save one fixed param eg oracle
 
-        create_combined_histogram(last_epoch_df, combined_df, 'oracle', os.path.join('supervised', 'exp_2'))
+        create_combined_histogram(last_epoch_df, combined_df, 'oracle', os.path.join('supervised', 'exp_2b'))
 
-        combined_path = os.path.join('supervised', 'exp_2', 'c')
+        combined_path = os.path.join('supervised', 'exp_2b', 'c')
         os.makedirs(combined_path, exist_ok=True)
         write_metrics_to_file(os.path.join(combined_path, 'metrics.txt'), last_epoch_df, ranges_1, params, stats)
         save_figures(os.path.join(combined_path, 'figs'), combined_df, avg_loss, ranges_2, range_dict, range_dict3,
@@ -246,4 +246,4 @@ def experiments(todo, repetitions, epochs, skip_train=False, batch_size=64):
 
 
 if __name__ == '__main__':
-    experiments([2], 1, 25, skip_train=False, batch_size=256)
+    experiments([2], 1, 25, skip_train=True, batch_size=256)
