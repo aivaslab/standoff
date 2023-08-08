@@ -265,6 +265,7 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False):
     }
 
     unique_vals = {param: df[param].unique() for param in params}
+    print(unique_vals, 'ddd', last_epoch_df.columns)
 
     for param in params:
         ci_df = df.groupby([param, 'epoch'])['accuracy'].apply(calculate_ci).reset_index()
@@ -276,12 +277,12 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False):
         ci_df = df.groupby([param1, param2, 'epoch'])['accuracy'].apply(calculate_ci).reset_index()
         avg_loss[(param1, param2)] = ci_df
 
-        means = last_epoch_df.groupby([param1, param2]).mean(numeric_only=True)
+        means = last_epoch_df.groupby([param1, param2]).mean()
         # variances[(param1, param2)] = grouped.var().mean()
         ranges_2[(param1, param2)] = means['accuracy'].max() - means['accuracy'].min()
 
         for value1 in unique_vals[param1]:
-            subset = means[means[param1] == value1]
+            subset = last_epoch_df[last_epoch_df[param1] == value1]
             if len(subset[param2].unique()) > 1:
                 new_means = subset.groupby(param2)['accuracy']
                 range_dict[(param1, value1, param2)] = new_means.max() - new_means.min()
