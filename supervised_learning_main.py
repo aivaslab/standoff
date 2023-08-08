@@ -264,6 +264,8 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False):
         'vars': variable_columns
     }
 
+    unique_vals = {param: df[param].unique() for param in params}
+
     for param in params:
         ci_df = df.groupby([param, 'epoch'])['accuracy'].apply(calculate_ci).reset_index()
         avg_loss[param] = ci_df
@@ -278,10 +280,10 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False):
         # variances[(param1, param2)] = grouped.var().mean()
         ranges_2[(param1, param2)] = means['accuracy'].max() - means['accuracy'].min()
 
-        for value1 in df[param1].unique():
-            subset = last_epoch_df[last_epoch_df[param1] == value1]
+        for value1 in unique_vals[param1]:
+            subset = means[means[param1] == value1]
             if len(subset[param2].unique()) > 1:
-                new_means = subset.groupby(param2)['accuracy'].mean()
+                new_means = subset.groupby(param2)['accuracy']
                 range_dict[(param1, value1, param2)] = new_means.max() - new_means.min()
 
     if not skip_3x:
@@ -289,11 +291,11 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False):
             ci_df = df.groupby([param1, param2, param3, 'epoch'])['accuracy'].apply(calculate_ci).reset_index()
             avg_loss[(param1, param2, param3)] = ci_df
 
-            for value1 in df[param1].unique():
-                for value2 in df[param2].unique():
+            for value1 in unique_vals[param1]:
+                for value2 in unique_vals[param2]:
                     subset = last_epoch_df[(last_epoch_df[param2] == value2) & (last_epoch_df[param1] == param1)]
                     if len(subset[param3].unique()) > 1:
-                        new_means = subset.groupby(param3)['accuracy'].mean()
+                        new_means = subset.groupby(param3)['accuracy']
                         range_dict3[(param1, value1, param2, value2, param3)] = new_means.max() - new_means.min()
 
     return avg_loss, variances, ranges_1, ranges_2, range_dict, range_dict3, stats
@@ -409,7 +411,7 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
     while test < num_random_tests:
         try:
             # model_kwargs = {x: random.choice(model_kwargs_base[x]) for x in model_kwargs_base.keys()}
-            model_kwargs = {'hidden_size': 16, 'num_layers': 1, 'output_len': 5, 'pool_kernel_size': 3,
+            model_kwargs = {'hidden_size': 16, 'num_layers': 2, 'output_len': 5, 'pool_kernel_size': 3,
                             'pool_stride': 2, 'channels': 7, 'kernels': 8, 'padding1': 1, 'padding2': 0,
                             'use_pool': False, 'stride1': 1, 'use_conv2': True, 'kernel_size1': 3, 'kernels2': 16,
                             'kernel_size2': 3}
@@ -449,6 +451,7 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
             replace_dict = {'1': 1, '0': 0}
             combined_df.replace(replace_dict, inplace=True)
             last_epoch_df.replace(replace_dict, inplace=True)
+            print('last_df cols', last_epoch_df.columns)
 
             avg_loss, variances, ranges_1, ranges_2, range_dict, range_dict3, stats = calculate_statistics(
                 combined_df, last_epoch_df, params + prior_metrics, skip_3x=True)
