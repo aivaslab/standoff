@@ -178,7 +178,7 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
         print('len obs', data_name, suffix, len(data_obs))
         this_path = os.path.join(path, data_name + suffix)
         os.makedirs(this_path, exist_ok=True)
-
+        data_labels['set_name'] = [data_name + suffix] * len(data_obs)
 
         np.savez_compressed(os.path.join(this_path, 'obs'), np.array(data_obs))
         np.savez_compressed(os.path.join(this_path,  'params'), np.array(data_params))
