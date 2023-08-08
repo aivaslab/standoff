@@ -179,10 +179,9 @@ def count_knowledge_combinations(event_lists, knowledges):
 
     return counter, name_from_knowledge
 
-if __name__ == '__main__':
-    print('initializing configs')
-    class ScenarioConfigs:
-        parameter_space = {
+class ScenarioConfigs:
+    def __init__(self):
+        self.parameter_space = {
             # baits and swaps main
             "visible_baits": [0, 1, 2],  # x
             "swaps": [0, 1, 2],  # y
@@ -212,11 +211,11 @@ if __name__ == '__main__':
             "uninformed_swap": lambda params: [0, 1] if params['swaps'] == 2 and params['visible_swaps'] == 1 else [-1],
         }
 
-        all_event_lists = {}
-        informed_event_lists = {}
-        uninformed_event_lists = {}
-        event_list_knowledge = {}  # name: knowledge
-        for params in parameter_generator(parameter_space):
+        self.all_event_lists = {}
+        self.informed_event_lists = {}
+        self.uninformed_event_lists = {}
+        self.event_list_knowledge = {}  # name: knowledge
+        for params in parameter_generator(self.parameter_space):
 
             visible_baits = params['visible_baits']
             swaps = params['swaps']
@@ -226,10 +225,10 @@ if __name__ == '__main__':
             second_swap_to_first_loc = params['second_swap_to_first_loc']
             delay_2nd_bait = params['delay_2nd_bait']
 
-            opponent_prefers_small = params['opponent_prefers_small']
+            '''opponent_prefers_small = params['opponent_prefers_small']
             encourage_sharing = params['encourage_sharing']
             subject_is_dominant = params['subject_is_dominant']
-            num_opponents = params['num_opponents']
+            num_opponents = params['num_opponents']'''
 
             first_bait_size = params['first_bait_size']
             uninformed_bait = params['uninformed_bait']
@@ -275,17 +274,17 @@ if __name__ == '__main__':
                 first_swap_index = add_swap(events, swap_num, (swap_index, swap_location), uninformed_swap, visible_swaps)
 
             events = remove_unnecessary_sequences(events)
-            event_list_knowledge[name] = identify_counterfactuals(events)
+            self.event_list_knowledge[name] = identify_counterfactuals(events)
 
 
-            all_event_lists[name] = events
+            self.all_event_lists[name] = events
             if visible_baits == 2 and visible_swaps == swaps:
-                informed_event_lists[name] = events
+                self.informed_event_lists[name] = events
             if visible_baits == 0 and visible_swaps == 0:
-                uninformed_event_lists[name] = events
+                self.uninformed_event_lists[name] = events
             # print(name, events)
 
-        counter, name_from_knowledge = count_knowledge_combinations(all_event_lists, event_list_knowledge)
+        counter, self.name_from_knowledge = count_knowledge_combinations(self.all_event_lists, self.event_list_knowledge)
         print(counter)
 
         #print('total lists', len(all_event_lists), 'informed lists', len(informed_event_lists), 'uninformed lists', len(uninformed_event_lists))
@@ -293,17 +292,17 @@ if __name__ == '__main__':
         all_event_delays = {}
         total_fillers = 0
 
-        for name, listy in all_event_lists.items():
+        for name, listy in self.all_event_lists.items():
             non_ob = count_non_ob_re(listy)
             fillers = list(generate_fillers(8 - (len(listy) - non_ob), non_ob))
             all_event_delays[name] = fillers
             total_fillers += len(fillers)
 
-        all_event_permutations = {}
+        self.all_event_permutations = {}
         total_products = 0
-        for event_name in all_event_lists:
-            all_event_permutations[event_name] = count_permutations(all_event_lists[event_name])
-            product = np.product(all_event_permutations[event_name])
+        for event_name in self.all_event_lists:
+            self.all_event_permutations[event_name] = count_permutations(self.all_event_lists[event_name])
+            product = np.product(self.all_event_permutations[event_name])
             total_products += product * len(all_event_delays[event_name])
         print('total fillers', total_fillers, 'total permutations', total_products)
 
@@ -313,10 +312,10 @@ if __name__ == '__main__':
             '1': {'params': 'defaults'}
         }
         stages = {}
-        for knowledge_key in name_from_knowledge.keys():
+        for knowledge_key in self.name_from_knowledge.keys():
             for stage_key, stage_info in stage_templates.items():
                 new_key = 'sl-' + knowledge_key + stage_key
-                stages[new_key] = {'events': name_from_knowledge[knowledge_key], **stage_info}
+                stages[new_key] = {'events': self.name_from_knowledge[knowledge_key], **stage_info}
 
         '''lack_to_generalized = {
             "moved": "0.2.2",
@@ -340,7 +339,7 @@ if __name__ == '__main__':
         for key, value in matching_names.items():
             print(f"For {key}, found matches: {value}")'''
 
-        standoff = {
+        self.standoff = {
             "defaults": {
                 "deterministic": True,
                 "hidden": True,
