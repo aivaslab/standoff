@@ -11,7 +11,7 @@ from ..pz_envs.scenario_configs import ScenarioConfigs
 class StandoffEnv(para_MultiGridEnv):
     mission = "get the best food before your opponent"
     metadata = {'render_modes': ['human', 'rgb_array'], "name": "standoffEnv"}
-    configs = ScenarioConfigs.standoff
+    configs = ScenarioConfigs().standoff
     info_keywords = ('minibatch', 'timestep',
                      'shouldAvoidBig', 'shouldAvoidSmall', 'correctSelection', 'selection',
                      'selectedBig', 'selectedSmall', 'selectedNeither',

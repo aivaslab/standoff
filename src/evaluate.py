@@ -100,7 +100,7 @@ def main(args):
 
     configNames = []
     short_names = []
-    for name in ScenarioConfigs.env_groups[args.env_group]:
+    for name in ScenarioConfigs().env_groups[args.env_sgroup]:
         configNames.append(f'Standoff-{name}-')
         short_names.append(name)
     episodes = args.episodes

@@ -17,7 +17,7 @@ def index_permutations(permutations, seed):
 class MiniStandoffEnv(para_MultiGridEnv):
     mission = "get the best food before your opponent"
     metadata = {'render_modes': ['human', 'rgb_array'], "name": "miniStandoffEnv"}
-    configs = ScenarioConfigs.standoff
+    configs = ScenarioConfigs().standoff
     info_keywords = ('minibatch', 'timestep',
                      'shouldAvoidBig', 'shouldAvoidSmall', 'correctSelection', 'selection',
                      'selectedBig', 'selectedSmall', 'selectedNeither',
