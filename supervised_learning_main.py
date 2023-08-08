@@ -221,8 +221,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
 
     train_dataset = CustomDatasetBig(data, labels, params, oracles)
     del data, labels, params, oracles
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True,
-                              num_workers=0)  # can't use more on windows
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=0)  # can't use more on windows
 
     model_kwargs['oracle_len'] = 0 if len(oracle_labels) == 0 else len(train_dataset.oracles_list[0][0])
     model_kwargs['output_len'] = 5  # np.prod(labels.shape[1:])
@@ -239,6 +238,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
 
     for epoch in range(num_epochs):
         for i, (inputs, target_labels, _, oracle_inputs, _) in enumerate(train_loader):
+            inputs, target_labels, oracle_inputs = inputs.to(device), target_labels.to(device), oracle_inputs.to(device)
             outputs = model(inputs, oracle_inputs)
             loss = criterion(outputs, torch.argmax(target_labels, dim=1))
             optimizer.zero_grad()
