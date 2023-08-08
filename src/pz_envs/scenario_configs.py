@@ -289,13 +289,13 @@ class ScenarioConfigs:
 
         #print('total lists', len(all_event_lists), 'informed lists', len(informed_event_lists), 'uninformed lists', len(uninformed_event_lists))
 
-        all_event_delays = {}
+        self.all_event_delays = {}
         total_fillers = 0
 
         for name, listy in self.all_event_lists.items():
             non_ob = count_non_ob_re(listy)
             fillers = list(generate_fillers(8 - (len(listy) - non_ob), non_ob))
-            all_event_delays[name] = fillers
+            self.all_event_delays[name] = fillers
             total_fillers += len(fillers)
 
         self.all_event_permutations = {}
@@ -303,7 +303,7 @@ class ScenarioConfigs:
         for event_name in self.all_event_lists:
             self.all_event_permutations[event_name] = count_permutations(self.all_event_lists[event_name])
             product = np.product(self.all_event_permutations[event_name])
-            total_products += product * len(all_event_delays[event_name])
+            total_products += product * len(self.all_event_delays[event_name])
         print('total fillers', total_fillers, 'total permutations', total_products)
 
         # generate 'stages' for train and test, where a stage is a list of event lists and parameters

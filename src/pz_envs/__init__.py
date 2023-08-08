@@ -103,12 +103,13 @@ def env_from_config(env_config, randomize_seed=True):
 
     return env_class(**env_kwargs)
 
+conf = ScenarioConfigs()
 
 for observation_style in ['rich']:
     for use_label in [True, False]:
         for view_size in [7, 17]:
             for difficulty in [3]:
-                for config in ScenarioConfigs.standoff.keys():
+                for config in conf.standoff.keys():
                     configName = config.replace(" ", "")
                     register_standoff_env(
                         f"Standoff-{configName}-{view_size}-{observation_style}-{difficulty}-v0" if not use_label else

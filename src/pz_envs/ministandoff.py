@@ -17,7 +17,8 @@ def index_permutations(permutations, seed):
 class MiniStandoffEnv(para_MultiGridEnv):
     mission = "get the best food before your opponent"
     metadata = {'render_modes': ['human', 'rgb_array'], "name": "miniStandoffEnv"}
-    configs = ScenarioConfigs().standoff
+    conf = ScenarioConfigs()
+    configs = conf.standoff
     info_keywords = ('minibatch', 'timestep',
                      'shouldAvoidBig', 'shouldAvoidSmall', 'correctSelection', 'selection',
                      'selectedBig', 'selectedSmall', 'selectedNeither',
@@ -104,9 +105,10 @@ class MiniStandoffEnv(para_MultiGridEnv):
         self.supervised_model = supervised_model  # used for generating special supervised labels
         self.last_supervised_labels = None
         self.has_released = False
+        self.conf = ScenarioConfigs()
 
         self.param_groups = [
-            {'eLists': ScenarioConfigs.all_event_lists, 'params': ScenarioConfigs.standoff['defaults'], 'perms': ScenarioConfigs.all_event_permutations, 'delays': ScenarioConfigs.all_event_delays},
+            {'eLists': self.conf.all_event_lists, 'params': self.conf.standoff['defaults'], 'perms': self.conf.all_event_permutations, 'delays': self.conf.all_event_delays},
         ]
 
     def reset_vision(self):
