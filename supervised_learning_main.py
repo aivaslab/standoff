@@ -153,6 +153,7 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
             handle = model.rnn.register_forward_hook(hook)
 
             for i, (inputs, labels, params, oracle_inputs, metrics) in enumerate(_val_loader):
+                inputs, target_labels, oracle_inputs = inputs.to(device), target_labels.to(device), oracle_inputs.to(device)
                 if i < num_activation_batches:
                     activations.append(hook.activations)
                     if i == num_activation_batches - 1:
