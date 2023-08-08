@@ -4,14 +4,12 @@ from ..base_AEC import para_MultiGridEnv, MultiGrid
 from ..objects import Wall, Goal, Curtain, Block, Box
 import random
 from ..puppets import pathfind
-import copy
 from ..pz_envs.scenario_configs import ScenarioConfigs
 
 
 class StandoffEnv(para_MultiGridEnv):
     mission = "get the best food before your opponent"
     metadata = {'render_modes': ['human', 'rgb_array'], "name": "standoffEnv"}
-    configs = ScenarioConfigs().standoff
     info_keywords = ('minibatch', 'timestep',
                      'shouldAvoidBig', 'shouldAvoidSmall', 'correctSelection', 'selection',
                      'selectedBig', 'selectedSmall', 'selectedNeither',
@@ -72,6 +70,8 @@ class StandoffEnv(para_MultiGridEnv):
         if puppets is None:
             puppets = []
         self.params = None
+        self.conf = ScenarioConfigs
+        self.configs = self.conf.standoff
         self.configName = config_name
         self.minibatch = 0
         self.deterministic = False  # used for generating deterministic baiting events for ground-truth evaluation
@@ -96,7 +96,7 @@ class StandoffEnv(para_MultiGridEnv):
         self.last_supervised_labels = None
         self.has_released = False
 
-        self.param_groups = [{'eLists': ScenarioConfigs.all_event_lists, 'params': ScenarioConfigs.standoff['defaults']}, ]
+        self.param_groups = [{'eLists': self.conf.all_event_lists, 'params': self.conf.standoff['defaults']}, ]
 
     def reset_vision(self):
         """

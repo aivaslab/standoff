@@ -17,8 +17,6 @@ def index_permutations(permutations, seed):
 class MiniStandoffEnv(para_MultiGridEnv):
     mission = "get the best food before your opponent"
     metadata = {'render_modes': ['human', 'rgb_array'], "name": "miniStandoffEnv"}
-    conf = ScenarioConfigs()
-    configs = conf.standoff
     info_keywords = ('minibatch', 'timestep',
                      'shouldAvoidBig', 'shouldAvoidSmall', 'correctSelection', 'selection',
                      'selectedBig', 'selectedSmall', 'selectedNeither',
@@ -74,6 +72,8 @@ class MiniStandoffEnv(para_MultiGridEnv):
                          use_separate_reward_layers=use_separate_reward_layers)
         self.stop_on_release = False
         self.new_target = None
+        conf = ScenarioConfigs()
+        configs = conf.standoff
         if agent_spawn_kwargs is None:
             agent_spawn_kwargs = {'top': (0, 0), 'size': (2, self.width)}
         self.agent_spawn_kwargs = agent_spawn_kwargs
