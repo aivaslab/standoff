@@ -103,24 +103,25 @@ def env_from_config(env_config, randomize_seed=True):
 
     return env_class(**env_kwargs)
 
-conf = ScenarioConfigs()
-
-for observation_style in ['rich']:
-    for use_label in [True, False]:
-        for view_size in [7, 17]:
-            for difficulty in [3]:
-                for config in conf.standoff.keys():
-                    configName = config.replace(" ", "")
-                    register_standoff_env(
-                        f"Standoff-{configName}-{view_size}-{observation_style}-{difficulty}-v0" if not use_label else
-                        f"Standoff-{configName}-{view_size}-{observation_style}-{difficulty}-v1",
-                        StandoffEnv if view_size == 17 else MiniStandoffEnv,
-                        config,
-                        difficulty,
-                        _observation_style=observation_style,
-                        #observation_density=1,
-                        view_tile_size=1,
-                        _view_size=view_size,
-                        view_offset=3 if view_size > 7 else 0,
-                        use_label=use_label,
-                    )
+if __name__ == '__main__':
+    conf = ScenarioConfigs()
+    
+    for observation_style in ['rich']:
+        for use_label in [True, False]:
+            for view_size in [7, 17]:
+                for difficulty in [3]:
+                    for config in conf.standoff.keys():
+                        configName = config.replace(" ", "")
+                        register_standoff_env(
+                            f"Standoff-{configName}-{view_size}-{observation_style}-{difficulty}-v0" if not use_label else
+                            f"Standoff-{configName}-{view_size}-{observation_style}-{difficulty}-v1",
+                            StandoffEnv if view_size == 17 else MiniStandoffEnv,
+                            config,
+                            difficulty,
+                            _observation_style=observation_style,
+                            #observation_density=1,
+                            view_tile_size=1,
+                            _view_size=view_size,
+                            view_offset=3 if view_size > 7 else 0,
+                            use_label=use_label,
+                        )
