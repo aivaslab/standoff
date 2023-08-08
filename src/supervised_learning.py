@@ -79,6 +79,8 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
         _subject_valence = [1] if pref_type == '' else [2] if pref_type == 'd' else [1, 2]
 
         data_name = f'{configName}'
+        informedness = data_name[3:-1]
+        print('data name', data_name)
         data_obs = []
         data_labels = {}
         all_labels = list(set(labels + prior_metrics + posterior_metrics))
@@ -151,7 +153,7 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
                                 if label == "correctSelection" or label == 'incorrectSelection':
                                     data = one_hot(5, info['p_0'][label])
                                 elif label == "informedness":
-                                    data = data_name
+                                    data = informedness
                                 elif label == "opponents":
                                     data = params["num_puppets"]
                                 else:
@@ -180,7 +182,7 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
                         break
 
         print('len obs', data_name, params["num_puppets"], len(data_obs))
-        this_path = os.path.join(path, data_name + str(params["num_puppets"]))
+        this_path = os.path.join(path, data_name)
         os.makedirs(this_path, exist_ok=True)
 
         np.savez_compressed(os.path.join(this_path, 'obs'), np.array(data_obs))
