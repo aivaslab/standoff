@@ -246,9 +246,9 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
             optimizer.step()
             t.update(1)
 
-        print('saving model')
         os.makedirs(save_path, exist_ok=True)
         torch.save([model.kwargs, model.state_dict()], os.path.join(save_path, f'{repetition}-model_epoch{epoch}.pt'))
+        torch.cuda.empty_cache()
 
 
 def calculate_ci(group):

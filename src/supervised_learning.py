@@ -399,12 +399,6 @@ class CustomDatasetBig(Dataset):
     def __getitem__(self, index):
 
         list_index, local_index = self._find_list_index(index)
-
-        #data = torch.from_numpy(pickle.loads(self.data_list[list_index][local_index])).float().to(self.device)
-        #labels = torch.from_numpy(self.labels_list[list_index][local_index].astype(np.int8)).to(self.device)
-        #oracles = torch.from_numpy(self.oracles_list[list_index][local_index].astype(np.int8)).to(self.device) if len(self.oracles_list) > 1 else torch.tensor([]).to(self.device)
-
-        #experimental: moving data in loop
         data = torch.from_numpy(pickle.loads(self.data_list[list_index][local_index])).float()
         labels = torch.from_numpy(self.labels_list[list_index][local_index].astype(np.int8))
         oracles = torch.from_numpy(self.oracles_list[list_index][local_index].astype(np.int8)) if len(
