@@ -140,3 +140,4 @@ dmypy.json
 *.txt
 *.npz
 *.h5
+*.pkl
