@@ -147,7 +147,8 @@ def experiments(todo, repetitions, epochs, skip_train=False, batch_size=64):
                                                 skip_train=skip_train,
                                                 batch_size=batch_size,
                                                 prior_metrics=list(set(prior_metrics+labels)),
-                                                key_param='oracle'
+                                                key_param='oracle',
+                                                key_param_value=oracle_name,
                                                 )
             last_path_list.append(last_epoch_paths)
             combined_path_list.append(combined_paths)

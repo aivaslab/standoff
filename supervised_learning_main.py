@@ -384,7 +384,7 @@ def find_df_paths(directory, file_pattern):
 # train_model('random-2500', 'exist')
 def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, eval_sets=None,
                            load_path='supervised', oracle_labels=[], skip_train=True, batch_size=64,
-                           prior_metrics=[], key_param=None):
+                           prior_metrics=[], key_param=None, key_param_value=None):
     # labels = ['loc', 'exist', 'vision', 'b-loc', 'b-exist', 'target', 'correctSelection']
     params = ['visible_baits', 'swaps', 'visible_swaps', 'first_swap_is_both',
               'second_swap_to_first_loc', 'delay_2nd_bait', 'first_bait_size',
@@ -454,6 +454,7 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
             replace_dict = {'1': 1, '0': 0}
             combined_df.replace(replace_dict, inplace=True)
             last_epoch_df.replace(replace_dict, inplace=True)
+            last_epoch_df[key_param] = key_param_value
             print('last_df cols', last_epoch_df.columns)
 
             avg_loss, variances, ranges_1, ranges_2, range_dict, range_dict3, stats = calculate_statistics(
