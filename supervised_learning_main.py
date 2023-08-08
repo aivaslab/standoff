@@ -4,6 +4,7 @@ import pickle
 
 import sys
 import os
+import time
 
 import pandas as pd
 import heapq
@@ -20,8 +21,7 @@ from torch.utils.data import DataLoader
 import tqdm
 import torch.nn as nn
 import torch
-from src.supervised_learning import RNNModel, CustomDataset, DiskLoadingDataset, h5Dataset, h5DatasetSlow, \
-    CustomDatasetBig
+from src.supervised_learning import RNNModel, CustomDatasetBig
 import traceback
 import torch.multiprocessing as mp
 
@@ -41,13 +41,22 @@ def decode_event_name(name):
     delay_2nd_bait = 1 if 'd' in main_part else 0
 
     # Convert the numerical suffix to binary and pad with zeroes to ensure 4 bits
-    binary_suffix = format(int(numerical_suffix), '04b')
+    '''binary_suffix = format(int(numerical_suffix), '04b')
 
     # Extract parameters from the binary suffix
     first_bait_size = int(binary_suffix[3])
     uninformed_bait = int(binary_suffix[2])
     uninformed_swap = int(binary_suffix[1])
-    first_swap = int(binary_suffix[0])
+    first_swap = int(binary_suffix[0])'''
+
+    # Convert the numerical suffix to binary
+    binary_suffix = int(numerical_suffix)
+
+    # Extract parameters from the binary suffix using bitwise operations
+    first_bait_size = (binary_suffix >> 3) & 1
+    uninformed_bait = (binary_suffix >> 2) & 1
+    uninformed_swap = (binary_suffix >> 1) & 1
+    first_swap = binary_suffix & 1
 
     # print(numerical_suffix, first_bait_size)
 
@@ -59,7 +68,7 @@ def decode_event_name(name):
     visible_baits_eq_1 = visible_baits == 1
     visible_swaps_eq_1 = visible_swaps == 1
 
-    return pd.Series({
+    '''return pd.Series({
         "visible_baits": visible_baits,
         "swaps": swaps,
         "visible_swaps": visible_swaps,
@@ -70,7 +79,19 @@ def decode_event_name(name):
         "uninformed_bait": uninformed_bait if visible_baits_eq_1 else 'N/A (informed baits!=1)',
         "uninformed_swap": uninformed_swap if swaps_eq_2 and visible_swaps_eq_1 else 'N/A (swaps<2 or informed swaps!=1)',
         "first_swap": first_swap if swaps_gt_0 and not delay_2nd_bait and not first_swap_is_both else 'N/A (swaps=0 or 2nd bait delayed or first swap both)'
-    })
+    })'''
+    return {
+        "visible_baits": visible_baits,
+        "swaps": swaps,
+        "visible_swaps": visible_swaps,
+        "first_swap_is_both": first_swap_is_both if swaps_gt_0 else 'na',
+        "second_swap_to_first_loc": second_swap_to_first_loc if swaps_eq_2 and delay_2nd_bait_false else 'na',
+        "delay_2nd_bait": delay_2nd_bait if swaps_gt_0 and first_swap_is_both_false else 'na',
+        "first_bait_size": first_bait_size,
+        "uninformed_bait": uninformed_bait if visible_baits_eq_1 else 'na',
+        "uninformed_swap": uninformed_swap if swaps_eq_2 and visible_swaps_eq_1 else 'na',
+        "first_swap": first_swap if swaps_gt_0 and not delay_2nd_bait and not first_swap_is_both else 'na'
+    }
 
 class SaveActivations:
     def __init__(self):
@@ -126,11 +147,12 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
     hook = SaveActivations()
     activations = []
 
+
     for idx, _val_loader in enumerate(test_loaders):
         with torch.no_grad():
             handle = model.rnn.register_forward_hook(hook)
 
-            for i, (inputs, labels, params, oracle_inputs, metrics) in enumerate(tqdm.tqdm(_val_loader)):
+            for i, (inputs, labels, params, oracle_inputs, metrics) in enumerate(_val_loader):
                 if i < num_activation_batches:
                     activations.append(hook.activations)
                     if i == num_activation_batches - 1:
@@ -148,6 +170,7 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
                 batch_param_losses = [
                     {
                         'param': param,
+                        **decode_event_name(param),
                         'epoch': epoch_number,
                         'loss': loss.item(),
                         'accuracy': correct.item(),
@@ -162,20 +185,21 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
     # save dfs periodically to free up ram:
     df_paths = []
     os.makedirs(model_save_path, exist_ok=True)
+
     df = pd.DataFrame(param_losses_list)
-    df = df.join(df['param'].apply(decode_event_name))
-    df.replace(r'N/A.*', 'na', regex=True, inplace=True)  # todo: construct na dict automatically
     print('saving csv...')
-    df.to_csv(os.path.join(model_save_path, f'param_losses_{epoch_number}_{repetition}.csv'))
+    df.to_csv(os.path.join(model_save_path, f'param_losses_{epoch_number}_{repetition}.csv'), index=False)
     df_paths.append(os.path.join(model_save_path, f'param_losses_{epoch_number}_{repetition}.csv'))
+    print('saving activations...')
     with open(os.path.join(model_save_path, f'activations_{epoch_number}_{repetition}.pkl'), 'wb') as f:
         pickle.dump(activations, f)
+    print('finished')
     return df_paths
 
 
 def train_model(train_sets, target_label, load_path='supervised/', save_path='', epochs=100,
                 model_kwargs=None,
-                lr=0.001, oracle_labels=[], repetition=0, batch_size=64):
+                lr=0.002, oracle_labels=[], repetition=0, batch_size=64):
     use_cuda = torch.cuda.is_available()
     if oracle_labels[0] == None:
         oracle_labels = []
@@ -254,8 +278,8 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False):
     param_pairs = itertools.combinations(params, 2)
     param_triples = itertools.combinations(params, 3)
 
-    numeric_columns = last_epoch_df.select_dtypes(include=[np.number]).columns  # select only numeric columns
-    variable_columns = [col for col in numeric_columns if last_epoch_df[col].std() > 0]  # filter out constant columns
+    #numeric_columns = last_epoch_df.select_dtypes(include=[np.number]).columns  # select only numeric columns
+    #variable_columns = [col for col in numeric_columns if last_epoch_df[col].std() > 0]  # filter out constant columns
     variable_columns = last_epoch_df.select_dtypes(include=[np.number]).nunique().index[
         last_epoch_df.select_dtypes(include=[np.number]).nunique() > 1].tolist()
 
@@ -384,7 +408,7 @@ def find_df_paths(directory, file_pattern):
 # train_model('random-2500', 'exist')
 def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, eval_sets=None,
                            load_path='supervised', oracle_labels=[], skip_train=True, batch_size=64,
-                           prior_metrics=[], key_param=None, key_param_value=None):
+                           prior_metrics=[], key_param=None, key_param_value=None, save_every=1):
     # labels = ['loc', 'exist', 'vision', 'b-loc', 'b-exist', 'target', 'correctSelection']
     params = ['visible_baits', 'swaps', 'visible_swaps', 'first_swap_is_both',
               'second_swap_to_first_loc', 'delay_2nd_bait', 'first_bait_size',
@@ -408,7 +432,7 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
     test_names = []
 
     num_random_tests = 1
-    lr = 0.001
+    lr = 0.002
 
     test = 0
     while test < num_random_tests:
@@ -432,30 +456,35 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
                     train_model(train_sets, 'correctSelection', load_path=load_path,
                                 save_path=save_path, epochs=epochs, model_kwargs=model_kwargs,
                                 lr=lr, oracle_labels=oracle_labels, repetition=repetition, batch_size=batch_size)
-                    for epoch in range(epochs):
-                        df_paths = evaluate_model(eval_sets, 'correctSelection', load_path=load_path,
-                                                  model_save_path=save_path,
-                                                  oracle_labels=oracle_labels, repetition=repetition,
-                                                  epoch_number=epoch, batch_size=batch_size,
-                                                  prior_metrics=prior_metrics)
-                        dfs_paths.extend(df_paths)
-                        if epoch == epochs - 1:
-                            last_epoch_df_paths.extend(df_paths)
+                    for epoch in tqdm.tqdm(range(epochs)):
+                        if epoch % save_every == 0 or epoch == epochs - 1:
+                            df_paths = evaluate_model(eval_sets, 'correctSelection', load_path=load_path,
+                                                      model_save_path=save_path,
+                                                      oracle_labels=oracle_labels, repetition=repetition,
+                                                      epoch_number=epoch, batch_size=batch_size,
+                                                      prior_metrics=prior_metrics)
+                            dfs_paths.extend(df_paths)
+                            if epoch == epochs - 1:
+                                last_epoch_df_paths.extend(df_paths)
             else:
                 dfs_paths = find_df_paths(save_path, 'param_losses_*_*.csv')
                 max_epoch = max(int(path.split('_')[-2]) for path in dfs_paths)
                 last_epoch_df_paths = [path for path in dfs_paths if int(path.split('_')[-2]) == max_epoch]
 
             print('loading dfs...')
+            cur_time = time.time()
+
             df_list = [pd.read_csv(df_path) for df_path in dfs_paths]
             combined_df = pd.concat(df_list, ignore_index=True)
+
             last_df_list = [pd.read_csv(df_path) for df_path in last_epoch_df_paths]
             last_epoch_df = pd.concat(last_df_list, ignore_index=True)
             replace_dict = {'1': 1, '0': 0}
             combined_df.replace(replace_dict, inplace=True)
             last_epoch_df.replace(replace_dict, inplace=True)
             last_epoch_df[key_param] = key_param_value
-            print('last_df cols', last_epoch_df.columns)
+            #print('join replace took', time.time()-cur_time)
+            #print('last_df cols', last_epoch_df.columns, last_epoch_df.t)
 
             avg_loss, variances, ranges_1, ranges_2, range_dict, range_dict3, stats = calculate_statistics(
                 combined_df, last_epoch_df, params + prior_metrics, skip_3x=True)

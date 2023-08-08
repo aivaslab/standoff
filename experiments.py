@@ -58,7 +58,7 @@ def create_combined_histogram(df, combined_avg, param, folder):
     plt.close()
 
 
-def experiments(todo, repetitions, epochs, skip_train=False, batch_size=64):
+def experiments(todo, repetitions, epochs, skip_train=False, batch_size=64, desired_evals=5):
     """What is the overall performance of naive, off-the-shelf models on this task? Which parameters of competitive
     feeding settings are the most sensitive to overall model performance? To what extent are different models
     sensitive to different parameters? """
@@ -131,7 +131,8 @@ def experiments(todo, repetitions, epochs, skip_train=False, batch_size=64):
                                )
 
     if 2 in todo:
-        print('Running experiment 2: varied oracle modules')
+        save_every = max(1, epochs // desired_evals)
+        print('Running experiment 2: varied oracle modules, saving every', save_every)
         combined_path_list = []
         last_path_list = []
         #os.makedirs(os.path.join('supervised', 'exp_2'), exist_ok=True)
@@ -149,6 +150,7 @@ def experiments(todo, repetitions, epochs, skip_train=False, batch_size=64):
                                                 prior_metrics=list(set(prior_metrics+labels)),
                                                 key_param='oracle',
                                                 key_param_value=oracle_name,
+                                                save_every=save_every,
                                                 )
             last_path_list.append(last_epoch_paths)
             combined_path_list.append(combined_paths)
@@ -247,4 +249,4 @@ def experiments(todo, repetitions, epochs, skip_train=False, batch_size=64):
 
 
 if __name__ == '__main__':
-    experiments([2], 1, 25, skip_train=True, batch_size=256)
+    experiments([0, 2], 1, 25, skip_train=False, batch_size=256, desired_evals=4)
