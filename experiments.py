@@ -67,7 +67,7 @@ def experiments(todo, repetitions, epochs, skip_train=False, batch_size=64, desi
               'second_swap_to_first_loc', 'delay_2nd_bait', 'first_bait_size',
               'uninformed_bait', 'uninformed_swap', 'first_swap']
     prior_metrics = ['shouldAvoidBig', 'shouldAvoidSmall', 'correctSelection', 'incorrectSelection',
-                     'firstBaitReward', 'eventVisibility', 'shouldGetBig', 'shouldGetSmall', 'set_name']
+                     'firstBaitReward', 'eventVisibility', 'shouldGetBig', 'shouldGetSmall', 'informedness', 'opponents']
 
     sub_regime_keys = [
         "",

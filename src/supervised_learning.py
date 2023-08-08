@@ -150,6 +150,10 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
                             for label in [x for x in all_labels if x not in posterior_metrics]:
                                 if label == "correctSelection" or label == 'incorrectSelection':
                                     data = one_hot(5, info['p_0'][label])
+                                elif label == "informedness":
+                                    data = data_name
+                                elif label == "opponents":
+                                    data = params["num_puppets"]
                                 else:
                                     data = info['p_0'][label]
                                 data_labels[label].append(copy.copy(data))
@@ -175,10 +179,9 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
                         # normally the while loop won't break because reset uses a modulus
                         break
 
-        print('len obs', data_name, suffix, len(data_obs))
-        this_path = os.path.join(path, data_name + suffix)
+        print('len obs', data_name, params["num_puppets"], len(data_obs))
+        this_path = os.path.join(path, data_name + str(params["num_puppets"]))
         os.makedirs(this_path, exist_ok=True)
-        data_labels['set_name'] = [data_name + suffix] * len(data_obs)
 
         np.savez_compressed(os.path.join(this_path, 'obs'), np.array(data_obs))
         np.savez_compressed(os.path.join(this_path,  'params'), np.array(data_params))
