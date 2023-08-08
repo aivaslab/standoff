@@ -254,12 +254,12 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False):
     param_pairs = itertools.combinations(params, 2)
     param_triples = itertools.combinations(params, 3)
 
-    #numeric_columns = last_epoch_df.select_dtypes(include=[np.number]).columns  # select only numeric columns
-    #variable_columns = [col for col in numeric_columns if last_epoch_df[col].std() > 0]  # filter out constant columns
+    numeric_columns = last_epoch_df.select_dtypes(include=[np.number]).columns  # select only numeric columns
+    variable_columns = [col for col in numeric_columns if last_epoch_df[col].std() > 0]  # filter out constant columns
     variable_columns = last_epoch_df.select_dtypes(include=[np.number]).nunique().index[
         last_epoch_df.select_dtypes(include=[np.number]).nunique() > 1].tolist()
 
-    correlations = last_epoch_df[variable_columns].corr()
+    correlations = last_epoch_df[variable_columns + 'accuracy'].corr()
     target_correlations = correlations['accuracy'][variable_columns]
     stats = {
         'param_correlations': correlations,
