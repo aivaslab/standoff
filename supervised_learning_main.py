@@ -254,8 +254,11 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False):
     param_pairs = itertools.combinations(params, 2)
     param_triples = itertools.combinations(params, 3)
 
-    numeric_columns = last_epoch_df.select_dtypes(include=[np.number]).columns  # select only numeric columns
-    variable_columns = [col for col in numeric_columns if last_epoch_df[col].std() > 0]  # filter out constant columns
+    #numeric_columns = last_epoch_df.select_dtypes(include=[np.number]).columns  # select only numeric columns
+    #variable_columns = [col for col in numeric_columns if last_epoch_df[col].std() > 0]  # filter out constant columns
+    variable_columns = last_epoch_df.select_dtypes(include=[np.number]).nunique().index[
+        last_epoch_df.select_dtypes(include=[np.number]).nunique() > 1].tolist()
+
     correlations = last_epoch_df[variable_columns].corr()
     target_correlations = correlations['accuracy'][variable_columns]
     stats = {
@@ -270,8 +273,6 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False):
         avg_loss[param] = df.groupby([param, 'epoch'])['accuracy'].apply(calculate_ci).reset_index()
         means = last_epoch_df.groupby([param]).mean(numeric_only=True)
         ranges_1[param] = means['accuracy'].max() - means['accuracy'].min()
-
-
 
     for param1, param2 in param_pairs:
         avg_loss[(param1, param2)] = df.groupby([param1, param2, 'epoch'])['accuracy'].apply(calculate_ci).reset_index()
