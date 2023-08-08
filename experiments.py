@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
 
+from src.pz_envs import ScenarioConfigs
 from src.supervised_learning import gen_data
 from supervised_learning_main import run_supervised_session, calculate_statistics, write_metrics_to_file, save_figures
 
@@ -113,7 +114,7 @@ def experiments(todo, repetitions, epochs, skip_train=False, batch_size=64, desi
         os.makedirs('supervised', exist_ok=True)
         for pref_type, pref_suffix in pref_types:
             for role_type, role_suffix in role_types:
-                gen_data(labels, path='supervised', pref_type=pref_suffix, role_type=role_suffix, prior_metrics=prior_metrics)
+                gen_data(labels, path='supervised', pref_type=pref_suffix, role_type=role_suffix, prior_metrics=prior_metrics, ScenarioConfigs=ScenarioConfigs)
 
     if 'h' in todo:
         print('Running hyperparameter search on all regimes, pref_types, role_types')

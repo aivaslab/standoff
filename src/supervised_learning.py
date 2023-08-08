@@ -14,7 +14,6 @@ sys.path.append(os.getcwd())
 from .objects import *
 from .agents import GridAgentInterface
 from .pz_envs import env_from_config
-from .pz_envs.scenario_configs import ScenarioConfigs
 # import src.pz_envs
 from torch.utils.data import Dataset
 import tqdm
@@ -28,7 +27,6 @@ def one_hot(size, data):
     return np.eye(size)[data]
 
 
-def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_extra_data=False, prior_metrics=[]):
     # labels = ['loc', 'exist', 'vision', 'b-loc', 'b-exist', 'target']
     posterior_metrics = ['selection', 'selectedBig', 'selectedSmall', 'selectedNeither',
                          'selectedPrevBig', 'selectedPrevSmall', 'selectedPrevNeither',
