@@ -482,6 +482,12 @@ class MiniStandoffEnv(para_MultiGridEnv):
                         if tile is not None and tile.type == "Goal":
                             # size used to distinguish treats from boxes
                             self.last_seen_reward[agent + str(box)] = tile.reward if isinstance(tile.reward, int) else 0
+
+                            if name == "sw":
+                                for key, value in self.last_seen_reward.items():
+                                    if value == tile.reward:
+                                        self.last_seen_reward[key] = 0
+
                             # print('rew update', agent, box, tile.reward)
                         elif not self.grid.get(x, y) and self.last_seen_reward[agent + str(box)] != 0:
                             self.last_seen_reward[agent + str(box)] = 0
@@ -555,6 +561,7 @@ class MiniStandoffEnv(para_MultiGridEnv):
                     if len(self.big_food_locations) > 0 and self.agent_goal[self.puppets[-1]] == \
                             self.big_food_locations[-1]:
                         self.infos['p_0']['shouldAvoidBig'] = not self.subject_is_dominant
+                        self.infos['p_0']['shouldGetBig'] = self.subject_is_dominant
                         self.infos['p_0']['shouldAvoidSmall'] = False
                     elif len(self.small_food_locations) > 0 and self.agent_goal[self.puppets[-1]] == \
                             self.small_food_locations[-1]:
@@ -569,25 +576,31 @@ class MiniStandoffEnv(para_MultiGridEnv):
                     self.infos['p_0']['correctSelection'] = self.small_food_locations[-1]
                     self.infos['p_0']['incorrectSelection'] = self.big_food_locations[-1]
                     self.infos['p_0']['shouldGetSmall'] = True
+                    self.infos['p_0']['shouldGetBig'] = False
                 else:
                     self.infos['p_0']['correctSelection'] = self.big_food_locations[-1]
                     self.infos['p_0']['incorrectSelection'] = self.small_food_locations[-1]
                     self.infos['p_0']['shouldGetBig'] = True
+                    self.infos['p_0']['shouldGetSmall'] = False
             elif len(self.small_food_locations) > 0:
                 if not self.infos['p_0']['shouldAvoidSmall']:
                     self.infos['p_0']['correctSelection'] = self.small_food_locations[-1]
                     self.infos['p_0']['shouldGetSmall'] = True
+                    self.infos['p_0']['shouldGetBig'] = False
                     self.infos['p_0']['incorrectSelection'] = -1
                 else:
                     self.infos['p_0']['correctSelection'] = -1
                     self.infos['p_0']['shouldGetBig'] = True
+                    self.infos['p_0']['shouldGetSmall'] = False
                     self.infos['p_0']['incorrectSelection'] = self.small_food_locations[-1]
             elif len(self.big_food_locations) > 0:
                 if not self.infos['p_0']['shouldAvoidBig']:
                     self.infos['p_0']['correctSelection'] = self.big_food_locations[-1]
                     self.infos['p_0']['shouldGetBig'] = True
+                    self.infos['p_0']['shouldGetSmall'] = False
                     self.infos['p_0']['incorrectSelection'] = -1
                 else:
                     self.infos['p_0']['correctSelection'] = -1
                     self.infos['p_0']['shouldGetSmall'] = True
+                    self.infos['p_0']['shouldGetBig'] = False
                     self.infos['p_0']['incorrectSelection'] = self.big_food_locations[-1]

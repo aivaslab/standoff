@@ -138,10 +138,10 @@ def experiments(todo, repetitions, epochs, skip_train=False, batch_size=64):
 
         for single_oracle, oracle_name in zip(oracles, oracle_names):
             print('oracle:', single_oracle)
-            combined_paths, last_epoch_paths = run_supervised_session(save_path=os.path.join('supervised', 'exp_2', oracle_name),
+            combined_paths, last_epoch_paths = run_supervised_session(save_path=os.path.join('supervised', 'exp_2b', oracle_name),
                                                 repetitions=repetitions,
                                                 epochs=epochs,
-                                                train_sets=regimes['tiny'],
+                                                train_sets=regimes['complete'],
                                                 eval_sets=regimes['situational'],
                                                 oracle_labels=[single_oracle],
                                                 skip_train=skip_train,
@@ -246,4 +246,4 @@ def experiments(todo, repetitions, epochs, skip_train=False, batch_size=64):
 
 
 if __name__ == '__main__':
-    experiments([2], 1, 1, skip_train=False, batch_size=256)
+    experiments([2], 1, 25, skip_train=False, batch_size=256)
