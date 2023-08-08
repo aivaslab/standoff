@@ -27,6 +27,7 @@ def one_hot(size, data):
     return np.eye(size)[data]
 
 
+def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_extra_data=False, prior_metrics=[], ScenarioConfigs=None):
     # labels = ['loc', 'exist', 'vision', 'b-loc', 'b-exist', 'target']
     posterior_metrics = ['selection', 'selectedBig', 'selectedSmall', 'selectedNeither',
                          'selectedPrevBig', 'selectedPrevSmall', 'selectedPrevNeither',
