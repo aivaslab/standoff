@@ -139,14 +139,14 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
 
         print('loading dataframes for final comparison')
 
-        combined_df = load_dataframes(combined_path_list, regimes.keys(), 'regime')
-        last_epoch_df = load_dataframes(last_path_list, regimes.keys(), 'regime')
+        combined_df = load_dataframes(combined_path_list, regimes.keys(), key_param)
+        last_epoch_df = load_dataframes(last_path_list, regimes.keys(), key_param)
 
         create_combined_histogram(last_epoch_df, combined_df, key_param, os.path.join('supervised', 'exp_1b'))
         # todo: add specific cell plots here
 
         avg_loss, variances, ranges_1, ranges_2, range_dict, range_dict3, stats = calculate_statistics(
-            combined_df, last_epoch_df, list(set(params + prior_metrics + ['regime'])),
+            combined_df, last_epoch_df, list(set(params + prior_metrics + [key_param])),
             skip_3x=True)  # todo: make it definitely save one fixed param eg oracle
 
         combined_path = os.path.join('supervised', 'exp_1b', 'c')
@@ -160,6 +160,7 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
         print('Running experiment 2: varied oracle modules, saving every', save_every)
         combined_path_list = []
         last_path_list = []
+        key_param = 'oracle'
         #os.makedirs(os.path.join('supervised', 'exp_2'), exist_ok=True)
 
         for single_oracle, oracle_name in zip(oracles, oracle_names):
@@ -173,7 +174,7 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
                                                 skip_train=skip_train,
                                                 batch_size=batch_size,
                                                 prior_metrics=list(set(prior_metrics+labels)),
-                                                key_param='oracle',
+                                                key_param=key_param,
                                                 key_param_value=oracle_name,
                                                 save_every=save_every,
                                                 skip_calc=skip_calc,
@@ -183,14 +184,14 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
 
         print('loading dataframes for final comparison')
 
-        combined_df = load_dataframes(combined_path_list, oracle_names, 'oracle')
-        last_epoch_df = load_dataframes(last_path_list, oracle_names, 'oracle')
+        combined_df = load_dataframes(combined_path_list, oracle_names, key_param)
+        last_epoch_df = load_dataframes(last_path_list, oracle_names, key_param)
 
-        create_combined_histogram(last_epoch_df, combined_df, 'oracle', os.path.join('supervised', 'exp_2b'))
+        create_combined_histogram(last_epoch_df, combined_df, key_param, os.path.join('supervised', 'exp_2b'))
         # todo: add specific cell plots here
 
         avg_loss, variances, ranges_1, ranges_2, range_dict, range_dict3, stats = calculate_statistics(
-            combined_df, last_epoch_df, list(set(params + prior_metrics + ['oracle'])), skip_3x=True) #todo: make it definitely save one fixed param eg oracle
+            combined_df, last_epoch_df, list(set(params + prior_metrics + [key_param])), skip_3x=True) #todo: make it definitely save one fixed param eg oracle
 
 
         combined_path = os.path.join('supervised', 'exp_2b', 'c')
