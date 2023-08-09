@@ -103,7 +103,7 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
         last_path_list = []
         # os.makedirs(os.path.join('supervised', 'exp_2'), exist_ok=True)
 
-        for regime in zip(regimes.keys()):
+        for regime in regimes.keys():
             print('regime:', regime)
             combined_paths, last_epoch_paths = run_supervised_session(
                 save_path=os.path.join('supervised', 'exp_1b', regime),
@@ -286,4 +286,4 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
 
 
 if __name__ == '__main__':
-    experiments([2], 1, 25, skip_train=True, skip_calc=False, batch_size=256, desired_evals=4)
+    experiments([1], 1, 16, skip_train=False, skip_calc=False, batch_size=256, desired_evals=4)
