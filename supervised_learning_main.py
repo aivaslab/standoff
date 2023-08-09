@@ -5,6 +5,7 @@ import pickle
 import sys
 import os
 import time
+import numpy as np
 from functools import lru_cache
 
 import pandas as pd
@@ -17,7 +18,7 @@ from src.utils.plotting import save_double_param_figures, save_single_param_figu
 
 sys.path.append(os.getcwd())
 
-from src.objects import *
+#from src.objects import *
 from torch.utils.data import DataLoader
 import tqdm
 import torch.nn as nn
@@ -94,12 +95,15 @@ def decode_event_name(name):
         "first_swap": first_swap if swaps_gt_0 and not delay_2nd_bait and not first_swap_is_both else 'na'
     }
 
+
 class SaveActivations:
     def __init__(self):
         self.activations = None
 
     def __call__(self, module, module_in, module_out):
         self.activations = module_out
+
+
 def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_path='', oracle_labels=[], repetition=0,
                    epoch_number=0, batch_size=64, prior_metrics=[], num_activation_batches=1):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -148,7 +152,6 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
     hook = SaveActivations()
     activations = []
 
-
     for idx, _val_loader in enumerate(test_loaders):
         with torch.no_grad():
             handle = model.rnn.register_forward_hook(hook)
@@ -181,7 +184,8 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
                         'neither_food_selected': neither.item(),
                         **{x: v[k].numpy() if hasattr(v[k], 'numpy') else v[k] for x, v in metrics.items()}
                     }
-                    for k, (param, loss, correct, small, big, neither) in enumerate(zip(params, losses, corrects, small_food_selected, big_food_selected, neither_food_selected))]
+                    for k, (param, loss, correct, small, big, neither) in enumerate(
+                        zip(params, losses, corrects, small_food_selected, big_food_selected, neither_food_selected))]
                 param_losses_list.extend(batch_param_losses)
 
     # save dfs periodically to free up ram:
@@ -223,7 +227,8 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
 
     train_dataset = CustomDatasetBig(data, labels, params, oracles)
     del data, labels, params, oracles
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=0)  # can't use more on windows
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True,
+                              num_workers=0)  # can't use more on windows
 
     model_kwargs['oracle_len'] = 0 if len(oracle_labels) == 0 else len(train_dataset.oracles_list[0][0])
     model_kwargs['output_len'] = 5  # np.prod(labels.shape[1:])
@@ -252,22 +257,24 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
         torch.save([model.kwargs, model.state_dict()], os.path.join(save_path, f'{repetition}-model_epoch{epoch}.pt'))
         torch.cuda.empty_cache()
 
+
 @lru_cache(maxsize=None)
 def get_t_value(n, confidence=0.95):
     return t.ppf((1 + confidence) / 2, n - 1)
+
+
 def calculate_ci(group):
-    confidence = 0.95
     group_arr = group.values
     n = group_arr.shape[0]
-    m = np.mean(group_arr)
+    m = group_arr.mean()
     std_err = sem(group_arr)
-    h = std_err * get_t_value(n, confidence)
+    h = std_err * get_t_value(n)
 
-    return pd.DataFrame({'lower': [m - h], 'upper': [m + h], 'mean': [m]},
-                        columns=['lower', 'upper', 'mean'])
+    #return {'lower': m - h, 'upper': m + h, 'mean': m}
+    return pd.DataFrame({'lower': [m - h], 'upper': [m + h], 'mean': [m]}, columns=['lower', 'upper', 'mean'])
 
 
-def calculate_statistics(df, last_epoch_df, params, skip_3x=False):
+def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=False):
     avg_loss = {}
     variances = {}
     ranges_1 = {}
@@ -276,6 +283,7 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False):
     range_dict3 = {}
 
     print('calculating statistics...')
+    print(params)
 
     param_pairs = itertools.combinations(params, 2)
     param_triples = itertools.combinations(params, 3)
@@ -298,18 +306,26 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False):
         means = last_epoch_df.groupby([param]).mean(numeric_only=True)
         ranges_1[param] = means['accuracy'].max() - means['accuracy'].min()
 
-    print('starting param pairs')
-    for param1, param2 in param_pairs:
+    '''cur_time = time.time()
+    means = grouped_last_epoch.mean()
+    ranges_1 = means['accuracy'].groupby(level=0).apply(lambda x: x.max() - x.min()).rename({i: param for i, param in enumerate(params)}).to_dict()
+    ranges_2 = means['accuracy'].groupby(level=[0, 1]).apply(lambda x: x.max() - x.min()).rename({i: param for i, param in enumerate(params)}).to_dict()
+    print('new param style time', time.time() - cur_time, ranges_1.keys(), ranges_2.keys())'''
+    #grouped_last_epoch = last_epoch_df.groupby(list(params))
+    #multi_grouped = df.groupby(list(params) + ['epoch'])['accuracy']
+
+    for param1, param2 in tqdm.tqdm(param_pairs):
         avg_loss[(param1, param2)] = df.groupby([param1, param2, 'epoch'])['accuracy'].apply(calculate_ci).reset_index()
 
         means = last_epoch_df.groupby([param1, param2]).mean()
         ranges_2[(param1, param2)] = means['accuracy'].max() - means['accuracy'].min()
 
-        for value1 in unique_vals[param1]:
-            subset = last_epoch_df[last_epoch_df[param1] == value1]
-            if len(subset[param2].unique()) > 1:
-                new_means = subset.groupby(param2)['accuracy'].mean()
-                range_dict[(param1, value1, param2)] = new_means.max() - new_means.min()
+        if not skip_2x1:
+            for value1 in unique_vals[param1]:
+                subset = last_epoch_df[last_epoch_df[param1] == value1]
+                if len(subset[param2].unique()) > 1:
+                    new_means = subset.groupby(param2)['accuracy'].mean()
+                    range_dict[(param1, value1, param2)] = new_means.max() - new_means.min()
 
     if not skip_3x:
         for param1, param2, param3 in param_triples:
@@ -400,6 +416,8 @@ def write_metrics_to_file(filepath, df, ranges, params, stats, key_param=None):
         f.write("\nCorrelations between key parameter and other parameters:\n")
         for param, corr in key_param_corr.iteritems():
             f.write(f"Correlation between {key_param} and {param}: {corr}\n")'''
+
+
 def find_df_paths(directory, file_pattern):
     """Find all CSV files in a directory based on a pattern."""
     return glob.glob(f"{directory}/{file_pattern}")
@@ -483,15 +501,16 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
                 combined_df.replace(replace_dict, inplace=True)
                 last_epoch_df.replace(replace_dict, inplace=True)
                 last_epoch_df[key_param] = key_param_value
-                #print('join replace took', time.time()-cur_time)
-                #print('last_df cols', last_epoch_df.columns, last_epoch_df.t)
+                # print('join replace took', time.time()-cur_time)
+                # print('last_df cols', last_epoch_df.columns, last_epoch_df.t)
                 combined_df['informedness'] = combined_df['informedness'].fillna('none')
                 last_epoch_df['informedness'] = last_epoch_df['informedness'].fillna('none')
 
                 avg_loss, variances, ranges_1, ranges_2, range_dict, range_dict3, stats = calculate_statistics(
                     combined_df, last_epoch_df, params + prior_metrics, skip_3x=True)
 
-                write_metrics_to_file(os.path.join(save_path, 'metrics.txt'), last_epoch_df, ranges_1, params, stats, key_param=key_param)
+                write_metrics_to_file(os.path.join(save_path, 'metrics.txt'), last_epoch_df, ranges_1, params, stats,
+                                      key_param=key_param)
 
                 save_figures(os.path.join(save_path, 'figs'), combined_df, avg_loss, ranges_2, range_dict, range_dict3,
                              params + prior_metrics, last_epoch_df, num=12)

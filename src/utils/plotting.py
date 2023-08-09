@@ -347,8 +347,8 @@ def save_double_param_figures(save_dir, top_pairs, df, avg_loss, last_epoch_df):
                     (avg_loss[(param1, param2)][param1] == value1) & (
                                 avg_loss[(param1, param2)][param2] == value2)]
 
-                str1 = f'{param1} = {value1}' if not isinstance(value1, str) or value1[0:3] != "N/A" else value1
-                str2 = f'{param2} = {value2}' if not isinstance(value2, str) or value2[0:3] != "N/A" else value2
+                str1 = f'{param1} = {value1}' if not isinstance(value1, str) or value1[0:3] != "N/A" or value1[0:3] != "na" else value1
+                str2 = f'{param2} = {value2}' if not isinstance(value2, str) or value2[0:3] != "N/A" or value1[0:2] != "na" else value2
                 plt.plot(sub_df['epoch'], sub_df['mean'],
                          label=f'{str1}, {str2}')
                 plt.fill_between(sub_df['epoch'], sub_df['lower'], sub_df['upper'], alpha=0.2)
@@ -395,7 +395,7 @@ def save_single_param_figures(save_dir, params, df, avg_loss, last_epoch_df):
         for value in unique_values:
             sub_df = avg_loss[param][avg_loss[param][param] == value]
 
-            plt.plot(sub_df['epoch'], sub_df['mean'], label=f'{param} = {value}' if not isinstance(value, str) or value[0:3] != "N/A" else value)
+            plt.plot(sub_df['epoch'], sub_df['mean'], label=f'{param} = {value}' if not isinstance(value, str) or value[0:3] != "N/A" or value[0:2] != "na" else value)
             plt.fill_between(sub_df['epoch'], sub_df['lower'], sub_df['upper'], alpha=0.2)
         plt.title(f'Average accuracy vs Epoch for {param}')
         plt.xlabel('Epoch')
@@ -449,7 +449,7 @@ def save_fixed_double_param_figures(save_dir, top_n_ranges, df, avg_loss, last_e
         for value2 in unique_values:
             sub_df = avg_loss[(param1, param2)][(avg_loss[(param1, param2)][param2] == value2) & (avg_loss[(param1, param2)][param1] == value1)]
             plt.plot(sub_df['epoch'], sub_df['mean'],
-                     label=f'{param2} = {value2}' if not isinstance(value2, str) or value2[0:3] != "N/A" else value2)
+                     label=f'{param2} = {value2}' if not isinstance(value2, str) or value2[0:3] != "N/A" or value2[0:2] != "na" else value2)
             plt.fill_between(sub_df['epoch'], sub_df['lower'], sub_df['upper'], alpha=0.2)
         plt.title(f'Average accuracy vs Epoch for {param2} given {param1} = {value1}')
         plt.xlabel('Epoch')
@@ -547,7 +547,7 @@ def create_combined_histogram(df, combined_avg, param, folder):
         mean_acc_per_epoch = value_df.groupby('epoch')['accuracy'].mean()
 
         plt.plot(mean_acc_per_epoch.index, mean_acc_per_epoch.values,
-                 label=f'{param} = {value}' if not isinstance(value, str) or value[0:3] != "N/A" else value)
+                 label=f'{param} = {value}' if not isinstance(value, str) or value[0:3] != "N/A" or value[0:2] != "na" else value)
         #plt.fill_between(sub_df['epoch'], sub_df['lower'], sub_df['upper'], alpha=0.2)
     plt.title(f'Average accuracy vs Epoch for {param}')
     plt.xlabel('Epoch')
