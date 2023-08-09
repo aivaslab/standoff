@@ -363,6 +363,9 @@ def write_metrics_to_file(filepath, df, ranges, params, stats, key_param=None):
         f.write(f"Average accuracy: {mean_accuracy} ({std_accuracy})\n")
 
         param_stats = df2.groupby('param')['accuracy'].agg(['mean', 'std', 'count'])
+        perfect_accuracy_tasks = param_stats[param_stats['mean'] == 1.0]
+        f.write(f"Number of tasks with perfect accuracy: {len(perfect_accuracy_tasks)}\n\n")
+
         top_10 = param_stats.nlargest(10, 'mean')
         bottom_10 = param_stats.nsmallest(10, 'mean')
 
@@ -374,13 +377,19 @@ def write_metrics_to_file(filepath, df, ranges, params, stats, key_param=None):
             f.write(f"Task: {param} (n={row['count']}), Mean accuracy: {row['mean']}, Std deviation: {row['std']}\n")
 
         sorted_ranges = sorted(ranges.items(), key=lambda x: x[1], reverse=True)
-        f.write("Top 10 parameters based on sensitivity to accuracy across values:\n")
-        for i in range(10):
-            f.write(f"Parameter: {sorted_ranges[i][0]}, Range: {sorted_ranges[i][1]}\n")
+        f.write("All parameters sorted by range of mean accuracy across values:\n")
+        for this_param in sorted_ranges:
+            f.write(f"Parameter: {this_param[0]}, Range: {this_param[1]}\n")
 
-        f.write("\nBottom 10 parameters based on sensitivity to accuracy across values:\n")
-        for i in range(10):
-            f.write(f"Parameter: {sorted_ranges[-(i + 1)][0]}, Range: {sorted_ranges[-(i + 1)][1]}\n")
+        if key_param:
+            f.write(f"\nAccuracy for each unique value of {key_param}:\n")
+            key_param_groups = df2.groupby(key_param)
+
+            for key, group in key_param_groups:
+                f.write(f"\n{key_param}: {key}\n")
+                mean_accuracy = group['accuracy'].mean()
+                std_accuracy = group['accuracy'].std()
+                f.write(f"Acc {key_param}: {key}: {mean_accuracy} ({std_accuracy})\n")
 
         param_value_stats = []
         for param in params:
@@ -392,16 +401,11 @@ def write_metrics_to_file(filepath, df, ranges, params, stats, key_param=None):
             param_value_stats.extend(param_stats_with_name)
 
         param_value_stats.sort(key=lambda x: x[2], reverse=True)  # sort by mean accuracy
-        top_10_values = param_value_stats[:10]
-        bottom_10_values = param_value_stats[-10:]
 
-        f.write("Top 10 parameter values based on average accuracy:\n")
-        for param, value, mean_accuracy, std_dev in top_10_values:
+        f.write("All parameter values sorted by average accuracy:\n")
+        for param, value, mean_accuracy, std_dev in param_value_stats:
             f.write(f"Parameter: {param}, Value: {value}, Mean accuracy: {mean_accuracy}, Std. deviation: {std_dev}\n")
 
-        f.write("\nBottom 10 parameter values based on average accuracy:\n")
-        for param, value, mean_accuracy, std_dev in bottom_10_values:
-            f.write(f"Parameter: {param}, Value: {value}, Mean accuracy: {mean_accuracy}, Std. deviation: {std_dev}\n")
 
         f.write("\nCorrelations between parameters and accuracy:\n")
         for param in stats['vars']:
