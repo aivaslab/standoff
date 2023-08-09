@@ -151,7 +151,7 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
 
         combined_path = os.path.join('supervised', 'exp_1b', 'c')
         os.makedirs(combined_path, exist_ok=True)
-        write_metrics_to_file(os.path.join(combined_path, 'metrics.txt'), last_epoch_df, ranges_1, params, stats)
+        write_metrics_to_file(os.path.join(combined_path, 'metrics.txt'), last_epoch_df, ranges_1, params, stats, key_param=key_param)
         save_figures(os.path.join(combined_path, 'figs'), combined_df, avg_loss, ranges_2, range_dict, range_dict3,
                      params, last_epoch_df, num=12)
 
@@ -196,7 +196,7 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
 
         combined_path = os.path.join('supervised', 'exp_2b', 'c')
         os.makedirs(combined_path, exist_ok=True)
-        write_metrics_to_file(os.path.join(combined_path, 'metrics.txt'), last_epoch_df, ranges_1, params, stats)
+        write_metrics_to_file(os.path.join(combined_path, 'metrics.txt'), last_epoch_df, ranges_1, params, stats, key_param=key_param)
         save_figures(os.path.join(combined_path, 'figs'), combined_df, avg_loss, ranges_2, range_dict, range_dict3,
                      params, last_epoch_df, num=12)
 
