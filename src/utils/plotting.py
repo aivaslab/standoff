@@ -337,8 +337,12 @@ def save_double_param_figures(save_dir, top_pairs, df, avg_loss, last_epoch_df):
     os.makedirs(this_save_dir, exist_ok=True)
     for (param1, param2), _ in top_pairs:
         plt.figure(figsize=(10, 6))
-        for value1 in df[param1].unique():
-            for value2 in df[param2].unique():
+        unique_values1 = last_epoch_df[param1].unique()
+        unique_values2 = last_epoch_df[param2].unique()
+        if len(unique_values2) * len(unique_values1) > 12:
+            continue
+        for value1 in unique_values1:
+            for value2 in unique_values2:
                 sub_df = avg_loss[(param1, param2)][
                     (avg_loss[(param1, param2)][param1] == value1) & (
                                 avg_loss[(param1, param2)][param2] == value2)]
@@ -362,8 +366,8 @@ def save_double_param_figures(save_dir, top_pairs, df, avg_loss, last_epoch_df):
         plt.figure(figsize=(10, 6))
         hist_data = []
         labels = []
-        for value1 in df[param1].unique():
-            for value2 in df[param2].unique():
+        for value1 in unique_values1:
+            for value2 in unique_values2:
                 value_df = last_epoch_df[(last_epoch_df[param2] == value2) & (last_epoch_df[param1] == value1)]
                 mean_acc = value_df.groupby('param')['accuracy'].mean()
                 hist_data.append(pd.Categorical(mean_acc))
@@ -385,7 +389,10 @@ def save_single_param_figures(save_dir, params, df, avg_loss, last_epoch_df):
     os.makedirs(this_save_dir, exist_ok=True)
     for param in params:
         plt.figure(figsize=(10, 6))
-        for value in df[param].unique():
+        unique_values = df[param].unique()
+        if len(unique_values) > 12:
+            continue
+        for value in unique_values:
             sub_df = avg_loss[param][avg_loss[param][param] == value]
 
             plt.plot(sub_df['epoch'], sub_df['mean'], label=f'{param} = {value}' if not isinstance(value, str) or value[0:3] != "N/A" else value)
@@ -403,7 +410,8 @@ def save_single_param_figures(save_dir, params, df, avg_loss, last_epoch_df):
         plt.figure(figsize=(10, 6))
         hist_data = []
         labels = []
-        for value in df[param].unique():
+        #unique_values = df[param].unique()
+        for value in unique_values:
             value_df = last_epoch_df[last_epoch_df[param] == value]
             mean_acc = value_df.groupby('param')['accuracy'].mean()
             hist_data.append(pd.Categorical(mean_acc))
@@ -435,7 +443,10 @@ def save_fixed_double_param_figures(save_dir, top_n_ranges, df, avg_loss, last_e
         param1, value1, param2 = combo
         subset = df[df[param1] == value1]
         plt.figure(figsize=(10, 6))
-        for value2 in subset[param2].unique():
+        unique_values = subset[param2].unique()
+        if len(unique_values) > 12:
+            continue
+        for value2 in unique_values:
             sub_df = avg_loss[(param1, param2)][(avg_loss[(param1, param2)][param2] == value2) & (avg_loss[(param1, param2)][param1] == value1)]
             plt.plot(sub_df['epoch'], sub_df['mean'],
                      label=f'{param2} = {value2}' if not isinstance(value2, str) or value2[0:3] != "N/A" else value2)
@@ -453,7 +464,7 @@ def save_fixed_double_param_figures(save_dir, top_n_ranges, df, avg_loss, last_e
         plt.figure(figsize=(10, 6))
         hist_data = []
         labels = []
-        for value2 in subset[param2].unique():
+        for value2 in unique_values:
             value_df = last_epoch_df[(last_epoch_df[param2] == value2) & (last_epoch_df[param1] == value1)]
             mean_acc = value_df.groupby('param')['accuracy'].mean()
             hist_data.append(pd.Categorical(mean_acc))
@@ -476,7 +487,10 @@ def save_fixed_triple_param_figures(save_dir, top_n_ranges, df, avg_loss, last_e
         param1, value1, param2, value2, param3 = combo
         subset = df[(df[param1] == value1) & (df[param2] == value2)]
         plt.figure(figsize=(10, 6))
-        for value3 in subset[param3].unique():
+        unique_values = subset[param3].unique()
+        if len(unique_values) > 12:
+            continue
+        for value3 in unique_values:
             sub_df = avg_loss[(param1, param2, param3)][(avg_loss[(param1, param2, param3)][param1] == value1) &
                                                         (avg_loss[(param1, param2, param3)][param2] == value2) &
                                                         (avg_loss[(param1, param2, param3)][param3] == value3)]
@@ -496,7 +510,7 @@ def save_fixed_triple_param_figures(save_dir, top_n_ranges, df, avg_loss, last_e
         plt.figure(figsize=(10, 6))
         hist_data = []
         labels = []
-        for value3 in subset[param3].unique():
+        for value3 in unique_values:
             value_df = last_epoch_df[(last_epoch_df[param2] == value2) & (last_epoch_df[param1] == value1) & (last_epoch_df[param3] == value3)]
             mean_acc = value_df.groupby('param')['accuracy'].mean()
             hist_data.append(pd.Categorical(mean_acc))
@@ -524,3 +538,44 @@ def plot_losses(data_name, label, train_losses, val_losses, val_set_names, speci
     plt.ylim(bottom=0)
     plt.tight_layout()
     plt.savefig(f'supervised/{data_name}-{label}-losses.png')
+
+
+def create_combined_histogram(df, combined_avg, param, folder):
+    plt.figure(figsize=(10, 6))
+    for value in combined_avg[param].unique():
+        value_df = combined_avg[combined_avg[param] == value]
+        mean_acc_per_epoch = value_df.groupby('epoch')['accuracy'].mean()
+
+        plt.plot(mean_acc_per_epoch.index, mean_acc_per_epoch.values,
+                 label=f'{param} = {value}' if not isinstance(value, str) or value[0:3] != "N/A" else value)
+        #plt.fill_between(sub_df['epoch'], sub_df['lower'], sub_df['upper'], alpha=0.2)
+    plt.title(f'Average accuracy vs Epoch for {param}')
+    plt.xlabel('Epoch')
+    plt.ylabel('Average accuracy')
+    plt.legend()
+    plt.ylim(0, 1)
+    file_path = os.path.join(os.getcwd(), folder, f'{param}.png')
+    plt.savefig(file_path)
+    plt.close()
+
+    # Creating the histogram
+    plt.figure(figsize=(10, 6))
+    hist_data = []
+    labels = []
+    for value in df[param].unique():
+        value_df = df[df[param] == value]
+        mean_acc = value_df.groupby('param')['accuracy'].mean()
+        hist_data.append(pd.Categorical(mean_acc))
+        labels.append(f'{param} = {value}')
+
+
+    #hist_data = np.asarray(hist_data, dtype=object)
+    plt.hist(hist_data, bins=np.arange(0, 1.01, 0.05), stacked=True, label=labels, alpha=0.5)
+
+    plt.title(f'Histogram of accuracy for last epoch for {param}')
+    plt.xlabel('Accuracy')
+    plt.ylabel('Count')
+    plt.legend(loc='upper left')
+    file_path = os.path.join(os.getcwd(), folder, f'hist_{param}.png')
+    plt.savefig(file_path)
+    plt.close()

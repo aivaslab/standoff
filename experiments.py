@@ -1,12 +1,17 @@
 import os
 
-import numpy as np
 import pandas as pd
-from matplotlib import pyplot as plt
 
 from src.pz_envs import ScenarioConfigs
 from src.supervised_learning import gen_data
+from src.utils.plotting import create_combined_histogram
 from supervised_learning_main import run_supervised_session, calculate_statistics, write_metrics_to_file, save_figures
+import numpy as np
+
+import warnings
+warnings.filterwarnings("ignore", category=pd.errors.DtypeWarning)
+warnings.filterwarnings("ignore", category=RuntimeWarning)
+warnings.filterwarnings("ignore", category=np.VisibleDeprecationWarning)
 
 
 def add_label_and_combine_dfs(df_list, params, label):
@@ -18,48 +23,7 @@ def add_label_and_combine_dfs(df_list, params, label):
     return combined_df
 
 
-def create_combined_histogram(df, combined_avg, param, folder):
-    plt.figure(figsize=(10, 6))
-    for value in combined_avg[param].unique():
-        value_df = combined_avg[combined_avg[param] == value]
-        mean_acc_per_epoch = value_df.groupby('epoch')['accuracy'].mean()
-
-        plt.plot(mean_acc_per_epoch.index, mean_acc_per_epoch.values,
-                 label=f'{param} = {value}' if not isinstance(value, str) or value[0:3] != "N/A" else value)
-        #plt.fill_between(sub_df['epoch'], sub_df['lower'], sub_df['upper'], alpha=0.2)
-    plt.title(f'Average accuracy vs Epoch for {param}')
-    plt.xlabel('Epoch')
-    plt.ylabel('Average accuracy')
-    plt.legend()
-    plt.ylim(0, 1)
-    file_path = os.path.join(os.getcwd(), folder, f'{param}.png')
-    plt.savefig(file_path)
-    plt.close()
-
-    # Creating the histogram
-    plt.figure(figsize=(10, 6))
-    hist_data = []
-    labels = []
-    for value in df[param].unique():
-        value_df = df[df[param] == value]
-        mean_acc = value_df.groupby('param')['accuracy'].mean()
-        hist_data.append(pd.Categorical(mean_acc))
-        labels.append(f'{param} = {value}')
-
-
-    #hist_data = np.asarray(hist_data, dtype=object)
-    plt.hist(hist_data, bins=np.arange(0, 1.01, 0.05), stacked=True, label=labels, alpha=0.5)
-
-    plt.title(f'Histogram of accuracy for last epoch for {param}')
-    plt.xlabel('Accuracy')
-    plt.ylabel('Count')
-    plt.legend(loc='upper left')
-    file_path = os.path.join(os.getcwd(), folder, f'hist_{param}.png')
-    plt.savefig(file_path)
-    plt.close()
-
-
-def experiments(todo, repetitions, epochs, skip_train=False, batch_size=64, desired_evals=5):
+def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, batch_size=64, desired_evals=5):
     """What is the overall performance of naive, off-the-shelf models on this task? Which parameters of competitive
     feeding settings are the most sensitive to overall model performance? To what extent are different models
     sensitive to different parameters? """
@@ -152,13 +116,14 @@ def experiments(todo, repetitions, epochs, skip_train=False, batch_size=64, desi
                                                 key_param='oracle',
                                                 key_param_value=oracle_name,
                                                 save_every=save_every,
+                                                skip_calc=skip_calc,
                                                 )
             last_path_list.append(last_epoch_paths)
             combined_path_list.append(combined_paths)
 
         replace_dict = {'1': 1, '0': 0}
 
-        print('loading dataframes')
+        print('loading dataframes for final comparison')
 
         df_list = []
         for df_paths, oracle_name in zip(combined_path_list, oracle_names):
@@ -169,6 +134,7 @@ def experiments(todo, repetitions, epochs, skip_train=False, batch_size=64, desi
                     chunk = chunk.assign(oracle=oracle_name)
                     df_list.append(chunk)
         combined_df = pd.concat(df_list, ignore_index=True)
+        combined_df['informedness'] = combined_df['informedness'].fillna('none')
 
         last_df_list = []
         for df_paths, oracle_name in zip(last_path_list, oracle_names):
@@ -179,11 +145,14 @@ def experiments(todo, repetitions, epochs, skip_train=False, batch_size=64, desi
                     chunk = chunk.assign(oracle=oracle_name)
                     last_df_list.append(chunk)
         last_epoch_df = pd.concat(last_df_list, ignore_index=True)
+        last_epoch_df['informedness'] = last_epoch_df['informedness'].fillna('none')
+
+        create_combined_histogram(last_epoch_df, combined_df, 'oracle', os.path.join('supervised', 'exp_2b'))
+        # todo: add specific cell plots here
 
         avg_loss, variances, ranges_1, ranges_2, range_dict, range_dict3, stats = calculate_statistics(
             combined_df, last_epoch_df, list(set(params + prior_metrics + ['oracle'])), skip_3x=True) #todo: make it definitely save one fixed param eg oracle
 
-        create_combined_histogram(last_epoch_df, combined_df, 'oracle', os.path.join('supervised', 'exp_2b'))
 
         combined_path = os.path.join('supervised', 'exp_2b', 'c')
         os.makedirs(combined_path, exist_ok=True)
@@ -250,4 +219,4 @@ def experiments(todo, repetitions, epochs, skip_train=False, batch_size=64, desi
 
 
 if __name__ == '__main__':
-    experiments([2], 1, 25, skip_train=False, batch_size=256, desired_evals=4)
+    experiments([2], 1, 25, skip_train=True, skip_calc=False, batch_size=256, desired_evals=4)

@@ -5,6 +5,7 @@ import pickle
 import sys
 import os
 import time
+from functools import lru_cache
 
 import pandas as pd
 import heapq
@@ -251,14 +252,16 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
         torch.save([model.kwargs, model.state_dict()], os.path.join(save_path, f'{repetition}-model_epoch{epoch}.pt'))
         torch.cuda.empty_cache()
 
-
+@lru_cache(maxsize=None)
+def get_t_value(n, confidence=0.95):
+    return t.ppf((1 + confidence) / 2, n - 1)
 def calculate_ci(group):
     confidence = 0.95
     group_arr = group.values
     n = group_arr.shape[0]
     m = np.mean(group_arr)
     std_err = sem(group_arr)
-    h = std_err * t.ppf((1 + confidence) / 2, n - 1)
+    h = std_err * get_t_value(n, confidence)
 
     return pd.DataFrame({'lower': [m - h], 'upper': [m + h], 'mean': [m]},
                         columns=['lower', 'upper', 'mean'])
@@ -274,13 +277,9 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False):
 
     print('calculating statistics...')
 
-    # hist_data = last_epoch_df.groupby('param').mean(numeric_only=True)
-
     param_pairs = itertools.combinations(params, 2)
     param_triples = itertools.combinations(params, 3)
 
-    #numeric_columns = last_epoch_df.select_dtypes(include=[np.number]).columns  # select only numeric columns
-    #variable_columns = [col for col in numeric_columns if last_epoch_df[col].std() > 0]  # filter out constant columns
     variable_columns = last_epoch_df.select_dtypes(include=[np.number]).nunique().index[
         last_epoch_df.select_dtypes(include=[np.number]).nunique() > 1].tolist()
 
@@ -299,11 +298,11 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False):
         means = last_epoch_df.groupby([param]).mean(numeric_only=True)
         ranges_1[param] = means['accuracy'].max() - means['accuracy'].min()
 
+    print('starting param pairs')
     for param1, param2 in param_pairs:
         avg_loss[(param1, param2)] = df.groupby([param1, param2, 'epoch'])['accuracy'].apply(calculate_ci).reset_index()
 
         means = last_epoch_df.groupby([param1, param2]).mean()
-        # variances[(param1, param2)] = grouped.var().mean()
         ranges_2[(param1, param2)] = means['accuracy'].max() - means['accuracy'].min()
 
         for value1 in unique_vals[param1]:
@@ -340,7 +339,7 @@ def save_figures(path, df, avg_loss, ranges, range_dict, range_dict3, params, la
     save_fixed_triple_param_figures(path, top_n_ranges3, df, avg_loss, last_epoch_df)
 
 
-def write_metrics_to_file(filepath, df, ranges, params, stats, key_param):
+def write_metrics_to_file(filepath, df, ranges, params, stats, key_param=None):
     df2 = df[df['epoch'] == df['epoch'].max()]
     with open(filepath, 'w') as f:
         mean_accuracy = df2['accuracy'].mean()
@@ -409,7 +408,7 @@ def find_df_paths(directory, file_pattern):
 # train_model('random-2500', 'exist')
 def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, eval_sets=None,
                            load_path='supervised', oracle_labels=[], skip_train=True, batch_size=64,
-                           prior_metrics=[], key_param=None, key_param_value=None, save_every=1):
+                           prior_metrics=[], key_param=None, key_param_value=None, save_every=1, skip_calc=True):
     # labels = ['loc', 'exist', 'vision', 'b-loc', 'b-exist', 'target', 'correctSelection']
     params = ['visible_baits', 'swaps', 'visible_swaps', 'first_swap_is_both',
               'second_swap_to_first_loc', 'delay_2nd_bait', 'first_bait_size',
@@ -472,30 +471,32 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
                 max_epoch = max(int(path.split('_')[-2]) for path in dfs_paths)
                 last_epoch_df_paths = [path for path in dfs_paths if int(path.split('_')[-2]) == max_epoch]
 
-            print('loading dfs...')
-            cur_time = time.time()
+            if not skip_calc:
+                print('loading dfs...')
 
-            df_list = [pd.read_csv(df_path) for df_path in dfs_paths]
-            combined_df = pd.concat(df_list, ignore_index=True)
+                df_list = [pd.read_csv(df_path) for df_path in dfs_paths]
+                combined_df = pd.concat(df_list, ignore_index=True)
 
-            last_df_list = [pd.read_csv(df_path) for df_path in last_epoch_df_paths]
-            last_epoch_df = pd.concat(last_df_list, ignore_index=True)
-            replace_dict = {'1': 1, '0': 0}
-            combined_df.replace(replace_dict, inplace=True)
-            last_epoch_df.replace(replace_dict, inplace=True)
-            last_epoch_df[key_param] = key_param_value
-            #print('join replace took', time.time()-cur_time)
-            #print('last_df cols', last_epoch_df.columns, last_epoch_df.t)
+                last_df_list = [pd.read_csv(df_path) for df_path in last_epoch_df_paths]
+                last_epoch_df = pd.concat(last_df_list, ignore_index=True)
+                replace_dict = {'1': 1, '0': 0}
+                combined_df.replace(replace_dict, inplace=True)
+                last_epoch_df.replace(replace_dict, inplace=True)
+                last_epoch_df[key_param] = key_param_value
+                #print('join replace took', time.time()-cur_time)
+                #print('last_df cols', last_epoch_df.columns, last_epoch_df.t)
+                combined_df['informedness'] = combined_df['informedness'].fillna('none')
+                last_epoch_df['informedness'] = last_epoch_df['informedness'].fillna('none')
 
-            avg_loss, variances, ranges_1, ranges_2, range_dict, range_dict3, stats = calculate_statistics(
-                combined_df, last_epoch_df, params + prior_metrics, skip_3x=True)
+                avg_loss, variances, ranges_1, ranges_2, range_dict, range_dict3, stats = calculate_statistics(
+                    combined_df, last_epoch_df, params + prior_metrics, skip_3x=True)
 
-            write_metrics_to_file(os.path.join(save_path, 'metrics.txt'), last_epoch_df, ranges_1, params, stats, key_param=key_param)
+                write_metrics_to_file(os.path.join(save_path, 'metrics.txt'), last_epoch_df, ranges_1, params, stats, key_param=key_param)
 
-            save_figures(os.path.join(save_path, 'figs'), combined_df, avg_loss, ranges_2, range_dict, range_dict3,
-                         params + prior_metrics, last_epoch_df, num=12)
+                save_figures(os.path.join(save_path, 'figs'), combined_df, avg_loss, ranges_2, range_dict, range_dict3,
+                             params + prior_metrics, last_epoch_df, num=12)
 
-            test_names.append(model_name)
+                test_names.append(model_name)
             test += 1
         except BaseException as e:
             print(e)
