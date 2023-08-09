@@ -47,11 +47,19 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
         ('informed', ['i0', 'i1']),
         ('contrastive', ['i0', 'u0', 'i1', 'u1']),
         ('complete', ['a0', 'i1']),
-        ('comprehensive', ['a0', 'i1', 'u1'])
+        ('comprehensive', ['a0', 'i1', 'u1']),
+        ('tiny', ['sl-' + x + '0' for x in ["eb-es"]])
+    ]
+    sub_regime_keys = [
+        "",
+        "eb", "es",
+        "eb-lb", "es-ls",
+        "eb-es",
+        "eb-es-lb", "eb-es-ls",
+        "eb-es-lb-ls"
     ]
     regimes = {
         'situational': ['sl-' + x + '1' for x in sub_regime_keys],
-        'tiny': ['sl-' + x + '0' for x in ["eb-es"]],
         'informed': ['sl-' + x + '0' for x in ["eb-es-lb-ls"]] + ['sl-' + x + '1' for x in ["eb-es-lb-ls"]],
         'contrastive': ['sl-' + x + '0' for x in ["eb-es-lb-ls", ""]] + ['sl-' + x + '1' for x in ["eb-es-lb-ls", ""]],
         'complete': ['sl-' + x + '0' for x in sub_regime_keys] + ['sl-' + x + '1' for x in ["eb-es-lb-ls"]],
@@ -89,11 +97,70 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
         print('Running experiment 1: varied models training directly on the test set')
 
         # todo: add hparam search for many models, comparison between them?
-        run_supervised_session(save_path=os.path.join('supervised', 'exp_1'),
-                               repetitions=repetitions,
-                               epochs=epochs,
-                               train_sets=regimes['situational'],
-                               )
+        save_every = max(1, epochs // desired_evals)
+        print('Running experiment 2: varied oracle modules, saving every', save_every)
+        combined_path_list = []
+        last_path_list = []
+        # os.makedirs(os.path.join('supervised', 'exp_2'), exist_ok=True)
+
+        for regime in zip(regimes.keys()):
+            print('regime:', regime)
+            combined_paths, last_epoch_paths = run_supervised_session(
+                save_path=os.path.join('supervised', 'exp_1b', regime),
+                repetitions=repetitions,
+                epochs=epochs,
+                train_sets=regimes[regime],
+                eval_sets=regimes['situational'],
+                oracle_labels=[None],
+                skip_train=skip_train,
+                batch_size=batch_size,
+                prior_metrics=list(set(prior_metrics + labels)),
+                key_param='regime',
+                key_param_value=regime,
+                save_every=save_every,
+                skip_calc=skip_calc,
+                )
+            last_path_list.append(last_epoch_paths)
+            combined_path_list.append(combined_paths)
+
+        replace_dict = {'1': 1, '0': 0}
+
+        print('loading dataframes for final comparison')
+
+        df_list = []
+        for df_paths, oracle_name in zip(combined_path_list, oracle_names):
+            for df_path in df_paths:
+                chunks = pd.read_csv(df_path, chunksize=10000)
+                for chunk in chunks:
+                    chunk.replace(replace_dict, inplace=True)
+                    chunk = chunk.assign(oracle=oracle_name)
+                    df_list.append(chunk)
+        combined_df = pd.concat(df_list, ignore_index=True)
+        combined_df['informedness'] = combined_df['informedness'].fillna('none')
+
+        last_df_list = []
+        for df_paths, oracle_name in zip(last_path_list, oracle_names):
+            for df_path in df_paths:
+                chunks = pd.read_csv(df_path, chunksize=10000)
+                for chunk in chunks:
+                    chunk.replace(replace_dict, inplace=True)
+                    chunk = chunk.assign(oracle=oracle_name)
+                    last_df_list.append(chunk)
+        last_epoch_df = pd.concat(last_df_list, ignore_index=True)
+        last_epoch_df['informedness'] = last_epoch_df['informedness'].fillna('none')
+
+        create_combined_histogram(last_epoch_df, combined_df, 'regime', os.path.join('supervised', 'exp_1b'))
+        # todo: add specific cell plots here
+
+        avg_loss, variances, ranges_1, ranges_2, range_dict, range_dict3, stats = calculate_statistics(
+            combined_df, last_epoch_df, list(set(params + prior_metrics + ['regime'])),
+            skip_3x=True)  # todo: make it definitely save one fixed param eg oracle
+
+        combined_path = os.path.join('supervised', 'exp_1b', 'c')
+        os.makedirs(combined_path, exist_ok=True)
+        write_metrics_to_file(os.path.join(combined_path, 'metrics.txt'), last_epoch_df, ranges_1, params, stats)
+        save_figures(os.path.join(combined_path, 'figs'), combined_df, avg_loss, ranges_2, range_dict, range_dict3,
+                     params, last_epoch_df, num=12)
 
     if 2 in todo:
         save_every = max(1, epochs // desired_evals)
