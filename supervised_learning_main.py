@@ -55,10 +55,10 @@ def decode_event_name(name):
     binary_suffix = int(numerical_suffix)
 
     # Extract parameters from the binary suffix using bitwise operations
-    first_bait_size = (binary_suffix >> 3) & 1
-    uninformed_bait = (binary_suffix >> 2) & 1
-    uninformed_swap = (binary_suffix >> 1) & 1
-    first_swap = binary_suffix & 1
+    first_bait_size = binary_suffix & 1
+    uninformed_bait = (binary_suffix >> 1) & 1
+    uninformed_swap = (binary_suffix >> 2) & 1
+    first_swap = (binary_suffix >> 3) & 1
 
     # print(numerical_suffix, first_bait_size)
 
