@@ -22,6 +22,20 @@ def add_label_and_combine_dfs(df_list, params, label):
 
     return combined_df
 
+def load_dataframes(combined_path_list, value_names, key_param):
+    df_list = []
+
+    replace_dict = {'1': 1, '0': 0}
+    for df_paths, value_name in zip(combined_path_list, value_names):
+        for df_path in df_paths:
+            chunks = pd.read_csv(df_path, chunksize=10000)
+            for chunk in chunks:
+                chunk.replace(replace_dict, inplace=True)
+                chunk = chunk.assign(**{key_param: value_name})
+                df_list.append(chunk)
+    combined_df = pd.concat(df_list, ignore_index=True)
+    combined_df['informedness'] = combined_df['informedness'].fillna('none')
+    return combined_df
 
 def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, batch_size=64, desired_evals=5):
     """What is the overall performance of naive, off-the-shelf models on this task? Which parameters of competitive
@@ -98,9 +112,9 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
 
         # todo: add hparam search for many models, comparison between them?
         save_every = max(1, epochs // desired_evals)
-        print('Running experiment 2: varied oracle modules, saving every', save_every)
         combined_path_list = []
         last_path_list = []
+        key_param = 'regime'
         # os.makedirs(os.path.join('supervised', 'exp_2'), exist_ok=True)
 
         for regime in regimes.keys():
@@ -115,7 +129,7 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
                 skip_train=skip_train,
                 batch_size=batch_size,
                 prior_metrics=list(set(prior_metrics + labels)),
-                key_param='regime',
+                key_param=key_param,
                 key_param_value=regime,
                 save_every=save_every,
                 skip_calc=skip_calc,
@@ -123,33 +137,12 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
             last_path_list.append(last_epoch_paths)
             combined_path_list.append(combined_paths)
 
-        replace_dict = {'1': 1, '0': 0}
-
         print('loading dataframes for final comparison')
 
-        df_list = []
-        for df_paths, oracle_name in zip(combined_path_list, oracle_names):
-            for df_path in df_paths:
-                chunks = pd.read_csv(df_path, chunksize=10000)
-                for chunk in chunks:
-                    chunk.replace(replace_dict, inplace=True)
-                    chunk = chunk.assign(oracle=oracle_name)
-                    df_list.append(chunk)
-        combined_df = pd.concat(df_list, ignore_index=True)
-        combined_df['informedness'] = combined_df['informedness'].fillna('none')
+        combined_df = load_dataframes(combined_path_list, regimes.keys(), 'regime')
+        last_epoch_df = load_dataframes(last_path_list, regimes.keys(), 'regime')
 
-        last_df_list = []
-        for df_paths, oracle_name in zip(last_path_list, oracle_names):
-            for df_path in df_paths:
-                chunks = pd.read_csv(df_path, chunksize=10000)
-                for chunk in chunks:
-                    chunk.replace(replace_dict, inplace=True)
-                    chunk = chunk.assign(oracle=oracle_name)
-                    last_df_list.append(chunk)
-        last_epoch_df = pd.concat(last_df_list, ignore_index=True)
-        last_epoch_df['informedness'] = last_epoch_df['informedness'].fillna('none')
-
-        create_combined_histogram(last_epoch_df, combined_df, 'regime', os.path.join('supervised', 'exp_1b'))
+        create_combined_histogram(last_epoch_df, combined_df, key_param, os.path.join('supervised', 'exp_1b'))
         # todo: add specific cell plots here
 
         avg_loss, variances, ranges_1, ranges_2, range_dict, range_dict3, stats = calculate_statistics(
@@ -188,31 +181,10 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
             last_path_list.append(last_epoch_paths)
             combined_path_list.append(combined_paths)
 
-        replace_dict = {'1': 1, '0': 0}
-
         print('loading dataframes for final comparison')
 
-        df_list = []
-        for df_paths, oracle_name in zip(combined_path_list, oracle_names):
-            for df_path in df_paths:
-                chunks = pd.read_csv(df_path, chunksize=10000)
-                for chunk in chunks:
-                    chunk.replace(replace_dict, inplace=True)
-                    chunk = chunk.assign(oracle=oracle_name)
-                    df_list.append(chunk)
-        combined_df = pd.concat(df_list, ignore_index=True)
-        combined_df['informedness'] = combined_df['informedness'].fillna('none')
-
-        last_df_list = []
-        for df_paths, oracle_name in zip(last_path_list, oracle_names):
-            for df_path in df_paths:
-                chunks = pd.read_csv(df_path, chunksize=10000)
-                for chunk in chunks:
-                    chunk.replace(replace_dict, inplace=True)
-                    chunk = chunk.assign(oracle=oracle_name)
-                    last_df_list.append(chunk)
-        last_epoch_df = pd.concat(last_df_list, ignore_index=True)
-        last_epoch_df['informedness'] = last_epoch_df['informedness'].fillna('none')
+        combined_df = load_dataframes(combined_path_list, oracle_names, 'oracle')
+        last_epoch_df = load_dataframes(last_path_list, oracle_names, 'oracle')
 
         create_combined_histogram(last_epoch_df, combined_df, 'oracle', os.path.join('supervised', 'exp_2b'))
         # todo: add specific cell plots here
@@ -286,4 +258,4 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
 
 
 if __name__ == '__main__':
-    experiments([1], 1, 16, skip_train=False, skip_calc=False, batch_size=256, desired_evals=4)
+    experiments([1], 1, 8, skip_train=True, skip_calc=True, batch_size=256, desired_evals=4)
