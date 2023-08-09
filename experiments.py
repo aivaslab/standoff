@@ -32,7 +32,7 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
               'second_swap_to_first_loc', 'delay_2nd_bait', 'first_bait_size',
               'uninformed_bait', 'uninformed_swap', 'first_swap']
     prior_metrics = ['shouldAvoidBig', 'shouldAvoidSmall', 'correctSelection', 'incorrectSelection',
-                     'firstBaitReward', 'eventVisibility', 'shouldGetBig', 'shouldGetSmall', 'informedness', 'opponents']
+                     'firstBaitReward', 'shouldGetBig', 'informedness']
 
     sub_regime_keys = [
         "",
@@ -70,7 +70,7 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
     ]
 
     # generate supervised data
-    labels = ['loc', 'exist', 'vision', 'b-loc', 'b-exist', 'target', 'correctSelection']
+    labels = ['loc', 'vision', 'b-loc', 'b-exist', 'target', 'correctSelection']
     oracles = [None] + labels
     oracle_names = [x if x is not None else "None" for x in oracles]
     if 0 in todo:
