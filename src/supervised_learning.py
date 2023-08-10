@@ -411,7 +411,7 @@ class CustomDatasetBig(Dataset):
 class RNNModel(nn.Module):
     def __init__(self, hidden_size, num_layers, output_len, channels, kernels=8, kernels2=8, kernel_size1=3,
                  kernel_size2=3, stride1=1, pool_kernel_size=2, pool_stride=2, padding1=0, padding2=0, use_pool=True,
-                 use_conv2=False, oracle_len=0):
+                 use_conv2=False, oracle_len=0, oracle_layer=0):
         super(RNNModel, self).__init__()
         self.kwargs = {'hidden_size': hidden_size, 'num_layers': num_layers,
                        'output_len': output_len, 'pool_kernel_size': pool_kernel_size,
@@ -422,6 +422,7 @@ class RNNModel(nn.Module):
 
         input_size = 7
 
+        self.oracle_layer = oracle_layer
         self.use_pool = use_pool
         self.use_conv2 = use_conv2
         conv1_output_size = (input_size - kernel_size1 + 2 * padding1) // stride1 + 1
@@ -464,19 +465,28 @@ class RNNModel(nn.Module):
 
             if self.use_conv2:
                 x_t = self.pool(F.relu(self.conv2(x_t))) if self.use_pool else F.relu(self.conv2(x_t))
-            conv_outputs.append(x_t.view(x.size(0), -1))
+
+            flattened = x_t.view(x.size(0), -1)
+            if self.oracle_layer == 1:
+                flattened = torch.cat((flattened, oracle_inputs), dim=1)
+
+            conv_outputs.append(flattened)
         x = torch.stack(conv_outputs, dim=1)
 
         out, _ = self.rnn(x)
         out = out[:, -1, :]  # Use only the last timestep's output
-        outputs = self.fc(torch.cat((out, oracle_inputs), dim=-1))
+
+        if self.oracle_layer != 1:
+            out = torch.cat((out, oracle_inputs), dim=-1)
+
+        outputs = self.fc(out)
         return outputs
 
 
 class FeedForwardModel(nn.Module):
     def __init__(self, hidden_size, output_len, channels, kernels=8, kernels2=8, kernel_size1=3,
                  kernel_size2=3, stride1=1, pool_kernel_size=2, pool_stride=2, padding1=0, padding2=0,
-                 use_pool=True, use_conv2=False, oracle_len=0, num_layers=1):
+                 use_pool=True, use_conv2=False, oracle_len=0, num_layers=1, oracle_layer=0):
         super(FeedForwardModel, self).__init__()
         self.kwargs = {'hidden_size': hidden_size, 'num_layers': num_layers,
                        'output_len': output_len, 'pool_kernel_size': pool_kernel_size,
@@ -488,6 +498,7 @@ class FeedForwardModel(nn.Module):
         self.use_pool = use_pool
         self.use_conv2 = use_conv2
         self.hidden_size = hidden_size
+        self.oracle_layer = oracle_layer
 
         # Since we're stacking all the time steps as extra channels:
         # Each time step will add 'channels' to the input.
@@ -527,6 +538,9 @@ class FeedForwardModel(nn.Module):
         # Flatten and pass through the FC layers
         x = x.view(x.size(0), -1)
         x = F.relu(self.fc(x))
-        x = self.output_layer(torch.cat((x, oracle_inputs), dim=-1))
+        if self.oracle_layer == 0:
+            x = self.output_layer(torch.cat((x, oracle_inputs), dim=-1))
+        else:
+            x = self.output_layer(x)
 
         return x

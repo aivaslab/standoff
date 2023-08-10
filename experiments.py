@@ -162,7 +162,10 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
         combined_path_list = []
         last_path_list = []
         key_param = 'oracle'
+        oracle_layer = 1
         exp_name = 'exp_2' if not use_ff else 'exp_2-f'
+        if oracle_layer != 0:
+            exp_name = exp_name + str(oracle_layer)
         #os.makedirs(os.path.join('supervised', 'exp_2'), exist_ok=True)
 
         for single_oracle, oracle_name in zip(oracles, oracle_names):
@@ -180,7 +183,8 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
                                                 key_param_value=oracle_name,
                                                 save_every=save_every,
                                                 skip_calc=skip_calc,
-                                                use_ff=use_ff
+                                                use_ff=use_ff,
+                                                oracle_layer=oracle_layer,
                                                 )
             last_path_list.append(last_epoch_paths)
             combined_path_list.append(combined_paths)
@@ -262,4 +266,4 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
 
 
 if __name__ == '__main__':
-    experiments([1], 1, 8, skip_train=True, skip_calc=True, batch_size=256, desired_evals=4)
+    experiments([1], 1, 16, skip_train=False, skip_calc=False, batch_size=256, desired_evals=1, use_ff=True)

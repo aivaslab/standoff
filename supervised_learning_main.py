@@ -18,7 +18,7 @@ from src.utils.plotting import save_double_param_figures, save_single_param_figu
 
 sys.path.append(os.getcwd())
 
-#from src.objects import *
+# from src.objects import *
 from torch.utils.data import DataLoader
 import tqdm
 import torch.nn as nn
@@ -110,7 +110,7 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
     special_criterion = nn.CrossEntropyLoss(reduction='none')
 
     model_kwargs, state_dict = torch.load(os.path.join(model_save_path, f'{repetition}-model_epoch{epoch_number}.pt'))
-    model = RNNModel(**model_kwargs).to(device)
+    model = RNNModel(**model_kwargs).to(device) if not use_ff else FeedForwardModel(**model_kwargs)
     model.load_state_dict(state_dict)
     model.eval()
 
@@ -235,7 +235,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
     model_kwargs['channels'] = 5  # np.prod(params.shape[2])
 
     device = torch.device('cuda' if use_cuda else 'cpu')
-    model = RNNModel(**model_kwargs).to(device)
+    model = RNNModel(**model_kwargs).to(device) if not use_ff else FeedForwardModel(**model_kwargs)
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
@@ -270,7 +270,7 @@ def calculate_ci(group):
     std_err = sem(group_arr)
     h = std_err * get_t_value(n)
 
-    #return {'lower': m - h, 'upper': m + h, 'mean': m}
+    # return {'lower': m - h, 'upper': m + h, 'mean': m}
     return pd.DataFrame({'lower': [m - h], 'upper': [m + h], 'mean': [m]}, columns=['lower', 'upper', 'mean'])
 
 
@@ -311,8 +311,8 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=Fals
     ranges_1 = means['accuracy'].groupby(level=0).apply(lambda x: x.max() - x.min()).rename({i: param for i, param in enumerate(params)}).to_dict()
     ranges_2 = means['accuracy'].groupby(level=[0, 1]).apply(lambda x: x.max() - x.min()).rename({i: param for i, param in enumerate(params)}).to_dict()
     print('new param style time', time.time() - cur_time, ranges_1.keys(), ranges_2.keys())'''
-    #grouped_last_epoch = last_epoch_df.groupby(list(params))
-    #multi_grouped = df.groupby(list(params) + ['epoch'])['accuracy']
+    # grouped_last_epoch = last_epoch_df.groupby(list(params))
+    # multi_grouped = df.groupby(list(params) + ['epoch'])['accuracy']
 
     for param1, param2 in tqdm.tqdm(param_pairs):
         avg_loss[(param1, param2)] = df.groupby([param1, param2, 'epoch'])['accuracy'].apply(calculate_ci).reset_index()
@@ -406,7 +406,6 @@ def write_metrics_to_file(filepath, df, ranges, params, stats, key_param=None):
         for param, value, mean_accuracy, std_dev in param_value_stats:
             f.write(f"Parameter: {param}, Value: {value}, Mean accuracy: {mean_accuracy}, Std. deviation: {std_dev}\n")
 
-
         f.write("\nCorrelations between parameters and accuracy:\n")
         for param in stats['vars']:
             f.write(f"Correlation between {param} and acc: {stats['accuracy_correlations'][param]}\n")
@@ -430,7 +429,8 @@ def find_df_paths(directory, file_pattern):
 # train_model('random-2500', 'exist')
 def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, eval_sets=None,
                            load_path='supervised', oracle_labels=[], skip_train=True, batch_size=64,
-                           prior_metrics=[], key_param=None, key_param_value=None, save_every=1, skip_calc=True, use_ff=False):
+                           prior_metrics=[], key_param=None, key_param_value=None, save_every=1, skip_calc=True,
+                           use_ff=False, oracle_layer=0):
     # labels = ['loc', 'exist', 'vision', 'b-loc', 'b-exist', 'target', 'correctSelection']
     params = ['visible_baits', 'swaps', 'visible_swaps', 'first_swap_is_both',
               'second_swap_to_first_loc', 'delay_2nd_bait', 'first_bait_size',
@@ -463,7 +463,7 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
             model_kwargs = {'hidden_size': 16, 'num_layers': 2, 'output_len': 5, 'pool_kernel_size': 3,
                             'pool_stride': 2, 'channels': 7, 'kernels': 8, 'padding1': 1, 'padding2': 0,
                             'use_pool': False, 'stride1': 1, 'use_conv2': True, 'kernel_size1': 3, 'kernels2': 16,
-                            'kernel_size2': 3}
+                            'kernel_size2': 3, 'oracle_layer': oracle_layer} #note I'm using oracle layer here, so not part of hparam search
             '''model_kwargs = {'hidden_size': 6, 'num_layers': 1, 'output_len': 5, 'pool_kernel_size': 3,
                             'pool_stride': 2, 'channels': 4, 'kernels': 8, 'padding1': 1, 'padding2': 0,
                             'use_pool': False, 'stride1': 1, 'use_conv2': True, 'kernel_size1': 3, 'kernels2': 8,
