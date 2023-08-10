@@ -110,7 +110,10 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
     special_criterion = nn.CrossEntropyLoss(reduction='none')
 
     model_kwargs, state_dict = torch.load(os.path.join(model_save_path, f'{repetition}-model_epoch{epoch_number}.pt'))
-    model = RNNModel(**model_kwargs).to(device) if not use_ff else FeedForwardModel(**model_kwargs).to(device)
+    if use_ff:
+        FeedForwardModel(**model_kwargs).to(device)
+    else:
+        model = RNNModel(**model_kwargs).to(device)
     model.load_state_dict(state_dict)
     model.eval()
 
@@ -154,7 +157,10 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
 
     for idx, _val_loader in enumerate(test_loaders):
         with torch.no_grad():
-            handle = model.rnn.register_forward_hook(hook) if use_ff else model.fc.register_forward_hook(hook)
+            if use_ff:
+                model.fc.register_forward_hook(hook)
+            else:
+                handle = model.rnn.register_forward_hook(hook)
 
             for i, (inputs, labels, params, oracle_inputs, metrics) in enumerate(_val_loader):
                 inputs, labels, oracle_inputs = inputs.to(device), labels.to(device), oracle_inputs.to(device)
