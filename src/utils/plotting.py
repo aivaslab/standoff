@@ -332,7 +332,7 @@ def plot_tsne(data, labels, index, color):
     #    plt.annotate(name, (data[i + index[0], 0], data[i + index[0], 1]), textcoords="offset points", xytext=(-10, 5), ha='center')
 
 
-def save_double_param_figures(save_dir, top_pairs, df, avg_loss, last_epoch_df):
+def save_double_param_figures(save_dir, top_pairs, avg_loss, last_epoch_df):
     this_save_dir = os.path.join(save_dir, 'doubleparams')
     os.makedirs(this_save_dir, exist_ok=True)
     for (param1, param2), _ in top_pairs:
@@ -382,14 +382,59 @@ def save_double_param_figures(save_dir, top_pairs, df, avg_loss, last_epoch_df):
         plt.savefig(os.path.join(os.getcwd(), os.path.join(this_save_dir, f'hist_{param1}{param2}.png')))
         plt.close()
 
+def save_key_param_figures(save_dir, key_param_stats, key_param):
+    this_save_dir = os.path.join(save_dir, 'key_param')
+    os.makedirs(this_save_dir, exist_ok=True)
+    print('saving key param figures')
+
+    n_groups = len(list(key_param_stats.keys()))
+
+    # Loop through each param
+    for param in list(next(iter(key_param_stats.values())).keys()):
+
+        # Prepare data for current param
+        labels = list(key_param_stats.keys())  # Key values as labels
+        param_vals = list(key_param_stats[next(iter(key_param_stats))][param]['mean'].keys())
+        bar_width = 0.8 / len(param_vals)
+        index = np.arange(len(labels))
+
+        fig, ax = plt.subplots()
+
+        # Create bars for each param_val within the group of key_param
+        for idx, (param_val, color) in enumerate(zip(param_vals, plt.cm.tab10.colors)):
+            means = [key_param_stats[key_val][param]['mean'][param_val] for key_val in labels]
+            #stds = [key_param_stats[key_val][param]['std'][param_val] for key_val in labels]
+            cis = [key_param_stats[key_val][param]['ci'][param_val] for key_val in labels]
+            ax.bar(index + idx * bar_width, means, bar_width, label=param_val, yerr=cis, alpha=0.8, capsize=5, color=color)
 
 
-def save_single_param_figures(save_dir, params, df, avg_loss, last_epoch_df):
+            #lower_error = [mean - key_param_stats[key_val][param]['q1'][param_val] for key_val, mean in
+            #               zip(labels, means)]
+            #upper_error = [key_param_stats[key_val][param]['q3'][param_val] - mean for key_val, mean in
+            #               zip(labels, means)]
+
+            #ax.bar(index + idx * bar_width, means, bar_width, label='{}: {}'.format(param, param_val),
+            #       yerr=[lower_error, upper_error], alpha=0.8, capsize=5, color=color)
+
+        # Format plot
+        ax.set_xlabel(key_param)
+        ax.set_ylabel('Accuracy')
+        ax.set_title('Accuracy by {} and {}'.format(param, key_param))
+        ax.set_xticks(index + bar_width * (n_groups - 1) / 2)
+        ax.set_xticklabels(labels, rotation=45, ha='right')
+        ax.legend(loc='upper left', bbox_to_anchor=(1, 1))
+
+        # Show plot
+        plt.tight_layout()
+        file_path = os.path.join(os.getcwd(), this_save_dir, f'key_{param}.png')
+        plt.savefig(file_path)
+
+def save_single_param_figures(save_dir, params, avg_loss, last_epoch_df):
     this_save_dir = os.path.join(save_dir, 'singleparams')
     os.makedirs(this_save_dir, exist_ok=True)
     for param in params:
         plt.figure(figsize=(10, 6))
-        unique_values = df[param].unique()
+        unique_values = last_epoch_df[param].unique()
         if len(unique_values) > 12:
             continue
         for value in unique_values:
@@ -410,22 +455,16 @@ def save_single_param_figures(save_dir, params, df, avg_loss, last_epoch_df):
         plt.figure(figsize=(10, 6))
         hist_data = []
         labels = []
-        #unique_values = df[param].unique()
         for value in unique_values:
             value_df = last_epoch_df[last_epoch_df[param] == value]
             mean_acc = value_df.groupby('param')['accuracy'].mean()
             hist_data.append(pd.Categorical(mean_acc))
             labels.append(f'{param} = {value}')
-            #print(param, value, len(mean_acc.values), mean_acc.values)
 
 
-        #print('lenny', len(hist_data))
-        #hist_data = np.asarray(hist_data, dtype=object)
         hist_data = [np.array(data) for data in hist_data]
 
         plt.hist(hist_data, bins=np.arange(0, 1.01, 0.05), stacked=True, label=labels)
-        #for i, data in enumerate(hist_data):
-        #    plt.hist(data, bins=np.arange(0, 1.01, 0.05), stacked=True, label=labels[i], alpha=0.5)
 
         plt.title(f'Histogram of accuracy for last epoch for {param}')
         plt.xlabel('Accuracy')

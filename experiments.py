@@ -45,7 +45,7 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
     params = ['visible_baits', 'swaps', 'visible_swaps', 'first_swap_is_both',
               'second_swap_to_first_loc', 'delay_2nd_bait', 'first_bait_size',
               'uninformed_bait', 'uninformed_swap', 'first_swap']
-    prior_metrics = ['shouldAvoidBig', 'shouldAvoidSmall', 'correctSelection', 'incorrectSelection',
+    prior_metrics = ['shouldAvoidSmall', 'correctSelection', 'incorrectSelection',
                      'firstBaitReward', 'shouldGetBig', 'informedness']
 
     sub_regime_keys = [
@@ -146,15 +146,15 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
         create_combined_histogram(last_epoch_df, combined_df, key_param, os.path.join('supervised', exp_name))
         # todo: add specific cell plots here
 
-        avg_loss, variances, ranges_1, ranges_2, range_dict, range_dict3, stats = calculate_statistics(
+        avg_loss, variances, ranges_1, ranges_2, range_dict, range_dict3, stats, key_param_stats = calculate_statistics(
             combined_df, last_epoch_df, list(set(params + prior_metrics + [key_param])),
-            skip_3x=True)  # todo: make it definitely save one fixed param eg oracle
+            skip_3x=True, key_param=key_param)  # todo: make it definitely save one fixed param eg oracle
 
         combined_path = os.path.join('supervised', exp_name, 'c')
         os.makedirs(combined_path, exist_ok=True)
         write_metrics_to_file(os.path.join(combined_path, 'metrics.txt'), last_epoch_df, ranges_1, params, stats, key_param=key_param)
         save_figures(os.path.join(combined_path, 'figs'), combined_df, avg_loss, ranges_2, range_dict, range_dict3,
-                     params, last_epoch_df, num=12)
+                     params, last_epoch_df, num=12, key_param_stats=key_param_stats, key_param=key_param)
 
     if 2 in todo:
         save_every = max(1, epochs // desired_evals)
@@ -197,15 +197,15 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
         create_combined_histogram(last_epoch_df, combined_df, key_param, os.path.join('supervised', exp_name))
         # todo: add specific cell plots here
 
-        avg_loss, variances, ranges_1, ranges_2, range_dict, range_dict3, stats = calculate_statistics(
-            combined_df, last_epoch_df, list(set(params + prior_metrics + [key_param])), skip_3x=True) #todo: make it definitely save one fixed param eg oracle
+        avg_loss, variances, ranges_1, ranges_2, range_dict, range_dict3, stats, key_param_stats = calculate_statistics(
+            combined_df, last_epoch_df, list(set(params + prior_metrics + [key_param])), skip_3x=True, key_param=key_param) #todo: make it definitely save one fixed param eg oracle
 
 
         combined_path = os.path.join('supervised', exp_name, 'c')
         os.makedirs(combined_path, exist_ok=True)
         write_metrics_to_file(os.path.join(combined_path, 'metrics.txt'), last_epoch_df, ranges_1, params, stats, key_param=key_param)
         save_figures(os.path.join(combined_path, 'figs'), combined_df, avg_loss, ranges_2, range_dict, range_dict3,
-                     params, last_epoch_df, num=12)
+                     params, last_epoch_df, num=12, key_param_stats=key_param_stats, key_param=key_param)
 
 
 
@@ -266,4 +266,4 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
 
 
 if __name__ == '__main__':
-    experiments([1], 1, 20, skip_train=False, skip_calc=False, batch_size=256, desired_evals=1, use_ff=True)
+    experiments([2], 1, 20, skip_train=True, skip_calc=True, batch_size=256, desired_evals=1, use_ff=True)

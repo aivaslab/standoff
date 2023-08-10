@@ -14,7 +14,7 @@ import heapq
 from scipy.stats import sem, t
 
 from src.utils.plotting import save_double_param_figures, save_single_param_figures, save_fixed_double_param_figures, \
-    save_fixed_triple_param_figures
+    save_fixed_triple_param_figures, save_key_param_figures
 
 sys.path.append(os.getcwd())
 
@@ -280,7 +280,7 @@ def calculate_ci(group):
     return pd.DataFrame({'lower': [m - h], 'upper': [m + h], 'mean': [m]}, columns=['lower', 'upper', 'mean'])
 
 
-def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=False):
+def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=False, key_param=None):
     avg_loss = {}
     variances = {}
     ranges_1 = {}
@@ -307,31 +307,24 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=Fals
 
     unique_vals = {param: df[param].unique() for param in params}
 
-    for param in params:
-        avg_loss[param] = df.groupby([param, 'epoch'])['accuracy'].apply(calculate_ci).reset_index()
-        means = last_epoch_df.groupby([param]).mean(numeric_only=True)
-        ranges_1[param] = means['accuracy'].max() - means['accuracy'].min()
+    if False:
+        for param in params:
+            avg_loss[param] = df.groupby([param, 'epoch'])['accuracy'].apply(calculate_ci).reset_index()
+            means = last_epoch_df.groupby([param]).mean(numeric_only=True)
+            ranges_1[param] = means['accuracy'].max() - means['accuracy'].min()
 
-    '''cur_time = time.time()
-    means = grouped_last_epoch.mean()
-    ranges_1 = means['accuracy'].groupby(level=0).apply(lambda x: x.max() - x.min()).rename({i: param for i, param in enumerate(params)}).to_dict()
-    ranges_2 = means['accuracy'].groupby(level=[0, 1]).apply(lambda x: x.max() - x.min()).rename({i: param for i, param in enumerate(params)}).to_dict()
-    print('new param style time', time.time() - cur_time, ranges_1.keys(), ranges_2.keys())'''
-    # grouped_last_epoch = last_epoch_df.groupby(list(params))
-    # multi_grouped = df.groupby(list(params) + ['epoch'])['accuracy']
+        for param1, param2 in tqdm.tqdm(param_pairs):
+            avg_loss[(param1, param2)] = df.groupby([param1, param2, 'epoch'])['accuracy'].apply(calculate_ci).reset_index()
 
-    for param1, param2 in tqdm.tqdm(param_pairs):
-        avg_loss[(param1, param2)] = df.groupby([param1, param2, 'epoch'])['accuracy'].apply(calculate_ci).reset_index()
+            means = last_epoch_df.groupby([param1, param2]).mean()
+            ranges_2[(param1, param2)] = means['accuracy'].max() - means['accuracy'].min()
 
-        means = last_epoch_df.groupby([param1, param2]).mean()
-        ranges_2[(param1, param2)] = means['accuracy'].max() - means['accuracy'].min()
-
-        if not skip_2x1:
-            for value1 in unique_vals[param1]:
-                subset = last_epoch_df[last_epoch_df[param1] == value1]
-                if len(subset[param2].unique()) > 1:
-                    new_means = subset.groupby(param2)['accuracy'].mean()
-                    range_dict[(param1, value1, param2)] = new_means.max() - new_means.min()
+            if not skip_2x1:
+                for value1 in unique_vals[param1]:
+                    subset = last_epoch_df[last_epoch_df[param1] == value1]
+                    if len(subset[param2].unique()) > 1:
+                        new_means = subset.groupby(param2)['accuracy'].mean()
+                        range_dict[(param1, value1, param2)] = new_means.max() - new_means.min()
 
     if not skip_3x:
         for param1, param2, param3 in param_triples:
@@ -345,18 +338,50 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=Fals
                         new_means = subset.groupby(param3)['accuracy'].mean()
                         range_dict3[(param1, value1, param2, value2, param3)] = new_means.max() - new_means.min()
 
+    print('key param stats')
+    key_param_stats = {}
+    if key_param is not None:
+        for param in params:
+            if param != key_param:
+                # Initializing a nested dictionary for each unique key_param value
+                for key_val in unique_vals[key_param]:
+                    subset = last_epoch_df[last_epoch_df[key_param] == key_val]
+                    grouped = subset.groupby(param)['accuracy']
+                    means = grouped.mean()
+                    stds = grouped.std()
+                    counts = grouped.size()
+                    z_value = 1.96  # For a 95% CI
+                    standard_errors = z_value * np.sqrt(means * (1 - means) / counts)
+
+                    Q1 = grouped.quantile(0.25)
+                    Q3 = grouped.quantile(0.75)
+
+                    if key_val not in key_param_stats:
+                        key_param_stats[key_val] = {}
+                    key_param_stats[key_val][param] = {
+                        'mean': means.to_dict(),
+                        'std': stds.to_dict(),
+                        'q1': Q1.to_dict(),
+                        'q3': Q3.to_dict(),
+                        'ci': standard_errors.to_dict(),
+                    }
+                    # dict order is key_val > param > mean/std > param_val
+
+
     print('finished')
+    return avg_loss, variances, ranges_1, ranges_2, range_dict, range_dict3, stats, key_param_stats
 
-    return avg_loss, variances, ranges_1, ranges_2, range_dict, range_dict3, stats
 
-
-def save_figures(path, df, avg_loss, ranges, range_dict, range_dict3, params, last_epoch_df, num=10):
+def save_figures(path, df, avg_loss, ranges, range_dict, range_dict3, params, last_epoch_df, num=10, key_param_stats=None, key_param=None):
     top_pairs = sorted(ranges.items(), key=lambda x: x[1], reverse=True)[:num]
     top_n_ranges = heapq.nlargest(num, range_dict, key=range_dict.get)
     top_n_ranges3 = heapq.nlargest(num, range_dict3, key=range_dict3.get)
 
-    save_double_param_figures(path, top_pairs, df, avg_loss, last_epoch_df)
-    save_single_param_figures(path, params, df, avg_loss, last_epoch_df)
+    if key_param_stats is not None:
+        save_key_param_figures(path, key_param_stats, key_param)
+
+    save_double_param_figures(path, top_pairs, avg_loss, last_epoch_df)
+    save_single_param_figures(path, params, avg_loss, last_epoch_df)
     save_fixed_double_param_figures(path, top_n_ranges, df, avg_loss, last_epoch_df)
     save_fixed_triple_param_figures(path, top_n_ranges3, df, avg_loss, last_epoch_df)
 
@@ -518,7 +543,7 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
                 combined_df['informedness'] = combined_df['informedness'].fillna('none')
                 last_epoch_df['informedness'] = last_epoch_df['informedness'].fillna('none')
 
-                avg_loss, variances, ranges_1, ranges_2, range_dict, range_dict3, stats = calculate_statistics(
+                avg_loss, variances, ranges_1, ranges_2, range_dict, range_dict3, stats, _ = calculate_statistics(
                     combined_df, last_epoch_df, params + prior_metrics, skip_3x=True)
 
                 write_metrics_to_file(os.path.join(save_path, 'metrics.txt'), last_epoch_df, ranges_1, params, stats,
