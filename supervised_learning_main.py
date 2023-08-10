@@ -111,7 +111,7 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
 
     model_kwargs, state_dict = torch.load(os.path.join(model_save_path, f'{repetition}-model_epoch{epoch_number}.pt'))
     if use_ff:
-        FeedForwardModel(**model_kwargs).to(device)
+        model = FeedForwardModel(**model_kwargs).to(device)
     else:
         model = RNNModel(**model_kwargs).to(device)
     model.load_state_dict(state_dict)
@@ -158,7 +158,7 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
     for idx, _val_loader in enumerate(test_loaders):
         with torch.no_grad():
             if use_ff:
-                model.fc.register_forward_hook(hook)
+                handle = model.fc.register_forward_hook(hook)
             else:
                 handle = model.rnn.register_forward_hook(hook)
 
