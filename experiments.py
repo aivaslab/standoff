@@ -93,7 +93,7 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
 
     # generate supervised data
     labels = ['loc', 'vision', 'b-loc', 'b-exist', 'target', 'correctSelection']
-    oracles = [None] + labels
+    oracles = labels + [None]
     oracle_names = [x if x is not None else "None" for x in oracles]
     if 0 in todo:
         print('Generating datasets with labels', labels)
@@ -162,7 +162,7 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
         combined_path_list = []
         last_path_list = []
         key_param = 'oracle'
-        oracle_layer = 1
+        oracle_layer = 0
         exp_name = 'exp_2' if not use_ff else 'exp_2-f'
         if oracle_layer != 0:
             exp_name = exp_name + str(oracle_layer)
@@ -266,4 +266,4 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
 
 
 if __name__ == '__main__':
-    experiments([1], 1, 16, skip_train=False, skip_calc=False, batch_size=256, desired_evals=1, use_ff=True)
+    experiments([1], 1, 20, skip_train=False, skip_calc=False, batch_size=256, desired_evals=1, use_ff=True)

@@ -110,7 +110,7 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
     special_criterion = nn.CrossEntropyLoss(reduction='none')
 
     model_kwargs, state_dict = torch.load(os.path.join(model_save_path, f'{repetition}-model_epoch{epoch_number}.pt'))
-    model = RNNModel(**model_kwargs).to(device) if not use_ff else FeedForwardModel(**model_kwargs)
+    model = RNNModel(**model_kwargs).to(device) if not use_ff else FeedForwardModel(**model_kwargs).to(device)
     model.load_state_dict(state_dict)
     model.eval()
 
@@ -235,7 +235,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
     model_kwargs['channels'] = 5  # np.prod(params.shape[2])
 
     device = torch.device('cuda' if use_cuda else 'cpu')
-    model = RNNModel(**model_kwargs).to(device) if not use_ff else FeedForwardModel(**model_kwargs)
+    model = RNNModel(**model_kwargs).to(device) if not use_ff else FeedForwardModel(**model_kwargs).to(device)
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
