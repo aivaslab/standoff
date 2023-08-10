@@ -307,24 +307,23 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=Fals
 
     unique_vals = {param: df[param].unique() for param in params}
 
-    if False:
-        for param in params:
-            avg_loss[param] = df.groupby([param, 'epoch'])['accuracy'].apply(calculate_ci).reset_index()
-            means = last_epoch_df.groupby([param]).mean(numeric_only=True)
-            ranges_1[param] = means['accuracy'].max() - means['accuracy'].min()
+    for param in params:
+        avg_loss[param] = df.groupby([param, 'epoch'])['accuracy'].apply(calculate_ci).reset_index()
+        means = last_epoch_df.groupby([param]).mean(numeric_only=True)
+        ranges_1[param] = means['accuracy'].max() - means['accuracy'].min()
 
-        for param1, param2 in tqdm.tqdm(param_pairs):
-            avg_loss[(param1, param2)] = df.groupby([param1, param2, 'epoch'])['accuracy'].apply(calculate_ci).reset_index()
+    for param1, param2 in tqdm.tqdm(param_pairs):
+        avg_loss[(param1, param2)] = df.groupby([param1, param2, 'epoch'])['accuracy'].apply(calculate_ci).reset_index()
 
-            means = last_epoch_df.groupby([param1, param2]).mean()
-            ranges_2[(param1, param2)] = means['accuracy'].max() - means['accuracy'].min()
+        means = last_epoch_df.groupby([param1, param2]).mean()
+        ranges_2[(param1, param2)] = means['accuracy'].max() - means['accuracy'].min()
 
-            if not skip_2x1:
-                for value1 in unique_vals[param1]:
-                    subset = last_epoch_df[last_epoch_df[param1] == value1]
-                    if len(subset[param2].unique()) > 1:
-                        new_means = subset.groupby(param2)['accuracy'].mean()
-                        range_dict[(param1, value1, param2)] = new_means.max() - new_means.min()
+        if not skip_2x1:
+            for value1 in unique_vals[param1]:
+                subset = last_epoch_df[last_epoch_df[param1] == value1]
+                if len(subset[param2].unique()) > 1:
+                    new_means = subset.groupby(param2)['accuracy'].mean()
+                    range_dict[(param1, value1, param2)] = new_means.max() - new_means.min()
 
     if not skip_3x:
         for param1, param2, param3 in param_triples:
