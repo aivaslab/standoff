@@ -23,7 +23,7 @@ from torch.utils.data import DataLoader
 import tqdm
 import torch.nn as nn
 import torch
-from src.supervised_learning import RNNModel, CustomDatasetBig
+from src.supervised_learning import RNNModel, CustomDatasetBig, FeedForwardModel
 import traceback
 import torch.multiprocessing as mp
 
@@ -105,7 +105,7 @@ class SaveActivations:
 
 
 def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_path='', oracle_labels=[], repetition=0,
-                   epoch_number=0, batch_size=64, prior_metrics=[], num_activation_batches=1):
+                   epoch_number=0, batch_size=64, prior_metrics=[], num_activation_batches=1, use_ff=False):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     special_criterion = nn.CrossEntropyLoss(reduction='none')
 
@@ -154,7 +154,7 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
 
     for idx, _val_loader in enumerate(test_loaders):
         with torch.no_grad():
-            handle = model.rnn.register_forward_hook(hook)
+            handle = model.rnn.register_forward_hook(hook) if use_ff else model.fc.register_forward_hook(hook)
 
             for i, (inputs, labels, params, oracle_inputs, metrics) in enumerate(_val_loader):
                 inputs, labels, oracle_inputs = inputs.to(device), labels.to(device), oracle_inputs.to(device)
@@ -205,7 +205,7 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
 
 def train_model(train_sets, target_label, load_path='supervised/', save_path='', epochs=100,
                 model_kwargs=None,
-                lr=0.002, oracle_labels=[], repetition=0, batch_size=64):
+                lr=0.002, oracle_labels=[], repetition=0, batch_size=64, use_ff=False):
     use_cuda = torch.cuda.is_available()
     if oracle_labels[0] == None:
         oracle_labels = []
@@ -430,7 +430,7 @@ def find_df_paths(directory, file_pattern):
 # train_model('random-2500', 'exist')
 def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, eval_sets=None,
                            load_path='supervised', oracle_labels=[], skip_train=True, batch_size=64,
-                           prior_metrics=[], key_param=None, key_param_value=None, save_every=1, skip_calc=True):
+                           prior_metrics=[], key_param=None, key_param_value=None, save_every=1, skip_calc=True, use_ff=False):
     # labels = ['loc', 'exist', 'vision', 'b-loc', 'b-exist', 'target', 'correctSelection']
     params = ['visible_baits', 'swaps', 'visible_swaps', 'first_swap_is_both',
               'second_swap_to_first_loc', 'delay_2nd_bait', 'first_bait_size',
@@ -477,14 +477,16 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
                 for repetition in range(repetitions):
                     train_model(train_sets, 'correctSelection', load_path=load_path,
                                 save_path=save_path, epochs=epochs, model_kwargs=model_kwargs,
-                                lr=lr, oracle_labels=oracle_labels, repetition=repetition, batch_size=batch_size)
+                                lr=lr, oracle_labels=oracle_labels, repetition=repetition, batch_size=batch_size,
+                                use_ff=use_ff)
                     for epoch in tqdm.tqdm(range(epochs)):
                         if epoch % save_every == 0 or epoch == epochs - 1:
                             df_paths = evaluate_model(eval_sets, 'correctSelection', load_path=load_path,
                                                       model_save_path=save_path,
                                                       oracle_labels=oracle_labels, repetition=repetition,
                                                       epoch_number=epoch, batch_size=batch_size,
-                                                      prior_metrics=prior_metrics)
+                                                      prior_metrics=prior_metrics,
+                                                      use_ff=use_ff)
                             dfs_paths.extend(df_paths)
                             if epoch == epochs - 1:
                                 last_epoch_df_paths.extend(df_paths)

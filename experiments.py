@@ -37,7 +37,7 @@ def load_dataframes(combined_path_list, value_names, key_param):
     combined_df['informedness'] = combined_df['informedness'].fillna('none')
     return combined_df
 
-def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, batch_size=64, desired_evals=5):
+def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, batch_size=64, desired_evals=5, use_ff=False):
     """What is the overall performance of naive, off-the-shelf models on this task? Which parameters of competitive
     feeding settings are the most sensitive to overall model performance? To what extent are different models
     sensitive to different parameters? """
@@ -115,12 +115,12 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
         combined_path_list = []
         last_path_list = []
         key_param = 'regime'
-        # os.makedirs(os.path.join('supervised', 'exp_2'), exist_ok=True)
+        exp_name = 'exp_1' if not use_ff else 'exp_1-f'
 
         for regime in regimes.keys():
             print('regime:', regime)
             combined_paths, last_epoch_paths = run_supervised_session(
-                save_path=os.path.join('supervised', 'exp_1b', regime),
+                save_path=os.path.join('supervised', exp_name, regime),
                 repetitions=repetitions,
                 epochs=epochs,
                 train_sets=regimes[regime],
@@ -133,6 +133,7 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
                 key_param_value=regime,
                 save_every=save_every,
                 skip_calc=skip_calc,
+                use_ff=use_ff
                 )
             last_path_list.append(last_epoch_paths)
             combined_path_list.append(combined_paths)
@@ -142,14 +143,14 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
         combined_df = load_dataframes(combined_path_list, regimes.keys(), key_param)
         last_epoch_df = load_dataframes(last_path_list, regimes.keys(), key_param)
 
-        create_combined_histogram(last_epoch_df, combined_df, key_param, os.path.join('supervised', 'exp_1b'))
+        create_combined_histogram(last_epoch_df, combined_df, key_param, os.path.join('supervised', exp_name))
         # todo: add specific cell plots here
 
         avg_loss, variances, ranges_1, ranges_2, range_dict, range_dict3, stats = calculate_statistics(
             combined_df, last_epoch_df, list(set(params + prior_metrics + [key_param])),
             skip_3x=True)  # todo: make it definitely save one fixed param eg oracle
 
-        combined_path = os.path.join('supervised', 'exp_1b', 'c')
+        combined_path = os.path.join('supervised', exp_name, 'c')
         os.makedirs(combined_path, exist_ok=True)
         write_metrics_to_file(os.path.join(combined_path, 'metrics.txt'), last_epoch_df, ranges_1, params, stats, key_param=key_param)
         save_figures(os.path.join(combined_path, 'figs'), combined_df, avg_loss, ranges_2, range_dict, range_dict3,
@@ -161,11 +162,12 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
         combined_path_list = []
         last_path_list = []
         key_param = 'oracle'
+        exp_name = 'exp_2' if not use_ff else 'exp_2-f'
         #os.makedirs(os.path.join('supervised', 'exp_2'), exist_ok=True)
 
         for single_oracle, oracle_name in zip(oracles, oracle_names):
             print('oracle:', single_oracle)
-            combined_paths, last_epoch_paths = run_supervised_session(save_path=os.path.join('supervised', 'exp_2b', oracle_name),
+            combined_paths, last_epoch_paths = run_supervised_session(save_path=os.path.join('supervised', exp_name, oracle_name),
                                                 repetitions=repetitions,
                                                 epochs=epochs,
                                                 train_sets=regimes['complete'],
@@ -178,6 +180,7 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
                                                 key_param_value=oracle_name,
                                                 save_every=save_every,
                                                 skip_calc=skip_calc,
+                                                use_ff=use_ff
                                                 )
             last_path_list.append(last_epoch_paths)
             combined_path_list.append(combined_paths)
@@ -187,14 +190,14 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
         combined_df = load_dataframes(combined_path_list, oracle_names, key_param)
         last_epoch_df = load_dataframes(last_path_list, oracle_names, key_param)
 
-        create_combined_histogram(last_epoch_df, combined_df, key_param, os.path.join('supervised', 'exp_2b'))
+        create_combined_histogram(last_epoch_df, combined_df, key_param, os.path.join('supervised', exp_name))
         # todo: add specific cell plots here
 
         avg_loss, variances, ranges_1, ranges_2, range_dict, range_dict3, stats = calculate_statistics(
             combined_df, last_epoch_df, list(set(params + prior_metrics + [key_param])), skip_3x=True) #todo: make it definitely save one fixed param eg oracle
 
 
-        combined_path = os.path.join('supervised', 'exp_2b', 'c')
+        combined_path = os.path.join('supervised', exp_name, 'c')
         os.makedirs(combined_path, exist_ok=True)
         write_metrics_to_file(os.path.join(combined_path, 'metrics.txt'), last_epoch_df, ranges_1, params, stats, key_param=key_param)
         save_figures(os.path.join(combined_path, 'figs'), combined_df, avg_loss, ranges_2, range_dict, range_dict3,

@@ -432,8 +432,7 @@ class RNNModel(nn.Module):
                                      padding=0 if pool_kernel_size < conv1_output_size else 1)
         # self.output_len = output_len
 
-        pool1_output_size = (
-                                conv1_output_size - pool_kernel_size + 2 * 0 if pool_kernel_size < conv1_output_size else 1) // pool_stride + 1 if use_pool else conv1_output_size
+        pool1_output_size = (conv1_output_size - pool_kernel_size + 2 * 0 if pool_kernel_size < conv1_output_size else 1) // pool_stride + 1 if use_pool else conv1_output_size
 
 
         if use_conv2:
@@ -444,8 +443,7 @@ class RNNModel(nn.Module):
             if use_pool:
                 self.pool2 = nn.MaxPool2d(kernel_size=pks, stride=pool_stride,
                                           padding=0 if pool_kernel_size < conv2_output_size else 1)
-            pool2_output_size = (
-                                    conv2_output_size - pks + 2 * 0 if pks < conv2_output_size else 1) // pool_stride + 1 if use_pool else conv2_output_size
+            pool2_output_size = (conv2_output_size - pks + 2 * 0 if pks < conv2_output_size else 1) // pool_stride + 1 if use_pool else conv2_output_size
         else:
             conv2_output_size = conv1_output_size
             pool2_output_size = pool1_output_size
@@ -473,3 +471,62 @@ class RNNModel(nn.Module):
         out = out[:, -1, :]  # Use only the last timestep's output
         outputs = self.fc(torch.cat((out, oracle_inputs), dim=-1))
         return outputs
+
+
+class FeedForwardModel(nn.Module):
+    def __init__(self, hidden_size, output_len, channels, kernels=8, kernels2=8, kernel_size1=3,
+                 kernel_size2=3, stride1=1, pool_kernel_size=2, pool_stride=2, padding1=0, padding2=0,
+                 use_pool=True, use_conv2=False, oracle_len=0, num_layers=1):
+        super(FeedForwardModel, self).__init__()
+        self.kwargs = {'hidden_size': hidden_size, 'num_layers': num_layers,
+                       'output_len': output_len, 'pool_kernel_size': pool_kernel_size,
+                       'pool_stride': pool_stride, 'channels': channels, 'kernels': kernels,
+                       'padding1': padding1, 'padding2': padding2, 'use_pool': use_pool, 'stride1': stride1,
+                       'use_conv2': use_conv2, 'kernel_size1': kernel_size1,
+                       'kernels2': kernels2, 'kernel_size2': kernel_size2, 'oracle_len': oracle_len}
+
+        self.use_pool = use_pool
+        self.use_conv2 = use_conv2
+        self.hidden_size = hidden_size
+
+        # Since we're stacking all the time steps as extra channels:
+        # Each time step will add 'channels' to the input.
+        time_steps = 9
+        self.channels = channels * time_steps
+
+        self.conv1 = nn.Conv2d(self.channels, kernels, kernel_size=kernel_size1, padding=padding1, stride=stride1)
+        self.pool = nn.MaxPool2d(kernel_size=pool_kernel_size, stride=pool_stride) if use_pool else None
+
+        self.conv2 = None
+        if use_conv2:
+            self.conv2 = nn.Conv2d(kernels, kernels2, kernel_size=kernel_size2, padding=padding2)
+
+        self.flattened_size = None
+
+        self.fc = nn.Linear(self.flattened_size, hidden_size)
+        self.output_layer = nn.Linear(hidden_size + oracle_len, output_len)
+
+    def forward(self, x, oracle_inputs):
+        # Stack the time steps across the channel dimension
+        x = x.view(x.size(0), self.channels, x.size(3), x.size(4))
+
+        # Conv and pooling operations
+        x = F.relu(self.conv1(x))
+        if self.use_pool:
+            x = self.pool(x)
+        if self.use_conv2:
+            x = F.relu(self.conv2(x))
+            if self.use_pool:
+                x = self.pool(x)
+
+        # Calculate the flattened size if it's None (only during the first forward pass)
+        if self.flattened_size is None:
+            self.flattened_size = x.size(1) * x.size(2) * x.size(3)
+            self.fc = nn.Linear(self.flattened_size, self.hidden_size).to(x.device)
+
+        # Flatten and pass through the FC layers
+        x = x.view(x.size(0), -1)
+        x = F.relu(self.fc(x))
+        x = self.output_layer(torch.cat((x, oracle_inputs), dim=-1))
+
+        return x
