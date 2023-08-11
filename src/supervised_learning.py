@@ -27,7 +27,7 @@ def one_hot(size, data):
     return np.eye(size)[data]
 
 
-def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_extra_data=False, prior_metrics=[], ScenarioConfigs=None):
+def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_extra_data=False, prior_metrics=[], conf=None):
     # labels = ['loc', 'exist', 'vision', 'b-loc', 'b-exist', 'target']
     posterior_metrics = ['selection', 'selectedBig', 'selectedSmall', 'selectedNeither',
                          'selectedPrevBig', 'selectedPrevSmall', 'selectedPrevNeither',
@@ -68,11 +68,10 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
     all_path_infos = pd.DataFrame()
     suffix = pref_type + role_type
 
-
-    for configName in ScenarioConfigs.stages:
-        configs = ScenarioConfigs().standoff
-        events = ScenarioConfigs.stages[configName]['events']
-        params = configs[ScenarioConfigs.stages[configName]['params']]
+    for configName in conf.stages:
+        configs = conf.standoff
+        events = conf.stages[configName]['events']
+        params = configs[conf.stages[configName]['params']]
 
         _subject_is_dominant = [False] if role_type == '' else [True] if role_type == 'D' else [True, False]
         _subject_valence = [1] if pref_type == '' else [2] if pref_type == 'd' else [1, 2]
@@ -117,8 +116,8 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
                 env.target_param_group_count = 20
                 env.param_groups = [ {'eLists': {n: events[n]},
                                       'params': params,
-                                      'perms': {n: ScenarioConfigs.all_event_permutations[n]},
-                                      'delays': {n: ScenarioConfigs.all_event_delays[n]}
+                                      'perms': {n: conf.all_event_permutations[n]},
+                                      'delays': {n: conf.all_event_delays[n]}
                                       }
                                      for n in events ]
                 print('first param group', env.param_groups[0])

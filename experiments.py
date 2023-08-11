@@ -150,13 +150,14 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
     labels = ['loc', 'vision', 'b-loc', 'b-exist', 'target', 'correctSelection']
     oracles = labels + [None]
     oracle_names = [x if x is not None else "None" for x in oracles]
+    conf = ScenarioConfigs()
     if 0 in todo:
         print('Generating datasets with labels', labels)
         os.makedirs('supervised', exist_ok=True)
         for pref_type, pref_suffix in pref_types:
             for role_type, role_suffix in role_types:
                 gen_data(labels, path='supervised', pref_type=pref_suffix, role_type=role_suffix,
-                         prior_metrics=prior_metrics, ScenarioConfigs=ScenarioConfigs)
+                         prior_metrics=prior_metrics, conf=conf)
 
     if 'h' in todo:
         print('Running hyperparameter search on all regimes, pref_types, role_types')
