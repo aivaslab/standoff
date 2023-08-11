@@ -311,11 +311,11 @@ class ScenarioConfigs:
             '0': {'params': 'no-op'},
             '1': {'params': 'defaults'}
         }
-        stages = {}
+        self.stages = {}
         for knowledge_key in self.name_from_knowledge.keys():
             for stage_key, stage_info in stage_templates.items():
                 new_key = 'sl-' + knowledge_key + stage_key
-                stages[new_key] = {'events': self.name_from_knowledge[knowledge_key], **stage_info}
+                self.stages[new_key] = {'events': self.name_from_knowledge[knowledge_key], **stage_info}
 
         '''lack_to_generalized = {
             "moved": "0.2.2",
