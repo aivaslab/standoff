@@ -411,14 +411,14 @@ class CustomDatasetBig(Dataset):
 class RNNModel(nn.Module):
     def __init__(self, hidden_size, num_layers, output_len, channels, kernels=8, kernels2=8, kernel_size1=3,
                  kernel_size2=3, stride1=1, pool_kernel_size=2, pool_stride=2, padding1=0, padding2=0, use_pool=True,
-                 use_conv2=False, oracle_len=0, oracle_layer=0, is_fc=False):
+                 use_conv2=False, oracle_len=0, oracle_layer=0, is_fc=False, lr=0.0, batch_size=0.0):
         super(RNNModel, self).__init__()
         self.kwargs = {'hidden_size': hidden_size, 'num_layers': num_layers,
                        'output_len': output_len, 'pool_kernel_size': pool_kernel_size,
                        'pool_stride': pool_stride, 'channels': channels, 'kernels': kernels,
                        'padding1': padding1, 'padding2': padding2, 'use_pool': use_pool, 'stride1': stride1,
                        'use_conv2': use_conv2, 'kernel_size1': kernel_size1,
-                       'kernels2': kernels2, 'kernel_size2': kernel_size2, 'oracle_len': oracle_len, 'is_fc': is_fc}
+                       'kernels2': kernels2, 'kernel_size2': kernel_size2, 'oracle_len': oracle_len, 'is_fc': is_fc, 'lr': lr, 'batch_size': batch_size}
 
         input_size = 7
 
@@ -432,7 +432,6 @@ class RNNModel(nn.Module):
         if use_pool:
             self.pool = nn.MaxPool2d(kernel_size=pool_kernel_size, stride=pool_stride,
                                      padding=0 if pool_kernel_size < conv1_output_size else 1)
-        # self.output_len = output_len
 
         pool1_output_size = (conv1_output_size - pool_kernel_size + 2 * 0 if pool_kernel_size < conv1_output_size else 1) // pool_stride + 1 if use_pool else conv1_output_size
 

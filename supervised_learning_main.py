@@ -105,11 +105,12 @@ class SaveActivations:
 
 
 def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_path='', oracle_labels=[], repetition=0,
-                   epoch_number=0, batch_size=64, prior_metrics=[], num_activation_batches=1, use_ff=False):
+                   epoch_number=0, prior_metrics=[], num_activation_batches=1, use_ff=False):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     special_criterion = nn.CrossEntropyLoss(reduction='none')
 
     model_kwargs, state_dict = torch.load(os.path.join(model_save_path, f'{repetition}-model_epoch{epoch_number}.pt'))
+    batch_size = model_kwargs['batch_size']
     if use_ff:
         model = FeedForwardModel(**model_kwargs).to(device)
     else:
@@ -211,11 +212,14 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
 
 def train_model(train_sets, target_label, load_path='supervised/', save_path='', epochs=100,
                 model_kwargs=None,
-                lr=0.002, oracle_labels=[], repetition=0, batch_size=64, use_ff=False):
+                oracle_labels=[], repetition=0, use_ff=False,
+                save_models=True, save_every=5, record_loss=False):
     use_cuda = torch.cuda.is_available()
-    if oracle_labels[0] == None:
+    if len(oracle_labels) == 0 or oracle_labels[0] == None:
         oracle_labels = []
     data, labels, params, oracles = [], [], [], []
+    batch_size = model_kwargs['batch_size']
+    lr = model_kwargs['lr']
 
     for data_name in train_sets:
         dir = os.path.join(load_path, data_name)
@@ -248,8 +252,10 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
     num_epochs = epochs
 
     t = tqdm.trange(num_epochs * len(train_loader))
+    avg_epoch_loss = 100
 
     for epoch in range(num_epochs):
+        total_loss = 0.0
         for i, (inputs, target_labels, _, oracle_inputs, _) in enumerate(train_loader):
             inputs, target_labels, oracle_inputs = inputs.to(device), target_labels.to(device), oracle_inputs.to(device)
             outputs = model(inputs, oracle_inputs)
@@ -259,9 +265,17 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
             optimizer.step()
             t.update(1)
 
-        os.makedirs(save_path, exist_ok=True)
-        torch.save([model.kwargs, model.state_dict()], os.path.join(save_path, f'{repetition}-model_epoch{epoch}.pt'))
+            if record_loss:
+                total_loss += loss.item()
+
+        if record_loss:
+            avg_epoch_loss = total_loss / len(train_loader)
+
+        if save_models and (epoch % save_every == save_every - 1):
+            os.makedirs(save_path, exist_ok=True)
+            torch.save([model.kwargs, model.state_dict()], os.path.join(save_path, f'{repetition}-model_epoch{epoch}.pt'))
         torch.cuda.empty_cache()
+    return avg_epoch_loss
 
 
 @lru_cache(maxsize=None)
@@ -466,21 +480,6 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
               'second_swap_to_first_loc', 'delay_2nd_bait', 'first_bait_size',
               'uninformed_bait', 'uninformed_swap', 'first_swap']
 
-    model_kwargs_base = {'hidden_size': [6, 8, 12, 16, 32],
-                         'num_layers': [1, 2, 3],
-                         'kernels': [4, 8, 16, 24, 32],
-                         'kernel_size1': [1, 3, 5],
-                         'kernel_size2': [1, 3, 5],
-                         'stride1': [1, 2],
-                         'pool_kernel_size': [2, 3],
-                         'pool_stride': [1, 2],
-                         'padding1': [0, 1],
-                         'padding2': [0, 1],
-                         'use_pool': [True, False],
-                         'use_conv2': [True, False],
-                         'kernels2': [8, 16, 32, 48],
-                         }
-
     test_names = []
 
     num_random_tests = 1
@@ -489,7 +488,6 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
     test = 0
     while test < num_random_tests:
         try:
-            # model_kwargs = {x: random.choice(model_kwargs_base[x]) for x in model_kwargs_base.keys()}
             model_kwargs = {'hidden_size': 16, 'num_layers': 2, 'output_len': 5, 'pool_kernel_size': 3,
                             'pool_stride': 2, 'channels': 7, 'kernels': 8, 'padding1': 1, 'padding2': 0,
                             'use_pool': False, 'stride1': 1, 'use_conv2': True, 'kernel_size1': 3, 'kernels2': 16,
@@ -507,14 +505,14 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
                 for repetition in range(repetitions):
                     train_model(train_sets, 'correctSelection', load_path=load_path,
                                 save_path=save_path, epochs=epochs, model_kwargs=model_kwargs,
-                                lr=lr, oracle_labels=oracle_labels, repetition=repetition, batch_size=batch_size,
+                                oracle_labels=oracle_labels, repetition=repetition,
                                 use_ff=use_ff)
                     for epoch in tqdm.tqdm(range(epochs)):
-                        if epoch % save_every == 0 or epoch == epochs - 1:
+                        if epoch % save_every == save_every - 1 or epoch == epochs - 1:
                             df_paths = evaluate_model(eval_sets, 'correctSelection', load_path=load_path,
                                                       model_save_path=save_path,
                                                       oracle_labels=oracle_labels, repetition=repetition,
-                                                      epoch_number=epoch, batch_size=batch_size,
+                                                      epoch_number=epoch,
                                                       prior_metrics=prior_metrics,
                                                       use_ff=use_ff)
                             dfs_paths.extend(df_paths)

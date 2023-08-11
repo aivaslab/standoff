@@ -389,34 +389,20 @@ def save_key_param_figures(save_dir, key_param_stats, key_param):
 
     n_groups = len(list(key_param_stats.keys()))
 
-    # Loop through each param
     for param in list(next(iter(key_param_stats.values())).keys()):
 
-        # Prepare data for current param
-        labels = list(key_param_stats.keys())  # Key values as labels
+        labels = list(key_param_stats.keys())
         param_vals = list(key_param_stats[next(iter(key_param_stats))][param]['mean'].keys())
         bar_width = 0.8 / len(param_vals)
         index = np.arange(len(labels))
 
         fig, ax = plt.subplots()
 
-        # Create bars for each param_val within the group of key_param
         for idx, (param_val, color) in enumerate(zip(param_vals, plt.cm.tab10.colors)):
             means = [key_param_stats[key_val][param]['mean'][param_val] for key_val in labels]
-            #stds = [key_param_stats[key_val][param]['std'][param_val] for key_val in labels]
             cis = [key_param_stats[key_val][param]['ci'][param_val] for key_val in labels]
             ax.bar(index + idx * bar_width, means, bar_width, label=param_val, yerr=cis, alpha=0.8, capsize=5, color=color)
 
-
-            #lower_error = [mean - key_param_stats[key_val][param]['q1'][param_val] for key_val, mean in
-            #               zip(labels, means)]
-            #upper_error = [key_param_stats[key_val][param]['q3'][param_val] - mean for key_val, mean in
-            #               zip(labels, means)]
-
-            #ax.bar(index + idx * bar_width, means, bar_width, label='{}: {}'.format(param, param_val),
-            #       yerr=[lower_error, upper_error], alpha=0.8, capsize=5, color=color)
-
-        # Format plot
         ax.set_xlabel(key_param)
         ax.set_ylabel('Accuracy')
         ax.set_title('Accuracy by {} and {}'.format(param, key_param))
@@ -424,9 +410,34 @@ def save_key_param_figures(save_dir, key_param_stats, key_param):
         ax.set_xticklabels(labels, rotation=45, ha='right')
         ax.legend(loc='upper left', bbox_to_anchor=(1, 1))
 
-        # Show plot
         plt.tight_layout()
         file_path = os.path.join(os.getcwd(), this_save_dir, f'key_{param}.png')
+        plt.savefig(file_path)
+
+        labels = list(key_param_stats[next(iter(key_param_stats))][param]['mean'].keys())
+        key_param_vals = list(key_param_stats.keys())
+        bar_width = 0.8 / len(key_param_vals)
+        index = np.arange(len(labels))
+
+        fig, ax = plt.subplots()
+
+        # Create bars for each key_param within the group of param_val
+        for idx, (key_val, color) in enumerate(zip(key_param_vals, plt.cm.tab10.colors)):
+            means = [key_param_stats[key_val][param]['mean'][param_val] for param_val in labels]
+            cis = [key_param_stats[key_val][param]['ci'][param_val] for param_val in labels]
+            ax.bar(index + idx * bar_width, means, bar_width, label=key_val, yerr=cis, alpha=0.8, capsize=5,
+                   color=color)
+
+        # Format plot
+        ax.set_xlabel(param)
+        ax.set_ylabel('Accuracy')
+        ax.set_title('Accuracy by {} and {}'.format(key_param, param))
+        ax.set_xticks(index + bar_width * (len(key_param_vals) - 1) / 2)
+        ax.set_xticklabels(labels, rotation=45, ha='right')
+        ax.legend(loc='upper left', bbox_to_anchor=(1, 1))
+
+        plt.tight_layout()
+        file_path = os.path.join(os.getcwd(), this_save_dir, f'reversed_key_{param}.png')
         plt.savefig(file_path)
 
 def save_single_param_figures(save_dir, params, avg_loss, last_epoch_df):
