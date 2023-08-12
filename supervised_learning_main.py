@@ -19,7 +19,7 @@ from src.utils.plotting import save_double_param_figures, save_single_param_figu
 sys.path.append(os.getcwd())
 
 # from src.objects import *
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, random_split
 import tqdm
 import torch.nn as nn
 import torch
@@ -240,6 +240,13 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True,
                               num_workers=0)  # can't use more on windows
 
+    if record_loss:
+        train_size = int(0.8 * len(train_dataset))
+        test_size = len(train_dataset) - train_size
+        train_dataset, test_dataset = random_split(train_dataset, [train_size, test_size])
+        train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=0)
+        test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=0)
+
     model_kwargs['oracle_len'] = 0 if len(oracle_labels) == 0 else len(train_dataset.oracles_list[0][0])
     model_kwargs['output_len'] = 5  # np.prod(labels.shape[1:])
     model_kwargs['channels'] = 5  # np.prod(params.shape[2])
@@ -267,15 +274,24 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
 
             if record_loss:
                 total_loss += loss.item()
-
-        if record_loss:
-            avg_epoch_loss = total_loss / len(train_loader)
-
         if save_models and (epoch % save_every == save_every - 1):
             os.makedirs(save_path, exist_ok=True)
             torch.save([model.kwargs, model.state_dict()], os.path.join(save_path, f'{repetition}-model_epoch{epoch}.pt'))
         torch.cuda.empty_cache()
-    return avg_epoch_loss
+
+    if record_loss:
+        with torch.no_grad():
+            test_loss = 0.0
+            for inputs, target_labels, _, oracle_inputs, _ in test_loader:
+                inputs, target_labels, oracle_inputs = inputs.to(device), target_labels.to(
+                    device), oracle_inputs.to(device)
+                outputs = model(inputs, oracle_inputs)
+                loss = criterion(outputs, torch.argmax(target_labels, dim=1))
+                test_loss += loss.item()
+
+            avg_epoch_loss = test_loss / len(test_loader)
+
+        return avg_epoch_loss
 
 
 @lru_cache(maxsize=None)
