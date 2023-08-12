@@ -161,7 +161,7 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
 
     if 'h' in todo:
         print('Running hyperparameter search on all regimes, pref_types, role_types')
-        run_hparam_search(trials=2, repetitions=2, log_file='hparam_file.txt', train_sets=regimes['direct'], epochs=2)
+        run_hparam_search(trials=100, repetitions=3, log_file='hparam_file.txt', train_sets=regimes['direct'], epochs=20)
 
     # Experiment 1
     if 1 in todo:
