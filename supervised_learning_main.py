@@ -504,14 +504,7 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
     test = 0
     while test < num_random_tests:
         try:
-            model_kwargs = {'hidden_size': 16, 'num_layers': 2, 'output_len': 5, 'pool_kernel_size': 3,
-                            'pool_stride': 2, 'channels': 7, 'kernels': 8, 'padding1': 1, 'padding2': 0,
-                            'use_pool': False, 'stride1': 1, 'use_conv2': True, 'kernel_size1': 3, 'kernels2': 16,
-                            'kernel_size2': 3, 'oracle_layer': oracle_layer} #note I'm using oracle layer here, so not part of hparam search
-            '''model_kwargs = {'hidden_size': 6, 'num_layers': 1, 'output_len': 5, 'pool_kernel_size': 3,
-                            'pool_stride': 2, 'channels': 4, 'kernels': 8, 'padding1': 1, 'padding2': 0,
-                            'use_pool': False, 'stride1': 1, 'use_conv2': True, 'kernel_size1': 3, 'kernels2': 8,
-                            'kernel_size2': 3}'''
+            model_kwargs = {"hidden_size": 32, "num_layers": 3, "kernels": 8, "kernel_size1": 3, "kernel_size2": 1, "stride1": 1, "pool_kernel_size": 3, "pool_stride": 1, "padding1": 0, "padding2": 0, "use_pool": False, "use_conv2": False, "kernels2": 8, "batch_size": 256, "lr": 0.001, "oracle_len": 0, "output_len": 5, "channels": 5}
 
             model_name = "".join([str(x) + "," for x in model_kwargs.values()])
 
