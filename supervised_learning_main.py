@@ -175,8 +175,9 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
                 _, predicted = torch.max(outputs, 1)
                 corrects = (predicted == torch.argmax(labels, dim=1))
 
-                small_food_selected = (predicted.cpu() == torch.argmax(metrics['loc'][:, :, 0], dim=1))
-                big_food_selected = (predicted.cpu() == torch.argmax(metrics['loc'][:, :, 1], dim=1))
+                pred = predicted.cpu()
+                small_food_selected = (pred == torch.argmax(metrics['loc'][:, :, 0], dim=1))
+                big_food_selected = (pred == torch.argmax(metrics['loc'][:, :, 1], dim=1))
                 neither_food_selected = ~(small_food_selected | big_food_selected)
 
                 batch_param_losses = [
@@ -184,6 +185,7 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
                         'param': param,
                         **decode_event_name(param),
                         'epoch': epoch_number,
+                        'pred': _pred,
                         'loss': loss.item(),
                         'accuracy': correct.item(),
                         'small_food_selected': small.item(),
@@ -191,8 +193,8 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
                         'neither_food_selected': neither.item(),
                         **{x: v[k].numpy() if hasattr(v[k], 'numpy') else v[k] for x, v in metrics.items()}
                     }
-                    for k, (param, loss, correct, small, big, neither) in enumerate(
-                        zip(params, losses, corrects, small_food_selected, big_food_selected, neither_food_selected))]
+                    for k, (param, loss, correct, small, big, neither, _pred) in enumerate(
+                        zip(params, losses, corrects, small_food_selected, big_food_selected, neither_food_selected, pred))]
                 param_losses_list.extend(batch_param_losses)
 
     # save dfs periodically to free up ram:
@@ -336,6 +338,17 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=Fals
     }
 
     unique_vals = {param: df[param].unique() for param in params}
+
+    # delayless = aggregate accuracy over "delay" values, preserving mean and std. Other columns to preserve are params list
+
+    # we are going to populate a dict showcasing policy differences when informedness changes:
+
+    # for each informed (informedness == 'eb-es-lb-ls') row, find the other rows with identical param+perm values.
+
+    # update our dict[informedness] based on whether or not the "pred" value changes across informedness
+
+    # we should be left with a table: informedness, delta pred (mean), delta pred (std).
+
 
     for param in params:
         avg_loss[param] = df.groupby([param, 'epoch'])['accuracy'].apply(calculate_ci).reset_index()

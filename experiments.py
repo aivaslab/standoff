@@ -325,4 +325,4 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
 
 
 if __name__ == '__main__':
-    experiments([0, 1], repetitions=1, epochs=50, skip_train=True, skip_eval=False, skip_calc=False, batch_size=256, desired_evals=1, use_ff=False)
+    experiments([1], repetitions=1, epochs=50, skip_train=True, skip_eval=False, skip_calc=False, batch_size=256, desired_evals=1, use_ff=False)

@@ -440,6 +440,19 @@ def save_key_param_figures(save_dir, key_param_stats, key_param):
         file_path = os.path.join(os.getcwd(), this_save_dir, f'reversed_key_{param}.png')
         plt.savefig(file_path)
 
+        df_list = []
+
+        for key_val in key_param_stats.keys():
+            for param_val in key_param_stats[key_val][param]['mean'].keys():
+                mean = key_param_stats[key_val][param]['mean'][param_val]
+                ci = key_param_stats[key_val][param]['ci'][param_val]
+                df_list.append([key_val, param_val, f"{mean} ({ci})"])
+
+        df = pd.DataFrame(df_list, columns=[key_param, param, "Accuracy mean (Accuracy std)"])
+
+        table_save_path = os.path.join(this_save_dir, f'{param}_accuracy_table.csv')
+        df.to_csv(table_save_path, index=False)
+
 def save_single_param_figures(save_dir, params, avg_loss, last_epoch_df):
     this_save_dir = os.path.join(save_dir, 'singleparams')
     os.makedirs(this_save_dir, exist_ok=True)
