@@ -331,7 +331,23 @@ def plot_tsne(data, labels, index, color):
     # for i, name in enumerate(labels[index[0]:index[1]]):
     #    plt.annotate(name, (data[i + index[0], 0], data[i + index[0], 1]), textcoords="offset points", xytext=(-10, 5), ha='center')
 
+def save_delta_figure(df_summary, dir):
+    df_list = []
+    for key_val, sub_df in df_summary.items():
+        for _, row in sub_df.iterrows():
+            informedness = row['Informedness']
+            mean, std = map(float, row['Summary'].strip('()').split(' '))
+            df_list.append([key_val, informedness, mean, std])
 
+    df = pd.DataFrame(df_list, columns=["key_val", "Informedness", "mean", "std"])
+    pivot_df = df.pivot(index="key_val", columns="Informedness", values="mean")
+
+    plt.figure(figsize=(10, 8))
+    ax = sns.heatmap(pivot_df, annot=pivot_df, fmt='.2f', cmap='coolwarm', linewidths=0.5, linecolor='white')
+    plt.title("Heatmap of Informedness based on key_val")
+
+    plot_save_path = os.path.join(dir, 'delta_heatmap.png')
+    plt.savefig(plot_save_path)
 def save_double_param_figures(save_dir, top_pairs, avg_loss, last_epoch_df):
     this_save_dir = os.path.join(save_dir, 'doubleparams')
     os.makedirs(this_save_dir, exist_ok=True)
@@ -452,6 +468,14 @@ def save_key_param_figures(save_dir, key_param_stats, key_param):
 
         table_save_path = os.path.join(this_save_dir, f'{param}_accuracy_table.csv')
         df.to_csv(table_save_path, index=False)
+
+        pivot_df = df.pivot(index=key_param, columns=param, values="Accuracy mean (Accuracy std)")
+        mean_values_df = pivot_df.applymap(lambda x: float(x.split(' ')[0]))
+        plt.figure(figsize=(10, 8))
+        ax = sns.heatmap(mean_values_df, annot=pivot_df, fmt='', cmap='coolwarm', linewidths=0.5, linecolor='white')
+        plt.title(f"Heatmap of {param} based on {key_param}")
+        plot_save_path = os.path.join(this_save_dir, f'{param}_heatmap.png')
+        plt.savefig(plot_save_path)
 
 def save_single_param_figures(save_dir, params, avg_loss, last_epoch_df):
     this_save_dir = os.path.join(save_dir, 'singleparams')

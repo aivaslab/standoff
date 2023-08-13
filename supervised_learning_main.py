@@ -339,47 +339,7 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=Fals
 
     unique_vals = {param: df[param].unique() for param in params}
 
-    delta_preds = {}
-    delta_preds_ex_changed = []
-    delta_preds_lx_changed = []
 
-    print('calculating delta preds')
-
-    informed_rows = last_epoch_df[last_epoch_df['informedness'] == 'eb-es-lb-ls']
-    for index, row in informed_rows.iterrows():
-        matching_rows = df[
-            (df['param'] == row['param']) & (last_epoch_df['perm'] == row['perm']) & (last_epoch_df['informedness'] != 'eb-es-lb-ls')]
-
-        for _, match in matching_rows.iterrows():
-            if 'lb' not in match['informedness']:
-                delta_pred_opt = 1
-            else:
-                delta_pred_opt = 0
-            delta_pred = abs(match['pred'] - row['pred'])
-            if match['informedness'] not in delta_preds.keys():
-                delta_preds[match['informedness']] = []
-            delta_preds[match['informedness']].append(delta_pred)
-
-            # Check if 'eb' or 'es' has changed
-            if 'eb' in row['informedness'] and 'eb' not in match['informedness'] or \
-                    'es' in row['informedness'] and 'es' not in match['informedness']:
-                delta_preds_ex_changed.append(abs(delta_pred - delta_pred_opt))
-
-            # Check if 'lx' has changed
-            if 'lx' in row['informedness'] or 'lx' in match['informedness']:
-                delta_preds_lx_changed.append(abs(delta_pred - delta_pred_opt))
-
-    # Calculate means and standard deviations
-    delta_mean = np.mean(delta_preds)
-    delta_std = np.std(delta_preds)
-    df_summary = pd.DataFrame({
-        'Informedness': list(delta_mean.keys()),
-        'Summary': [f"{delta_mean[key]} ({delta_std[key]})" for key in delta_mean.keys()]
-    })
-    delta_ex_changed_mean = np.mean(delta_preds_ex_changed)
-    delta_ex_changed_std = np.std(delta_preds_ex_changed)
-    delta_lx_changed_mean = np.mean(delta_preds_lx_changed)
-    delta_lx_changed_std = np.std(delta_preds_lx_changed)
 
     print('calculating single params')
 
@@ -413,6 +373,8 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=Fals
                         new_means = subset.groupby(param3)['accuracy'].mean()
                         range_dict3[(param1, value1, param2, value2, param3)] = new_means.max() - new_means.min()
 
+    df_summary = {}
+    delta_x = {}
     print('key param stats')
     key_param_stats = {}
     if key_param is not None:
@@ -442,15 +404,64 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=Fals
                     }
                     # dict order is key_val > param > mean/std > param_val
 
+        for key_val in unique_vals[key_param]:
+            delta_preds = {}
+            delta_preds_ex_changed = []
+            delta_preds_lx_changed = []
+
+            print('calculating delta preds')
+
+            informed_rows = last_epoch_df[last_epoch_df['informedness'] == 'eb-es-lb-ls']
+            for index, row in informed_rows.iterrows():
+                matching_rows = df[
+                    (df['param'] == row['param']) & (last_epoch_df['perm'] == row['perm']) & (
+                                last_epoch_df['informedness'] != 'eb-es-lb-ls')]
+
+                for _, match in matching_rows.iterrows():
+                    if 'lb' not in match['informedness']:
+                        delta_pred_opt = 1
+                    else:
+                        delta_pred_opt = 0
+                    delta_pred = abs(match['pred'] - row['pred'])
+                    if match['informedness'] not in delta_preds.keys():
+                        delta_preds[match['informedness']] = []
+                    delta_preds[match['informedness']].append(delta_pred)
+
+                    # Check if 'eb' or 'es' has changed
+                    if 'eb' in row['informedness'] and 'eb' not in match['informedness'] or \
+                            'es' in row['informedness'] and 'es' not in match['informedness']:
+                        delta_preds_ex_changed.append(abs(delta_pred - delta_pred_opt))
+
+                    # Check if 'lx' has changed
+                    if 'lx' in row['informedness'] or 'lx' in match['informedness']:
+                        delta_preds_lx_changed.append(abs(delta_pred - delta_pred_opt))
+
+            # Calculate means and standard deviations
+            delta_mean = np.mean(delta_preds)
+            delta_std = np.std(delta_preds)
+            df_summary[key_val] = pd.DataFrame({
+                'Informedness': list(delta_mean.keys()),
+                'Summary': [f"{delta_mean[key]} ({delta_std[key]})" for key in delta_mean.keys()]
+            })
+            delta_x[key_val] = {
+                'delta_ex_changed_mean': np.mean(delta_preds_ex_changed),
+                'delta_ex_changed_std': np.std(delta_preds_ex_changed),
+                'delta_lx_changed_mean': np.mean(delta_preds_lx_changed),
+                'delta_lx_changed_std': np.std(delta_preds_lx_changed),
+            }
+
 
     print('finished')
-    return avg_loss, variances, ranges_1, ranges_2, range_dict, range_dict3, stats, key_param_stats
+    return avg_loss, variances, ranges_1, ranges_2, range_dict, range_dict3, stats, key_param_stats, df_summary, delta_x
 
 
-def save_figures(path, df, avg_loss, ranges, range_dict, range_dict3, params, last_epoch_df, num=10, key_param_stats=None, key_param=None):
+def save_figures(path, df, avg_loss, ranges, range_dict, range_dict3, params, last_epoch_df, num=10, key_param_stats=None, key_param=None, delta_sum=None):
     top_pairs = sorted(ranges.items(), key=lambda x: x[1], reverse=True)[:num]
     top_n_ranges = heapq.nlargest(num, range_dict, key=range_dict.get)
     top_n_ranges3 = heapq.nlargest(num, range_dict3, key=range_dict3.get)
+
+    if delta_sum:
+        save_delta_firgures(path)
 
     if key_param_stats is not None:
         save_key_param_figures(path, key_param_stats, key_param)
@@ -461,7 +472,7 @@ def save_figures(path, df, avg_loss, ranges, range_dict, range_dict3, params, la
     save_fixed_triple_param_figures(path, top_n_ranges3, df, avg_loss, last_epoch_df)
 
 
-def write_metrics_to_file(filepath, df, ranges, params, stats, key_param=None):
+def write_metrics_to_file(filepath, df, ranges, params, stats, key_param=None, d_s=None, d_x=None):
     df2 = df[df['epoch'] == df['epoch'].max()]
     with open(filepath, 'w') as f:
         mean_accuracy = df2['accuracy'].mean()
@@ -520,6 +531,12 @@ def write_metrics_to_file(filepath, df, ranges, params, stats, key_param=None):
         for i in range(len(stats['vars'])):
             for j in range(i + 1, len(stats['vars'])):
                 f.write(f"Correlation between {params[i]} and {params[j]}: {stats['param_correlations'].iloc[i, j]}\n")
+
+        if d_s is not None:
+            f.write("\nDelta prediction results:\n")
+            f.write(d_x)
+            f.write("\nDelta prediction table:\n")
+            f.write(d_s)
 
         '''key_param_corr = df2.corr()[key_param].sort_values(key='absolute', ascending=False)
         f.write("\nCorrelations between key parameter and other parameters:\n")
@@ -596,7 +613,7 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
                 combined_df['informedness'] = combined_df['informedness'].fillna('none')
                 last_epoch_df['informedness'] = last_epoch_df['informedness'].fillna('none')
 
-                avg_loss, variances, ranges_1, ranges_2, range_dict, range_dict3, stats, _ = calculate_statistics(
+                avg_loss, variances, ranges_1, ranges_2, range_dict, range_dict3, stats, _, _, _ = calculate_statistics(
                     combined_df, last_epoch_df, params + prior_metrics, skip_3x=True)
 
                 write_metrics_to_file(os.path.join(save_path, 'metrics.txt'), last_epoch_df, ranges_1, params, stats,
