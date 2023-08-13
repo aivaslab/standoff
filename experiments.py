@@ -109,7 +109,7 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
               'second_swap_to_first_loc', 'delay_2nd_bait', 'first_bait_size',
               'uninformed_bait', 'uninformed_swap', 'first_swap']
     prior_metrics = ['shouldAvoidSmall', 'correctSelection', 'incorrectSelection',
-                     'shouldGetBig', 'informedness',]# 'perm', 'delay']
+                     'shouldGetBig', 'informedness', 'perm', 'delay']
 
     sub_regime_keys = [
         "",
@@ -325,4 +325,4 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
 
 
 if __name__ == '__main__':
-    experiments([1], repetitions=1, epochs=50, skip_train=True, skip_eval=False, skip_calc=False, batch_size=256, desired_evals=1, use_ff=False)
+    experiments([0, 1], repetitions=1, epochs=50, skip_train=True, skip_eval=False, skip_calc=False, batch_size=256, desired_evals=1, use_ff=False)

@@ -339,16 +339,49 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=Fals
 
     unique_vals = {param: df[param].unique() for param in params}
 
-    # delayless = aggregate accuracy over "delay" values, preserving mean and std. Other columns to preserve are params list
+    delta_preds = {}
+    delta_preds_ex_changed = []
+    delta_preds_lx_changed = []
 
-    # we are going to populate a dict showcasing policy differences when informedness changes:
+    print('calculating delta preds')
 
-    # for each informed (informedness == 'eb-es-lb-ls') row, find the other rows with identical param+perm values.
+    informed_rows = last_epoch_df[last_epoch_df['informedness'] == 'eb-es-lb-ls']
+    for index, row in informed_rows.iterrows():
+        matching_rows = df[
+            (df['param'] == row['param']) & (last_epoch_df['perm'] == row['perm']) & (last_epoch_df['informedness'] != 'eb-es-lb-ls')]
 
-    # update our dict[informedness] based on whether or not the "pred" value changes across informedness
+        for _, match in matching_rows.iterrows():
+            if 'lb' not in match['informedness']:
+                delta_pred_opt = 1
+            else:
+                delta_pred_opt = 0
+            delta_pred = abs(match['pred'] - row['pred'])
+            if match['informedness'] not in delta_preds.keys():
+                delta_preds[match['informedness']] = []
+            delta_preds[match['informedness']].append(delta_pred)
 
-    # we should be left with a table: informedness, delta pred (mean), delta pred (std).
+            # Check if 'eb' or 'es' has changed
+            if 'eb' in row['informedness'] and 'eb' not in match['informedness'] or \
+                    'es' in row['informedness'] and 'es' not in match['informedness']:
+                delta_preds_ex_changed.append(abs(delta_pred - delta_pred_opt))
 
+            # Check if 'lx' has changed
+            if 'lx' in row['informedness'] or 'lx' in match['informedness']:
+                delta_preds_lx_changed.append(abs(delta_pred - delta_pred_opt))
+
+    # Calculate means and standard deviations
+    delta_mean = np.mean(delta_preds)
+    delta_std = np.std(delta_preds)
+    df_summary = pd.DataFrame({
+        'Informedness': list(delta_mean.keys()),
+        'Summary': [f"{delta_mean[key]} ({delta_std[key]})" for key in delta_mean.keys()]
+    })
+    delta_ex_changed_mean = np.mean(delta_preds_ex_changed)
+    delta_ex_changed_std = np.std(delta_preds_ex_changed)
+    delta_lx_changed_mean = np.mean(delta_preds_lx_changed)
+    delta_lx_changed_std = np.std(delta_preds_lx_changed)
+
+    print('calculating single params')
 
     for param in params:
         avg_loss[param] = df.groupby([param, 'epoch'])['accuracy'].apply(calculate_ci).reset_index()
