@@ -234,6 +234,8 @@ class MiniStandoffEnv(para_MultiGridEnv):
         obscured = False
         counter = 1
         instantiated_perms = index_permutations(perms, (self.current_param_group_pos // len(self.delays)))
+        self.infos['p_0']['perm'] = instantiated_perms
+        self.infos['p_0']['delay'] = delays
         for k, event in enumerate(events):
             event_type = event[0]
 
