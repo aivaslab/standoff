@@ -100,7 +100,7 @@ def load_dataframes(combined_path_list, value_names, key_param):
 
 
 def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, batch_size=64, desired_evals=5,
-                use_ff=False):
+                use_ff=False, skip_eval=False):
     """What is the overall performance of naive, off-the-shelf models on this task? Which parameters of competitive
     feeding settings are the most sensitive to overall model performance? To what extent are different models
     sensitive to different parameters? """
@@ -184,6 +184,7 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
                 eval_sets=regimes['direct'],
                 oracle_labels=[None],
                 skip_train=skip_train,
+                skip_eval=skip_eval,
                 batch_size=batch_size,
                 prior_metrics=list(set(prior_metrics + labels)),
                 key_param=key_param,
@@ -236,6 +237,7 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
                 eval_sets=regimes['situational'],
                 oracle_labels=[single_oracle],
                 skip_train=skip_train,
+                skip_eval=skip_eval,
                 batch_size=batch_size,
                 prior_metrics=list(set(prior_metrics + labels)),
                 key_param=key_param,
@@ -323,4 +325,4 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
 
 
 if __name__ == '__main__':
-    experiments([0, 1], repetitions=1, epochs=50, skip_train=False, skip_calc=False, batch_size=256, desired_evals=1, use_ff=False)
+    experiments([1], repetitions=1, epochs=50, skip_train=True, skip_eval=False, skip_calc=False, batch_size=256, desired_evals=1, use_ff=False)

@@ -490,7 +490,7 @@ def find_df_paths(directory, file_pattern):
 def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, eval_sets=None,
                            load_path='supervised', oracle_labels=[], skip_train=True, batch_size=64,
                            prior_metrics=[], key_param=None, key_param_value=None, save_every=1, skip_calc=True,
-                           use_ff=False, oracle_layer=0):
+                           use_ff=False, oracle_layer=0, skip_eval=False):
     # labels = ['loc', 'exist', 'vision', 'b-loc', 'b-exist', 'target', 'correctSelection']
     params = ['visible_baits', 'swaps', 'visible_swaps', 'first_swap_is_both',
               'second_swap_to_first_loc', 'delay_2nd_bait', 'first_bait_size',
@@ -510,12 +510,13 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
 
             dfs_paths = []
             last_epoch_df_paths = []
-            if not skip_train:
-                for repetition in range(repetitions):
+            for repetition in range(repetitions):
+                if not skip_train:
                     train_model(train_sets, 'correctSelection', load_path=load_path,
                                 save_path=save_path, epochs=epochs, model_kwargs=model_kwargs,
                                 oracle_labels=oracle_labels, repetition=repetition,
                                 use_ff=use_ff)
+                if not skip_eval:
                     for epoch in tqdm.tqdm(range(epochs)):
                         if epoch % save_every == save_every - 1 or epoch == epochs - 1:
                             df_paths = evaluate_model(eval_sets, 'correctSelection', load_path=load_path,
