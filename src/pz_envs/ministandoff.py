@@ -563,15 +563,20 @@ class MiniStandoffEnv(para_MultiGridEnv):
                     if len(self.big_food_locations) > 0 and self.agent_goal[self.puppets[-1]] == \
                             self.big_food_locations[-1]:
                         self.infos['p_0']['shouldAvoidBig'] = not self.subject_is_dominant
-                        self.infos['p_0']['shouldGetBig'] = self.subject_is_dominant
+                        self.infos['p_0']['shouldGetBig'] = False
+                        self.infos['p_0']['shouldGetSmall'] = True
                         self.infos['p_0']['shouldAvoidSmall'] = False
                     elif len(self.small_food_locations) > 0 and self.agent_goal[self.puppets[-1]] == \
                             self.small_food_locations[-1]:
                         self.infos['p_0']['shouldAvoidSmall'] = not self.subject_is_dominant
                         self.infos['p_0']['shouldAvoidBig'] = False
+                        self.infos['p_0']['shouldGetBig'] = True
+                        self.infos['p_0']['shouldGetSmall'] = False
                     else:
                         self.infos['p_0']['shouldAvoidBig'] = False
                         self.infos['p_0']['shouldAvoidSmall'] = False
+                        self.infos['p_0']['shouldGetBig'] = True
+                        self.infos['p_0']['shouldGetSmall'] = False
 
             if len(self.big_food_locations) > 0 and len(self.small_food_locations) > 0:
                 if 'shouldAvoidBig' in self.infos['p_0'].keys() and self.infos['p_0']['shouldAvoidBig']:
