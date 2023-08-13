@@ -211,9 +211,9 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
         combined_path = os.path.join('supervised', exp_name, 'c')
         os.makedirs(combined_path, exist_ok=True)
         write_metrics_to_file(os.path.join(combined_path, 'metrics.txt'), last_epoch_df, ranges_1, params, stats,
-                              key_param=key_param)
+                              key_param=key_param, d_s=delta_sum, d_x=delta_x)
         save_figures(os.path.join(combined_path, 'figs'), combined_df, avg_loss, ranges_2, range_dict, range_dict3,
-                     params, last_epoch_df, num=12, key_param_stats=key_param_stats, key_param=key_param)
+                     params, last_epoch_df, num=12, key_param_stats=key_param_stats, key_param=key_param, delta_sum=delta_sum)
 
     if 2 in todo:
         save_every = max(1, epochs // desired_evals)
@@ -267,7 +267,7 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
         write_metrics_to_file(os.path.join(combined_path, 'metrics.txt'), last_epoch_df, ranges_1, params, stats, d_s=delta_sum, d_x=delta_x,
                               key_param=key_param)
         save_figures(os.path.join(combined_path, 'figs'), combined_df, avg_loss, ranges_2, range_dict, range_dict3,
-                     params, last_epoch_df, num=12, key_param_stats=key_param_stats, key_param=key_param, d_s=delta_sum)
+                     params, last_epoch_df, num=12, key_param_stats=key_param_stats, key_param=key_param, delta_sum=delta_sum)
 
     # Experiment 7
     if 7 in todo:
