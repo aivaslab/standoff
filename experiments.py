@@ -172,7 +172,7 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
         combined_path_list = []
         last_path_list = []
         key_param = 'regime'
-        exp_name = 'exp_1r' if not use_ff else 'exp_1r-f'
+        exp_name = 'exp_1rd' if not use_ff else 'exp_1rd-f'
 
         for regime in regimes.keys():
             print('regime:', regime)
@@ -323,4 +323,4 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
 
 
 if __name__ == '__main__':
-    experiments([1], repetitions=1, epochs=50, skip_train=False, skip_calc=False, batch_size=256, desired_evals=1, use_ff=False)
+    experiments([0, 1], repetitions=1, epochs=50, skip_train=False, skip_calc=False, batch_size=256, desired_evals=1, use_ff=False)
