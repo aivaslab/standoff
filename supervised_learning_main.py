@@ -449,7 +449,12 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=Fals
                 key = row['informedness_match']
                 if key not in delta_preds:
                     delta_preds[key] = []
-                delta_preds[key].append(abs(row['pred_match'] - row['pred']))
+
+                difference = abs(row['pred_match'] - row['pred'])
+
+                if np.isnan(difference):
+                    print(f"Warning: NaN difference for key {key} with pred_match {row['pred_match']} and pred {row['pred']}.")
+                delta_preds[key].append(difference)
 
             # Calculate means and standard deviations
             delta_mean = {key: np.mean(val) for key, val in delta_preds.items()}
