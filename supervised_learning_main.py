@@ -435,8 +435,8 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=Fals
 
             subset = last_epoch_df[last_epoch_df[key_param] == key_val]
             subset['pred'] = subset['pred'].apply(convert_to_numeric).astype(np.int8)
-            inf['perm'] = inf['perm'].astype(str)
-            noinf['perm'] = noinf['perm'].astype(str)
+            #inf['perm'] = inf['perm'].astype(str)
+            #noinf['perm'] = noinf['perm'].astype(str)
 
             subset = pd.concat([subset, pd.get_dummies(subset['pred'], prefix='pred')], axis=1)[required_columns + set_keys + ['informedness']]
 
