@@ -435,8 +435,9 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=Fals
             subset['pred'] = subset['pred'].apply(convert_to_numeric).astype(np.int8)
             subset = pd.concat([subset, pd.get_dummies(subset['pred'], prefix='pred')], axis=1)
             set_keys = ['first_swap_is_both', 'second_swap_to_first_loc', 'visible_baits', 'delay_2nd_bait', 'swaps', 'visible_swaps', 'perm', 'informedness']
-            print('grouping')
 
+            required_columns = ['informedness', 'informedness_m'] + [f'pred_{i}' for i in range(5)] + \
+                               [f'pred_{i}_m' for i in range(5)]
 
             print('merging')
 
@@ -446,7 +447,7 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=Fals
                 on=set_keys,
                 suffixes=('_m', ''),
                 how='left'
-            )#.fillna(0)
+            )[required_columns]
 
             '''informed_grouped = informed_rows.groupby(set_keys + ['informedness']).mean().reset_index()
             prefiltered_grouped = prefiltered_df.groupby(set_keys + ['informedness']).mean().reset_index()
