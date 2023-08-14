@@ -439,14 +439,19 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=Fals
             print('length of subset', len(subset))
 
             subset = pd.concat([subset, pd.get_dummies(subset['pred'], prefix='pred')], axis=1)[required_columns + set_keys]
-            print(f"Number of NaN values in 'pred_0': {subset['pred_0'].isna().sum()}")
+            print(f"Number of NaN values in 'pred_3': {subset['pred_3'].isna().sum()}")
             print('length of subset after concat', len(subset))
 
             print('merging')
+            inf = subset[subset['informedness'] == 'eb-es-lb-ls'].groupby(set_keys).mean().reset_index()
+            noinf = subset[subset['informedness'] != 'eb-es-lb-ls'].groupby(set_keys).mean().reset_index()
+
+            print("inf duplicates:", inf.duplicated(subset=set_keys).sum())
+            print("noinf duplicates:", noinf.duplicated(subset=set_keys).sum())
 
             merged_df = pd.merge(
-                subset[subset['informedness'] == 'eb-es-lb-ls'].groupby(set_keys).mean().reset_index(),
-                subset[subset['informedness'] != 'eb-es-lb-ls'].groupby(set_keys).mean().reset_index(),
+                inf,
+                noinf,
                 on=set_keys,
                 suffixes=('_m', ''),
                 how='inner'
