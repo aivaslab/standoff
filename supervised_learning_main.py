@@ -185,7 +185,7 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
                         'param': param,
                         **decode_event_name(param),
                         'epoch': epoch_number,
-                        'pred': _pred,
+                        'pred': _pred.item(),
                         'loss': loss.item(),
                         'accuracy': correct.item(),
                         'small_food_selected': small.item(),
@@ -313,7 +313,10 @@ def calculate_ci(group):
     # return {'lower': m - h, 'upper': m + h, 'mean': m}
     return pd.DataFrame({'lower': [m - h], 'upper': [m + h], 'mean': [m]}, columns=['lower', 'upper', 'mean'])
 
+lenny = len("tensor(")
 def convert_to_numeric(x):
+    if isinstance(x, str):
+        return float(x[lenny:-1])
     if torch.is_tensor(x) and x.numel() == 1:
         return x.item()
     try:
