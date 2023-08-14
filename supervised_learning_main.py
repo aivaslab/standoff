@@ -421,13 +421,13 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=Fals
             print('calculating delta preds')
 
             informed_rows = last_epoch_df[last_epoch_df['informedness'] == 'eb-es-lb-ls']
-            not_eb_es_lb_ls = last_epoch_df['informedness'] != 'eb-es-lb-ls'
+            prefiltered_df = last_epoch_df[last_epoch_df['informedness'] != 'eb-es-lb-ls']
+
             for index, row in informed_rows.iterrows():
-                matching_rows = last_epoch_df[
-                    (last_epoch_df['param'] == row['param']) &
-                    (last_epoch_df['perm'] == row['perm']) &
-                    not_eb_es_lb_ls
-                    ]
+                matching_rows = prefiltered_df[
+                    (prefiltered_df['param'] == row['param']) &
+                    (prefiltered_df['perm'] == row['perm'])
+                ]
 
                 for _, match in matching_rows.iterrows():
                     if 'lb' not in match['informedness']:
@@ -450,8 +450,8 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=Fals
                         delta_preds_lx_changed.append(abs(delta_pred - delta_pred_opt))
 
             # Calculate means and standard deviations
-            delta_mean = np.mean(delta_preds)
-            delta_std = np.std(delta_preds)
+            delta_mean = {key: np.mean(val) for key, val in delta_preds.items()}
+            delta_std = {key: np.std(val) for key, val in delta_preds.items()}
             df_summary[key_val] = pd.DataFrame({
                 'Informedness': list(delta_mean.keys()),
                 'Summary': [f"{delta_mean[key]} ({delta_std[key]})" for key in delta_mean.keys()]
