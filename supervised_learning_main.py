@@ -443,8 +443,8 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=Fals
 
             print('Grouping')
 
-            informed_grouped = informed_rows.groupby(set_keys).mean().reset_index()
-            prefiltered_grouped = prefiltered_df.groupby(set_keys).mean().reset_index()
+            informed_grouped = informed_rows.groupby(set_keys + ['informedness']).mean().reset_index()
+            prefiltered_grouped = prefiltered_df.groupby(set_keys + ['informedness']).mean().reset_index()
 
             merged_df = pd.merge(prefiltered_grouped, informed_grouped,
                                  on=set_keys,
@@ -456,7 +456,7 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=Fals
             print('unmatched:', unmatched.head())
             print('Length after dropna', len(merged_df))
             for i in range(5):
-                merged_df[f'pred_diff_{i}'] = merged_df[f'pred_{i}_match'] - merged_df[f'pred_{i}']
+                merged_df[f'pred_diff_{i}'] = abs(merged_df[f'pred_{i}_match'] - merged_df[f'pred_{i}'])
             merged_df['total_pred_diff'] = merged_df[[f'pred_diff_{idx}' for idx in range(5)]].sum(axis=1)
 
             for _, row in merged_df.iterrows():
