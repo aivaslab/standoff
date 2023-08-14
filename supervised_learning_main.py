@@ -446,8 +446,8 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=Fals
                 print(f"{col} has {subset[col].nunique()} unique values.")
 
             print('merging')
-            inf = subset[subset['informedness'] == 'eb-es-lb-ls'].groupby(set_keys).mean().reset_index()
-            noinf = subset[subset['informedness'] != 'eb-es-lb-ls'].groupby(set_keys).mean().reset_index()
+            inf = subset[subset['informedness'] == 'eb-es-lb-ls'].groupby(set_keys, observed=True).mean().reset_index()
+            noinf = subset[subset['informedness'] != 'eb-es-lb-ls'].groupby(set_keys, observed=True).mean().reset_index()
             print('length of subset after subset', len(inf), len(noinf), inf.columns)
 
             print("inf duplicates:", inf.duplicated(subset=set_keys).sum())
@@ -458,7 +458,7 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=Fals
                 noinf,
                 on=set_keys,
                 suffixes=('_m', ''),
-                how='inner'
+                how='inner',
             )
             print('merged_df size', len(merged_df))
             print(merged_df.columns)
