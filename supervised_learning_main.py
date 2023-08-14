@@ -429,6 +429,8 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=Fals
                                  suffixes=('', '_match'),
                                  how='right')
 
+            print(merged_df.head())
+
             print('merged_dfs')
 
             for _, row in merged_df.iterrows():
