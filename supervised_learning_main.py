@@ -431,10 +431,12 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=Fals
 
             print('calculating delta preds for key', key_val)
             required_columns = [f'pred_{i}' for i in range(5)]
-            set_keys = ['first_swap_is_both', 'second_swap_to_first_loc', 'delay_2nd_bait', 'swaps', 'perm', ]
+            set_keys = ['first_swap_is_both', 'second_swap_to_first_loc', 'delay_2nd_bait', 'perm', ]
 
             subset = last_epoch_df[last_epoch_df[key_param] == key_val]
             subset['pred'] = subset['pred'].apply(convert_to_numeric).astype(np.int8)
+            inf['perm'] = inf['perm'].astype(str)
+            noinf['perm'] = noinf['perm'].astype(str)
 
             subset = pd.concat([subset, pd.get_dummies(subset['pred'], prefix='pred')], axis=1)[required_columns + set_keys + ['informedness']]
 
