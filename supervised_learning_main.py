@@ -194,7 +194,8 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
                         **{x: v[k].numpy() if hasattr(v[k], 'numpy') else v[k] for x, v in metrics.items()}
                     }
                     for k, (param, loss, correct, small, big, neither, _pred) in enumerate(
-                        zip(params, losses, corrects, small_food_selected, big_food_selected, neither_food_selected, pred))]
+                        zip(params, losses, corrects, small_food_selected, big_food_selected, neither_food_selected,
+                            pred))]
                 param_losses_list.extend(batch_param_losses)
 
     # save dfs periodically to free up ram:
@@ -278,7 +279,8 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
                 total_loss += loss.item()
         if save_models and (epoch % save_every == save_every - 1):
             os.makedirs(save_path, exist_ok=True)
-            torch.save([model.kwargs, model.state_dict()], os.path.join(save_path, f'{repetition}-model_epoch{epoch}.pt'))
+            torch.save([model.kwargs, model.state_dict()],
+                       os.path.join(save_path, f'{repetition}-model_epoch{epoch}.pt'))
         torch.cuda.empty_cache()
 
     if record_loss:
@@ -312,7 +314,7 @@ def calculate_ci(group):
     return pd.DataFrame({'lower': [m - h], 'upper': [m + h], 'mean': [m]}, columns=['lower', 'upper', 'mean'])
 
 
-def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=False, key_param=None):
+def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=False, key_param=None, skip_1x=True):
     avg_loss = {}
     variances = {}
     ranges_1 = {}
@@ -321,7 +323,6 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=Fals
     range_dict3 = {}
 
     print('calculating statistics...')
-
 
     print('making categorical')
     for param in params:
@@ -348,28 +349,28 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=Fals
 
     unique_vals = {param: df[param].unique() for param in params}
 
+    if not skip_1x:
+        print('calculating single params')
 
+        for param in params:
+            avg_loss[param] = df.groupby([param, 'epoch'])['accuracy'].apply(calculate_ci).reset_index()
+            means = last_epoch_df.groupby([param]).mean(numeric_only=True)
+            ranges_1[param] = means['accuracy'].max() - means['accuracy'].min()
+        print('calculating double params')
 
-    print('calculating single params')
+        for param1, param2 in tqdm.tqdm(param_pairs):
+            avg_loss[(param1, param2)] = df.groupby([param1, param2, 'epoch'])['accuracy'].apply(
+                calculate_ci).reset_index()
 
-    for param in params:
-        avg_loss[param] = df.groupby([param, 'epoch'])['accuracy'].apply(calculate_ci).reset_index()
-        means = last_epoch_df.groupby([param]).mean(numeric_only=True)
-        ranges_1[param] = means['accuracy'].max() - means['accuracy'].min()
-    print('calculating double params')
+            means = last_epoch_df.groupby([param1, param2]).mean()
+            ranges_2[(param1, param2)] = means['accuracy'].max() - means['accuracy'].min()
 
-    for param1, param2 in tqdm.tqdm(param_pairs):
-        avg_loss[(param1, param2)] = df.groupby([param1, param2, 'epoch'])['accuracy'].apply(calculate_ci).reset_index()
-
-        means = last_epoch_df.groupby([param1, param2]).mean()
-        ranges_2[(param1, param2)] = means['accuracy'].max() - means['accuracy'].min()
-
-        if not skip_2x1:
-            for value1 in unique_vals[param1]:
-                subset = last_epoch_df[last_epoch_df[param1] == value1]
-                if len(subset[param2].unique()) > 1:
-                    new_means = subset.groupby(param2)['accuracy'].mean()
-                    range_dict[(param1, value1, param2)] = new_means.max() - new_means.min()
+            if not skip_2x1:
+                for value1 in unique_vals[param1]:
+                    subset = last_epoch_df[last_epoch_df[param1] == value1]
+                    if len(subset[param2].unique()) > 1:
+                        new_means = subset.groupby(param2)['accuracy'].mean()
+                        range_dict[(param1, value1, param2)] = new_means.max() - new_means.min()
 
     if not skip_3x:
         for param1, param2, param3 in param_triples:
@@ -449,12 +450,12 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=Fals
                 'Summary': [f"{delta_mean[key]} ({delta_std[key]})" for key in delta_mean.keys()]
             })
 
-
     print('finished')
     return avg_loss, variances, ranges_1, ranges_2, range_dict, range_dict3, stats, key_param_stats, df_summary, delta_x
 
 
-def save_figures(path, df, avg_loss, ranges, range_dict, range_dict3, params, last_epoch_df, num=10, key_param_stats=None, key_param=None, delta_sum=None):
+def save_figures(path, df, avg_loss, ranges, range_dict, range_dict3, params, last_epoch_df, num=10,
+                 key_param_stats=None, key_param=None, delta_sum=None):
     top_pairs = sorted(ranges.items(), key=lambda x: x[1], reverse=True)[:num]
     top_n_ranges = heapq.nlargest(num, range_dict, key=range_dict.get)
     top_n_ranges3 = heapq.nlargest(num, range_dict3, key=range_dict3.get)
@@ -566,7 +567,10 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
     test = 0
     while test < num_random_tests:
         try:
-            model_kwargs = {"hidden_size": 32, "num_layers": 3, "kernels": 8, "kernel_size1": 3, "kernel_size2": 1, "stride1": 1, "pool_kernel_size": 3, "pool_stride": 1, "padding1": 0, "padding2": 0, "use_pool": False, "use_conv2": False, "kernels2": 8, "batch_size": 256, "lr": 0.001, "oracle_len": 0, "output_len": 5, "channels": 5}
+            model_kwargs = {"hidden_size": 32, "num_layers": 3, "kernels": 8, "kernel_size1": 3, "kernel_size2": 1,
+                            "stride1": 1, "pool_kernel_size": 3, "pool_stride": 1, "padding1": 0, "padding2": 0,
+                            "use_pool": False, "use_conv2": False, "kernels2": 8, "batch_size": 256, "lr": 0.001,
+                            "oracle_len": 0, "output_len": 5, "channels": 5}
 
             model_name = "".join([str(x) + "," for x in model_kwargs.values()])
 
