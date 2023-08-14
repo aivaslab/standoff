@@ -400,7 +400,7 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=Fals
     print('key param stats')
     key_param_stats = {}
     if key_param is not None:
-        '''for param in params:
+        for param in params:
             if param != key_param:
                 # Initializing a nested dictionary for each unique key_param value
                 for key_val in unique_vals[key_param]:
@@ -424,7 +424,7 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=Fals
                         'q3': Q3.to_dict(),
                         'ci': standard_errors.to_dict(),
                     }
-                    # dict order is key_val > param > mean/std > param_val'''
+                    # dict order is key_val > param > mean/std > param_val
 
         for key_val in unique_vals[key_param]:
             delta_preds = {}
