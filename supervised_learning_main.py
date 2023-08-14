@@ -530,9 +530,9 @@ def write_metrics_to_file(filepath, df, ranges, params, stats, key_param=None, d
 
         if d_s is not None:
             f.write("\nDelta prediction results:\n")
-            f.write(d_x)
+            f.write(str(d_x))
             f.write("\nDelta prediction table:\n")
-            f.write(d_s)
+            f.write(str(d_s))
 
         '''key_param_corr = df2.corr()[key_param].sort_values(key='absolute', ascending=False)
         f.write("\nCorrelations between key parameter and other parameters:\n")
