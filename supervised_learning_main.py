@@ -447,6 +447,8 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=Fals
                 suffixes=('_m', ''),
                 how='left'
             )
+            print('merged_df size', len(merged_df))
+            print(merged_df.head())
 
             '''informed_grouped = informed_rows.groupby(set_keys + ['informedness']).mean().reset_index()
             prefiltered_grouped = prefiltered_df.groupby(set_keys + ['informedness']).mean().reset_index()
