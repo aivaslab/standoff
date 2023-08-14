@@ -611,10 +611,7 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
     test = 0
     while test < num_random_tests:
         try:
-            model_kwargs = {"hidden_size": 32, "num_layers": 3, "kernels": 8, "kernel_size1": 3, "kernel_size2": 1,
-                            "stride1": 1, "pool_kernel_size": 3, "pool_stride": 1, "padding1": 0, "padding2": 0,
-                            "use_pool": False, "use_conv2": False, "kernels2": 8, "batch_size": 256, "lr": 0.001,
-                            "oracle_len": 0, "output_len": 5, "channels": 5}
+            model_kwargs = {"hidden_size": 32, "num_layers": 3, "kernels": 16, "kernel_size1": 3, "kernel_size2": 5, "stride1": 1, "pool_kernel_size": 3, "pool_stride": 1, "padding1": 1, "padding2": 1, "use_pool": False, "use_conv2": False, "kernels2": 16, "batch_size": 256, "lr": 0.001, "oracle_len": 0, "output_len": 5, "channels": 5}
 
             model_name = "".join([str(x) + "," for x in model_kwargs.values()])
 
