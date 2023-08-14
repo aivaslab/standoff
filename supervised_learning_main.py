@@ -431,14 +431,14 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=Fals
 
             print('calculating delta preds for key', key_val)
             required_columns = [f'pred_{i}' for i in range(5)]
-            set_keys = ['first_swap_is_both', 'second_swap_to_first_loc', 'visible_baits', 'delay_2nd_bait', 'swaps', 'visible_swaps', 'perm', 'informedness']
+            set_keys = ['first_swap_is_both', 'second_swap_to_first_loc', 'visible_baits', 'delay_2nd_bait', 'swaps', 'visible_swaps', 'perm', ]
 
             subset = last_epoch_df[last_epoch_df[key_param] == key_val]
             subset['pred'] = subset['pred'].apply(convert_to_numeric).astype(np.int8)
             print(f"Number of NaN values in 'pred': {subset['pred'].isna().sum()}")
             print('length of subset', len(subset))
 
-            subset = pd.concat([subset, pd.get_dummies(subset['pred'], prefix='pred')], axis=1)[required_columns + set_keys]
+            subset = pd.concat([subset, pd.get_dummies(subset['pred'], prefix='pred')], axis=1)[required_columns + set_keys + ['informedness']]
             print(f"Number of NaN values in 'pred_3': {subset['pred_3'].isna().sum()}")
             print('length of subset after concat', len(subset))
 
@@ -446,8 +446,8 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=Fals
                 print(f"{col} has {subset[col].nunique()} unique values.")
 
             print('merging')
-            inf = subset[subset['informedness'] == 'eb-es-lb-ls'].groupby(set_keys, observed=True).mean().reset_index()
-            noinf = subset[subset['informedness'] != 'eb-es-lb-ls'].groupby(set_keys, observed=True).mean().reset_index()
+            inf = subset[subset['informedness'] == 'eb-es-lb-ls'].groupby(set_keys + ['informedness'], observed=True).mean().reset_index()
+            noinf = subset[subset['informedness'] != 'eb-es-lb-ls'].groupby(set_keys + ['informedness'], observed=True).mean().reset_index()
             print('length of subset after subset', len(inf), len(noinf), inf.columns)
 
             print("inf duplicates:", inf.duplicated(subset=set_keys).sum())
