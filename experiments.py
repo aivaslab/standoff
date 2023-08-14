@@ -147,7 +147,7 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
     ]
 
     # generate supervised data
-    labels = ['loc', 'vision', 'b-loc', 'b-exist', 'target', 'correctSelection']
+    labels = ['loc', 'vision', 'b-loc', 'target']
     oracles = labels + [None]
     oracle_names = [x if x is not None else "None" for x in oracles]
     conf = ScenarioConfigs()
@@ -325,4 +325,4 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
 
 
 if __name__ == '__main__':
-    experiments([1], repetitions=1, epochs=50, skip_train=True, skip_eval=True, skip_calc=True, batch_size=256, desired_evals=1, use_ff=False)
+    experiments([2], repetitions=3, epochs=50, skip_train=False, skip_eval=False, skip_calc=False, batch_size=256, desired_evals=1, use_ff=False)
