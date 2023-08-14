@@ -434,11 +434,11 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=Fals
             subset = last_epoch_df[last_epoch_df[key_param] == key_val]
             subset['pred'] = subset['pred'].apply(convert_to_numeric).astype(np.int8)
             subset = pd.concat([subset, pd.get_dummies(subset['pred'], prefix='pred')], axis=1)
-            set_keys = ['first_swap_is_both', 'second_swap_to_first_loc', 'visible_baits', 'delay_2nd_bait', 'swaps', 'visible_swaps', 'perm']
+            set_keys = ['first_swap_is_both', 'second_swap_to_first_loc', 'visible_baits', 'delay_2nd_bait', 'swaps', 'visible_swaps', 'perm', 'informedness']
             print('grouping')
 
-            informed_rows = subset[subset['informedness'] == 'eb-es-lb-ls'].groupby(set_keys + ['informedness', 'pred']).size().unstack(fill_value=0).reset_index()
-            prefiltered_df = subset[subset['informedness'] != 'eb-es-lb-ls'].groupby(set_keys + ['informedness', 'pred']).size().unstack(fill_value=0).reset_index()
+            informed_rows = subset[subset['informedness'] == 'eb-es-lb-ls'].groupby(set_keys + ['pred']).mean().reset_index()
+            prefiltered_df = subset[subset['informedness'] != 'eb-es-lb-ls'].groupby(set_keys + ['pred']).mean().reset_index()
 
             print('merging')
 
