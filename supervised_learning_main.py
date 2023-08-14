@@ -432,20 +432,21 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=Fals
             print('calculating delta preds for key', key_val)
 
             subset = last_epoch_df[last_epoch_df[key_param] == key_val]
-            subset['pred'] = subset['pred'].apply(convert_to_numeric)
+            subset['pred'] = subset['pred'].apply(convert_to_numeric).astype(np.int8)
             subset = pd.concat([subset, pd.get_dummies(subset['pred'], prefix='pred')], axis=1)
             set_keys = ['first_swap_is_both', 'second_swap_to_first_loc', 'visible_baits', 'delay_2nd_bait', 'swaps', 'visible_swaps', 'perm']
-
-            informed_rows = subset[subset['informedness'] == 'eb-es-lb-ls']
-            prefiltered_df = subset[subset['informedness'] != 'eb-es-lb-ls']
-
             print('grouping')
 
+            informed_rows = subset[subset['informedness'] == 'eb-es-lb-ls'].groupby(set_keys + ['informedness', 'pred']).size().unstack(fill_value=0).reset_index()
+            prefiltered_df = subset[subset['informedness'] != 'eb-es-lb-ls'].groupby(set_keys + ['informedness', 'pred']).size().unstack(fill_value=0).reset_index()
+
+            print('merging')
+
             merged_df = pd.merge(
-                prefiltered_df.groupby(set_keys + ['informedness', 'pred']).size().unstack(fill_value=0).reset_index(),
-                informed_rows.groupby(set_keys + ['informedness', 'pred']).size().unstack(fill_value=0).reset_index(),
+                prefiltered_df,
+                informed_rows,
                 on=set_keys,
-                suffixes=('_match', ''),
+                suffixes=('_m', ''),
                 how='left'
             ).fillna(0)
 
@@ -462,10 +463,10 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=Fals
 
             print('diffing')
             for i in range(5):
-                merged_df[f'pred_diff_{i}'] = abs(merged_df[f'pred_{i}_match'] - merged_df[f'pred_{i}'])
+                merged_df[f'pred_diff_{i}'] = abs(merged_df[f'pred_{i}_m'] - merged_df[f'pred_{i}'])
             merged_df['total_pred_diff'] = merged_df[[f'pred_diff_{idx}' for idx in range(5)]].sum(axis=1)
-            for key in merged_df['informedness_match'].unique():
-                delta_preds[key] = merged_df.loc[merged_df['informedness_match'] == key, 'total_pred_diff'].tolist()
+            for key in merged_df['informedness_m'].unique():
+                delta_preds[key] = merged_df.loc[merged_df['informedness_m'] == key, 'total_pred_diff'].tolist()
 
             '''for _, row in merged_df.iterrows():
                 key = row['informedness_match']
