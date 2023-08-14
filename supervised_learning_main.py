@@ -179,6 +179,7 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
                 else:
                     outputs = model(inputs, None)
                     typical_outputs = outputs[:, :5]
+                    _, predicted = torch.max(typical_outputs, 1)
                     oracle_outputs = outputs[:, 5:]
 
                     losses = special_criterion(typical_outputs, torch.argmax(labels, dim=1))
@@ -469,7 +470,7 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=Fals
 
             print('calculating delta preds for key', key_val)
             required_columns = [f'pred_{i}' for i in range(5)]
-            set_keys = ['first_swap_is_both', 'second_swap_to_first_loc', 'delay_2nd_bait',]
+            set_keys = ['first_swap_is_both', 'second_swap_to_first_loc', 'delay_2nd_bait', 'swaps']
             perm_keys = ['p-b-0', 'p-b-1', 'p-s-0', 'p-s-1']
 
             subset = last_epoch_df[last_epoch_df[key_param] == key_val]
