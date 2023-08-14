@@ -435,12 +435,8 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=Fals
 
             subset = last_epoch_df[last_epoch_df[key_param] == key_val]
             subset['pred'] = subset['pred'].apply(convert_to_numeric).astype(np.int8)
-            print(f"Number of NaN values in 'pred': {subset['pred'].isna().sum()}")
-            print('length of subset', len(subset))
 
             subset = pd.concat([subset, pd.get_dummies(subset['pred'], prefix='pred')], axis=1)[required_columns + set_keys + ['informedness']]
-            print(f"Number of NaN values in 'pred_3': {subset['pred_3'].isna().sum()}")
-            print('length of subset after concat', len(subset))
 
             for col in set_keys:
                 print(f"{col} has {subset[col].nunique()} unique values.")
@@ -450,8 +446,6 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=Fals
             noinf = subset[subset['informedness'] != 'eb-es-lb-ls'].groupby(set_keys + ['informedness'], observed=True).mean().reset_index()
             print('length of subset after subset', len(inf), len(noinf), inf.columns)
 
-            print("inf duplicates:", inf.duplicated(subset=set_keys).sum())
-            print("noinf duplicates:", noinf.duplicated(subset=set_keys).sum())
 
             merged_df = pd.merge(
                 inf,
@@ -460,8 +454,6 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=Fals
                 suffixes=('_m', ''),
                 how='inner',
             )
-            print('merged_df size', len(merged_df))
-            print(merged_df.columns)
 
             '''informed_grouped = informed_rows.groupby(set_keys + ['informedness']).mean().reset_index()
             prefiltered_grouped = prefiltered_df.groupby(set_keys + ['informedness']).mean().reset_index()
@@ -475,11 +467,12 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=Fals
             merged_df = merged_df.dropna(subset=['pred'])'''
 
             print('diffing')
-            merged_df['total_pred_diff'] = 0
             for i in range(5):
-                merged_df['total_pred_diff'] += abs(merged_df[f'pred_{i}_m'] - merged_df[f'pred_{i}'])
-            for key in merged_df['informedness_m'].unique():
-                delta_preds[key] = merged_df.loc[merged_df['informedness_m'] == key, 'total_pred_diff'].tolist()
+                merged_df[f'pred_diff_{i}'] = abs(merged_df[f'pred_{i}_match'] - merged_df[f'pred_{i}'])
+            merged_df['total_pred_diff'] = merged_df[[f'pred_diff_{idx}' for idx in range(5)]].sum(axis=1)
+
+            for key in merged_df['informedness'].unique():
+                delta_preds[key] = merged_df.loc[merged_df['informedness'] == key, 'total_pred_diff'].tolist()
 
             '''for _, row in merged_df.iterrows():
                 key = row['informedness_match']
