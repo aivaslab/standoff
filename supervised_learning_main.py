@@ -433,15 +433,21 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=Fals
 
             subset = last_epoch_df[last_epoch_df[key_param] == key_val]
             subset['pred'] = subset['pred'].apply(convert_to_numeric)
+            subset = pd.concat([subset, pd.get_dummies(subset['pred'], prefix='pred')], axis=1)
             #subset['pred'] = pd.to_numeric(subset['pred'], errors='coerce')
             print(f"Number of NaN values in 'pred': {subset['pred'].isna().sum()}")
+            set_keys = ['first_swap_is_both', 'second_swap_to_first_loc', 'visible_baits', 'delay_2nd_bait', 'swaps', 'visible_swaps', 'perm']
 
             informed_rows = subset[subset['informedness'] == 'eb-es-lb-ls']
             prefiltered_df = subset[subset['informedness'] != 'eb-es-lb-ls']
 
-            merged_df = pd.merge(prefiltered_df, informed_rows,
-                                 on=['first_swap_is_both', 'second_swap_to_first_loc', 'visible_baits',
-                                     'delay_2nd_bait', 'swaps', 'visible_swaps', 'perm'],
+            print('Grouping')
+
+            informed_grouped = informed_rows.groupby(set_keys).mean().reset_index()
+            prefiltered_grouped = prefiltered_df.groupby(set_keys).mean().reset_index()
+
+            merged_df = pd.merge(prefiltered_grouped, informed_grouped,
+                                 on=set_keys,
                                  suffixes=('_match', ''),
                                  how='left')
             print('Length before dropna', len(merged_df))
@@ -449,17 +455,20 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=Fals
             unmatched = merged_df[merged_df['pred'].isna()]
             print('unmatched:', unmatched.head())
             print('Length after dropna', len(merged_df))
+            for i in range(5):
+                merged_df[f'pred_diff_{i}'] = merged_df[f'pred_{i}_match'] - merged_df[f'pred_{i}']
+            merged_df['total_pred_diff'] = merged_df[[f'pred_diff_{idx}' for idx in range(5)]].sum(axis=1)
 
             for _, row in merged_df.iterrows():
                 key = row['informedness_match']
                 if key not in delta_preds:
                     delta_preds[key] = []
+                delta_preds[key].append(row['total_pred_diff'])
 
-                difference = abs(row['pred_match'] - row['pred'])
 
-                if np.isnan(difference):
-                    print(f"Warning: NaN difference for key {key} with pred_match {row['pred_match']} and pred {row['pred']}.")
-                delta_preds[key].append(difference)
+                #if np.isnan(difference):
+                #    print(f"Warning: NaN difference for key {key} with pred_match {row['pred_match']} and pred {row['pred']}.")
+                #delta_preds[key].append(difference)
 
             # Calculate means and standard deviations
             delta_mean = {key: np.mean(val) for key, val in delta_preds.items()}
