@@ -322,6 +322,7 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=Fals
 
     print('calculating statistics...')
 
+
     print('making categorical')
     for param in params:
         if df[param].dtype == 'object':
@@ -429,12 +430,16 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=Fals
                                  suffixes=('', '_match'),
                                  how='right')
 
-            print(merged_df.head())
-
-            print('merged_dfs')
+            print('merged_dfs, len:', len(merged_df))
+            print("Size of informed_rows:", len(informed_rows))
+            print("Size of prefiltered_df:", len(prefiltered_df))
+            print(merged_df['informedness_match'].unique())
 
             for _, row in merged_df.iterrows():
-                delta_preds[row['informedness_match']].append(abs(row['pred_match'] - row['pred']))
+                key = row['informedness_match']
+                if key not in delta_preds:
+                    delta_preds[key] = []
+                delta_preds[key].append(abs(row['pred_match'] - row['pred']))
 
             # Calculate means and standard deviations
             delta_mean = {key: np.mean(val) for key, val in delta_preds.items()}
