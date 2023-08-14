@@ -436,9 +436,11 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=Fals
             subset = last_epoch_df[last_epoch_df[key_param] == key_val]
             subset['pred'] = subset['pred'].apply(convert_to_numeric).astype(np.int8)
             print(f"Number of NaN values in 'pred': {subset['pred'].isna().sum()}")
+            print('length of subset', len(subset))
 
             subset = pd.concat([subset, pd.get_dummies(subset['pred'], prefix='pred')], axis=1)[required_columns + set_keys]
             print(f"Number of NaN values in 'pred_0': {subset['pred_0'].isna().sum()}")
+            print('length of subset after concat', len(subset))
 
             print('merging')
 
