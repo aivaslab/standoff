@@ -439,15 +439,15 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=Fals
             informed_rows = subset[subset['informedness'] == 'eb-es-lb-ls']
             prefiltered_df = subset[subset['informedness'] != 'eb-es-lb-ls']
 
-            merged_df = pd.merge(informed_rows, prefiltered_df,
+            merged_df = pd.merge(prefiltered_df, informed_rows,
                                  on=['first_swap_is_both', 'second_swap_to_first_loc', 'visible_baits',
                                      'delay_2nd_bait', 'swaps', 'visible_swaps', 'perm'],
-                                 suffixes=('', '_match'),
-                                 how='right')
+                                 suffixes=('_match', ''),
+                                 how='left')
             print('Length before dropna', len(merged_df))
             merged_df = merged_df.dropna(subset=['pred'])
             unmatched = merged_df[merged_df['pred'].isna()]
-            print(unmatched.head())
+            print('unmatched:', unmatched.head())
             print('Length after dropna', len(merged_df))
 
             for _, row in merged_df.iterrows():
