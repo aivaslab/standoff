@@ -452,7 +452,7 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=Fals
                 noinf,
                 on=set_keys,
                 suffixes=('_m', ''),
-                how='inner',
+                how='right',
             )
 
             '''informed_grouped = informed_rows.groupby(set_keys + ['informedness']).mean().reset_index()
