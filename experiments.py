@@ -234,7 +234,7 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
                 repetitions=repetitions,
                 epochs=epochs,
                 train_sets=default_regime,
-                eval_sets=regimes['situational'],
+                eval_sets=regimes['direct'],
                 oracle_labels=[single_oracle],
                 skip_train=skip_train,
                 skip_eval=skip_eval,
