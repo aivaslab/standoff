@@ -438,13 +438,17 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=Fals
 
             subset = pd.concat([subset, pd.get_dummies(subset['pred'], prefix='pred')], axis=1)[required_columns + set_keys + ['informedness']]
 
-            for col in set_keys:
+            for col in set_keys + ['informedness']:
                 print(f"{col} has {subset[col].nunique()} unique values.")
 
             print('merging')
             inf = subset[subset['informedness'] == 'eb-es-lb-ls'].groupby(set_keys + ['informedness'], observed=True).mean().reset_index()
             noinf = subset[subset['informedness'] != 'eb-es-lb-ls'].groupby(set_keys + ['informedness'], observed=True).mean().reset_index()
             print('length of subset after subset', len(inf), len(noinf), inf.columns)
+
+            for col in set_keys + ['informedness']:
+                print(f"inf {col} has {noinf[col].nunique()} unique values.")
+                print(f"noinf {col} has {noinf[col].nunique()} unique values.")
 
 
             merged_df = pd.merge(
