@@ -437,18 +437,16 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=Fals
             set_keys = ['first_swap_is_both', 'second_swap_to_first_loc', 'visible_baits', 'delay_2nd_bait', 'swaps', 'visible_swaps', 'perm', 'informedness']
             print('grouping')
 
-            informed_rows = subset[subset['informedness'] == 'eb-es-lb-ls'].groupby(set_keys).mean().reset_index()
-            prefiltered_df = subset[subset['informedness'] != 'eb-es-lb-ls'].groupby(set_keys).mean().reset_index()
 
             print('merging')
 
             merged_df = pd.merge(
-                prefiltered_df,
-                informed_rows,
+                subset[subset['informedness'] == 'eb-es-lb-ls'].groupby(set_keys).mean().reset_index(),
+                subset[subset['informedness'] != 'eb-es-lb-ls'].groupby(set_keys).mean().reset_index(),
                 on=set_keys,
                 suffixes=('_m', ''),
                 how='left'
-            ).fillna(0)
+            )#.fillna(0)
 
             '''informed_grouped = informed_rows.groupby(set_keys + ['informedness']).mean().reset_index()
             prefiltered_grouped = prefiltered_df.groupby(set_keys + ['informedness']).mean().reset_index()
