@@ -14,7 +14,7 @@ import heapq
 from scipy.stats import sem, t
 
 from src.utils.plotting import save_double_param_figures, save_single_param_figures, save_fixed_double_param_figures, \
-    save_fixed_triple_param_figures, save_key_param_figures
+    save_fixed_triple_param_figures, save_key_param_figures, save_delta_figure
 
 sys.path.append(os.getcwd())
 
@@ -321,7 +321,15 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=Fals
     range_dict3 = {}
 
     print('calculating statistics...')
-    print(params)
+
+    print('making categorical')
+    for param in params:
+        if df[param].dtype == 'object':
+            df[param] = df[param].astype('category')
+            last_epoch_df[param] = last_epoch_df[param].astype('category')
+    params = [param for param in params if param not in ['delay', 'perm']]
+
+    print('params:', params)
 
     param_pairs = itertools.combinations(params, 2)
     param_triples = itertools.combinations(params, 3)
@@ -347,6 +355,7 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=Fals
         avg_loss[param] = df.groupby([param, 'epoch'])['accuracy'].apply(calculate_ci).reset_index()
         means = last_epoch_df.groupby([param]).mean(numeric_only=True)
         ranges_1[param] = means['accuracy'].max() - means['accuracy'].min()
+    print('calculating double params')
 
     for param1, param2 in tqdm.tqdm(param_pairs):
         avg_loss[(param1, param2)] = df.groupby([param1, param2, 'epoch'])['accuracy'].apply(calculate_ci).reset_index()
@@ -461,7 +470,7 @@ def save_figures(path, df, avg_loss, ranges, range_dict, range_dict3, params, la
     top_n_ranges3 = heapq.nlargest(num, range_dict3, key=range_dict3.get)
 
     if delta_sum:
-        save_delta_firgures(path)
+        save_delta_figure(path)
 
     if key_param_stats is not None:
         save_key_param_figures(path, key_param_stats, key_param)
