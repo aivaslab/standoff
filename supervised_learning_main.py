@@ -444,6 +444,9 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=Fals
                                      'delay_2nd_bait', 'swaps', 'visible_swaps', 'perm'],
                                  suffixes=('', '_match'),
                                  how='right')
+            print('Length before dropna', len(merged_df))
+            merged_df = merged_df.dropna(subset=['pred'])
+            print('Length after dropna', len(merged_df))
 
             for _, row in merged_df.iterrows():
                 key = row['informedness_match']
