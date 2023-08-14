@@ -431,7 +431,7 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=Fals
 
             print('calculating delta preds for key', key_val)
             required_columns = [f'pred_{i}' for i in range(5)]
-            set_keys = ['first_swap_is_both', 'second_swap_to_first_loc', 'visible_baits', 'delay_2nd_bait', 'swaps', 'visible_swaps', 'perm', ]
+            set_keys = ['first_swap_is_both', 'second_swap_to_first_loc', 'delay_2nd_bait', 'swaps', 'perm', ]
 
             subset = last_epoch_df[last_epoch_df[key_param] == key_val]
             subset['pred'] = subset['pred'].apply(convert_to_numeric).astype(np.int8)
@@ -452,7 +452,7 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=Fals
                 noinf,
                 on=set_keys,
                 suffixes=('_m', ''),
-                how='right',
+                how='inner',
             )
 
             '''informed_grouped = informed_rows.groupby(set_keys + ['informedness']).mean().reset_index()
