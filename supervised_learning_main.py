@@ -430,24 +430,23 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=Fals
             delta_preds = {}
 
             print('calculating delta preds for key', key_val)
+            required_columns = [f'pred_{i}' for i in range(5)]
+            set_keys = ['first_swap_is_both', 'second_swap_to_first_loc', 'visible_baits', 'delay_2nd_bait', 'swaps', 'visible_swaps', 'perm', 'informedness']
 
             subset = last_epoch_df[last_epoch_df[key_param] == key_val]
             subset['pred'] = subset['pred'].apply(convert_to_numeric).astype(np.int8)
-            subset = pd.concat([subset, pd.get_dummies(subset['pred'], prefix='pred')], axis=1)
-            set_keys = ['first_swap_is_both', 'second_swap_to_first_loc', 'visible_baits', 'delay_2nd_bait', 'swaps', 'visible_swaps', 'perm', 'informedness']
+            subset = pd.concat([subset, pd.get_dummies(subset['pred'], prefix='pred')], axis=1)[required_columns + set_keys]
 
-            required_columns = ['informedness', 'informedness_m'] + [f'pred_{i}' for i in range(5)] + \
-                               [f'pred_{i}_m' for i in range(5)]
 
             print('merging')
 
             merged_df = pd.merge(
-                subset[subset['informedness'] == 'eb-es-lb-ls'].groupby(set_keys).mean(),
-                subset[subset['informedness'] != 'eb-es-lb-ls'].groupby(set_keys).mean(),
+                subset[subset['informedness'] == 'eb-es-lb-ls'].groupby(set_keys).mean().reset_index(),
+                subset[subset['informedness'] != 'eb-es-lb-ls'].groupby(set_keys).mean().reset_index(),
                 on=set_keys,
                 suffixes=('_m', ''),
                 how='left'
-            )[required_columns]
+            )
 
             '''informed_grouped = informed_rows.groupby(set_keys + ['informedness']).mean().reset_index()
             prefiltered_grouped = prefiltered_df.groupby(set_keys + ['informedness']).mean().reset_index()
@@ -461,9 +460,9 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=Fals
             merged_df = merged_df.dropna(subset=['pred'])'''
 
             print('diffing')
+            merged_df['total_pred_diff'] = 0
             for i in range(5):
-                merged_df[f'pred_diff_{i}'] = abs(merged_df[f'pred_{i}_m'] - merged_df[f'pred_{i}'])
-            merged_df['total_pred_diff'] = merged_df[[f'pred_diff_{idx}' for idx in range(5)]].sum(axis=1)
+                merged_df['total_pred_diff'] += abs(merged_df[f'pred_{i}_m'] - merged_df[f'pred_{i}'])
             for key in merged_df['informedness_m'].unique():
                 delta_preds[key] = merged_df.loc[merged_df['informedness_m'] == key, 'total_pred_diff'].tolist()
 
