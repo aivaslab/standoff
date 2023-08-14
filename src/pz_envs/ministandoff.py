@@ -236,6 +236,13 @@ class MiniStandoffEnv(para_MultiGridEnv):
         instantiated_perms = index_permutations(perms, (self.current_param_group_pos // len(self.delays)))
         self.infos['p_0']['perm'] = str(instantiated_perms)
         self.infos['p_0']['delay'] = str(delays)
+        for b in range(2):
+            # store the bait/swap locations
+            self.infos['p_0'][f'p-b-{b}'] = -1
+            self.infos['p_0'][f'p-s-{b}'] = -1
+
+        baits_so_far = 0
+        swaps_so_far = 0
         for k, event in enumerate(events):
             event_type = event[0]
 
@@ -302,12 +309,18 @@ class MiniStandoffEnv(para_MultiGridEnv):
                     # remove empty bucket for cases where event[x] wasn't e
                     if not was_empty:
                         #print(event, empty_buckets, instantiated_perms, k, instantiated_perms[k], len(empty_buckets))
+                        self.infos['p_0'][f'p-b-{baits_so_far}'] = instantiated_perms[k]
                         empty_buckets.pop(instantiated_perms[k])
+                        baits_so_far += 1
                 elif event_type == "rem":
                     empty_buckets.append(event[1])
                 elif event_type == "ob" or event_type == "re":
                     # hardcoded, will not work for multiple conspecifics
                     event_args[k] = "p_1"
+                elif event_type == 'sw':
+                    self.infos['p_0'][f'p-s-{swaps_so_far}'] = instantiated_perms[k]
+                    swaps_so_far += 1
+
                 # could also add functionality for moving empty buckets which are swapped, but that is not used in any tasks
 
         # add timers for events

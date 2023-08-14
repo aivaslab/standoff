@@ -1,5 +1,6 @@
 
 import pickle
+from functools import lru_cache
 
 import h5py
 import sys
@@ -23,6 +24,7 @@ import torch.nn.functional as F
 import torch
 
 
+@lru_cache(maxsize=None)
 def one_hot(size, data):
     return np.eye(size)[data]
 
@@ -85,6 +87,7 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
         for label in all_labels:
             data_labels[label] = []
         data_params = []
+        posterior_metrics = set(posterior_metrics)
 
         for subject_is_dominant in _subject_is_dominant:
             for subject_valence in _subject_valence:
@@ -156,7 +159,7 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
                                     data = params["num_puppets"]
                                 else:
                                     data = info['p_0'][label]
-                                data_labels[label].append(copy.copy(data))
+                                data_labels[label].append(data)
                             break
 
                         pos += 1
