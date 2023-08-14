@@ -164,15 +164,15 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
             else:
                 handle = model.rnn.register_forward_hook(hook)
 
-            for i, (inputs, labels, params, oracle_inputs, metrics) in enumerate(_val_loader):
-                inputs, labels, oracle_inputs = inputs.to(device), labels.to(device), oracle_inputs.to(device)
+            for i, (inputs, labels, params, oracles, metrics) in enumerate(_val_loader):
+                inputs, labels, oracles = inputs.to(device), labels.to(device), oracles.to(device)
                 if i < num_activation_batches:
                     activations.append(hook.activations)
                     if i == num_activation_batches - 1:
                         handle.remove()
 
                 if not oracle_is_target:
-                    outputs = model(inputs, oracle_inputs)
+                    outputs = model(inputs, oracles)
                     losses = special_criterion(outputs, torch.argmax(labels, dim=1))
                     _, predicted = torch.max(outputs, 1)
                     corrects = (predicted == torch.argmax(labels, dim=1))
@@ -180,6 +180,7 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
                     outputs = model(inputs, None)
                     typical_outputs = outputs[:, :5]
                     oracle_outputs = outputs[:, 5:]
+
                     losses = special_criterion(typical_outputs, torch.argmax(labels, dim=1))
                     oracle_losses = oracle_criterion(oracle_outputs, oracles)
 
