@@ -421,10 +421,13 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=Fals
             print('calculating delta preds')
 
             informed_rows = last_epoch_df[last_epoch_df['informedness'] == 'eb-es-lb-ls']
+            not_eb_es_lb_ls = last_epoch_df['informedness'] != 'eb-es-lb-ls'
             for index, row in informed_rows.iterrows():
-                matching_rows = df[
-                    (df['param'] == row['param']) & (last_epoch_df['perm'] == row['perm']) & (
-                                last_epoch_df['informedness'] != 'eb-es-lb-ls')]
+                matching_rows = last_epoch_df[
+                    (last_epoch_df['param'] == row['param']) &
+                    (last_epoch_df['perm'] == row['perm']) &
+                    not_eb_es_lb_ls
+                    ]
 
                 for _, match in matching_rows.iterrows():
                     if 'lb' not in match['informedness']:
@@ -442,7 +445,8 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=Fals
                         delta_preds_ex_changed.append(abs(delta_pred - delta_pred_opt))
 
                     # Check if 'lx' has changed
-                    if 'lx' in row['informedness'] or 'lx' in match['informedness']:
+                    if 'lb' in row['informedness'] and 'lb' not in match['informedness'] or \
+                            'ls' in row['informedness'] and 'ls' not in match['informedness']:
                         delta_preds_lx_changed.append(abs(delta_pred - delta_pred_opt))
 
             # Calculate means and standard deviations
