@@ -442,6 +442,9 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=Fals
             print(f"Number of NaN values in 'pred_3': {subset['pred_3'].isna().sum()}")
             print('length of subset after concat', len(subset))
 
+            for col in set_keys:
+                print(f"{col} has {subset[col].nunique()} unique values.")
+
             print('merging')
             inf = subset[subset['informedness'] == 'eb-es-lb-ls'].groupby(set_keys).mean().reset_index()
             noinf = subset[subset['informedness'] != 'eb-es-lb-ls'].groupby(set_keys).mean().reset_index()
