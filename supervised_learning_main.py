@@ -200,7 +200,7 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
                         'small_food_selected': small.item(),
                         'big_food_selected': big.item(),
                         'neither_food_selected': neither.item(),
-                        **{x: v[k].numpy() if hasattr(v[k], 'numpy') else v[k] for x, v in metrics.items()}
+                        **{x: v[k].numpy() if hasattr(v[k], 'numpy') else v[k] for x, v in metrics.items()},
                         ** ({'oracle_loss': oracle_loss.item()} if oracle_is_target else {})
 
                     }
