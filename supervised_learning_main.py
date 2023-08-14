@@ -415,39 +415,24 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=Fals
 
         for key_val in unique_vals[key_param]:
             delta_preds = {}
-            delta_preds_ex_changed = []
-            delta_preds_lx_changed = []
 
-            print('calculating delta preds')
+            print('calculating delta preds for key', key_val)
 
-            informed_rows = last_epoch_df[last_epoch_df['informedness'] == 'eb-es-lb-ls']
-            prefiltered_df = last_epoch_df[last_epoch_df['informedness'] != 'eb-es-lb-ls']
+            subset = last_epoch_df[last_epoch_df[key_param] == key_val]
 
-            for index, row in informed_rows.iterrows():
-                matching_rows = prefiltered_df[
-                    (prefiltered_df['param'] == row['param']) &
-                    (prefiltered_df['perm'] == row['perm'])
-                ]
+            informed_rows = subset[subset['informedness'] == 'eb-es-lb-ls']
+            prefiltered_df = subset[subset['informedness'] != 'eb-es-lb-ls']
 
-                for _, match in matching_rows.iterrows():
-                    if 'lb' not in match['informedness']:
-                        delta_pred_opt = 1
-                    else:
-                        delta_pred_opt = 0
-                    delta_pred = abs(match['pred'] - row['pred'])
-                    if match['informedness'] not in delta_preds.keys():
-                        delta_preds[match['informedness']] = []
-                    delta_preds[match['informedness']].append(delta_pred)
+            merged_df = pd.merge(informed_rows, prefiltered_df,
+                                 on=['first_swap_is_both', 'second_swap_to_first_loc', 'visible_baits',
+                                     'delay_2nd_bait', 'swaps', 'visible_swaps', 'perm'],
+                                 suffixes=('', '_match'),
+                                 how='right')
 
-                    # Check if 'eb' or 'es' has changed
-                    if 'eb' in row['informedness'] and 'eb' not in match['informedness'] or \
-                            'es' in row['informedness'] and 'es' not in match['informedness']:
-                        delta_preds_ex_changed.append(abs(delta_pred - delta_pred_opt))
+            print('merged_dfs')
 
-                    # Check if 'lx' has changed
-                    if 'lb' in row['informedness'] and 'lb' not in match['informedness'] or \
-                            'ls' in row['informedness'] and 'ls' not in match['informedness']:
-                        delta_preds_lx_changed.append(abs(delta_pred - delta_pred_opt))
+            for _, row in merged_df.iterrows():
+                delta_preds[row['informedness_match']].append(abs(row['pred_match'] - row['pred']))
 
             # Calculate means and standard deviations
             delta_mean = {key: np.mean(val) for key, val in delta_preds.items()}
@@ -456,12 +441,6 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=Fals
                 'Informedness': list(delta_mean.keys()),
                 'Summary': [f"{delta_mean[key]} ({delta_std[key]})" for key in delta_mean.keys()]
             })
-            delta_x[key_val] = {
-                'delta_ex_changed_mean': np.mean(delta_preds_ex_changed),
-                'delta_ex_changed_std': np.std(delta_preds_ex_changed),
-                'delta_lx_changed_mean': np.mean(delta_preds_lx_changed),
-                'delta_lx_changed_std': np.std(delta_preds_lx_changed),
-            }
 
 
     print('finished')
