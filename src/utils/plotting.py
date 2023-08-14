@@ -336,7 +336,7 @@ def save_delta_figure(dir, df_summary):
     for key_val, sub_df in df_summary.items():
         for _, row in sub_df.iterrows():
             informedness = row['Informedness']
-            mean, std = map(float, row['Summary'].strip('()').split(' '))
+            mean, std = map(float, row['Summary'].strip().split(' ').strip('()'))
             df_list.append([key_val, informedness, mean, std])
 
     df = pd.DataFrame(df_list, columns=["key_val", "Informedness", "mean", "std"])
