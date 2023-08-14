@@ -316,11 +316,11 @@ def calculate_ci(group):
 lenny = len("tensor(")
 def convert_to_numeric(x):
     if isinstance(x, str):
-        return float(x[lenny:-1])
+        return int(x[lenny:-1])
     if torch.is_tensor(x) and x.numel() == 1:
         return x.item()
     try:
-        return float(x)
+        return int(x)
     except (ValueError, TypeError):
         print(x)
         return np.nan
