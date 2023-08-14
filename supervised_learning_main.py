@@ -457,7 +457,7 @@ def save_figures(path, df, avg_loss, ranges, range_dict, range_dict3, params, la
     top_n_ranges3 = heapq.nlargest(num, range_dict3, key=range_dict3.get)
 
     if delta_sum:
-        save_delta_figure(path)
+        save_delta_figure(path, delta_sum)
 
     if key_param_stats is not None:
         save_key_param_figures(path, key_param_stats, key_param)

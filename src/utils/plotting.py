@@ -331,7 +331,7 @@ def plot_tsne(data, labels, index, color):
     # for i, name in enumerate(labels[index[0]:index[1]]):
     #    plt.annotate(name, (data[i + index[0], 0], data[i + index[0], 1]), textcoords="offset points", xytext=(-10, 5), ha='center')
 
-def save_delta_figure(df_summary, dir):
+def save_delta_figure(dir, df_summary):
     df_list = []
     for key_val, sub_df in df_summary.items():
         for _, row in sub_df.iterrows():
