@@ -70,6 +70,9 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
     all_path_infos = pd.DataFrame()
     suffix = pref_type + role_type
 
+    onehot_labels = ['correctSelection', 'incorrectSelection']
+    extra_labels = ['informedness', 'opponents']
+
     for configName in conf.stages:
         configs = conf.standoff
         events = conf.stages[configName]['events']
@@ -83,7 +86,7 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
         print('data name', data_name)
         data_obs = []
         data_labels = {}
-        all_labels = list(set(labels + prior_metrics + list(posterior_metrics)))
+        all_labels = list(set(labels + prior_metrics + list(posterior_metrics) + extra_labels))
         for label in all_labels:
             data_labels[label] = []
         data_params = []
@@ -132,8 +135,6 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
 
                 env.deterministic = True
                 print('total_groups', total_groups)
-                onehot_labels = ['correctSelection', 'incorrectSelection']
-                extra_labels = ['informedness', 'opponents']
                 check_labels = [x for x in all_labels if x not in posterior_metrics and x not in extra_labels and x not in onehot_labels]
 
                 while True:
