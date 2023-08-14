@@ -458,6 +458,7 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=Fals
                 'Informedness': list(delta_mean.keys()),
                 'Summary': [f"{delta_mean[key]} ({delta_std[key]})" for key in delta_mean.keys()]
             })
+            print(df_summary[key_val])
 
     print('finished')
     return avg_loss, variances, ranges_1, ranges_2, range_dict, range_dict3, stats, key_param_stats, df_summary, delta_x
