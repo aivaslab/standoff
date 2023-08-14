@@ -325,7 +325,7 @@ def convert_to_numeric(x):
         print(x)
         return np.nan
 
-def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=False, key_param=None, skip_1x=True):
+def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=False, key_param=None, skip_1x=False):
     avg_loss = {}
     variances = {}
     ranges_1 = {}
