@@ -421,6 +421,7 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=Fals
             print('calculating delta preds for key', key_val)
 
             subset = last_epoch_df[last_epoch_df[key_param] == key_val]
+            print(subset['pred'][:25])
             subset['pred'] = pd.to_numeric(subset['pred'], errors='coerce')
 
             informed_rows = subset[subset['informedness'] == 'eb-es-lb-ls']
@@ -441,8 +442,6 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=Fals
                 key = row['informedness_match']
                 if key not in delta_preds:
                     delta_preds[key] = []
-                print(row['pred_match'], type(row['pred_match']))
-                print(row['pred'], type(row['pred']))
                 delta_preds[key].append(abs(row['pred_match'] - row['pred']))
 
             # Calculate means and standard deviations
