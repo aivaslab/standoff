@@ -421,7 +421,6 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=Fals
             print('calculating delta preds for key', key_val)
 
             subset = last_epoch_df[last_epoch_df[key_param] == key_val]
-            print(subset['pred'][:25])
             subset['pred'] = pd.to_numeric(subset['pred'], errors='coerce')
 
             informed_rows = subset[subset['informedness'] == 'eb-es-lb-ls']
@@ -432,11 +431,6 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=Fals
                                      'delay_2nd_bait', 'swaps', 'visible_swaps', 'perm'],
                                  suffixes=('', '_match'),
                                  how='right')
-
-            print('merged_dfs, len:', len(merged_df))
-            print("Size of informed_rows:", len(informed_rows))
-            print("Size of prefiltered_df:", len(prefiltered_df))
-            print(merged_df['informedness_match'].unique())
 
             for _, row in merged_df.iterrows():
                 key = row['informedness_match']
