@@ -446,6 +446,8 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=Fals
                                  how='right')
             print('Length before dropna', len(merged_df))
             merged_df = merged_df.dropna(subset=['pred'])
+            unmatched = merged_df[merged_df['pred'].isna()]
+            print(unmatched.head())
             print('Length after dropna', len(merged_df))
 
             for _, row in merged_df.iterrows():
