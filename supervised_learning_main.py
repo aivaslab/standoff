@@ -442,8 +442,8 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=Fals
             print('merging')
 
             merged_df = pd.merge(
-                subset[subset['informedness'] == 'eb-es-lb-ls'].groupby(set_keys).mean().reset_index(),
-                subset[subset['informedness'] != 'eb-es-lb-ls'].groupby(set_keys).mean().reset_index(),
+                subset[subset['informedness'] == 'eb-es-lb-ls'].groupby(set_keys).mean(),
+                subset[subset['informedness'] != 'eb-es-lb-ls'].groupby(set_keys).mean(),
                 on=set_keys,
                 suffixes=('_m', ''),
                 how='left'
