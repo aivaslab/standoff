@@ -313,6 +313,13 @@ def calculate_ci(group):
     # return {'lower': m - h, 'upper': m + h, 'mean': m}
     return pd.DataFrame({'lower': [m - h], 'upper': [m + h], 'mean': [m]}, columns=['lower', 'upper', 'mean'])
 
+def convert_to_numeric(x):
+    if torch.is_tensor(x) and x.numel() == 1:
+        return x.item()
+    try:
+        return float(x)
+    except (ValueError, TypeError):
+        return x
 
 def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=False, key_param=None, skip_1x=True):
     avg_loss = {}
@@ -421,7 +428,7 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=Fals
             print('calculating delta preds for key', key_val)
 
             subset = last_epoch_df[last_epoch_df[key_param] == key_val]
-            subset['pred'] = subset['pred'].apply(lambda x: x.item())
+            subset['pred'] = subset['pred'].apply(convert_to_numeric)
             #subset['pred'] = pd.to_numeric(subset['pred'], errors='coerce')
             print(f"Number of NaN values in 'pred': {subset['pred'].isna().sum()}")
 
