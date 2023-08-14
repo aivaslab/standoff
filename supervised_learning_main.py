@@ -468,7 +468,7 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=Fals
 
             print('diffing')
             for i in range(5):
-                merged_df[f'pred_diff_{i}'] = abs(merged_df[f'pred_{i}_match'] - merged_df[f'pred_{i}'])
+                merged_df[f'pred_diff_{i}'] = abs(merged_df[f'pred_{i}_m'] - merged_df[f'pred_{i}'])
             merged_df['total_pred_diff'] = merged_df[[f'pred_diff_{idx}' for idx in range(5)]].sum(axis=1)
 
             for key in merged_df['informedness'].unique():
