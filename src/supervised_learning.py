@@ -83,7 +83,7 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
         print('data name', data_name)
         data_obs = []
         data_labels = {}
-        all_labels = list(set(labels + prior_metrics + posterior_metrics))
+        all_labels = list(set(labels + prior_metrics + list(posterior_metrics)))
         for label in all_labels:
             data_labels[label] = []
         data_params = []
@@ -132,6 +132,9 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
 
                 env.deterministic = True
                 print('total_groups', total_groups)
+                onehot_labels = ['correctSelection', 'incorrectSelection']
+                extra_labels = ['informedness', 'opponents']
+                check_labels = [x for x in all_labels if x not in posterior_metrics and x not in extra_labels and x not in onehot_labels]
 
                 while True:
                     env.deterministic_seed = env.current_param_group_pos
@@ -150,16 +153,14 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
                         if pos == frames - 1 or env.has_released:
                             data_obs.append(serialize_data(this_ob.astype(np.uint8)))
                             data_params.append(eName)
-                            for label in [x for x in all_labels if x not in posterior_metrics]:
-                                if label == "correctSelection" or label == 'incorrectSelection':
-                                    data = one_hot(5, info['p_0'][label])
-                                elif label == "informedness":
-                                    data = informedness
-                                elif label == "opponents":
-                                    data = params["num_puppets"]
-                                else:
-                                    data = info['p_0'][label]
+                            for label in onehot_labels:
+                                data = one_hot(5, info['p_0'][label])
                                 data_labels[label].append(data)
+                            for label in check_labels:
+                                data = info['p_0'][label]
+                                data_labels[label].append(data)
+                            data_labels['informedness'].append(informedness)
+                            data_labels['opponents'].append(params["num_puppets"])
                             break
 
                         pos += 1
