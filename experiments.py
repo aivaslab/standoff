@@ -215,6 +215,59 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
         save_figures(os.path.join(combined_path, 'figs'), combined_df, avg_loss, ranges_2, range_dict, range_dict3,
                      params, last_epoch_df, num=12, key_param_stats=key_param_stats, key_param=key_param, delta_sum=delta_sum)
 
+    if 11 in todo:
+        print('Running experiment 11: train oracle label ')
+
+        # todo: add hparam search for many models, comparison between them?
+        save_every = max(1, epochs // desired_evals)
+        combined_path_list = []
+        last_path_list = []
+        key_param = 'regime'
+        oracle = 'b-loc'
+        exp_name = 'exp_1rd' if not use_ff else 'exp_1rd-f'
+
+        for regime in regimes.keys():
+            print('regime:', regime, 'oracle:', oracle)
+            combined_paths, last_epoch_paths = run_supervised_session(
+                save_path=os.path.join('supervised', exp_name, regime),
+                repetitions=repetitions,
+                epochs=epochs,
+                train_sets=regimes[regime],
+                eval_sets=regimes['direct'],
+                oracle_labels=[oracle],
+                oracle_is_target=True,
+                skip_train=skip_train,
+                skip_eval=skip_eval,
+                batch_size=batch_size,
+                prior_metrics=list(set(prior_metrics + labels)),
+                key_param=key_param,
+                key_param_value=regime,
+                save_every=save_every,
+                skip_calc=skip_calc,
+                use_ff=use_ff
+            )
+            last_path_list.append(last_epoch_paths)
+            combined_path_list.append(combined_paths)
+
+        print('loading dataframes for final comparison')
+
+        combined_df = load_dataframes(combined_path_list, regimes.keys(), key_param)
+        last_epoch_df = load_dataframes(last_path_list, regimes.keys(), key_param)
+
+        create_combined_histogram(last_epoch_df, combined_df, key_param, os.path.join('supervised', exp_name))
+        # todo: add specific cell plots here
+
+        avg_loss, variances, ranges_1, ranges_2, range_dict, range_dict3, stats, key_param_stats, delta_sum, delta_x = calculate_statistics(
+            combined_df, last_epoch_df, list(set(params + prior_metrics + [key_param])),
+            skip_3x=True, key_param=key_param)  # todo: make it definitely save one fixed param eg oracle
+
+        combined_path = os.path.join('supervised', exp_name, 'c')
+        os.makedirs(combined_path, exist_ok=True)
+        write_metrics_to_file(os.path.join(combined_path, 'metrics.txt'), last_epoch_df, ranges_1, params, stats,
+                              key_param=key_param, d_s=delta_sum, d_x=delta_x)
+        save_figures(os.path.join(combined_path, 'figs'), combined_df, avg_loss, ranges_2, range_dict, range_dict3,
+                     params, last_epoch_df, num=12, key_param_stats=key_param_stats, key_param=key_param, delta_sum=delta_sum)
+
     if 2 in todo:
         save_every = max(1, epochs // desired_evals)
         print('Running experiment 2: varied oracle modules, saving every', save_every)
@@ -325,4 +378,4 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
 
 
 if __name__ == '__main__':
-    experiments([0], repetitions=3, epochs=30, skip_train=False, skip_eval=False, skip_calc=False, batch_size=256, desired_evals=1, use_ff=False)
+    experiments([11], repetitions=1, epochs=50, skip_train=False, skip_eval=False, skip_calc=False, batch_size=256, desired_evals=1, use_ff=False)

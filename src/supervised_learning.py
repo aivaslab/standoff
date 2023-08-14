@@ -405,7 +405,7 @@ class CustomDatasetBig(Dataset):
         list_index, local_index = self._find_list_index(index)
         data = torch.from_numpy(pickle.loads(self.data_list[list_index][local_index])).float()
         labels = torch.from_numpy(self.labels_list[list_index][local_index].astype(np.int8))
-        oracles = torch.from_numpy(self.oracles_list[list_index][local_index].astype(np.int8)) if len(
+        oracles = torch.from_numpy(self.oracles_list[list_index][local_index].astype(np.float32)) if len(
             self.oracles_list) > 1 else torch.tensor([])
 
         metrics = {key: self.metrics[key][index] for key in self.metrics.keys()} if self.metrics else 0
@@ -415,18 +415,21 @@ class CustomDatasetBig(Dataset):
 class RNNModel(nn.Module):
     def __init__(self, hidden_size, num_layers, output_len, channels, kernels=8, kernels2=8, kernel_size1=3,
                  kernel_size2=3, stride1=1, pool_kernel_size=2, pool_stride=2, padding1=0, padding2=0, use_pool=True,
-                 use_conv2=False, oracle_len=0, oracle_layer=0, is_fc=False, lr=0.0, batch_size=0.0):
+                 use_conv2=False, oracle_len=0, oracle_layer=0, is_fc=False, lr=0.0, batch_size=0.0,
+                 oracle_is_target=False):
         super(RNNModel, self).__init__()
         self.kwargs = {'hidden_size': hidden_size, 'num_layers': num_layers,
                        'output_len': output_len, 'pool_kernel_size': pool_kernel_size,
                        'pool_stride': pool_stride, 'channels': channels, 'kernels': kernels,
                        'padding1': padding1, 'padding2': padding2, 'use_pool': use_pool, 'stride1': stride1,
                        'use_conv2': use_conv2, 'kernel_size1': kernel_size1,
-                       'kernels2': kernels2, 'kernel_size2': kernel_size2, 'oracle_len': oracle_len, 'is_fc': is_fc, 'lr': lr, 'batch_size': batch_size}
+                       'kernels2': kernels2, 'kernel_size2': kernel_size2, 'oracle_len': oracle_len, 'is_fc': is_fc,
+                       'lr': lr, 'batch_size': batch_size, 'oracle_is_target': oracle_is_target}
 
         input_size = 7
 
         self.oracle_layer = oracle_layer
+        self.oracle_is_target = oracle_is_target
         self.is_fc = is_fc
         self.use_pool = use_pool
         self.use_conv2 = use_conv2
@@ -454,12 +457,12 @@ class RNNModel(nn.Module):
             pool2_output_size = pool1_output_size
 
         input_size = kernels2 * pool2_output_size * pool2_output_size
-        if self.oracle_layer != 0:
+        if self.oracle_layer != 0 and not oracle_is_target:
             input_size += oracle_len
 
         self.rnn = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
 
-        self.fc = nn.Linear(hidden_size + oracle_len if self.oracle_layer == 0 else hidden_size, int(output_len))
+        self.fc = nn.Linear(hidden_size + oracle_len if self.oracle_layer == 0 and not oracle_is_target else hidden_size, int(output_len) if not oracle_is_target else int(output_len) + oracle_len)
 
     def forward(self, x, oracle_inputs):
         conv_outputs = []
@@ -481,7 +484,7 @@ class RNNModel(nn.Module):
         out, _ = self.rnn(x)
         out = out[:, -1, :]  # Use only the last timestep's output
 
-        if self.oracle_layer != 1:
+        if not self.oracle_is_target and self.oracle_layer != 1:
             out = torch.cat((out, oracle_inputs), dim=-1)
 
         outputs = self.fc(out)

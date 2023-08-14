@@ -105,9 +105,10 @@ class SaveActivations:
 
 
 def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_path='', oracle_labels=[], repetition=0,
-                   epoch_number=0, prior_metrics=[], num_activation_batches=1, use_ff=False):
+                   epoch_number=0, prior_metrics=[], num_activation_batches=1, use_ff=False, oracle_is_target=False):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     special_criterion = nn.CrossEntropyLoss(reduction='none')
+    oracle_criterion = nn.MSELoss(reduction='none')
 
     model_kwargs, state_dict = torch.load(os.path.join(model_save_path, f'{repetition}-model_epoch{epoch_number}.pt'))
     batch_size = model_kwargs['batch_size']
@@ -170,10 +171,17 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
                     if i == num_activation_batches - 1:
                         handle.remove()
 
-                outputs = model(inputs, oracle_inputs)
-                losses = special_criterion(outputs, torch.argmax(labels, dim=1))
-                _, predicted = torch.max(outputs, 1)
-                corrects = (predicted == torch.argmax(labels, dim=1))
+                if not oracle_is_target:
+                    outputs = model(inputs, oracle_inputs)
+                    losses = special_criterion(outputs, torch.argmax(labels, dim=1))
+                    _, predicted = torch.max(outputs, 1)
+                    corrects = (predicted == torch.argmax(labels, dim=1))
+                else:
+                    outputs = model(inputs, None)
+                    typical_outputs = outputs[:, :5]
+                    oracle_outputs = outputs[:, 5:]
+                    losses = special_criterion(typical_outputs, torch.argmax(labels, dim=1))
+                    oracle_losses = oracle_criterion(oracle_outputs, oracles)
 
                 pred = predicted.cpu()
                 small_food_selected = (pred == torch.argmax(metrics['loc'][:, :, 0], dim=1))
@@ -192,10 +200,12 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
                         'big_food_selected': big.item(),
                         'neither_food_selected': neither.item(),
                         **{x: v[k].numpy() if hasattr(v[k], 'numpy') else v[k] for x, v in metrics.items()}
+                        ** ({'oracle_loss': oracle_loss.item()} if oracle_is_target else {})
+
                     }
-                    for k, (param, loss, correct, small, big, neither, _pred) in enumerate(
+                    for k, (param, loss, correct, small, big, neither, _pred, oracle_loss) in enumerate(
                         zip(params, losses, corrects, small_food_selected, big_food_selected, neither_food_selected,
-                            pred))]
+                            pred, (oracle_losses if oracle_is_target else [0]*len(pred))))]
                 param_losses_list.extend(batch_param_losses)
 
     # save dfs periodically to free up ram:
@@ -216,7 +226,8 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
 def train_model(train_sets, target_label, load_path='supervised/', save_path='', epochs=100,
                 model_kwargs=None,
                 oracle_labels=[], repetition=0, use_ff=False,
-                save_models=True, save_every=5, record_loss=False):
+                save_models=True, save_every=5, record_loss=False,
+                oracle_is_target=False):
     use_cuda = torch.cuda.is_available()
     if len(oracle_labels) == 0 or oracle_labels[0] == None:
         oracle_labels = []
@@ -253,10 +264,12 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
     model_kwargs['oracle_len'] = 0 if len(oracle_labels) == 0 else len(train_dataset.oracles_list[0][0])
     model_kwargs['output_len'] = 5  # np.prod(labels.shape[1:])
     model_kwargs['channels'] = 5  # np.prod(params.shape[2])
+    model_kwargs['oracle_is_target'] = oracle_is_target
 
     device = torch.device('cuda' if use_cuda else 'cpu')
     model = RNNModel(**model_kwargs).to(device) if not use_ff else FeedForwardModel(**model_kwargs).to(device)
     criterion = nn.CrossEntropyLoss()
+    oracle_criterion = nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
     num_epochs = epochs
@@ -266,10 +279,18 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
 
     for epoch in range(num_epochs):
         total_loss = 0.0
-        for i, (inputs, target_labels, _, oracle_inputs, _) in enumerate(train_loader):
-            inputs, target_labels, oracle_inputs = inputs.to(device), target_labels.to(device), oracle_inputs.to(device)
-            outputs = model(inputs, oracle_inputs)
-            loss = criterion(outputs, torch.argmax(target_labels, dim=1))
+        for i, (inputs, target_labels, _, oracles, _) in enumerate(train_loader):
+            inputs, target_labels, oracles = inputs.to(device), target_labels.to(device), oracles.to(device)
+            if not oracle_is_target:
+                outputs = model(inputs, oracles)
+                loss = criterion(outputs, torch.argmax(target_labels, dim=1))
+            else:
+                outputs = model(inputs, None)
+                typical_outputs = outputs[:, :5]
+                oracle_outputs = outputs[:, 5:]
+                typical_loss = criterion(typical_outputs, torch.argmax(target_labels, dim=1))
+                oracle_loss = oracle_criterion(oracle_outputs, oracles)
+                loss = typical_loss + oracle_loss
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
@@ -467,7 +488,6 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=Fals
                 print(f"inf {col} has {noinf[col].nunique()} unique values.")
                 print(f"noinf {col} has {noinf[col].nunique()} unique values.")
 
-
             '''merged_df = pd.merge(
                 inf,
                 noinf,
@@ -475,6 +495,7 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=Fals
                 suffixes=('_m', ''),
                 how='inner',
             )'''
+
             print('doing custom merge')
             merged_df = custom_merge(inf, noinf, perm_keys, set_keys)
             print('length', len(merged_df))
@@ -598,7 +619,7 @@ def find_df_paths(directory, file_pattern):
 def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, eval_sets=None,
                            load_path='supervised', oracle_labels=[], skip_train=True, batch_size=64,
                            prior_metrics=[], key_param=None, key_param_value=None, save_every=1, skip_calc=True,
-                           use_ff=False, oracle_layer=0, skip_eval=False):
+                           use_ff=False, oracle_layer=0, skip_eval=False, oracle_is_target=False):
     # labels = ['loc', 'exist', 'vision', 'b-loc', 'b-exist', 'target', 'correctSelection']
     params = ['visible_baits', 'swaps', 'visible_swaps', 'first_swap_is_both',
               'second_swap_to_first_loc', 'delay_2nd_bait', 'first_bait_size',
@@ -623,7 +644,7 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
                     train_model(train_sets, 'correctSelection', load_path=load_path,
                                 save_path=save_path, epochs=epochs, model_kwargs=model_kwargs,
                                 oracle_labels=oracle_labels, repetition=repetition,
-                                use_ff=use_ff)
+                                use_ff=use_ff, oracle_is_target=oracle_is_target)
                 if not skip_eval:
                     for epoch in tqdm.tqdm(range(epochs)):
                         if epoch % save_every == save_every - 1 or epoch == epochs - 1:
@@ -632,7 +653,8 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
                                                       oracle_labels=oracle_labels, repetition=repetition,
                                                       epoch_number=epoch,
                                                       prior_metrics=prior_metrics,
-                                                      use_ff=use_ff)
+                                                      use_ff=use_ff,
+                                                      oracle_is_target=oracle_is_target)
                             dfs_paths.extend(df_paths)
                             if epoch == epochs - 1:
                                 last_epoch_df_paths.extend(df_paths)
