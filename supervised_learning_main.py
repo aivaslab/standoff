@@ -422,6 +422,7 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=Fals
 
             subset = last_epoch_df[last_epoch_df[key_param] == key_val]
             subset['pred'] = pd.to_numeric(subset['pred'], errors='coerce')
+            print(f"Number of NaN values in 'pred': {subset['pred'].isna().sum()}")
 
             informed_rows = subset[subset['informedness'] == 'eb-es-lb-ls']
             prefiltered_df = subset[subset['informedness'] != 'eb-es-lb-ls']
