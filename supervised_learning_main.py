@@ -445,7 +445,7 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=Fals
             print('merging')
             inf = subset[subset['informedness'] == 'eb-es-lb-ls'].groupby(set_keys).mean().reset_index()
             noinf = subset[subset['informedness'] != 'eb-es-lb-ls'].groupby(set_keys).mean().reset_index()
-            print('length of subset after subset', len(inf), len(noinf))
+            print('length of subset after subset', len(inf), len(noinf), inf.columns)
 
             print("inf duplicates:", inf.duplicated(subset=set_keys).sum())
             print("noinf duplicates:", noinf.duplicated(subset=set_keys).sum())
@@ -458,7 +458,7 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=Fals
                 how='inner'
             )
             print('merged_df size', len(merged_df))
-            print(merged_df.head())
+            print(merged_df.columns)
 
             '''informed_grouped = informed_rows.groupby(set_keys + ['informedness']).mean().reset_index()
             prefiltered_grouped = prefiltered_df.groupby(set_keys + ['informedness']).mean().reset_index()
