@@ -447,7 +447,6 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=Fals
                 subset[subset['informedness'] != 'eb-es-lb-ls'].groupby(set_keys).mean().reset_index(),
                 on=set_keys,
                 suffixes=('_m', ''),
-                how='left'
             )
             print('merged_df size', len(merged_df))
             print(merged_df.head())
