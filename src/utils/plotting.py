@@ -487,6 +487,7 @@ def save_key_param_figures(save_dir, key_param_stats, key_param):
         table_save_path = os.path.join(this_save_dir, f'{param}_accuracy_table.csv')
         df.to_csv(table_save_path, index=False)
 
+        df["Accuracy mean (Accuracy ci)"] = df["accuracy mean"] + " (" + df["accuracy ci"] + ")"
         pivot_df = df.pivot(index=key_param, columns=param, values="Accuracy mean (Accuracy ci)")
         mean_values_df = pivot_df.applymap(lambda x: float(x.split(' ')[0]))
         plt.figure(figsize=(10, 8))
