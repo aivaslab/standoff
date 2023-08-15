@@ -531,7 +531,7 @@ def save_single_param_figures(save_dir, params, avg_loss, last_epoch_df):
 
         hist_data = [np.array(data) for data in hist_data]
 
-        plt.hist(hist_data, bins=np.arange(0, 1.01, 0.05), stacked=True, label=np.array(labels))
+        plt.hist(np.array(hist_data), bins=np.arange(0, 1.01, 0.05), stacked=True, label=np.array(labels))
 
         plt.title(f'Histogram of accuracy for last epoch for {param}')
         plt.xlabel('Accuracy')
