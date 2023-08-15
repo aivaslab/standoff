@@ -466,58 +466,59 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=Fals
                     }
                     # dict order is key_val > param > mean/std > param_val
 
-        for key_val in unique_vals[key_param]:
-            delta_preds = {}
+        if False:
+            for key_val in unique_vals[key_param]:
+                delta_preds = {}
 
-            print('calculating delta preds for key', key_val)
-            required_columns = [f'pred_{i}' for i in range(5)]
-            set_keys = ['first_swap_is_both', 'second_swap_to_first_loc', 'delay_2nd_bait', 'swaps']
-            perm_keys = ['p-b-0', 'p-b-1', 'p-s-0', 'p-s-1']
+                print('calculating delta preds for key', key_val)
+                required_columns = [f'pred_{i}' for i in range(5)]
+                set_keys = ['first_swap_is_both', 'second_swap_to_first_loc', 'delay_2nd_bait', 'swaps']
+                perm_keys = ['p-b-0', 'p-b-1', 'p-s-0', 'p-s-1']
 
-            subset = last_epoch_df[last_epoch_df[key_param] == key_val]
-            subset['pred'] = subset['pred'].apply(convert_to_numeric).astype(np.int8)
+                subset = last_epoch_df[last_epoch_df[key_param] == key_val]
+                subset['pred'] = subset['pred'].apply(convert_to_numeric).astype(np.int8)
 
-            subset = pd.concat([subset, pd.get_dummies(subset['pred'], prefix='pred')], axis=1)[required_columns + set_keys + ['informedness'] + perm_keys]
+                subset = pd.concat([subset, pd.get_dummies(subset['pred'], prefix='pred')], axis=1)[required_columns + set_keys + ['informedness'] + perm_keys]
 
-            for col in set_keys + ['informedness']:
-                print(f"{col} has {subset[col].nunique()} unique values.")
+                for col in set_keys + ['informedness']:
+                    print(f"{col} has {subset[col].nunique()} unique values.")
 
-            print('subsetting')
-            inf = subset[subset['informedness'] == 'eb-es-lb-ls'].groupby(set_keys + perm_keys + ['informedness'], observed=True).mean().reset_index()
-            noinf = subset[subset['informedness'] != 'eb-es-lb-ls'].groupby(set_keys + perm_keys + ['informedness'], observed=True).mean().reset_index()
-            print('length of subset after subset', len(inf), len(noinf), inf.columns)
+                print('subsetting')
+                inf = subset[subset['informedness'] == 'eb-es-lb-ls'].groupby(set_keys + perm_keys + ['informedness'], observed=True).mean().reset_index()
+                noinf = subset[subset['informedness'] != 'eb-es-lb-ls'].groupby(set_keys + perm_keys + ['informedness'], observed=True).mean().reset_index()
+                print('length of subset after subset', len(inf), len(noinf), inf.columns)
 
-            for col in set_keys + ['informedness']:
-                print(f"inf {col} has {noinf[col].nunique()} unique values.")
-                print(f"noinf {col} has {noinf[col].nunique()} unique values.")
+                for col in set_keys + ['informedness']:
+                    print(f"inf {col} has {noinf[col].nunique()} unique values.")
+                    print(f"noinf {col} has {noinf[col].nunique()} unique values.")
 
-            '''merged_df = pd.merge(
-                inf,
-                noinf,
-                on=set_keys,
-                suffixes=('_m', ''),
-                how='inner',
-            )'''
+                '''merged_df = pd.merge(
+                    inf,
+                    noinf,
+                    on=set_keys,
+                    suffixes=('_m', ''),
+                    how='inner',
+                )'''
 
-            print('doing custom merge')
-            merged_df = custom_merge(inf, noinf, perm_keys, set_keys)
-            print('length', len(merged_df))
+                print('doing custom merge')
+                merged_df = custom_merge(inf, noinf, perm_keys, set_keys)
+                print('length', len(merged_df))
 
-            print('diffing')
-            for i in range(5):
-                merged_df[f'pred_diff_{i}'] = abs(merged_df[f'pred_{i}_m'] - merged_df[f'pred_{i}'])
-            merged_df['total_pred_diff'] = merged_df[[f'pred_diff_{idx}' for idx in range(5)]].sum(axis=1)
+                print('diffing')
+                for i in range(5):
+                    merged_df[f'pred_diff_{i}'] = abs(merged_df[f'pred_{i}_m'] - merged_df[f'pred_{i}'])
+                merged_df['total_pred_diff'] = merged_df[[f'pred_diff_{idx}' for idx in range(5)]].sum(axis=1)
 
-            for key in merged_df['informedness'].unique():
-                delta_preds[key] = merged_df.loc[merged_df['informedness'] == key, 'total_pred_diff'].tolist()
+                for key in merged_df['informedness'].unique():
+                    delta_preds[key] = merged_df.loc[merged_df['informedness'] == key, 'total_pred_diff'].tolist()
 
-            delta_mean = {key: np.mean(val) for key, val in delta_preds.items()}
-            delta_std = {key: np.std(val) for key, val in delta_preds.items()}
-            df_summary[key_val] = pd.DataFrame({
-                'Informedness': list(delta_mean.keys()),
-                'Summary': [f"{delta_mean[key]} ({delta_std[key]})" for key in delta_mean.keys()]
-            })
-            print(df_summary[key_val])
+                delta_mean = {key: np.mean(val) for key, val in delta_preds.items()}
+                delta_std = {key: np.std(val) for key, val in delta_preds.items()}
+                df_summary[key_val] = pd.DataFrame({
+                    'Informedness': list(delta_mean.keys()),
+                    'Summary': [f"{delta_mean[key]} ({delta_std[key]})" for key in delta_mean.keys()]
+                })
+                print(df_summary[key_val])
 
     print('finished')
     return avg_loss, variances, ranges_1, ranges_2, range_dict, range_dict3, stats, key_param_stats, df_summary, delta_x
