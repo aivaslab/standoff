@@ -623,7 +623,7 @@ def find_df_paths(directory, file_pattern):
 def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, eval_sets=None,
                            load_path='supervised', oracle_labels=[], skip_train=True, batch_size=64,
                            prior_metrics=[], key_param=None, key_param_value=None, save_every=1, skip_calc=True,
-                           use_ff=False, oracle_layer=0, skip_eval=False, oracle_is_target=False):
+                           use_ff=False, oracle_layer=0, skip_eval=False, oracle_is_target=False, skip_figures=True):
     # labels = ['loc', 'exist', 'vision', 'b-loc', 'b-exist', 'target', 'correctSelection']
     params = ['visible_baits', 'swaps', 'visible_swaps', 'first_swap_is_both',
               'second_swap_to_first_loc', 'delay_2nd_bait', 'first_bait_size',
@@ -690,7 +690,8 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
                 write_metrics_to_file(os.path.join(save_path, 'metrics.txt'), last_epoch_df, ranges_1, params, stats,
                                       key_param=key_param)
 
-                save_figures(os.path.join(save_path, 'figs'), combined_df, avg_loss, ranges_2, range_dict, range_dict3,
+                if not skip_figures:
+                    save_figures(os.path.join(save_path, 'figs'), combined_df, avg_loss, ranges_2, range_dict, range_dict3,
                              params + prior_metrics, last_epoch_df, num=12)
 
                 test_names.append(model_name)
