@@ -184,7 +184,7 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
                     oracle_outputs = outputs[:, 5:]
 
                     losses = special_criterion(typical_outputs, torch.argmax(labels, dim=1))
-                    oracle_losses = oracle_criterion(oracle_outputs, oracles)
+                    oracle_losses = oracle_criterion(oracle_outputs, oracles).sum(dim=1)
 
                 pred = predicted.cpu()
                 small_food_selected = (pred == torch.argmax(metrics['loc'][:, :, 0], dim=1))
