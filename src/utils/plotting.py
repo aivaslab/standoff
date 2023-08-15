@@ -477,10 +477,10 @@ def save_key_param_figures(save_dir, key_param_stats, key_param):
         for key_val in key_param_stats.keys():
             for param_val in key_param_stats[key_val][param]['mean'].keys():
                 mean = key_param_stats[key_val][param]['mean'][param_val]
-                ci = key_param_stats[key_val][param]['ci'][param_val]
+                ci = key_param_stats[key_val][param]['std'][param_val]
                 df_list.append([key_val, param_val, f"{mean}", f"{ci}"])
 
-        df = pd.DataFrame(df_list, columns=[key_param, param, "accuracy mean", "accuracy ci"])
+        df = pd.DataFrame(df_list, columns=[key_param, param, "accuracy mean", "accuracy std"])
         if param == "informedness":
             df[param] = df[param].replace(reverse_mapping)
 
@@ -488,7 +488,7 @@ def save_key_param_figures(save_dir, key_param_stats, key_param):
         df.to_csv(table_save_path, index=False)
 
         df["Accuracy mean (Accuracy ci)"] = df["accuracy mean"] + " (" + df["accuracy ci"] + ")"
-        pivot_df = df.pivot(index=key_param, columns=param, values="Accuracy mean (Accuracy ci)")
+        pivot_df = df.pivot(index=key_param, columns=param, values="Accuracy mean (Accuracy std)")
         mean_values_df = pivot_df.applymap(lambda x: float(x.split(' ')[0]))
         plt.figure(figsize=(10, 8))
         ax = sns.heatmap(mean_values_df, annot=pivot_df, fmt='', cmap='coolwarm', linewidths=0.5, linecolor='white')
@@ -526,6 +526,8 @@ def save_single_param_figures(save_dir, params, avg_loss, last_epoch_df):
             value_df = last_epoch_df[last_epoch_df[param] == value]
             mean_acc = value_df.groupby('param')['accuracy'].mean()
             mean_acc.index = mean_acc.index.astype('category')
+            hist_data.append(mean_acc.values)
+            #labels.append(f'{param} = {value}')
             hist_data.extend(mean_acc.values)
             labels.extend([f'{param} = {value}'] * len(mean_acc.values))
 
