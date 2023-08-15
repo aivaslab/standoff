@@ -180,6 +180,7 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
                     outputs = model(inputs, None)
                     typical_outputs = outputs[:, :5]
                     _, predicted = torch.max(typical_outputs, 1)
+                    corrects = (predicted == torch.argmax(labels, dim=1))
                     oracle_outputs = outputs[:, 5:]
 
                     losses = special_criterion(typical_outputs, torch.argmax(labels, dim=1))
