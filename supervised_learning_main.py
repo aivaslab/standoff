@@ -176,6 +176,7 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
                     losses = special_criterion(outputs, torch.argmax(labels, dim=1))
                     _, predicted = torch.max(outputs, 1)
                     corrects = (predicted == torch.argmax(labels, dim=1))
+                    oracle_accuracy = 0.0
                 else:
                     outputs = model(inputs, None)
                     typical_outputs = outputs[:, :5]
@@ -185,6 +186,8 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
 
                     losses = special_criterion(typical_outputs, torch.argmax(labels, dim=1))
                     oracle_losses = oracle_criterion(oracle_outputs, oracles).sum(dim=1)
+                    binary_oracle_outputs = (oracle_outputs > 0.5).float()
+                    oracle_accuracy = (binary_oracle_outputs == oracles).all(dim=1).float()
 
                 pred = predicted.cpu()
                 small_food_selected = (pred == torch.argmax(metrics['loc'][:, :, 0], dim=1))
@@ -203,12 +206,13 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
                         'big_food_selected': big.item(),
                         'neither_food_selected': neither.item(),
                         **{x: v[k].numpy() if hasattr(v[k], 'numpy') else v[k] for x, v in metrics.items()},
+                        'o_acc': o_acc.item(),
                         ** ({'oracle_loss': oracle_loss.item()} if oracle_is_target else {})
 
                     }
-                    for k, (param, loss, correct, small, big, neither, _pred, oracle_loss) in enumerate(
+                    for k, (param, loss, correct, small, big, neither, _pred, o_acc, oracle_loss) in enumerate(
                         zip(params, losses, corrects, small_food_selected, big_food_selected, neither_food_selected,
-                            pred, (oracle_losses if oracle_is_target else [0]*len(pred))))]
+                            pred, oracle_accuracy, (oracle_losses if oracle_is_target else [0]*len(pred))))]
                 param_losses_list.extend(batch_param_losses)
 
     # save dfs periodically to free up ram:
