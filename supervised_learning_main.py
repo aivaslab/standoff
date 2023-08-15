@@ -399,13 +399,11 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=Fals
     variable_columns = last_epoch_df.select_dtypes(include=[np.number]).nunique().index[
         last_epoch_df.select_dtypes(include=[np.number]).nunique() > 1].tolist()
 
-    correlations = last_epoch_df[variable_columns + ['accuracy', 'o_acc']].corr()
+    correlations = last_epoch_df[variable_columns + ['accuracy']].corr()
     target_correlations = correlations['accuracy'][variable_columns]
-    target_correlations2 = correlations['o_acc'][variable_columns]
     stats = {
         'param_correlations': correlations,
         'accuracy_correlations': target_correlations,
-        'oracle_correlations': target_correlations,
         'vars': variable_columns
     }
 
