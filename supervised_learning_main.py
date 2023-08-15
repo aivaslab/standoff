@@ -395,11 +395,13 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=Fals
     variable_columns = last_epoch_df.select_dtypes(include=[np.number]).nunique().index[
         last_epoch_df.select_dtypes(include=[np.number]).nunique() > 1].tolist()
 
-    correlations = last_epoch_df[variable_columns + ['accuracy']].corr()
+    correlations = last_epoch_df[variable_columns + ['accuracy', 'o_acc']].corr()
     target_correlations = correlations['accuracy'][variable_columns]
+    target_correlations2 = correlations['o_acc'][variable_columns]
     stats = {
         'param_correlations': correlations,
         'accuracy_correlations': target_correlations,
+        'oracle_correlations': target_correlations,
         'vars': variable_columns
     }
 
@@ -444,32 +446,34 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=Fals
     delta_x = {}
     print('key param stats')
     key_param_stats = {}
+    oracle_key_param_stats = {}
     if key_param is not None:
         for param in params:
             if param != key_param:
                 # Initializing a nested dictionary for each unique key_param value
-                for key_val in unique_vals[key_param]:
-                    subset = last_epoch_df[last_epoch_df[key_param] == key_val]
-                    grouped = subset.groupby(param)['accuracy']
-                    means = grouped.mean()
-                    stds = grouped.std()
-                    counts = grouped.size()
-                    z_value = 1.96  # For a 95% CI
-                    standard_errors = z_value * np.sqrt(means * (1 - means) / counts)
+                for acc_type, save_dict in zip(['accuracy', 'o_acc'], [key_param_stats, oracle_key_param_stats]):
+                    for key_val in unique_vals[key_param]:
+                        subset = last_epoch_df[last_epoch_df[key_param] == key_val]
+                        grouped = subset.groupby(param)[acc_type]
+                        means = grouped.mean()
+                        stds = grouped.std()
+                        counts = grouped.size()
+                        z_value = 1.96  # For a 95% CI
+                        standard_errors = z_value * np.sqrt(means * (1 - means) / counts)
 
-                    Q1 = grouped.quantile(0.25)
-                    Q3 = grouped.quantile(0.75)
+                        Q1 = grouped.quantile(0.25)
+                        Q3 = grouped.quantile(0.75)
 
-                    if key_val not in key_param_stats:
-                        key_param_stats[key_val] = {}
-                    key_param_stats[key_val][param] = {
-                        'mean': means.to_dict(),
-                        'std': stds.to_dict(),
-                        'q1': Q1.to_dict(),
-                        'q3': Q3.to_dict(),
-                        'ci': standard_errors.to_dict(),
-                    }
-                    # dict order is key_val > param > mean/std > param_val
+                        if key_val not in save_dict:
+                            save_dict[key_val] = {}
+                        save_dict[key_val][param] = {
+                            'mean': means.to_dict(),
+                            'std': stds.to_dict(),
+                            'q1': Q1.to_dict(),
+                            'q3': Q3.to_dict(),
+                            'ci': standard_errors.to_dict(),
+                        }
+                        # dict order is key_val > param > mean/std > param_val
 
         if False:
             for key_val in unique_vals[key_param]:
@@ -526,11 +530,11 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=Fals
                 print(df_summary[key_val])
 
     print('finished')
-    return avg_loss, variances, ranges_1, ranges_2, range_dict, range_dict3, stats, key_param_stats, df_summary, delta_x
+    return avg_loss, variances, ranges_1, ranges_2, range_dict, range_dict3, stats, key_param_stats, oracle_key_param_stats, df_summary, delta_x
 
 
 def save_figures(path, df, avg_loss, ranges, range_dict, range_dict3, params, last_epoch_df, num=10,
-                 key_param_stats=None, key_param=None, delta_sum=None):
+                 key_param_stats=None,  oracle_stats=None, key_param=None, delta_sum=None):
     top_pairs = sorted(ranges.items(), key=lambda x: x[1], reverse=True)[:num]
     top_n_ranges = heapq.nlargest(num, range_dict, key=range_dict.get)
     top_n_ranges3 = heapq.nlargest(num, range_dict3, key=range_dict3.get)
@@ -539,7 +543,7 @@ def save_figures(path, df, avg_loss, ranges, range_dict, range_dict3, params, la
         save_delta_figure(path, delta_sum)
 
     if key_param_stats is not None:
-        save_key_param_figures(path, key_param_stats, key_param)
+        save_key_param_figures(path, key_param_stats, oracle_stats, key_param)
 
     save_double_param_figures(path, top_pairs, avg_loss, last_epoch_df)
     save_single_param_figures(path, params, avg_loss, last_epoch_df)
@@ -689,7 +693,7 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
                 combined_df['informedness'] = combined_df['informedness'].fillna('none')
                 last_epoch_df['informedness'] = last_epoch_df['informedness'].fillna('none')
 
-                avg_loss, variances, ranges_1, ranges_2, range_dict, range_dict3, stats, _, _, _ = calculate_statistics(
+                avg_loss, variances, ranges_1, ranges_2, range_dict, range_dict3, stats, _, _, _, _ = calculate_statistics(
                     combined_df, last_epoch_df, params + prior_metrics, skip_3x=True)
 
                 write_metrics_to_file(os.path.join(save_path, 'metrics.txt'), last_epoch_df, ranges_1, params, stats,

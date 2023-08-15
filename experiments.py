@@ -204,7 +204,7 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
         create_combined_histogram(last_epoch_df, combined_df, key_param, os.path.join('supervised', exp_name))
         # todo: add specific cell plots here
 
-        avg_loss, variances, ranges_1, ranges_2, range_dict, range_dict3, stats, key_param_stats, delta_sum, delta_x = calculate_statistics(
+        avg_loss, variances, ranges_1, ranges_2, range_dict, range_dict3, stats, key_param_stats, oracle_stats, delta_sum, delta_x = calculate_statistics(
             combined_df, last_epoch_df, list(set(params + prior_metrics + [key_param])),
             skip_3x=True, key_param=key_param)  # todo: make it definitely save one fixed param eg oracle
 
@@ -213,7 +213,7 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
         write_metrics_to_file(os.path.join(combined_path, 'metrics.txt'), last_epoch_df, ranges_1, params, stats,
                               key_param=key_param, d_s=delta_sum, d_x=delta_x)
         save_figures(os.path.join(combined_path, 'figs'), combined_df, avg_loss, ranges_2, range_dict, range_dict3,
-                     params, last_epoch_df, num=12, key_param_stats=key_param_stats, key_param=key_param, delta_sum=delta_sum)
+                     params, last_epoch_df, num=12, key_param_stats=key_param_stats, oracle_stats=oracle_stats, key_param=key_param, delta_sum=delta_sum)
 
     if 11 in todo:
         print('Running experiment 11: train oracle label ')
@@ -257,7 +257,7 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
         create_combined_histogram(last_epoch_df, combined_df, key_param, os.path.join('supervised', exp_name))
         # todo: add specific cell plots here
 
-        avg_loss, variances, ranges_1, ranges_2, range_dict, range_dict3, stats, key_param_stats, delta_sum, delta_x = calculate_statistics(
+        avg_loss, variances, ranges_1, ranges_2, range_dict, range_dict3, stats, key_param_stats, oracle_stats, delta_sum, delta_x = calculate_statistics(
             combined_df, last_epoch_df, list(set(params + prior_metrics + [key_param])),
             skip_3x=True, key_param=key_param)  # todo: make it definitely save one fixed param eg oracle
 
@@ -266,7 +266,7 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
         write_metrics_to_file(os.path.join(combined_path, 'metrics.txt'), last_epoch_df, ranges_1, params, stats,
                               key_param=key_param, d_s=delta_sum, d_x=delta_x)
         save_figures(os.path.join(combined_path, 'figs'), combined_df, avg_loss, ranges_2, range_dict, range_dict3,
-                     params, last_epoch_df, num=12, key_param_stats=key_param_stats, key_param=key_param, delta_sum=delta_sum)
+                     params, last_epoch_df, num=12, key_param_stats=key_param_stats,  oracle_stats=oracle_stats, key_param=key_param, delta_sum=delta_sum)
 
     if 2 in todo:
         save_every = max(1, epochs // desired_evals)
@@ -311,7 +311,7 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
         create_combined_histogram(last_epoch_df, combined_df, key_param, os.path.join('supervised', exp_name))
         # todo: add specific cell plots here
 
-        avg_loss, variances, ranges_1, ranges_2, range_dict, range_dict3, stats, key_param_stats, delta_sum, delta_x = calculate_statistics(
+        avg_loss, variances, ranges_1, ranges_2, range_dict, range_dict3, stats, key_param_stats, oracle_stats, delta_sum, delta_x = calculate_statistics(
             combined_df, last_epoch_df, list(set(params + prior_metrics + [key_param])), skip_3x=True,
             key_param=key_param)  # todo: make it definitely save one fixed param eg oracle
 
@@ -320,7 +320,7 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
         write_metrics_to_file(os.path.join(combined_path, 'metrics.txt'), last_epoch_df, ranges_1, params, stats, d_s=delta_sum, d_x=delta_x,
                               key_param=key_param)
         save_figures(os.path.join(combined_path, 'figs'), combined_df, avg_loss, ranges_2, range_dict, range_dict3,
-                     params, last_epoch_df, num=12, key_param_stats=key_param_stats, key_param=key_param, delta_sum=delta_sum)
+                     params, last_epoch_df, num=12, key_param_stats=key_param_stats,  oracle_stats=oracle_stats, key_param=key_param, delta_sum=delta_sum)
 
     # Experiment 7
     if 7 in todo:

@@ -401,7 +401,7 @@ def save_double_param_figures(save_dir, top_pairs, avg_loss, last_epoch_df):
         plt.savefig(os.path.join(os.getcwd(), os.path.join(this_save_dir, f'hist_{param1}{param2}.png')))
         plt.close()
 
-def save_key_param_figures(save_dir, key_param_stats, key_param):
+def save_key_param_figures(save_dir, key_param_stats, oracle_stats, key_param):
     this_save_dir = os.path.join(save_dir, 'key_param')
     os.makedirs(this_save_dir, exist_ok=True)
     print('saving key param figures')
@@ -474,18 +474,19 @@ def save_key_param_figures(save_dir, key_param_stats, key_param):
 
         df_list = []
 
-        for key_val in key_param_stats.keys():
-            for param_val in key_param_stats[key_val][param]['mean'].keys():
-                mean = key_param_stats[key_val][param]['mean'][param_val]
-                ci = key_param_stats[key_val][param]['std'][param_val]
-                df_list.append([key_val, param_val, f"{mean}", f"{ci}"])
+        for stat_dict, label in zip([key_param_stats, oracle_stats], ['accuracy', 'o_acc']):
+            for key_val in stat_dict.keys():
+                for param_val in stat_dict[key_val][param]['mean'].keys():
+                    mean = stat_dict[key_val][param]['mean'][param_val]
+                    ci = stat_dict[key_val][param]['std'][param_val]
+                    df_list.append([key_val, param_val, f"{mean}", f"{ci}"])
 
-        df = pd.DataFrame(df_list, columns=[key_param, param, "accuracy mean", "accuracy std"])
-        if param == "informedness":
-            df[param] = df[param].replace(reverse_mapping)
+            df = pd.DataFrame(df_list, columns=[key_param, param, "accuracy mean", "accuracy std"])
+            if param == "informedness":
+                df[param] = df[param].replace(reverse_mapping)
 
-        table_save_path = os.path.join(this_save_dir, f'{param}_accuracy_table.csv')
-        df.to_csv(table_save_path, index=False)
+            table_save_path = os.path.join(this_save_dir, f'{param}_{label}_table.csv')
+            df.to_csv(table_save_path, index=False)
 
         df["Accuracy mean (Accuracy ci)"] = df["accuracy mean"] + " (" + df["accuracy ci"] + ")"
         pivot_df = df.pivot(index=key_param, columns=param, values="Accuracy mean (Accuracy std)")
