@@ -529,7 +529,8 @@ def save_single_param_figures(save_dir, params, avg_loss, last_epoch_df):
             hist_data.append(mean_acc)
             labels.append(f'{param} = {value}')
 
-
+        for data in hist_data:
+            print(len(data))
         hist_data = [np.array(data) for data in hist_data]
 
         plt.hist(hist_data, bins=np.arange(0, 1.01, 0.05), stacked=True, label=labels)
