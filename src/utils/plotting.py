@@ -465,9 +465,9 @@ def save_key_param_figures(save_dir, key_param_stats, key_param):
             for param_val in key_param_stats[key_val][param]['mean'].keys():
                 mean = key_param_stats[key_val][param]['mean'][param_val]
                 ci = key_param_stats[key_val][param]['ci'][param_val]
-                df_list.append([key_val, param_val, f"{mean} ({ci})"])
+                df_list.append([key_val, param_val, f"{mean}", f"{ci}"])
 
-        df = pd.DataFrame(df_list, columns=[key_param, param, "Accuracy mean (Accuracy std)"])
+        df = pd.DataFrame(df_list, columns=[key_param, param, "accuracy mean", "accuracy std"])
 
         table_save_path = os.path.join(this_save_dir, f'{param}_accuracy_table.csv')
         df.to_csv(table_save_path, index=False)
