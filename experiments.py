@@ -174,7 +174,7 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
         key_param = 'regime'
         exp_name = 'exp_1rd' if not use_ff else 'exp_1rd-f'
 
-        for regime in regimes.keys()[1:]:
+        for regime in list(regimes.keys())[1:]:
             print('regime:', regime)
             combined_paths, last_epoch_paths = run_supervised_session(
                 save_path=os.path.join('supervised', exp_name, regime),
