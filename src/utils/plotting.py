@@ -388,7 +388,8 @@ def save_double_param_figures(save_dir, top_pairs, avg_loss, last_epoch_df):
             for value2 in unique_values2:
                 value_df = last_epoch_df[(last_epoch_df[param2] == value2) & (last_epoch_df[param1] == value1)]
                 mean_acc = value_df.groupby('param')['accuracy'].mean()
-                hist_data.append(pd.Categorical(mean_acc))
+                mean_acc.index = mean_acc.index.astype('category')
+                hist_data.append(mean_acc)
                 labels.append(f'{param2} = {value2}, {param1} = {value1}')
         hist_data = [np.array(data) for data in hist_data]
         plt.hist(hist_data, bins=np.arange(0, 1.01, 0.05), stacked=True, label=labels, alpha=0.5)
@@ -508,7 +509,8 @@ def save_single_param_figures(save_dir, params, avg_loss, last_epoch_df):
         for value in unique_values:
             value_df = last_epoch_df[last_epoch_df[param] == value]
             mean_acc = value_df.groupby('param')['accuracy'].mean()
-            hist_data.append(pd.Categorical(mean_acc))
+            mean_acc.index = mean_acc.index.astype('category')
+            hist_data.append(mean_acc)
             labels.append(f'{param} = {value}')
 
 
@@ -556,7 +558,8 @@ def save_fixed_double_param_figures(save_dir, top_n_ranges, df, avg_loss, last_e
         for value2 in unique_values:
             value_df = last_epoch_df[(last_epoch_df[param2] == value2) & (last_epoch_df[param1] == value1)]
             mean_acc = value_df.groupby('param')['accuracy'].mean()
-            hist_data.append(pd.Categorical(mean_acc))
+            mean_acc.index = mean_acc.index.astype('category')
+            hist_data.append(mean_acc)
             labels.append(f'{param2} = {value2}')
         hist_data = [np.array(data) for data in hist_data]
         plt.hist(hist_data, bins=np.arange(0, 1.01, 0.05), stacked=True, label=labels, alpha=0.5)
@@ -602,7 +605,8 @@ def save_fixed_triple_param_figures(save_dir, top_n_ranges, df, avg_loss, last_e
         for value3 in unique_values:
             value_df = last_epoch_df[(last_epoch_df[param2] == value2) & (last_epoch_df[param1] == value1) & (last_epoch_df[param3] == value3)]
             mean_acc = value_df.groupby('param')['accuracy'].mean()
-            hist_data.append(pd.Categorical(mean_acc))
+            mean_acc.index = mean_acc.index.astype('category')
+            hist_data.append(mean_acc)
             labels.append(f'{param3} = {value3}')
         hist_data = [np.array(data) for data in hist_data]
         plt.hist(hist_data, bins=np.arange(0, 1.01, 0.05), stacked=True, label=labels, alpha=0.5)
@@ -654,7 +658,8 @@ def create_combined_histogram(df, combined_avg, param, folder):
     for value in df[param].unique():
         value_df = df[df[param] == value]
         mean_acc = value_df.groupby('param')['accuracy'].mean()
-        hist_data.append(pd.Categorical(mean_acc))
+        mean_acc.index = mean_acc.index.astype('category')
+        hist_data.append(mean_acc)
         labels.append(f'{param} = {value}')
 
 
