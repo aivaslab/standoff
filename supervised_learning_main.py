@@ -186,7 +186,7 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
                     losses = special_criterion(typical_outputs, torch.argmax(labels, dim=1))
                     oracle_losses = oracle_criterion(oracle_outputs, oracles).sum(dim=1)
                     binary_oracle_outputs = (oracle_outputs > 0.5).float()
-                    oracle_accuracy = (binary_oracle_outputs == oracles).all(dim=1).float().sum() / 10
+                    oracle_accuracy = ((binary_oracle_outputs == oracles).float().sum(dim=1) / 10).float()
 
                 corrects = (predicted == torch.argmax(labels, dim=1))
                 pred = predicted.cpu()
