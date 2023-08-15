@@ -526,11 +526,9 @@ def save_single_param_figures(save_dir, params, avg_loss, last_epoch_df):
             value_df = last_epoch_df[last_epoch_df[param] == value]
             mean_acc = value_df.groupby('param')['accuracy'].mean()
             mean_acc.index = mean_acc.index.astype('category')
-            hist_data.append(mean_acc)
+            hist_data.append(mean_acc.values)
             labels.append(f'{param} = {value}')
 
-        for data in hist_data:
-            print(len(data))
         hist_data = [np.array(data) for data in hist_data]
 
         plt.hist(hist_data, bins=np.arange(0, 1.01, 0.05), stacked=True, label=labels)
