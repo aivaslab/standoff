@@ -164,6 +164,8 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
             else:
                 handle = model.rnn.register_forward_hook(hook)
 
+            tq = tqdm.trange(len(_val_loader))
+
             for i, (inputs, labels, params, oracles, metrics) in enumerate(_val_loader):
                 inputs, labels, oracles = inputs.to(device), labels.to(device), oracles.to(device)
                 if i < num_activation_batches:
@@ -194,13 +196,15 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
                 big_food_selected = (pred == torch.argmax(metrics['loc'][:, :, 1], dim=1))
                 neither_food_selected = ~(small_food_selected | big_food_selected)
 
+                tq.update(1)
+
                 batch_param_losses = [
                     {
                         'param': param,
                         **decode_event_name(param),
                         'epoch': epoch_number,
                         'pred': _pred.item(),
-                        'o_pred': o_pred.item(),
+                        'o_pred': o_pred.tolist(),
                         'loss': loss.item(),
                         'accuracy': correct.item(),
                         'small_food_selected': small.item(),
@@ -659,7 +663,7 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
                                 oracle_labels=oracle_labels, repetition=repetition,
                                 use_ff=use_ff, oracle_is_target=oracle_is_target)
                 if not skip_eval:
-                    for epoch in tqdm.tqdm(range(epochs)):
+                    for epoch in range(epochs):
                         if epoch % save_every == save_every - 1 or epoch == epochs - 1:
                             df_paths = evaluate_model(eval_sets, 'correctSelection', load_path=load_path,
                                                       model_save_path=save_path,
