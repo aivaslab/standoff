@@ -175,20 +175,20 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
                     outputs = model(inputs, oracles)
                     losses = special_criterion(outputs, torch.argmax(labels, dim=1))
                     _, predicted = torch.max(outputs, 1)
-                    corrects = (predicted == torch.argmax(labels, dim=1))
-                    oracle_accuracy = 0.0
+                    oracle_accuracy = torch.zeros(labels.size(0), device=device)
+                    oracle_outputs = torch.zeros((labels.size(0), 10), device=device)
                 else:
                     outputs = model(inputs, None)
                     typical_outputs = outputs[:, :5]
                     _, predicted = torch.max(typical_outputs, 1)
-                    corrects = (predicted == torch.argmax(labels, dim=1))
                     oracle_outputs = outputs[:, 5:]
 
                     losses = special_criterion(typical_outputs, torch.argmax(labels, dim=1))
                     oracle_losses = oracle_criterion(oracle_outputs, oracles).sum(dim=1)
                     binary_oracle_outputs = (oracle_outputs > 0.5).float()
-                    oracle_accuracy = (binary_oracle_outputs == oracles).all(dim=1).float()
+                    oracle_accuracy = (binary_oracle_outputs == oracles).all(dim=1).float().sum() / 10
 
+                corrects = (predicted == torch.argmax(labels, dim=1))
                 pred = predicted.cpu()
                 small_food_selected = (pred == torch.argmax(metrics['loc'][:, :, 0], dim=1))
                 big_food_selected = (pred == torch.argmax(metrics['loc'][:, :, 1], dim=1))
@@ -200,6 +200,7 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
                         **decode_event_name(param),
                         'epoch': epoch_number,
                         'pred': _pred.item(),
+                        'o_pred': o_pred.item(),
                         'loss': loss.item(),
                         'accuracy': correct.item(),
                         'small_food_selected': small.item(),
@@ -210,9 +211,9 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
                         ** ({'oracle_loss': oracle_loss.item()} if oracle_is_target else {})
 
                     }
-                    for k, (param, loss, correct, small, big, neither, _pred, o_acc, oracle_loss) in enumerate(
+                    for k, (param, loss, correct, small, big, neither, _pred, o_pred, o_acc, oracle_loss) in enumerate(
                         zip(params, losses, corrects, small_food_selected, big_food_selected, neither_food_selected,
-                            pred, oracle_accuracy, (oracle_losses if oracle_is_target else [0]*len(pred))))]
+                            pred, oracle_outputs, oracle_accuracy, (oracle_losses if oracle_is_target else [0]*len(pred))))]
                 param_losses_list.extend(batch_param_losses)
 
     # save dfs periodically to free up ram:
