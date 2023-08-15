@@ -408,6 +408,19 @@ def save_key_param_figures(save_dir, key_param_stats, key_param):
 
     n_groups = len(list(key_param_stats.keys()))
 
+    sub_regime_mapping = {
+        'noInfo': '',
+        'bigExist': 'eb',
+        'smallExist': 'es',
+        'bothExist': 'eb-es',
+        'bigExistBigLoc': 'eb-lb',
+        'smallExistSmallLoc': 'es-ls',
+        'bothExistBigLoc': 'eb-es-lb',
+        'bothExistSmallLoc': 'eb-es-ls',
+        'bothExistBothLoc': 'eb-es-lb-ls'
+    }
+    reverse_mapping = {v: k for k, v in sub_regime_mapping.items()}
+
     for param in list(next(iter(key_param_stats.values())).keys()):
 
         labels = list(key_param_stats.keys())
@@ -468,6 +481,8 @@ def save_key_param_figures(save_dir, key_param_stats, key_param):
                 df_list.append([key_val, param_val, f"{mean}", f"{ci}"])
 
         df = pd.DataFrame(df_list, columns=[key_param, param, "accuracy mean", "accuracy ci"])
+        if param == "informedness":
+            df[param] = df[param].replace(reverse_mapping)
 
         table_save_path = os.path.join(this_save_dir, f'{param}_accuracy_table.csv')
         df.to_csv(table_save_path, index=False)
