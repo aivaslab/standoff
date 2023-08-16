@@ -488,14 +488,15 @@ def save_key_param_figures(save_dir, key_param_stats, oracle_stats, key_param):
             table_save_path = os.path.join(this_save_dir, f'{param}_{label}_table.csv')
             df.to_csv(table_save_path, index=False)
 
-        df["Accuracy mean (Accuracy ci)"] = df["accuracy mean"] + " (" + df["accuracy ci"] + ")"
-        pivot_df = df.pivot(index=key_param, columns=param, values="Accuracy mean (Accuracy std)")
-        mean_values_df = pivot_df.applymap(lambda x: float(x.split(' ')[0]))
-        plt.figure(figsize=(10, 8))
-        ax = sns.heatmap(mean_values_df, annot=pivot_df, fmt='', cmap='coolwarm', linewidths=0.5, linecolor='white')
-        plt.title(f"Heatmap of {param} based on {key_param}")
-        plot_save_path = os.path.join(this_save_dir, f'{param}_heatmap.png')
-        plt.savefig(plot_save_path)
+        if False:
+            df["Accuracy mean (Accuracy std)"] = df["accuracy mean"] + " (" + df["accuracy std"] + ")"
+            pivot_df = df.pivot(index=key_param, columns=param, values="Accuracy mean (Accuracy std)")
+            mean_values_df = pivot_df.applymap(lambda x: float(x.split(' ')[0]))
+            plt.figure(figsize=(10, 8))
+            ax = sns.heatmap(mean_values_df, annot=pivot_df, fmt='', cmap='coolwarm', linewidths=0.5, linecolor='white')
+            plt.title(f"Heatmap of {param} based on {key_param}")
+            plot_save_path = os.path.join(this_save_dir, f'{param}_heatmap.png')
+            plt.savefig(plot_save_path)
 
 def save_single_param_figures(save_dir, params, avg_loss, last_epoch_df):
     this_save_dir = os.path.join(save_dir, 'singleparams')
