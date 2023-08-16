@@ -174,7 +174,7 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
         key_param = 'regime'
         exp_name = 'exp_1rd' if not use_ff else 'exp_1rd-f'
 
-        for regime in list(regimes.keys())[1:]:
+        for regime in list(regimes.keys())[-1:]:
             print('regime:', regime)
             combined_paths, last_epoch_paths = run_supervised_session(
                 save_path=os.path.join('supervised', exp_name, regime),
@@ -224,7 +224,7 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
         last_path_list = []
         key_param = 'regime'
         oracle = 'b-loc'
-        exp_name = 'exp_11rd' if not use_ff else 'exp_11rd-f'
+        exp_name = 'exp_3rd' if not use_ff else 'exp_3rd-f'
 
         for regime in regimes.keys():
             print('regime:', regime, 'oracle:', oracle)
@@ -378,4 +378,4 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
 
 
 if __name__ == '__main__':
-    experiments([1], repetitions=3, epochs=50, skip_train=False, skip_eval=False, skip_calc=False, batch_size=256, desired_evals=1, use_ff=False)
+    experiments([1], repetitions=3, epochs=50, skip_train=True, skip_eval=True, skip_calc=True, batch_size=256, desired_evals=1, use_ff=False)

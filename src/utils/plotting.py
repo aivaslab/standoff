@@ -18,6 +18,7 @@ def moving_average(values, window):
     weights = np.repeat(1.0, window) / window
     return np.convolve(values, weights, 'valid')
 
+
 def plot_results(log_folder, title='Learning Curve'):
     """
     plot the results
@@ -215,7 +216,7 @@ def plot_train_curriculum(start_paths, train_paths, window=1000, path=None):
                         realcol = 'index_col'
                     else:
                         realcol = col
-                    #df['index_col'] = df.index + max_episode  # shift the episode numbers
+                    # df['index_col'] = df.index + max_episode  # shift the episode numbers
                     df['yrolling'] = df['r'].rolling(window=window).mean()
                     plt.scatter(df.index, df.r, marker='.', alpha=0.05, s=0.1, label=os.path.basename(log_folder))
                     plt.plot(df[realcol], df.yrolling, label=os.path.basename(log_folder))
@@ -223,7 +224,6 @@ def plot_train_curriculum(start_paths, train_paths, window=1000, path=None):
 
         # we want the last 1000 datapoints in df to be in df_start:
         df_start = df.iloc[-1000:]
-
 
     for log_folder in train_paths:
         monitor_files = get_monitor_files(log_folder)
@@ -241,9 +241,11 @@ def plot_train_curriculum(start_paths, train_paths, window=1000, path=None):
                         realcol = 'index_col'
                     else:
                         realcol = col
-                    plt.scatter(df.index  + max_episode, df.r, marker='.', alpha=0.05, s=0.1, label=os.path.basename(log_folder))
-                    df_combined['yrolling'] = df_combined['r'].rolling(window=window).mean()#.iloc[1000:]
-                    plt.plot(df_combined[realcol] + max_episode, df_combined.yrolling, label=os.path.basename(log_folder))
+                    plt.scatter(df.index + max_episode, df.r, marker='.', alpha=0.05, s=0.1,
+                                label=os.path.basename(log_folder))
+                    df_combined['yrolling'] = df_combined['r'].rolling(window=window).mean()  # .iloc[1000:]
+                    plt.plot(df_combined[realcol] + max_episode, df_combined.yrolling,
+                             label=os.path.basename(log_folder))
 
     plt.axvline(x=max_episode, color='k', linestyle='--')
 
@@ -331,6 +333,7 @@ def plot_tsne(data, labels, index, color):
     # for i, name in enumerate(labels[index[0]:index[1]]):
     #    plt.annotate(name, (data[i + index[0], 0], data[i + index[0], 1]), textcoords="offset points", xytext=(-10, 5), ha='center')
 
+
 def save_delta_figure(dir, df_summary):
     df_list = []
     for key_val, sub_df in df_summary.items():
@@ -350,6 +353,8 @@ def save_delta_figure(dir, df_summary):
 
     plot_save_path = os.path.join(dir, 'delta_heatmap.png')
     plt.savefig(plot_save_path)
+
+
 def save_double_param_figures(save_dir, top_pairs, avg_loss, last_epoch_df):
     this_save_dir = os.path.join(save_dir, 'doubleparams')
     os.makedirs(this_save_dir, exist_ok=True)
@@ -363,14 +368,15 @@ def save_double_param_figures(save_dir, top_pairs, avg_loss, last_epoch_df):
             for value2 in unique_values2:
                 sub_df = avg_loss[(param1, param2)][
                     (avg_loss[(param1, param2)][param1] == value1) & (
-                                avg_loss[(param1, param2)][param2] == value2)]
+                            avg_loss[(param1, param2)][param2] == value2)]
 
-                str1 = f'{param1} = {value1}' if not isinstance(value1, str) or value1[0:3] != "N/A" or value1[0:3] != "na" else value1
-                str2 = f'{param2} = {value2}' if not isinstance(value2, str) or value2[0:3] != "N/A" or value1[0:2] != "na" else value2
+                str1 = f'{param1} = {value1}' if not isinstance(value1, str) or value1[0:3] != "N/A" or value1[
+                                                                                                        0:3] != "na" else value1
+                str2 = f'{param2} = {value2}' if not isinstance(value2, str) or value2[0:3] != "N/A" or value1[
+                                                                                                        0:2] != "na" else value2
                 plt.plot(sub_df['epoch'], sub_df['mean'],
                          label=f'{str1}, {str2}')
                 plt.fill_between(sub_df['epoch'], sub_df['lower'], sub_df['upper'], alpha=0.2)
-
 
         plt.title(f'Average accuracy vs Epoch for {param1} and {param2}')
         plt.xlabel('Epoch')
@@ -400,6 +406,7 @@ def save_double_param_figures(save_dir, top_pairs, avg_loss, last_epoch_df):
         plt.legend(loc='upper left')
         plt.savefig(os.path.join(os.getcwd(), os.path.join(this_save_dir, f'hist_{param1}{param2}.png')))
         plt.close()
+
 
 def save_key_param_figures(save_dir, key_param_stats, oracle_stats, key_param):
     this_save_dir = os.path.join(save_dir, 'key_param')
@@ -433,7 +440,8 @@ def save_key_param_figures(save_dir, key_param_stats, oracle_stats, key_param):
         for idx, (param_val, color) in enumerate(zip(param_vals, plt.cm.tab10.colors)):
             means = [key_param_stats[key_val][param]['mean'][param_val] for key_val in labels]
             cis = [key_param_stats[key_val][param]['ci'][param_val] for key_val in labels]
-            ax.bar(index + idx * bar_width, means, bar_width, label=param_val, yerr=cis, alpha=0.8, capsize=5, color=color)
+            ax.bar(index + idx * bar_width, means, bar_width, label=param_val, yerr=cis, alpha=0.8, capsize=5,
+                   color=color)
 
         ax.set_xlabel(key_param)
         ax.set_ylabel('Accuracy')
@@ -472,9 +480,8 @@ def save_key_param_figures(save_dir, key_param_stats, oracle_stats, key_param):
         file_path = os.path.join(os.getcwd(), this_save_dir, f'reversed_key_{param}.png')
         plt.savefig(file_path)
 
-        df_list = []
-
         for stat_dict, label in zip([key_param_stats, oracle_stats], ['accuracy', 'o_acc']):
+            df_list = []
             for key_val in stat_dict.keys():
                 for param_val in stat_dict[key_val][param]['mean'].keys():
                     mean = stat_dict[key_val][param]['mean'][param_val]
@@ -498,6 +505,7 @@ def save_key_param_figures(save_dir, key_param_stats, oracle_stats, key_param):
             plot_save_path = os.path.join(this_save_dir, f'{param}_heatmap.png')
             plt.savefig(plot_save_path)
 
+
 def save_single_param_figures(save_dir, params, avg_loss, last_epoch_df):
     this_save_dir = os.path.join(save_dir, 'singleparams')
     os.makedirs(this_save_dir, exist_ok=True)
@@ -509,7 +517,9 @@ def save_single_param_figures(save_dir, params, avg_loss, last_epoch_df):
         for value in unique_values:
             sub_df = avg_loss[param][avg_loss[param][param] == value]
 
-            plt.plot(sub_df['epoch'], sub_df['mean'], label=f'{param} = {value}' if not isinstance(value, str) or value[0:3] != "N/A" or value[0:2] != "na" else value)
+            plt.plot(sub_df['epoch'], sub_df['mean'],
+                     label=f'{param} = {value}' if not isinstance(value, str) or value[0:3] != "N/A" or value[
+                                                                                                        0:2] != "na" else value)
             plt.fill_between(sub_df['epoch'], sub_df['lower'], sub_df['upper'], alpha=0.2)
         plt.title(f'Average accuracy vs Epoch for {param}')
         plt.xlabel('Epoch')
@@ -529,7 +539,7 @@ def save_single_param_figures(save_dir, params, avg_loss, last_epoch_df):
             mean_acc = value_df.groupby('param')['accuracy'].mean()
             mean_acc.index = mean_acc.index.astype('category')
             hist_data.append(mean_acc.values)
-            #labels.append(f'{param} = {value}')
+            # labels.append(f'{param} = {value}')
             hist_data.extend(mean_acc.values)
             labels.extend([f'{param} = {value}'] * len(mean_acc.values))
 
@@ -557,9 +567,11 @@ def save_fixed_double_param_figures(save_dir, top_n_ranges, df, avg_loss, last_e
         if len(unique_values) > 12:
             continue
         for value2 in unique_values:
-            sub_df = avg_loss[(param1, param2)][(avg_loss[(param1, param2)][param2] == value2) & (avg_loss[(param1, param2)][param1] == value1)]
+            sub_df = avg_loss[(param1, param2)][
+                (avg_loss[(param1, param2)][param2] == value2) & (avg_loss[(param1, param2)][param1] == value1)]
             plt.plot(sub_df['epoch'], sub_df['mean'],
-                     label=f'{param2} = {value2}' if not isinstance(value2, str) or value2[0:3] != "N/A" or value2[0:2] != "na" else value2)
+                     label=f'{param2} = {value2}' if not isinstance(value2, str) or value2[0:3] != "N/A" or value2[
+                                                                                                            0:2] != "na" else value2)
             plt.fill_between(sub_df['epoch'], sub_df['lower'], sub_df['upper'], alpha=0.2)
         plt.title(f'Average accuracy vs Epoch for {param2} given {param1} = {value1}')
         plt.xlabel('Epoch')
@@ -622,7 +634,8 @@ def save_fixed_triple_param_figures(save_dir, top_n_ranges, df, avg_loss, last_e
         hist_data = []
         labels = []
         for value3 in unique_values:
-            value_df = last_epoch_df[(last_epoch_df[param2] == value2) & (last_epoch_df[param1] == value1) & (last_epoch_df[param3] == value3)]
+            value_df = last_epoch_df[(last_epoch_df[param2] == value2) & (last_epoch_df[param1] == value1) & (
+                        last_epoch_df[param3] == value3)]
             mean_acc = value_df.groupby('param')['accuracy'].mean()
             mean_acc.index = mean_acc.index.astype('category')
             hist_data.append(mean_acc)
@@ -659,8 +672,9 @@ def create_combined_histogram(df, combined_avg, param, folder):
         mean_acc_per_epoch = value_df.groupby('epoch')['accuracy'].mean()
 
         plt.plot(mean_acc_per_epoch.index, mean_acc_per_epoch.values,
-                 label=f'{param} = {value}' if not isinstance(value, str) or value[0:3] != "N/A" or value[0:2] != "na" else value)
-        #plt.fill_between(sub_df['epoch'], sub_df['lower'], sub_df['upper'], alpha=0.2)
+                 label=f'{param} = {value}' if not isinstance(value, str) or value[0:3] != "N/A" or value[
+                                                                                                    0:2] != "na" else value)
+        # plt.fill_between(sub_df['epoch'], sub_df['lower'], sub_df['upper'], alpha=0.2)
     plt.title(f'Average accuracy vs Epoch for {param}')
     plt.xlabel('Epoch')
     plt.ylabel('Average accuracy')
@@ -681,8 +695,7 @@ def create_combined_histogram(df, combined_avg, param, folder):
         hist_data.append(mean_acc)
         labels.append(f'{param} = {value}')
 
-
-    #hist_data = np.asarray(hist_data, dtype=object)
+    # hist_data = np.asarray(hist_data, dtype=object)
     plt.hist(hist_data, bins=np.arange(0, 1.01, 0.05), stacked=True, label=labels, alpha=0.5)
 
     plt.title(f'Histogram of accuracy for last epoch for {param}')
