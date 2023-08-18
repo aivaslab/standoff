@@ -45,6 +45,7 @@ def run_hparam_search(trials=64, repetitions=3, log_file='hparam_search_log.txt'
     while True:
 
         try:
+            # produce a random set of kwargs, from our base set above
             model_kwargs = {x: random.choice(model_kwargs_base[x]) for x in model_kwargs_base.keys()}
             print('kwargs', model_kwargs)
             cumulative_val = 0.0

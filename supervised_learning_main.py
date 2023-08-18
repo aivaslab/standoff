@@ -375,6 +375,9 @@ def custom_merge(df1, df2, cols_to_check, other_cols):
     return df1[final_condition]
 
 def calculate_statistics(df, last_epoch_df, params, skip_3x=False, skip_2x1=False, key_param=None, skip_1x=False):
+    '''
+    Calculates various statistics from datasets of model outputs detailing model performance.
+    '''
     avg_loss = {}
     variances = {}
     ranges_1 = {}
@@ -554,6 +557,9 @@ def save_figures(path, df, avg_loss, ranges, range_dict, range_dict3, params, la
 
 
 def write_metrics_to_file(filepath, df, ranges, params, stats, key_param=None, d_s=None, d_x=None):
+    '''
+    Produces a file showing several interesting metrics from the session(s)
+    '''
     df2 = df[df['epoch'] == df['epoch'].max()]
     with open(filepath, 'w') as f:
         mean_accuracy = df2['accuracy'].mean()
@@ -635,7 +641,11 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
                            load_path='supervised', oracle_labels=[], skip_train=True, batch_size=64,
                            prior_metrics=[], key_param=None, key_param_value=None, save_every=1, skip_calc=True,
                            use_ff=False, oracle_layer=0, skip_eval=False, oracle_is_target=False, skip_figures=True):
-    # labels = ['loc', 'exist', 'vision', 'b-loc', 'b-exist', 'target', 'correctSelection']
+
+    '''
+    Runs a session of supervised learning. Different steps, such as whether we train+save models, evaluate models, or run statistics on evaluations, are optional.
+
+    '''
     params = ['visible_baits', 'swaps', 'visible_swaps', 'first_swap_is_both',
               'second_swap_to_first_loc', 'delay_2nd_bait', 'first_bait_size',
               'uninformed_bait', 'uninformed_swap', 'first_swap']

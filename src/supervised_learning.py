@@ -30,6 +30,11 @@ def one_hot(size, data):
 
 
 def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_extra_data=False, prior_metrics=[], conf=None):
+    '''
+    For all relevant variants, iterates through all possible permutations of environment reset configs and simulates
+    up until the release event.
+    Records and saves observations, as well as data including labels and metrics.
+    '''
     # labels = ['loc', 'exist', 'vision', 'b-loc', 'b-exist', 'target']
     posterior_metrics = ['selection', 'selectedBig', 'selectedSmall', 'selectedNeither',
                          'selectedPrevBig', 'selectedPrevSmall', 'selectedPrevNeither',
