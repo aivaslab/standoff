@@ -71,7 +71,7 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
         # "view_type": 1,
     }
 
-    frames = 9
+    frames = 5
     all_path_infos = pd.DataFrame()
     suffix = pref_type + role_type
 
@@ -141,6 +141,7 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
                 env.deterministic = True
                 print('total_groups', total_groups)
                 check_labels = [x for x in all_labels if x not in posterior_metrics and x not in extra_labels and x not in onehot_labels]
+
 
                 while True:
                     env.deterministic_seed = env.current_param_group_pos
@@ -432,6 +433,7 @@ class RNNModel(nn.Module):
                        'lr': lr, 'batch_size': batch_size, 'oracle_is_target': oracle_is_target}
 
         input_size = 7
+        self.input_frames = 4
 
         self.oracle_layer = oracle_layer
         self.oracle_is_target = oracle_is_target
@@ -471,7 +473,7 @@ class RNNModel(nn.Module):
 
     def forward(self, x, oracle_inputs):
         conv_outputs = []
-        for t in range(9):
+        for t in range(self.input_frames):
             x_t = x[:, t, :, :, :]
 
             x_t = self.pool(F.relu(self.conv1(x_t))) if self.use_pool else F.relu(self.conv1(x_t))

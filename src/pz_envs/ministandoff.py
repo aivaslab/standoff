@@ -331,7 +331,8 @@ class MiniStandoffEnv(para_MultiGridEnv):
         for k, event in enumerate(events):
             self.add_timer(event, curTime, arg=event_args[k])
             if event[0] not in ['b', 'sw']:
-                curTime += 1
+                #curTime += 1 # obscure/reveal events no longer take time
+                pass
             else:
                 curTime += delays[delay_position]
                 delay_position += 1
