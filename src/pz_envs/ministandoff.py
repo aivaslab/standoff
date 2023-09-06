@@ -290,6 +290,8 @@ class MiniStandoffEnv(para_MultiGridEnv):
                             self.infos['p_0'][f'p-b-{baits_so_far}'] = event[x]
                         elif event_type == "sw":
                             self.infos['p_0'][f'p-s-{swaps_so_far}'] = event[x]
+                            if event[x] == 5:
+                                print('5 found e', event)
 
                         # if we are swapping to an empty bucket, and the prev bucket was not empty, make it empty
                         if event[0] == 'sw' and x == 2:
@@ -297,7 +299,6 @@ class MiniStandoffEnv(para_MultiGridEnv):
                                 empty_buckets.append(event[1])
 
                     elif event[x] == "else":
-                        print('else foyund')
                         available_spots = [i for i in range(boxes) if i != event[x - 1]]
                         event[x] = available_spots.pop(random.randrange(
                             len(available_spots)) if not self.deterministic else instantiated_perms[k])
@@ -307,14 +308,13 @@ class MiniStandoffEnv(para_MultiGridEnv):
                             empty_buckets.append(event[1])
                             empty_buckets.remove(event[2])
                     elif isinstance(event[x], int):
-                        if x == 2:
-                            if event_type == "b":
-                                self.infos['p_0'][f'p-b-{baits_so_far}'] = event[x]
-                            elif event_type == "sw":
-                                self.infos['p_0'][f'p-s-{swaps_so_far}'] = event[x]
+                        if event_type == "b" and x == 2:
+                            self.infos['p_0'][f'p-b-{baits_so_far}'] = event[x]
                         if event[0] != 'b':
                             # print(x, event[x], self.current_event_list_name, events, self.event_lists[self.current_event_list_name])
                             event[x] = events[event[x]][2]  # get a location from an index for first swap index number
+                            if x == 2:
+                                self.infos['p_0'][f'p-s-{swaps_so_far}'] = event[x]
 
 
 

@@ -259,7 +259,7 @@ class ScenarioConfigs:
                                                 visible_swaps)
                 else:
                     swap_index = bait_index[first_swap] if swap_num == 0 else bait_index[1 - first_swap]
-                    swap_location = first_swap_index if swap_num == 1 and second_swap_to_first_loc else 'e'
+                    swap_location = first_swap_index if (swap_num == 1 and second_swap_to_first_loc) else 'e'
                     first_swap_index = add_swap(events, swap_num, (swap_index, swap_location), uninformed_swap,
                                                 visible_swaps)
 
