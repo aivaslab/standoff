@@ -294,8 +294,8 @@ class ScenarioConfigs:
 
         for name, listy in self.all_event_lists.items():
             non_ob = count_non_ob_re(listy)
-            num_to_fill = 4 # this subtracts non_ob because each contributed 1 to fill
-            #fillers = list(generate_fillers(8 - (len(listy) - non_ob), non_ob))
+            num_to_fill = 4
+            #fillers = list(generate_fillers(8 - (len(listy) - non_ob), non_ob)) # this subtracts non_ob because each contributed 1 to fill
             fillers = list(generate_fillers(num_to_fill, non_ob))
             if not len(fillers) > 0:
                 print(name, listy, non_ob, num_to_fill)

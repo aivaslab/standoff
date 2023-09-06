@@ -78,6 +78,9 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
     onehot_labels = ['correctSelection', 'incorrectSelection']
     extra_labels = ['informedness', 'opponents']
 
+    tq = tqdm.tqdm(range(sum(len(conf.stages[cc]['events']) for cc in conf.stages)))
+    # tqdm not currently working with subject dominant and subject valence lists
+
     for configName in conf.stages:
         configs = conf.standoff
         events = conf.stages[configName]['events']
@@ -88,7 +91,7 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
 
         data_name = f'{configName}'
         informedness = data_name[3:-1]
-        print('data name', data_name)
+        #print('data name', data_name)
         data_obs = []
         data_labels = {}
         all_labels = list(set(labels + prior_metrics + list(posterior_metrics) + extra_labels))
@@ -119,6 +122,7 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
                 env_config['subject_visible_decs'] = (difficulty < 3)
                 env_config['gaze_highlighting'] = (difficulty < 3)
                 env_config['persistent_gaze_highlighting'] = (difficulty < 2)
+                env_config['conf'] = conf
 
                 env = env_from_config(env_config)
                 env.record_oracle_labels = True
@@ -131,15 +135,14 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
                                       'delays': {n: conf.all_event_delays[n]}
                                       }
                                      for n in events ]
-                print('first param group', env.param_groups[0])
+                #print('first param group', env.param_groups[0])
 
                 prev_param_group = -1
-                tq = tqdm.tqdm(range(len(env.param_groups)))
 
                 total_groups = len(env.param_groups)
 
                 env.deterministic = True
-                print('total_groups', total_groups)
+                #print('total_groups', total_groups)
                 check_labels = [x for x in all_labels if x not in posterior_metrics and x not in extra_labels and x not in onehot_labels]
 
 
@@ -190,7 +193,7 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
                         # normally the while loop won't break because reset uses a modulus
                         break
 
-        print('len obs', data_name, params["num_puppets"], len(data_obs))
+        #print('len obs', data_name, params["num_puppets"], len(data_obs))
         this_path = os.path.join(path, data_name)
         os.makedirs(this_path, exist_ok=True)
 

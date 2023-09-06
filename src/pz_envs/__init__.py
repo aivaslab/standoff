@@ -33,8 +33,9 @@ def register_standoff_env(
         _view_size=15,
         view_offset=4,
         use_label=False,
+        scenario_config=None
 ):
-    configs = ScenarioConfigs().standoff
+    configs = scenario_config.standoff
 
     env_config = {
         "max_steps": 50,
@@ -94,7 +95,6 @@ def register_standoff_env(
 
 def env_from_config(env_config, randomize_seed=True):
     possible_envs = {k: v for k, v in globals().items() if inspect.isclass(v) and issubclass(v, para_MultiGridEnv)}
-
     env_class = possible_envs[env_config['env_class']]
 
     env_kwargs = {k: v for k, v in env_config.items() if k != 'env_class'}
@@ -124,4 +124,5 @@ if __name__ == '__main__':
                             _view_size=view_size,
                             view_offset=3 if view_size > 7 else 0,
                             use_label=use_label,
+                            scenario_config=conf,
                         )

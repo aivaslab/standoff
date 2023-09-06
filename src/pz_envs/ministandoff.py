@@ -46,6 +46,7 @@ class MiniStandoffEnv(para_MultiGridEnv):
             persistent_gaze_highlighting=False,
             supervised_model=None,
             use_separate_reward_layers=True,
+            conf=None,
     ):
         super().__init__(agents,
                          puppets,
@@ -72,7 +73,11 @@ class MiniStandoffEnv(para_MultiGridEnv):
                          use_separate_reward_layers=use_separate_reward_layers)
         self.stop_on_release = False
         self.new_target = None
-        conf = ScenarioConfigs()
+        if conf == None:
+            print('found conf none')
+            self.conf = ScenarioConfigs()
+        else:
+            self.conf = conf
         configs = conf.standoff
         if agent_spawn_kwargs is None:
             agent_spawn_kwargs = {'top': (0, 0), 'size': (2, self.width)}
@@ -105,7 +110,6 @@ class MiniStandoffEnv(para_MultiGridEnv):
         self.supervised_model = supervised_model  # used for generating special supervised labels
         self.last_supervised_labels = None
         self.has_released = False
-        self.conf = ScenarioConfigs()
 
         self.param_groups = [
             {'eLists': self.conf.all_event_lists, 'params': self.conf.standoff['defaults'], 'perms': self.conf.all_event_permutations, 'delays': self.conf.all_event_delays},
@@ -358,7 +362,7 @@ class MiniStandoffEnv(para_MultiGridEnv):
             _y -= 1
         paths = []
         for box in range(self.boxes):
-            x = box * 1 + 1
+            x = box + 1
 
             pgrid = copy.copy(maze)
             for _x in range(self.width):
@@ -394,7 +398,7 @@ class MiniStandoffEnv(para_MultiGridEnv):
                         update_vis=False)
         if name == 'init':
             for box in range(self.boxes):
-                x = box * 1 + 1
+                x = box + 1
                 if self.use_box_colors:
                     self.put_obj(Box(color=self.color_list[self.box_color_order[box]], state=self.box_color_order[box]),
                                  x, y)
@@ -411,7 +415,7 @@ class MiniStandoffEnv(para_MultiGridEnv):
                 self.infos['p_0']['minibatch'] = self.minibatch
                 self.infos['p_0']['timestep'] = self.total_step_count
         elif name == 'b':
-            x = event[2] * 1 + 1
+            x = event[2] + 1
             if self.sub_valence == 1:
                 sub_obs_reward = arg
             else:
@@ -424,7 +428,7 @@ class MiniStandoffEnv(para_MultiGridEnv):
             self.put_obj(obj, x, y)
             self.objs_to_hide.append(obj)
         elif name == "rem":
-            x = event[1] * 1 + 1
+            x = event[1] + 1
             tile = self.grid.get(x, y)
             if tile is not None:
                 if hasattr(tile, "reward") and tile.reward == self.bigReward and self.currently_visible:
@@ -432,26 +436,28 @@ class MiniStandoffEnv(para_MultiGridEnv):
                 elif hasattr(tile, "reward") and tile.reward == self.smallReward:
                     self.small_food_locations.append(-1)
                     # this is a special case of removedUninformed1 where there is no correct solution.
-
             self.del_obj(x, y)
         elif name == "ob" or name == "re":
-            b = self.grid.get(*self.agent_door_pos[arg]) if arg in self.agent_door_pos.keys() else self.grid.get(3, self.height-3) # default for obscuring when no opponent
-            if name == "ob":
-                b.state = 1
-                b.see_behind = lambda: False
-                self.currently_visible = False
-            elif name == "re":
-                b.state = 0
-                b.see_behind = lambda: True
-                self.currently_visible = True
+            #b = self.grid.get(*self.agent_door_pos[arg]) if arg in self.agent_door_pos.keys() else self.grid.get(3, self.height-3) # default for obscuring when no opponent
+            # above line was used for hiding all doors
+            for box in range(self.boxes):
+                b = self.grid.get(box + 1, self.height - 3)
+                if name == "ob":
+                    b.state = 1
+                    b.see_behind = lambda: False
+                    self.currently_visible = False
+                elif name == "re":
+                    b.state = 0
+                    b.see_behind = lambda: True
+                    self.currently_visible = True
             for box in range(self.boxes):
                 self.can_see[arg + str(box)] = False if "ob" in name else True
         elif name == "sw":
-            b1 = self.grid.get(event[1] * 1 + 1, y)
-            b2 = self.grid.get(event[2] * 1 + 1, y)
+            b1 = self.grid.get(event[1] + 1, y)
+            b2 = self.grid.get(event[2] + 1, y)
             if self.use_box_colors:
-                self.put_obj(b2, event[1] * 1 + 1, y)
-                self.put_obj(b1, event[2] * 1 + 1, y)
+                self.put_obj(b2, event[1] + 1, y)
+                self.put_obj(b1, event[2] + 1, y)
                 temp = self.box_color_order[event[1]]
                 self.box_color_order[event[1]] = self.box_color_order[event[2]]
                 self.box_color_order[event[2]] = temp
@@ -463,8 +469,8 @@ class MiniStandoffEnv(para_MultiGridEnv):
 
                 obj1 = Goal(reward=r2, size=r2 * 0.01, color='green', hide=self.hidden, sub_obs_reward=sr2)
                 obj2 = Goal(reward=r1, size=r1 * 0.01, color='green', hide=self.hidden, sub_obs_reward=sr1)
-                self.put_obj(obj1, event[1] * 1 + 1, y)
-                self.put_obj(obj2, event[2] * 1 + 1, y)
+                self.put_obj(obj1, event[1] + 1, y)
+                self.put_obj(obj2, event[2] + 1, y)
                 self.objs_to_hide.append(obj1)
                 self.objs_to_hide.append(obj2)
         elif name == "rel":
@@ -485,14 +491,14 @@ class MiniStandoffEnv(para_MultiGridEnv):
 
         # track where the big and small foods have been
         for loc in range(self.boxes):
-            x = loc * 1 + 1
+            x = loc + 1
             obj = self.grid.get(x, y)
             self.append_food_locs(obj, loc)  # appends to self.big_food_locations and self.small_food_locations
 
         # oracle food location memory for puppet ai
         if name == "b" or name == "sw" or name == "rem" or (self.hidden is True and name == "re"):
             for box in range(self.boxes):
-                x = box * 1 + 1
+                x = box + 1
                 for agent in self.agents_and_puppets():
                     if self.can_see[agent + str(box)] and self.currently_visible:
                         tile = self.grid.get(x, y)
@@ -526,7 +532,7 @@ class MiniStandoffEnv(para_MultiGridEnv):
             self.new_target = False
             a = self.instance_from_name[target_agent]
             if a.active:
-                x = self.agent_goal[target_agent] * 1 + 1
+                x = self.agent_goal[target_agent] + 1
                 pgrid = self.grid.volatile
                 for _x in range(self.width):
                     if _x != x:
@@ -544,10 +550,10 @@ class MiniStandoffEnv(para_MultiGridEnv):
             if self.params['num_puppets'] > 0:
                 one_hot_goal[self.agent_goal[target_agent]] = 1
             self.infos['p_0']["target"] = one_hot_goal
-            while (len(self.visible_event_list) < 9):
+            while (len(self.visible_event_list) < 4):
                 self.visible_event_list.insert(0, 0)
-            self.infos['p_0']["vision"] = self.visible_event_list[:9]
-            real_boxes = [self.grid.get(box * 1 + 1, y) for box in range(self.boxes)]
+            self.infos['p_0']["vision"] = self.visible_event_list[:4]
+            real_boxes = [self.grid.get(box + 1, y) for box in range(self.boxes)]
 
             real_box_rewards = [box.get_reward() if box is not None and hasattr(box, "get_reward") else 0 for box in real_boxes]
             if self.params['num_puppets'] > 0:
