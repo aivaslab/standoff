@@ -286,6 +286,10 @@ class MiniStandoffEnv(para_MultiGridEnv):
                         # used for both empty baits and swap locations
                         event[x] = empty_buckets.pop(random.randrange(
                             len(empty_buckets)) if not self.deterministic else instantiated_perms[k])
+                        if event_type == "b":
+                            self.infos['p_0'][f'p-b-{baits_so_far}'] = event[x]
+                        elif event_type == "sw":
+                            self.infos['p_0'][f'p-s-{swaps_so_far}'] = event[x]
 
                         # if we are swapping to an empty bucket, and the prev bucket was not empty, make it empty
                         if event[0] == 'sw' and x == 2:
@@ -293,6 +297,7 @@ class MiniStandoffEnv(para_MultiGridEnv):
                                 empty_buckets.append(event[1])
 
                     elif event[x] == "else":
+                        print('else foyund')
                         available_spots = [i for i in range(boxes) if i != event[x - 1]]
                         event[x] = available_spots.pop(random.randrange(
                             len(available_spots)) if not self.deterministic else instantiated_perms[k])
@@ -301,9 +306,15 @@ class MiniStandoffEnv(para_MultiGridEnv):
                         if event[0] == 'sw' and x == 2 and event[1] not in empty_buckets and event[2] in empty_buckets:
                             empty_buckets.append(event[1])
                             empty_buckets.remove(event[2])
-                    elif isinstance(event[x], int) and event[0] != 'b':
-                        # print(x, event[x], self.current_event_list_name, events, self.event_lists[self.current_event_list_name])
-                        event[x] = events[event[x]][2]  # get a location from an index
+                    elif isinstance(event[x], int):
+                        if x == 2:
+                            if event_type == "b":
+                                self.infos['p_0'][f'p-b-{baits_so_far}'] = event[x]
+                            elif event_type == "sw":
+                                self.infos['p_0'][f'p-s-{swaps_so_far}'] = event[x]
+                        if event[0] != 'b':
+                            # print(x, event[x], self.current_event_list_name, events, self.event_lists[self.current_event_list_name])
+                            event[x] = events[event[x]][2]  # get a location from an index for first swap index number
 
 
 
@@ -313,16 +324,16 @@ class MiniStandoffEnv(para_MultiGridEnv):
                     # remove empty bucket for cases where event[x] wasn't e
                     if not was_empty:
                         #print(event, empty_buckets, instantiated_perms, k, instantiated_perms[k], len(empty_buckets))
-                        self.infos['p_0'][f'p-b-{baits_so_far}'] = instantiated_perms[k]
+                        #self.infos['p_0'][f'p-b-{baits_so_far}'] = instantiated_perms[k]
                         empty_buckets.pop(instantiated_perms[k])
-                        baits_so_far += 1
+                    baits_so_far += 1
                 elif event_type == "rem":
                     empty_buckets.append(event[1])
                 elif event_type == "ob" or event_type == "re":
                     # hardcoded, will not work for multiple conspecifics
                     event_args[k] = "p_1"
                 elif event_type == 'sw':
-                    self.infos['p_0'][f'p-s-{swaps_so_far}'] = instantiated_perms[k]
+                    #self.infos['p_0'][f'p-s-{swaps_so_far}'] = instantiated_perms[k]
                     swaps_so_far += 1
 
                 # could also add functionality for moving empty buckets which are swapped, but that is not used in any tasks
