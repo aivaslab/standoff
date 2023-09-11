@@ -1,5 +1,6 @@
 import json
 import os
+import pickle
 import traceback
 
 import pandas as pd
@@ -99,6 +100,7 @@ def load_dataframes(combined_path_list, value_names, key_param):
     return combined_df
 
 
+
 def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, batch_size=64, desired_evals=5,
                 use_ff=False, skip_eval=False):
     """What is the overall performance of naive, off-the-shelf models on this task? Which parameters of competitive
@@ -191,7 +193,8 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
                 key_param_value=regime,
                 save_every=save_every,
                 skip_calc=skip_calc,
-                use_ff=use_ff
+                use_ff=use_ff,
+                act_label_names=labels,
             )
             last_path_list.append(last_epoch_paths)
             combined_path_list.append(combined_paths)
@@ -213,7 +216,7 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
         write_metrics_to_file(os.path.join(combined_path, 'metrics.txt'), last_epoch_df, ranges_1, params, stats,
                               key_param=key_param, d_s=delta_sum, d_x=delta_x)
         save_figures(os.path.join(combined_path, 'figs'), combined_df, avg_loss, ranges_2, range_dict, range_dict3,
-                     params, last_epoch_df, num=12, key_param_stats=key_param_stats, oracle_stats=oracle_stats, key_param=key_param, delta_sum=delta_sum)
+                     params, last_epoch_df, num=12, key_param_stats=key_param_stats, oracle_stats=oracle_stats, key_param=key_param, delta_sum=delta_sum, delta_x=delta_x)
 
     if 11 in todo:
         print('Running experiment 11: train oracle label ')
@@ -378,4 +381,4 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
 
 
 if __name__ == '__main__':
-    experiments([0, 1], repetitions=1, epochs=2, skip_train=False, skip_eval=False, skip_calc=False, batch_size=256, desired_evals=1, use_ff=False)
+    experiments([1], repetitions=1, epochs=50, skip_train=True, skip_eval=True, skip_calc=True, batch_size=256, desired_evals=1, use_ff=False)

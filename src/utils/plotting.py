@@ -334,25 +334,53 @@ def plot_tsne(data, labels, index, color):
     #    plt.annotate(name, (data[i + index[0], 0], data[i + index[0], 1]), textcoords="offset points", xytext=(-10, 5), ha='center')
 
 
-def save_delta_figure(dir, df_summary):
-    df_list = []
-    for key_val, sub_df in df_summary.items():
-        for _, row in sub_df.iterrows():
-            informedness = row['Informedness']
-            mean, std = row['Summary'].strip().split(' ')
-            mean = float(mean)
-            std = float(std.strip('()'))
-            df_list.append([key_val, informedness, mean, std])
+def save_delta_figures(dir, df_summary, df_x):
+    for var in ['dpred', 'dpred_correct']:
+        df_list = []
+        for key_val, sub_df in df_summary.items():
+            for _, row in sub_df.iterrows():
+                informedness = row['Informedness']
+                mean, std = row[var].strip().split(' ')
+                mean = float(mean)
+                std = float(std.strip('()'))
+                df_list.append([key_val, informedness, mean, std])
 
-    df = pd.DataFrame(df_list, columns=["key_val", "Informedness", "mean", "std"])
-    pivot_df = df.pivot(index="key_val", columns="Informedness", values="mean")
+        df = pd.DataFrame(df_list, columns=["key_val", "Informedness", "mean", "std"])
+        pivot_df = df.pivot(index="key_val", columns="Informedness", values="mean")
 
-    plt.figure(figsize=(10, 8))
-    ax = sns.heatmap(pivot_df, annot=pivot_df, fmt='.2f', cmap='coolwarm', linewidths=0.5, linecolor='white')
-    plt.title(f"Heatmap of delta pi")
+        plt.figure(figsize=(10, 8))
+        ax = sns.heatmap(pivot_df, vmin=0, vmax=1, annot=pivot_df, fmt='.2f', cmap='crest', linewidths=0.5, linecolor='white')
+        plt.title(f"Heatmap of " + var)
 
-    plot_save_path = os.path.join(dir, 'delta_heatmap.png')
-    plt.savefig(plot_save_path)
+        plt.tight_layout()
+
+        os.makedirs(dir, exist_ok=True)
+        plot_save_path = os.path.join(dir, var + '_heatmap.png')
+        plt.savefig(plot_save_path)
+
+
+    for var in ['dpred', 'dpred_correct']:
+        df_list = []
+        for key_val, sub_df in df_x.items():
+            for _, row in sub_df.iterrows():
+                informedness = row['operator']
+                mean, std = row[var].strip().split(' ')
+                mean = float(mean)
+                std = float(std.strip('()'))
+                df_list.append([key_val, informedness, mean, std])
+
+        df = pd.DataFrame(df_list, columns=["key_val", "operator", "mean", "std"])
+        pivot_df = df.pivot(index="key_val", columns="operator", values="mean")
+
+        plt.figure(figsize=(10, 8))
+        ax = sns.heatmap(pivot_df, vmin=0, vmax=1, annot=pivot_df, fmt='.2f', cmap='crest', linewidths=0.5, linecolor='white')
+        plt.title(f"Heatmap of " + var)
+
+        plt.tight_layout()
+
+        os.makedirs(dir, exist_ok=True)
+        plot_save_path = os.path.join(dir, var + '_heatmap-ops.png')
+        plt.savefig(plot_save_path)
 
 
 def save_double_param_figures(save_dir, top_pairs, avg_loss, last_epoch_df):

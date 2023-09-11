@@ -382,7 +382,7 @@ class CustomDataset(Dataset):
 
         metrics = self.metrics[index] if len(self.metrics) else None
         return data, labels, self.params[index], oracles, metrics
-class CustomDatasetBig(Dataset):
+class BaseDatasetBig(Dataset):
     def __init__(self, data_list, labels_list, params_list, oracles_list, metrics=None):
         self.data_list = data_list
         self.labels_list = labels_list
@@ -409,8 +409,9 @@ class CustomDatasetBig(Dataset):
     def __len__(self):
         return self.cumulative_sizes[-1]
 
-    def __getitem__(self, index):
 
+class TrainDatasetBig(BaseDatasetBig):
+    def __getitem__(self, index):
         list_index, local_index = self._find_list_index(index)
         data = torch.from_numpy(pickle.loads(self.data_list[list_index][local_index])).float()
         labels = torch.from_numpy(self.labels_list[list_index][local_index].astype(np.int8))
@@ -420,6 +421,26 @@ class CustomDatasetBig(Dataset):
         metrics = {key: self.metrics[key][index] for key in self.metrics.keys()} if self.metrics else 0
 
         return data, labels, self.params_list[list_index][local_index], oracles, metrics
+
+
+class EvalDatasetBig(BaseDatasetBig):
+    def __init__(self, data_list, labels_list, params_list, oracles_list, metrics=None, act_list=None):
+        super().__init__(data_list, labels_list, params_list, oracles_list, metrics)
+        self.act_list = act_list
+
+    def __getitem__(self, index):
+        list_index, local_index = self._find_list_index(index)
+        data = torch.from_numpy(pickle.loads(self.data_list[list_index][local_index])).float()
+        labels = torch.from_numpy(self.labels_list[list_index][local_index].astype(np.int8))
+        oracles = torch.from_numpy(self.oracles_list[list_index][local_index].astype(np.float32)) if len(
+            self.oracles_list) > 1 else torch.tensor([])
+        act_labels_batch = {
+            name: torch.from_numpy(self.act_list[list_index][name][local_index].astype(np.float32))
+            for name in self.act_list[list_index].keys()}
+
+        metrics = {key: self.metrics[key][index] for key in self.metrics.keys()} if self.metrics else 0
+
+        return data, labels, self.params_list[list_index][local_index], oracles, metrics, act_labels_batch
 
 class RNNModel(nn.Module):
     def __init__(self, hidden_size, num_layers, output_len, channels, kernels=8, kernels2=8, kernel_size1=3,

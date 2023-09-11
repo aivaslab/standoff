@@ -13,8 +13,9 @@ import heapq
 
 from scipy.stats import sem, t
 
+from src.utils.activation_processing import process_activations
 from src.utils.plotting import save_double_param_figures, save_single_param_figures, save_fixed_double_param_figures, \
-    save_fixed_triple_param_figures, save_key_param_figures, save_delta_figure
+    save_fixed_triple_param_figures, save_key_param_figures, save_delta_figures
 
 sys.path.append(os.getcwd())
 
@@ -23,7 +24,7 @@ from torch.utils.data import DataLoader, random_split
 import tqdm
 import torch.nn as nn
 import torch
-from src.supervised_learning import RNNModel, CustomDatasetBig, FeedForwardModel
+from src.supervised_learning import RNNModel, TrainDatasetBig, EvalDatasetBig, FeedForwardModel
 import traceback
 import torch.multiprocessing as mp
 
@@ -98,14 +99,16 @@ def decode_event_name(name):
 
 class SaveActivations:
     def __init__(self):
-        self.activations = None
+        self.activations_out = None
+        self.activations_hidden = None
 
     def __call__(self, module, module_in, module_out):
-        self.activations = module_out
+        self.activations_out = module_out[0]
+        self.activations_hidden = module_out[1]
 
 
 def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_path='', oracle_labels=[], repetition=0,
-                   epoch_number=0, prior_metrics=[], num_activation_batches=1, use_ff=False, oracle_is_target=False):
+                   epoch_number=0, prior_metrics=[], num_activation_batches=1, use_ff=False, oracle_is_target=False, act_label_names=[]):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     special_criterion = nn.CrossEntropyLoss(reduction='none')
     oracle_criterion = nn.MSELoss(reduction='none')
@@ -126,7 +129,7 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
     prior_metrics_data = {}
 
     test_loaders = []
-    data, labels, params, oracles = [], [], [], []
+    data, labels, params, oracles, act_labels = [], [], [], [], []
     for val_set_name in test_sets:
         dir = os.path.join(load_path, val_set_name)
         data.append(np.load(os.path.join(dir, 'obs.npz'), mmap_mode='r')['arr_0'])
@@ -148,14 +151,29 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
             combined_oracle_data = np.concatenate(oracle_data, axis=-1)
             oracles.append(combined_oracle_data)
 
+        if True: # save labels for comparison with activations
+            act_label_data_dict = {}
+            for act_label_name in act_label_names:
+                this_label = np.load(os.path.join(dir, 'label-' + act_label_name + '.npz'))['arr_0']
+                flattened_label = this_label.reshape(this_label.shape[0], -1)
+                act_label_data_dict[act_label_name] = flattened_label
+            act_labels.append(act_label_data_dict)
+
     for metric, arrays in prior_metrics_data.items():
         prior_metrics_data[metric] = np.concatenate(arrays, axis=0)
 
-    val_dataset = CustomDatasetBig(data, labels, params, oracles, prior_metrics_data)
+    val_dataset = EvalDatasetBig(data, labels, params, oracles, prior_metrics_data, act_labels)
     test_loaders.append(DataLoader(val_dataset, batch_size=batch_size, shuffle=False))
 
     hook = SaveActivations()
-    activations = []
+    activation_data = {
+        'activations_out': [],
+        'activations_hidden_short': [],
+        'activations_hidden_long': [],
+        'inputs': [],
+        'labels': [],
+        'oracles': [],
+    }
 
     for idx, _val_loader in enumerate(test_loaders):
         with torch.no_grad():
@@ -166,12 +184,9 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
 
             tq = tqdm.trange(len(_val_loader))
 
-            for i, (inputs, labels, params, oracles, metrics) in enumerate(_val_loader):
+            for i, (inputs, labels, params, oracles, metrics, act_labels_dict) in enumerate(_val_loader):
                 inputs, labels, oracles = inputs.to(device), labels.to(device), oracles.to(device)
-                if i < num_activation_batches:
-                    activations.append(hook.activations)
-                    if i == num_activation_batches - 1:
-                        handle.remove()
+
 
                 if not oracle_is_target:
                     outputs = model(inputs, oracles)
@@ -197,6 +212,27 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
                 neither_food_selected = ~(small_food_selected | big_food_selected)
 
                 tq.update(1)
+
+                if i < num_activation_batches:
+                    activation_data['activations_out'].append(hook.activations_out.cpu().reshape(batch_size, -1))
+                    activation_data['activations_hidden_short'].append(
+                        hook.activations_hidden[0].cpu().reshape(batch_size, -1))
+                    activation_data['activations_hidden_long'].append(
+                        hook.activations_hidden[1].cpu().reshape(batch_size, -1))
+                    activation_data['inputs'].append(inputs.cpu().numpy().reshape(batch_size, -1))
+                    activation_data['labels'].append(labels.cpu().numpy().reshape(batch_size, -1))
+                    activation_data['oracles'].append(oracles.cpu().numpy().reshape(batch_size, -1))
+
+                    # Handle each act_label separately
+                    for name, act_label in act_labels_dict.items():
+                        key = f"act_label_{name}"
+                        if key not in activation_data:
+                            activation_data[key] = []
+                        activation_data[key].append(act_label.cpu().numpy().reshape(batch_size, -1))
+                        print(key, act_label.shape)
+
+                if i == num_activation_batches - 1:
+                        handle.remove()
 
                 batch_param_losses = [
                     {
@@ -230,7 +266,7 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
     df_paths.append(os.path.join(model_save_path, f'param_losses_{epoch_number}_{repetition}.csv'))
     print('saving activations...')
     with open(os.path.join(model_save_path, f'activations_{epoch_number}_{repetition}.pkl'), 'wb') as f:
-        pickle.dump(activations, f)
+        pickle.dump(activation_data, f)
     print('finished')
     return df_paths
 
@@ -261,7 +297,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
             combined_oracle_data = np.concatenate(oracle_data, axis=-1)
             oracles.append(combined_oracle_data)
 
-    train_dataset = CustomDatasetBig(data, labels, params, oracles)
+    train_dataset = TrainDatasetBig(data, labels, params, oracles)
     del data, labels, params, oracles
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True,
                               num_workers=0)  # can't use more on windows
@@ -374,6 +410,18 @@ def custom_merge(df1, df2, cols_to_check, other_cols):
 
     return df1[final_condition]
 
+
+def get_descendants(category, char, translation_dict):
+    if char not in category:
+        return []
+
+    without_char = category.replace(char, '')
+    descendants = []
+    for key in translation_dict.values():
+        if set(without_char).issubset(set(key)) and char not in key:
+            descendants.append(key)
+    return descendants
+
 def calculate_statistics(df, last_epoch_df, params, skip_3x=True, skip_2x1=False, key_param=None, skip_1x=True, record_delta_pi=True):
     '''
     Calculates various statistics from datasets of model outputs detailing model performance.
@@ -448,7 +496,7 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=True, skip_2x1=False
                         range_dict3[(param1, value1, param2, value2, param3)] = new_means.max() - new_means.min()
 
     df_summary = {}
-    delta_x = {}
+    delta_operator_summary = {}
     print('key param stats')
     key_param_stats = {}
     oracle_key_param_stats = {}
@@ -481,40 +529,102 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=True, skip_2x1=False
                         # dict order is key_val > param > mean/std > param_val
 
         if record_delta_pi:
-            for key_val in unique_vals[key_param]:
-                delta_preds = {}
+            # todo: if delay_2nd_bait or first_swap are na, just make them 0? shouldn't affect anything
+            print('calculating delta preds')
 
-                print('calculating delta preds')
+            translation_dict = {
+                'eb': 'Fn',
+                'es': 'Nf',
+                'eb-es': 'Ff',
+                'eb-lb': 'Tn',
+                'eb-es-lb': 'Tf',
+                'eb-es-ls': 'Ft',
+                'eb-es-lb-ls': 'Tt',
+                'es-ls': 'Nt',
+                'none': 'none'
+            }
+
+            operators = ['T', 't', 'F', 'f']
+
+
+            for key_val in unique_vals[key_param]: # for each train regime, etc
+
                 required_columns = [f'pred_{i}' for i in range(5)]
-                perm_keys = ['p-b-0', 'p-b-1', 'p-s-0', 'p-s-1', 'delay_2nd_bait', 'first_swap', 'first_bait_size']
-                # these columns show which location is selected for each bait and swap, or -1 if none (only applicable to swaps)
-                #question: are perm_keys set properly if eg 2nd_to_First and first_swap_both and delay_2nd_bait?
-                #i am going to assume yes
-
-                #subset = last_epoch_df[last_epoch_df[key_param] == key_val]
-                subset = last_epoch_df
+                perm_keys = ['p-b-0', 'p-b-1', 'p-s-0', 'p-s-1', 'delay_2nd_bait', 'first_swap', 'first_bait_size', 'delay']
+                # the p-x-y columns show which location is selected for each bait and swap, or -1 if none (only applicable to swaps)
+                subset = last_epoch_df[last_epoch_df[key_param] == key_val]
                 subset['pred'] = subset['pred'].apply(convert_to_numeric).astype(np.int8)
-
+                subset['informedness'] = subset['informedness'].replace(translation_dict)
                 conv = pd.concat([subset, pd.get_dummies(subset['pred'], prefix='pred')], axis=1)
+                subset = conv[required_columns + ['informedness', 'correctSelection'] + perm_keys]
 
-                for col in required_columns:
+                for col in required_columns: # a model might not predict all 5 values
                     if col not in conv.columns:
                         conv[col] = 0
 
-                subset = conv[required_columns + ['informedness'] + perm_keys]
+                # OPERATOR ONE
+                delta_mean = {key: [] for key in operators}
+                delta_std = {key: [] for key in operators}
+                delta_mean_correct = {key: [] for key in operators}
+                delta_std_correct = {key: [] for key in operators}
+                for op in operators:
 
-                for col in perm_keys + ['informedness']:
-                    print(f"{col} has {subset[col].nunique()} unique values.")
-                    print(subset[col].unique())
+                    delta_preds = []
+                    delta_preds_correct = []
+                    for key in translation_dict.values():
+                        # key is 1st position, descendents are 2nd
+                        descendants = get_descendants(key, op, translation_dict)
+                        if len(descendants) < 1:
+                            continue
+                        inf = subset[subset['informedness'] == key].groupby(perm_keys + ['informedness', 'correctSelection'], observed=True).mean().reset_index()
+                        print('ddd', descendants)
+                        noinf = subset[subset['informedness'].isin(descendants)].groupby(perm_keys + ['informedness', 'correctSelection'], observed=True).mean().reset_index()
+                        print('key', key, len(inf), len(noinf))
 
-                print('subsetting')
-                inf = subset[subset['informedness'] == 'eb-es-lb-ls'].groupby(perm_keys + ['informedness'], observed=True).mean().reset_index()
-                noinf = subset[subset['informedness'] != 'eb-es-lb-ls'].groupby(perm_keys + ['informedness'], observed=True).mean().reset_index()
-                print('length of subset after subset', len(inf), len(noinf), inf.columns)
+                        merged_df = pd.merge(
+                            inf,
+                            noinf,
+                            on=perm_keys,
+                            suffixes=('_m', ''),
+                            how='inner',
+                        )
 
-                for col in perm_keys + ['informedness']:
-                    print(f"inf {col} has {noinf[col].nunique()} unique values.")
-                    print(f"noinf {col} has {noinf[col].nunique()} unique values.")
+                        merged_df['changed_target'] = (
+                                    merged_df['correctSelection_m'] != merged_df['correctSelection']).astype(int)
+
+                        for i in range(5):
+                            merged_df[f'pred_diff_{i}'] = abs(merged_df[f'pred_{i}_m'] - merged_df[f'pred_{i}'])
+                        merged_df['total_pred_diff'] = merged_df[[f'pred_diff_{idx}' for idx in range(5)]].sum(
+                            axis=1) / 2
+                        merged_df['total_pred_diff_correct'] = 1 - abs(
+                            merged_df['total_pred_diff'] - merged_df['changed_target'])
+
+                        delta_preds.extend(merged_df['total_pred_diff'].tolist())
+                        delta_preds_correct.extend(merged_df['total_pred_diff_correct'].tolist())
+
+                    # these lines are wrong
+                    delta_mean[op] = np.mean(delta_preds)
+                    delta_std[op] = np.std(delta_preds)
+                    delta_mean_correct[op] = np.mean(delta_preds_correct)
+                    delta_std_correct[op] = np.std(delta_preds_correct)
+                    # all these are for one operator
+
+                delta_operator_summary[key_val] = pd.DataFrame({
+                    'operator': list(delta_mean.keys()),
+                    'dpred': [f"{delta_mean[key]} ({delta_std[key]})" for key in delta_mean.keys()],
+                    'dpred_correct': [f"{delta_mean_correct[key]} ({delta_std_correct[key]})" for key in
+                                      delta_mean_correct.keys()]
+                })
+                print('do', delta_operator_summary[key_val])
+
+
+                # CATEGORY ONE
+
+                #for col in perm_keys + ['informedness', 'correctSelection']:
+                #    print(f"{col} has {subset[col].nunique()} unique values:", subset[col].unique())
+
+                inf = subset[subset['informedness'] == 'Tt'].groupby(perm_keys + ['informedness', 'correctSelection'], observed=True).mean().reset_index()
+                noinf = subset[subset['informedness'] != 'Tt'].groupby(perm_keys + ['informedness', 'correctSelection'], observed=True).mean().reset_index()
 
                 merged_df = pd.merge(
                     inf,
@@ -524,38 +634,47 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=True, skip_2x1=False
                     how='inner',
                 )
 
-                #print('doing custom merge') #this was merging using set_keys, under assumption of many to one
-                #merged_df = custom_merge(inf, noinf, perm_keys, set_keys)
-                print('length', len(merged_df))
+                merged_df['changed_target'] = (merged_df['correctSelection_m'] != merged_df['correctSelection']).astype(int)
 
-                print('diffing')
                 for i in range(5):
                     merged_df[f'pred_diff_{i}'] = abs(merged_df[f'pred_{i}_m'] - merged_df[f'pred_{i}'])
-                merged_df['total_pred_diff'] = merged_df[[f'pred_diff_{idx}' for idx in range(5)]].sum(axis=1)
+                merged_df['total_pred_diff'] = merged_df[[f'pred_diff_{idx}' for idx in range(5)]].sum(axis=1) / 2
+                merged_df['total_pred_diff_correct'] = 1 - abs(merged_df['total_pred_diff'] - merged_df['changed_target'])
+
+                delta_preds = {}
+                delta_preds_correct = {}
 
                 for key in merged_df['informedness'].unique():
                     delta_preds[key] = merged_df.loc[merged_df['informedness'] == key, 'total_pred_diff'].tolist()
+                    delta_preds_correct[key] = merged_df.loc[merged_df['informedness'] == key, 'total_pred_diff_correct'].tolist()
 
                 delta_mean = {key: np.mean(val) for key, val in delta_preds.items()}
                 delta_std = {key: np.std(val) for key, val in delta_preds.items()}
+
+                delta_mean_correct = {key: np.mean(val) for key, val in delta_preds_correct.items()}
+                delta_std_correct = {key: np.std(val) for key, val in delta_preds_correct.items()}
+
                 df_summary[key_val] = pd.DataFrame({
                     'Informedness': list(delta_mean.keys()),
-                    'Summary': [f"{delta_mean[key]} ({delta_std[key]})" for key in delta_mean.keys()]
+                    'dpred': [f"{delta_mean[key]} ({delta_std[key]})" for key in delta_mean.keys()],
+                    'dpred_correct': [f"{delta_mean_correct[key]} ({delta_std_correct[key]})" for key in delta_mean_correct.keys()]
                 })
+
+                # todo: add informedness operators, rather than just category
                 print(df_summary[key_val])
 
     print('finished')
-    return avg_loss, variances, ranges_1, ranges_2, range_dict, range_dict3, stats, key_param_stats, oracle_key_param_stats, df_summary, delta_x
+    return avg_loss, variances, ranges_1, ranges_2, range_dict, range_dict3, stats, key_param_stats, oracle_key_param_stats, df_summary, delta_operator_summary
 
 
 def save_figures(path, df, avg_loss, ranges, range_dict, range_dict3, params, last_epoch_df, num=10,
-                 key_param_stats=None,  oracle_stats=None, key_param=None, delta_sum=None):
+                 key_param_stats=None,  oracle_stats=None, key_param=None, delta_sum=None, delta_x=None):
     top_pairs = sorted(ranges.items(), key=lambda x: x[1], reverse=True)[:num]
     top_n_ranges = heapq.nlargest(num, range_dict, key=range_dict.get)
     top_n_ranges3 = heapq.nlargest(num, range_dict3, key=range_dict3.get)
 
     if delta_sum:
-        save_delta_figure(path, delta_sum)
+        save_delta_figures(path, delta_sum, delta_x)
 
     if key_param_stats is not None:
         save_key_param_figures(path, key_param_stats, oracle_stats, key_param)
@@ -650,7 +769,8 @@ def find_df_paths(directory, file_pattern):
 def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, eval_sets=None,
                            load_path='supervised', oracle_labels=[], skip_train=True, batch_size=64,
                            prior_metrics=[], key_param=None, key_param_value=None, save_every=1, skip_calc=True,
-                           use_ff=False, oracle_layer=0, skip_eval=False, oracle_is_target=False, skip_figures=True):
+                           use_ff=False, oracle_layer=0, skip_eval=False, oracle_is_target=False, skip_figures=True,
+                           act_label_names=[]):
 
     '''
     Runs a session of supervised learning. Different steps, such as whether we train+save models, evaluate models, or run statistics on evaluations, are optional.
@@ -690,12 +810,14 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
                                                       epoch_number=epoch,
                                                       prior_metrics=prior_metrics,
                                                       use_ff=use_ff,
-                                                      oracle_is_target=oracle_is_target)
+                                                      oracle_is_target=oracle_is_target,
+                                                      act_label_names=act_label_names)
                             dfs_paths.extend(df_paths)
                             if epoch == epochs - 1:
                                 last_epoch_df_paths.extend(df_paths)
             else:
                 dfs_paths = find_df_paths(save_path, 'param_losses_*_*.csv')
+                print(save_path)
                 max_epoch = max(int(path.split('_')[-2]) for path in dfs_paths)
                 last_epoch_df_paths = [path for path in dfs_paths if int(path.split('_')[-2]) == max_epoch]
 
@@ -731,6 +853,9 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
         except BaseException as e:
             print(e)
             traceback.print_exc()
+
+    print('corring activations...')
+    process_activations(save_path, [49], [0])
     return dfs_paths, last_epoch_df_paths
 
 
