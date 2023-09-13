@@ -163,7 +163,7 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
         prior_metrics_data[metric] = np.concatenate(arrays, axis=0)
 
     val_dataset = EvalDatasetBig(data, labels, params, oracles, prior_metrics_data, act_labels)
-    test_loaders.append(DataLoader(val_dataset, batch_size=batch_size, shuffle=False))
+    test_loaders.append(DataLoader(val_dataset, batch_size=batch_size, shuffle=True))
 
     hook = SaveActivations()
     activation_data = {

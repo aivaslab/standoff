@@ -122,7 +122,6 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
         "eb-es-lb-ls"
     ]
     sub_regime_mapping = {
-        'noInfo': '',
         'bigExist': 'eb',
         'smallExist': 'es',
         'bothExist': 'eb-es',
@@ -130,7 +129,19 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
         'smallExistSmallLoc': 'es-ls',
         'bothExistBigLoc': 'eb-es-lb',
         'bothExistSmallLoc': 'eb-es-ls',
-        'bothExistBothLoc': 'eb-es-lb-ls'
+        'bothExistBothLoc': 'eb-es-lb-ls',
+        'noInfo': '',
+    }
+    sub_regime_mapping_new= {
+        'noInfo': '',
+        'E': 'eb',
+        'e': 'es',
+        'Ee': 'eb-es',
+        'EL': 'eb-lb',
+        'el': 'es-ls',
+        'EeL': 'eb-es-lb',
+        'Eel': 'eb-es-ls',
+        'EeLl': 'eb-es-lb-ls'
     }
     regimes = {k: ['sl-' + x + '0' for x in sub_regime_keys] + ['sl-' + v + '1'] for k, v in sub_regime_mapping.items()}
     regimes['direct'] = ['sl-' + x + '1' for x in sub_regime_keys]
