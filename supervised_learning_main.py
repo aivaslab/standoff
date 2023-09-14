@@ -108,7 +108,7 @@ class SaveActivations:
 
 
 def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_path='', oracle_labels=[], repetition=0,
-                   epoch_number=0, prior_metrics=[], num_activation_batches=1, use_ff=False, oracle_is_target=False, act_label_names=[]):
+                   epoch_number=0, prior_metrics=[], num_activation_batches=5, use_ff=False, oracle_is_target=False, act_label_names=[]):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     special_criterion = nn.CrossEntropyLoss(reduction='none')
     oracle_criterion = nn.MSELoss(reduction='none')

@@ -7,6 +7,95 @@ from scipy.stats import pearsonr
 import seaborn as sns
 import matplotlib.pyplot as plt
 
+from sklearn.manifold import TSNE
+from sklearn.metrics import mutual_info_score
+from torch.utils.data import Dataset, DataLoader
+import torch.nn as nn
+import torch.nn.functional as F
+import torch
+from sklearn.model_selection import train_test_split
+
+class VectorDataset(Dataset):
+    def __init__(self, act_vectors, other_vectors):
+        self.act_vectors = act_vectors
+        self.other_vectors = other_vectors
+
+    def __len__(self):
+        return len(self.act_vectors)
+
+    def __getitem__(self, idx):
+        return self.act_vectors[idx], self.other_vectors[idx]
+
+class LinearClassifier(nn.Module):
+    def __init__(self, input_size, output_size):
+        super(LinearClassifier, self).__init__()
+        self.fc = nn.Linear(input_size, output_size)
+
+    def forward(self, x):
+        return self.fc(x)
+class MLP(nn.Module):
+    def __init__(self, input_size, hidden_size, output_size):
+        super(MLP, self).__init__()
+        self.fc1 = nn.Linear(input_size, hidden_size)
+        self.fc2 = nn.Linear(hidden_size, output_size)
+
+    def forward(self, x):
+        x = F.relu(self.fc1(x))
+        x = self.fc2(x)
+        return x
+
+def train_mlp(activations, other_data):
+    # Parameters
+    input_size = activations.shape[1]  # Size of act_vector
+    output_size = other_data.shape[1]  # Size of other_vector
+    hidden_size = 128  # you can adjust this
+    learning_rate = 1e-2
+    num_epochs = 20
+    batch_size = 32
+
+    act_train, act_val, other_train, other_val = train_test_split(
+        activations, other_data, test_size=0.2, random_state=42
+    )
+    act_train_tensor = torch.tensor(act_train, dtype=torch.float32)
+    other_train_tensor = torch.tensor(other_train, dtype=torch.float32)
+    act_val_tensor = torch.tensor(act_val, dtype=torch.float32)
+    other_val_tensor = torch.tensor(other_val, dtype=torch.float32)
+
+    train_dataset = VectorDataset(act_train_tensor, other_train_tensor)
+    val_dataset = VectorDataset(act_val_tensor, other_val_tensor)
+
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+
+    # Initialize model, loss and optimizer
+    model = MLP(input_size, hidden_size, output_size)
+    linear_model = LinearClassifier(input_size, output_size)
+    criterion = nn.MSELoss()  # Using Mean Squared Error as loss for regression
+    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+
+    # Training loop
+    for epoch in range(num_epochs):
+        linear_model.train()  # Set the model to training mode
+        for act_vector, other_vector in train_loader:
+            outputs = linear_model(act_vector)
+            loss = criterion(outputs, other_vector)
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+        # Validation
+        linear_model.eval()  # Set the model to evaluation mode
+        val_losses = []
+        with torch.no_grad():
+            for act_vector, other_vector in val_loader:
+                outputs = linear_model(act_vector)
+                val_loss = criterion(outputs, other_vector)
+                val_losses.append(val_loss.item())
+
+        avg_val_loss = sum(val_losses) / len(val_losses)
+
+        print(f'Epoch [{epoch + 1}/{num_epochs}], Training Loss: {loss.item():.4f}, Validation Loss: {avg_val_loss:.4f}')
+
 
 def compute_vector_correlation(activation_scalars, other_data_vectors):
     act_size, vector_size = activation_scalars.shape[1], other_data_vectors.shape[1]
@@ -35,6 +124,18 @@ def get_unique_arrays(data):
             unique_arrays.append(item)
 
     return unique_arrays
+
+
+def get_integer_labels_for_data(data, unique_arrays):
+    """Map each data point to its corresponding unique label."""
+    integer_labels = []
+
+    for item in data:
+        # Find the index of the item in unique_arrays using a custom comparison for numpy arrays
+        idx = next(i for i, unique_array in enumerate(unique_arrays) if np.array_equal(item, unique_array))
+        integer_labels.append(idx)
+
+    return integer_labels
 
 def process_activations(path, epoch_numbers, repetitions):
     for epoch_number in epoch_numbers:
@@ -67,11 +168,28 @@ def process_activations(path, epoch_numbers, repetitions):
                 activations = correlation_data[act_key]
                 correlation_results = {}
 
+                tsne_model = TSNE(n_components=2, perplexity=30, n_iter=300)
+                tsne_values = tsne_model.fit_transform(activations)
+
+
                 for other_key, other_data in correlation_data2.items():
                     if other_key != act_key and True:
                         print(act_key, other_key, len(activations), len(other_data))
 
                         assert activations.shape[0] == other_data.shape[0]
+                        train_mlp(activations, other_data)
+
+                        unique_vectors = get_unique_arrays(other_data)
+                        integer_labels = get_integer_labels_for_data(other_data, unique_vectors)
+
+                        plt.figure(figsize=(10, 6))
+                        labels = correlation_data2[other_key]
+                        plt.scatter(tsne_values[:, 0], tsne_values[:, 1], c=integer_labels, edgecolors='black', cmap='viridis')
+                        plt.title(f't-SNE of {act_key} colored by {other_key}')
+                        plt.xlabel('Dimension 1')
+                        plt.ylabel('Dimension 2')
+                        plt.tight_layout()
+                        plt.savefig(os.path.join(path, f"{act_key}-tsne-colored-by-{other_key}.png"))
 
 
                         result_key = f"{other_key}"
@@ -94,13 +212,21 @@ def process_activations(path, epoch_numbers, repetitions):
                             ax.set_yticks(y_ticks)
                             ax.set_yticklabels(y_ticklabels)
 
-                            # Annotating with timesteps
+                            max_width = max([t.get_window_extent().width for t in ax.get_yticklabels()])
+                            offset = max_width / ax.figure.dpi * 1.5
+
+                            plot_width = ax.get_window_extent().width / ax.figure.dpi
+                            text_offset = -plot_width * 0.05
+
                             for ts in range(0, 4):
                                 plt.axhline(32 * ts, color='white', linestyle='--')
-                                ax.text(-1.5, 32 * ts + 16, f"Timestep {ts + 1}", va='center',
+                                ax.text(text_offset, 32 * ts + 16, f"Timestep {ts + 1}", va='center',
                                         ha='left', color='black', backgroundcolor='white', rotation=90)
                         plt.tight_layout()
+                        y_label_pos = ax.yaxis.get_label().get_position()
+                        ax.yaxis.get_label().set_position((y_label_pos[0] + offset, y_label_pos[1]))
                         plt.savefig(os.path.join(path, f"{other_key}-{act_key}.png"))
+
 
                 std_dev_results = []
                 for result_key, matrix in correlation_results.items():
@@ -121,10 +247,16 @@ def process_activations(path, epoch_numbers, repetitions):
                     ax.set_yticks(y_ticks)
                     ax.set_yticklabels(y_ticklabels)
 
-                    # Annotating with timesteps
+                    max_width = max([t.get_window_extent().width for t in ax.get_yticklabels()])
+                    offset = max_width / ax.figure.dpi * 1.5
+                    plot_width = ax.get_window_extent().width / ax.figure.dpi
+                    text_offset = -plot_width * 0.05
+
                     for ts in range(0, 4):
                         plt.axhline(32 * ts, color='white', linestyle='--')
-                        ax.text(-1.5, 32 * ts + 16, f"Timestep {ts + 1}", va='center',
+                        ax.text(text_offset, 32 * ts + 16, f"Timestep {ts + 1}", va='center',
                                 ha='left', color='black', backgroundcolor='white', rotation=90)
                 plt.tight_layout()
+                y_label_pos = ax.yaxis.get_label().get_position()
+                ax.yaxis.get_label().set_position((y_label_pos[0] + offset, y_label_pos[1]))
                 plt.savefig(os.path.join(path, f"{act_key}-entropy_heatmap.png"))
