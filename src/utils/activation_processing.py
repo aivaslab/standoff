@@ -177,7 +177,7 @@ def process_activations(path, epoch_numbers, repetitions):
                         print(act_key, other_key, len(activations), len(other_data))
 
                         assert activations.shape[0] == other_data.shape[0]
-                        train_mlp(activations, other_data)
+                        #train_mlp(activations, other_data)
 
                         unique_vectors = get_unique_arrays(other_data)
                         integer_labels = get_integer_labels_for_data(other_data, unique_vectors)

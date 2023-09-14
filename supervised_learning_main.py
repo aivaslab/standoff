@@ -411,15 +411,16 @@ def custom_merge(df1, df2, cols_to_check, other_cols):
     return df1[final_condition]
 
 
-def get_descendants(category, char, translation_dict):
-    if char not in category:
+def get_descendants(category, op, categories):
+    src, tgt = op.split('-')
+
+    if src not in category:
         return []
 
-    without_char = category.replace(char, '')
     descendants = []
-    for key in translation_dict.values():
-        if set(without_char).issubset(set(key)) and char not in key:
-            descendants.append(key)
+    for potential_descendant in categories:
+        if tgt in potential_descendant and src not in potential_descendant:
+            descendants.append(potential_descendant)
     return descendants
 
 def calculate_statistics(df, last_epoch_df, params, skip_3x=True, skip_2x1=False, key_param=None, skip_1x=True, record_delta_pi=True):
@@ -533,19 +534,18 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=True, skip_2x1=False
             print('calculating delta preds')
 
             translation_dict = {
-                'eb': 'Fn',
-                'es': 'Nf',
-                'eb-es': 'Ff',
-                'eb-lb': 'Tn',
-                'eb-es-lb': 'Tf',
-                'eb-es-ls': 'Ft',
-                'eb-es-lb-ls': 'Tt',
-                'es-ls': 'Nt',
-                'none': 'none'
+                'Fn': 'Fn',
+                'Nf': 'Nf',
+                'Ff': 'Ff',
+                'Tn': 'Tn',
+                'Tf': 'Tf',
+                'Ft': 'Ft',
+                'Tt': 'Tt',
+                'Nt': 'Nt',
+                'Nn': 'Nn'
             }
 
-            operators = ['T', 't', 'F', 'f']
-
+            operators = ['T-F', 't-f', 'F-N', 'f-n', 'T-N', 't-n']
 
             for key_val in unique_vals[key_param]: # for each train regime, etc
 
@@ -765,7 +765,6 @@ def find_df_paths(directory, file_pattern):
     return glob.glob(f"{directory}/{file_pattern}")
 
 
-# train_model('random-2500', 'exist')
 def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, eval_sets=None,
                            load_path='supervised', oracle_labels=[], skip_train=True, batch_size=64,
                            prior_metrics=[], key_param=None, key_param_value=None, save_every=1, skip_calc=True,
@@ -855,7 +854,8 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
             traceback.print_exc()
 
     print('corring activations...')
-    process_activations(save_path, [49], [0])
+    if not skip_calc:
+        process_activations(save_path, [49], [0])
     return dfs_paths, last_epoch_df_paths
 
 

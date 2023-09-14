@@ -165,8 +165,24 @@ def identify_counterfactuals(events):
 def count_knowledge_combinations(event_lists, knowledges):
     counter = {}
     def tuple_to_key(knowledge_tuple):
-        mapping = ['eb', 'es', 'lb', 'ls']
-        return '-'.join([mapping[i] for i, val in enumerate(knowledge_tuple) if val])
+        eb, es, lb, ls = knowledge_tuple
+        if eb and not lb:
+            b_letter = 'F'
+        elif eb and lb:
+            b_letter = 'T'
+        else:
+            b_letter = 'N'
+
+        if es and not ls:
+            s_letter = 'f'
+        elif es and ls:
+            s_letter = 't'
+        else:
+            s_letter = 'n'
+
+        return f'{b_letter}{s_letter}'
+        #mapping = ['eb', 'es', 'lb', 'ls']
+        #return '-'.join([mapping[i] for i, val in enumerate(knowledge_tuple) if val])
 
     name_from_knowledge = {}
     for name in event_lists:

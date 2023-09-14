@@ -435,8 +435,53 @@ def save_double_param_figures(save_dir, top_pairs, avg_loss, last_epoch_df):
         plt.savefig(os.path.join(os.getcwd(), os.path.join(this_save_dir, f'hist_{param1}{param2}.png')))
         plt.close()
 
+def save_key_param_heatmap(save_dir, key_param_stats, key_param):
+    this_save_dir = os.path.join(save_dir, 'key_param')
+    os.makedirs(this_save_dir, exist_ok=True)
+    print('kp', key_param)
+    key_param = "informedness"
+    print('saving key param heatmap')
+    n_groups = len(list(key_param_stats.keys()))
+    chars1 = ['T', 'F', 'N']
+    chars2 = ['t', 'f', 'n']
+
+    # Initialize an empty 3x3 matrix
+    for param in list(next(iter(key_param_stats.values())).keys()):
+        heatmap_data = np.zeros((3, 3))
+
+        # Populate the heatmap data
+        for i, char_x in enumerate(chars1):
+            for j, char_y in enumerate(chars2):
+                key_val = char_x + char_y.lower()
+                if key_val in key_param_stats:
+                    print(key_val, param)
+                    print('ddd', param, key_val, key_param_stats[param]["informedness"]['mean'][key_val])
+                    heatmap_data[i, j] = key_param_stats[param]["informedness"]['mean'][key_val]
+        fig, ax = plt.subplots()
+        cax = ax.imshow(heatmap_data, cmap='viridis', interpolation='nearest')
+
+        # Set the ticks
+        ax.set_xticks(np.arange(len(chars1)))
+        ax.set_yticks(np.arange(len(chars2)))
+
+        # Label them with the respective list entries
+        ax.set_xticklabels(chars1)
+        ax.set_yticklabels(chars2)
+
+        # Rotate the tick labels and set their alignment
+        plt.setp(ax.get_xticklabels(), rotation=45, ha="right", rotation_mode="anchor")
+        for i in range(len(chars1)):
+            for j in range(len(chars2)):
+                text = ax.text(j, i, heatmap_data[i, j], ha="center", va="center", color="w")
+
+        ax.set_title(f"Accuracy by inf")
+        fig.tight_layout()
+        file_path = os.path.join(os.getcwd(), this_save_dir, f'heatmap_inffy_{param}.png')
+        plt.savefig(file_path)
+
 
 def save_key_param_figures(save_dir, key_param_stats, oracle_stats, key_param):
+    save_key_param_heatmap(save_dir, key_param_stats, key_param)
     this_save_dir = os.path.join(save_dir, 'key_param')
     os.makedirs(this_save_dir, exist_ok=True)
     print('saving key param figures')

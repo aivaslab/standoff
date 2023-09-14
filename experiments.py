@@ -113,41 +113,31 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
     prior_metrics = ['shouldAvoidSmall', 'correctSelection', 'incorrectSelection',
                      'shouldGetBig', 'informedness', 'p-b-0', 'p-b-1', 'p-s-0', 'p-s-1', 'delay']
 
-    sub_regime_keys = [
-        "",
-        "eb", "es",
-        "eb-lb", "es-ls",
-        "eb-es",
-        "eb-es-lb", "eb-es-ls",
-        "eb-es-lb-ls"
+    sub_regime_keys_new = [
+        "Nn",
+        "Fn", "Nf",
+        "Tn", "Nt",
+        "Ff",
+        "Tf", "Ft",
+        "Tt"
     ]
-    sub_regime_mapping = {
-        'bigExist': 'eb',
-        'smallExist': 'es',
-        'bothExist': 'eb-es',
-        'bigExistBigLoc': 'eb-lb',
-        'smallExistSmallLoc': 'es-ls',
-        'bothExistBigLoc': 'eb-es-lb',
-        'bothExistSmallLoc': 'eb-es-ls',
-        'bothExistBothLoc': 'eb-es-lb-ls',
-        'noInfo': '',
-    }
     sub_regime_mapping_new= {
-        'noInfo': '',
-        'E': 'eb',
-        'e': 'es',
-        'Ee': 'eb-es',
-        'EL': 'eb-lb',
-        'el': 'es-ls',
-        'EeL': 'eb-es-lb',
-        'Eel': 'eb-es-ls',
-        'EeLl': 'eb-es-lb-ls'
+        'Nn': 'Nn',
+        'Fn': 'Fn',
+        'Nf': 'Nf',
+        'Ff': 'Ff',
+        'Tn': 'Tn',
+        'Nt': 'Nt',
+        'Tf': 'Tf',
+        'Ft': 'Ft',
+        'Tt': 'Tt'
     }
-    regimes = {k: ['sl-' + x + '0' for x in sub_regime_keys] + ['sl-' + v + '1'] for k, v in sub_regime_mapping.items()}
-    regimes['direct'] = ['sl-' + x + '1' for x in sub_regime_keys]
-    regimes['noOpponent'] = ['sl-' + x + '0' for x in sub_regime_keys]
+    regimes = {k: ['sl-' + x + '0' for x in sub_regime_keys_new] + ['sl-' + v + '1'] for k, v in sub_regime_mapping_new.items()}
+    print('regimes:', regimes)
+    regimes['direct'] = ['sl-' + x + '1' for x in sub_regime_keys_new]
+    regimes['noOpponent'] = ['sl-' + x + '0' for x in sub_regime_keys_new]
 
-    default_regime = regimes['bothExistBothLoc']
+    default_regime = regimes['Tt']
     pref_types = [
         ('same', ''),
         # ('different', 'd'),
@@ -185,7 +175,7 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
         combined_path_list = []
         last_path_list = []
         key_param = 'regime'
-        exp_name = 'exp_1rd' if not use_ff else 'exp_1rd-f'
+        exp_name = 'exp_1' if not use_ff else 'exp_1-f'
 
         for regime in list(regimes.keys()):
             print('regime:', regime)
@@ -258,7 +248,8 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
                 key_param_value=regime,
                 save_every=save_every,
                 skip_calc=skip_calc,
-                use_ff=use_ff
+                use_ff=use_ff,
+                act_label_names=labels,
             )
             last_path_list.append(last_epoch_paths)
             combined_path_list.append(combined_paths)
