@@ -174,7 +174,7 @@ def process_activations(path, epoch_numbers, repetitions):
 
                 for other_key, other_data in correlation_data2.items():
                     if other_key != act_key and True:
-                        print(act_key, other_key, len(activations), len(other_data))
+                        #print(act_key, other_key, len(activations), len(other_data))
 
                         assert activations.shape[0] == other_data.shape[0]
                         #train_mlp(activations, other_data)
@@ -194,7 +194,7 @@ def process_activations(path, epoch_numbers, repetitions):
 
                         result_key = f"{other_key}"
 
-                        print('data', other_data[0], len(get_unique_arrays(other_data)))
+                        #print('data', other_data[0], len(get_unique_arrays(other_data)))
 
                         temp_results = compute_vector_correlation(activations, other_data)
                         non_nan_columns = ~np.isnan(temp_results).any(axis=0)
@@ -202,7 +202,7 @@ def process_activations(path, epoch_numbers, repetitions):
 
                         # Plotting the heatmap for each matrix
                         plt.figure(figsize=(10, 10))
-                        ax = sns.heatmap(correlation_results[result_key], cmap='coolwarm', center=0)
+                        ax = sns.heatmap(correlation_results[result_key], cmap='coolwarm', center=0, vmin=-1, vmax=1)
                         plt.xlabel(f"{other_key} Environment Features")
                         plt.ylabel(f"{act_key} Neuron")
                         plt.title(f"{act_key} vs {result_key}")
@@ -228,17 +228,17 @@ def process_activations(path, epoch_numbers, repetitions):
                         plt.savefig(os.path.join(path, f"{other_key}-{act_key}.png"))
 
 
-                std_dev_results = []
+                sum_results = []
                 for result_key, matrix in correlation_results.items():
-                    row_std_devs = np.std(matrix, axis=1)
-                    std_dev_results.append(row_std_devs)
-                std_dev_matrix = np.column_stack(std_dev_results)
+                    sums = np.sum(np.abs(matrix), axis=1) / matrix.shape[1]
+                    sum_results.append(sums)
+                sum_matrix = np.column_stack(sum_results)
 
                 plt.figure(figsize=(15, 10))
-                ax = sns.heatmap(std_dev_matrix, cmap='viridis')
+                ax = sns.heatmap(sum_matrix, cmap='viridis')
                 plt.xlabel("Result Key")
                 plt.ylabel("Neuron")
-                plt.title("Variance of Neuron Activation Correlations")
+                plt.title("Mean of Absolute Neuron Activation Correlations")
                 plt.xticks(ticks = np.arange(0.5, len(correlation_results), 1), labels=correlation_results.keys(), rotation=90)
 
                 if act_key == 'activations_out':

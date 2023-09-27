@@ -228,7 +228,7 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
         last_path_list = []
         key_param = 'regime'
         oracle = 'b-loc'
-        exp_name = 'exp_3rd' if not use_ff else 'exp_3rd-f'
+        exp_name = 'exp_3x' if not use_ff else 'exp_3x-f'
 
         for regime in regimes.keys():
             print('regime:', regime, 'oracle:', oracle)
@@ -271,7 +271,7 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
         write_metrics_to_file(os.path.join(combined_path, 'metrics.txt'), last_epoch_df, ranges_1, params, stats,
                               key_param=key_param, d_s=delta_sum, d_x=delta_x)
         save_figures(os.path.join(combined_path, 'figs'), combined_df, avg_loss, ranges_2, range_dict, range_dict3,
-                     params, last_epoch_df, num=12, key_param_stats=key_param_stats,  oracle_stats=oracle_stats, key_param=key_param, delta_sum=delta_sum)
+                     params, last_epoch_df, num=12, key_param_stats=key_param_stats,  oracle_stats=oracle_stats, key_param=key_param, delta_sum=delta_sum, delta_x=delta_x)
 
     if 2 in todo:
         save_every = max(1, epochs // desired_evals)
@@ -304,6 +304,7 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
                 skip_calc=skip_calc,
                 use_ff=use_ff,
                 oracle_layer=oracle_layer,
+                act_label_names=labels,
                 )
             last_path_list.append(last_epoch_paths)
             combined_path_list.append(combined_paths)
@@ -383,4 +384,4 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
 
 
 if __name__ == '__main__':
-    experiments([1], repetitions=1, epochs=50, skip_train=True, skip_eval=True, skip_calc=True, batch_size=256, desired_evals=1, use_ff=False)
+    experiments([11], repetitions=1, epochs=5, skip_train=False, skip_eval=False, skip_calc=False, batch_size=256, desired_evals=1, use_ff=False)

@@ -744,9 +744,11 @@ def write_metrics_to_file(filepath, df, ranges, params, stats, key_param=None, d
             f.write(f"Correlation between {param} and acc: {stats['accuracy_correlations'][param]}\n")
 
         f.write("\nCorrelations between parameters:\n")
-        for i in range(len(stats['vars'])):
-            for j in range(i + 1, len(stats['vars'])):
-                f.write(f"Correlation between {params[i]} and {params[j]}: {stats['param_correlations'].iloc[i, j]}\n")
+        #print(len(params), len(stats['param_correlations']))
+        #print(params, stats['param_correlations'].columns)
+        for i in range(len(stats['param_correlations'])):
+            for j in range(i + 1, len(stats['param_correlations'])):
+                f.write(f"Correlation between {stats['param_correlations'].columns[i]} and {stats['param_correlations'].columns[j]}: {stats['param_correlations'].iloc[i, j]}\n")
 
         if d_s is not None:
             f.write("\nDelta prediction results:\n")
@@ -855,7 +857,7 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
 
     print('corring activations...')
     if not skip_calc:
-        process_activations(save_path, [49], [0])
+        process_activations(save_path, [epochs-1], [0])
     return dfs_paths, last_epoch_df_paths
 
 
