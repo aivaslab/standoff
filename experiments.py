@@ -230,7 +230,7 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
         oracle = 'b-loc'
         exp_name = 'exp_3x' if not use_ff else 'exp_3x-f'
 
-        for regime in regimes.keys():
+        for regime in list(regimes.keys()):
             print('regime:', regime, 'oracle:', oracle)
             combined_paths, last_epoch_paths = run_supervised_session(
                 save_path=os.path.join('supervised', exp_name, regime),
@@ -268,6 +268,7 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
 
         combined_path = os.path.join('supervised', exp_name, 'c')
         os.makedirs(combined_path, exist_ok=True)
+        print('made combined path')
         write_metrics_to_file(os.path.join(combined_path, 'metrics.txt'), last_epoch_df, ranges_1, params, stats,
                               key_param=key_param, d_s=delta_sum, d_x=delta_x)
         save_figures(os.path.join(combined_path, 'figs'), combined_df, avg_loss, ranges_2, range_dict, range_dict3,
@@ -384,4 +385,4 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
 
 
 if __name__ == '__main__':
-    experiments([11], repetitions=1, epochs=5, skip_train=False, skip_eval=False, skip_calc=False, batch_size=256, desired_evals=1, use_ff=False)
+    experiments([11], repetitions=1, epochs=10, skip_train=False, skip_eval=False, skip_calc=False, batch_size=256, desired_evals=1, use_ff=False)

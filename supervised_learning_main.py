@@ -4,7 +4,6 @@ import pickle
 
 import sys
 import os
-import time
 import numpy as np
 from functools import lru_cache
 
@@ -24,7 +23,7 @@ from torch.utils.data import DataLoader, random_split
 import tqdm
 import torch.nn as nn
 import torch
-from src.supervised_learning import RNNModel, TrainDatasetBig, EvalDatasetBig, FeedForwardModel
+from src.supervised_learning import RNNModel, TrainDatasetBig, EvalDatasetBig, FeedForwardModel, custom_collate
 import traceback
 import torch.multiprocessing as mp
 
@@ -32,10 +31,13 @@ mp.set_start_method('spawn', force=True)
 
 
 def decode_event_name(name):
-    # Split the name into the main part and the numerical suffix
-    main_part, numerical_suffix = name.split('-')
+    byte_list = name.tolist()
 
-    # Extract individual parameters
+    byte_list = [b for b in byte_list if b != 0]
+
+    params_str = ''.join([chr(c) for c in byte_list])
+    main_part, numerical_suffix = params_str.split('-')
+
     visible_baits = int(main_part[main_part.index('b') + 1:main_part.index('w')])
     swaps = int(main_part[main_part.index('w') + 1:main_part.index('v')])
     visible_swaps = int(main_part[main_part.index('v') + 1])
@@ -43,7 +45,6 @@ def decode_event_name(name):
     second_swap_to_first_loc = 1 if 's' in main_part else 0
     delay_2nd_bait = 1 if 'd' in main_part else 0
 
-    # Convert the numerical suffix to binary and pad with zeroes to ensure 4 bits
     '''binary_suffix = format(int(numerical_suffix), '04b')
 
     # Extract parameters from the binary suffix
@@ -163,7 +164,7 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
         prior_metrics_data[metric] = np.concatenate(arrays, axis=0)
 
     val_dataset = EvalDatasetBig(data, labels, params, oracles, prior_metrics_data, act_labels)
-    test_loaders.append(DataLoader(val_dataset, batch_size=batch_size, shuffle=True))
+    test_loaders.append(DataLoader(val_dataset, batch_size=batch_size, shuffle=True, collate_fn=custom_collate))
 
     hook = SaveActivations()
     activation_data = {
@@ -207,8 +208,8 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
 
                 corrects = (predicted == torch.argmax(labels, dim=1))
                 pred = predicted.cpu()
-                small_food_selected = (pred == torch.argmax(metrics['loc'][:, :, 0], dim=1))
-                big_food_selected = (pred == torch.argmax(metrics['loc'][:, :, 1], dim=1))
+                small_food_selected = (pred == torch.argmax(metrics['loc'][:, -1, :, 0], dim=1))
+                big_food_selected = (pred == torch.argmax(metrics['loc'][:, -1, :, 1], dim=1))
                 neither_food_selected = ~(small_food_selected | big_food_selected)
 
                 tq.update(1)

@@ -9,6 +9,7 @@ import os
 import pandas as pd
 
 from .utils.evaluation import get_relative_direction
+from torch.utils.data._utils.collate import default_collate
 
 sys.path.append(os.getcwd())
 
@@ -71,7 +72,7 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
         # "view_type": 1,
     }
 
-    frames = 5
+    frames = 4
     all_path_infos = pd.DataFrame()
     suffix = pref_type + role_type
 
@@ -91,6 +92,9 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
 
         data_name = f'{configName}'
         informedness = data_name[3:-1]
+        mapping = {'T': 2, 'F': 1, 'N': 0, 't': 2, 'f': 1, 'n': 0}
+        informedness = [mapping[char] for char in informedness]
+
         #print('data name', data_name)
         data_obs = []
         data_labels = {}
@@ -157,9 +161,16 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
                     this_ob = np.zeros((frames, *obs['p_0'].shape))
                     pos = 0
 
+                    temp_labels = {label: [] for label in check_labels}
+
                     while pos < frames:
                         next_obs, _, _, info = env.step({'p_0': 2})
                         this_ob[pos, :, :, :] = next_obs['p_0']
+
+                        for label in check_labels:
+                            temp_labels[label].append(info['p_0'][label])
+
+
                         if pos == frames - 1 or env.has_released:
                             data_obs.append(serialize_data(this_ob.astype(np.uint8)))
                             data_params.append(eName)
@@ -167,8 +178,8 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
                                 data = one_hot(5, info['p_0'][label])
                                 data_labels[label].append(data)
                             for label in check_labels:
-                                data = info['p_0'][label]
-                                data_labels[label].append(data)
+                                data_labels[label].append(np.stack(temp_labels[label]))
+
                             data_labels['informedness'].append(informedness)
                             data_labels['opponents'].append(params["num_puppets"])
                             break
@@ -410,6 +421,20 @@ class BaseDatasetBig(Dataset):
         return self.cumulative_sizes[-1]
 
 
+def custom_collate(batch):
+
+    data, labels, params, oracles, metrics, act_labels_batch = zip(*batch)
+
+    data = default_collate(data)
+    labels = default_collate(labels)
+    oracles = default_collate(oracles)
+    params = default_collate(params)
+    metric_keys = metrics[0].keys()
+    metrics_collated = {key: default_collate([d[key] for d in metrics]) for key in metric_keys}
+    act_labels_keys = act_labels_batch[0].keys()
+    act_labels_batch = {key: default_collate([d[key] for d in act_labels_batch]) for key in act_labels_keys}
+
+    return data, labels, params, oracles, metrics_collated, act_labels_batch
 class TrainDatasetBig(BaseDatasetBig):
     def __getitem__(self, index):
         list_index, local_index = self._find_list_index(index)
@@ -420,7 +445,14 @@ class TrainDatasetBig(BaseDatasetBig):
 
         metrics = {key: self.metrics[key][index] for key in self.metrics.keys()} if self.metrics else 0
 
-        return data, labels, self.params_list[list_index][local_index], oracles, metrics
+        params = self.params_list[list_index][local_index]
+
+        if isinstance(params, str):
+            byte_list = [ord(c) for c in params]
+            padded_byte_list = byte_list + [0] * (12 - len(byte_list))
+            params = torch.tensor(padded_byte_list, dtype=torch.int)
+
+        return data, labels, params, oracles, metrics
 
 
 class EvalDatasetBig(BaseDatasetBig):
@@ -440,7 +472,20 @@ class EvalDatasetBig(BaseDatasetBig):
 
         metrics = {key: self.metrics[key][index] for key in self.metrics.keys()} if self.metrics else 0
 
-        return data, labels, self.params_list[list_index][local_index], oracles, metrics, act_labels_batch
+        params = self.params_list[list_index][local_index]
+
+        if isinstance(params, str):
+            byte_list = [ord(c) for c in params]
+            padded_byte_list = byte_list + [0] * (12 - len(byte_list))
+            params = torch.tensor(padded_byte_list, dtype=torch.int)
+
+        '''print(type(data), type(labels), type(params), type(oracles), type(metrics), type(act_labels_batch))
+        for key, value in metrics.items():
+            print(f"Key: {key}, Type: {type(value)}")
+        for key, value in act_labels_batch.items():
+            print(f"Key: {key}, Type: {type(value)}")'''
+
+        return data, labels,params, oracles, metrics, act_labels_batch
 
 class RNNModel(nn.Module):
     def __init__(self, hidden_size, num_layers, output_len, channels, kernels=8, kernels2=8, kernel_size1=3,
@@ -458,6 +503,7 @@ class RNNModel(nn.Module):
 
         input_size = 7
         self.input_frames = 4
+
 
         self.oracle_layer = oracle_layer
         self.oracle_is_target = oracle_is_target
@@ -493,7 +539,11 @@ class RNNModel(nn.Module):
 
         self.rnn = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
 
-        self.fc = nn.Linear(hidden_size + oracle_len if self.oracle_layer == 0 and not oracle_is_target else hidden_size, int(output_len) if not oracle_is_target else int(output_len) + oracle_len)
+        self.fc_main_output = nn.Linear(hidden_size + oracle_len if self.oracle_layer == 0 and not oracle_is_target else hidden_size,
+                            int(output_len) if not oracle_is_target else int(output_len))
+
+        if oracle_is_target:
+            self.fc_oracle_output = nn.Linear(hidden_size, oracle_len // self.input_frames)
 
     def forward(self, x, oracle_inputs):
         conv_outputs = []
@@ -513,12 +563,15 @@ class RNNModel(nn.Module):
         x = torch.stack(conv_outputs, dim=1)
 
         out, _ = self.rnn(x)
-        out = out[:, -1, :]  # Use only the last timestep's output
+        outputs = self.fc_main_output(out[:, -1, :])
 
         if not self.oracle_is_target and self.oracle_layer != 1:
             out = torch.cat((out, oracle_inputs), dim=-1)
+        elif self.oracle_is_target:
+            oracle_outputs = self.fc_oracle_output(out)
+            oracle_outputs = oracle_outputs.view(oracle_outputs.size(0), -1)
+            outputs = torch.cat((outputs, oracle_outputs), dim=1)
 
-        outputs = self.fc(out)
         return outputs
 
 

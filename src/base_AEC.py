@@ -838,8 +838,8 @@ class para_MultiGridEnv(ParallelEnv):
         '''
 
         # activate timed events
-        if str(self.step_count + 1) in self.timers.keys():
-            for event in self.timers[str(self.step_count + 1)]:
+        if str(self.step_count) in self.timers.keys():
+            for event in self.timers[str(self.step_count)]:
                 self.timer_active(event[0], event[1])
 
         # If a user passes in actions with no agents, then just return empty observations, etc.
@@ -1107,6 +1107,38 @@ class para_MultiGridEnv(ParallelEnv):
 
         for agent in self.puppets:
             self.puppet_pathing(agent)
+
+        if self.record_oracle_labels and ((self.step_count <= self.end_at_frame or self.end_at_frame == -1) or self.has_released):
+            y = self.height // 2
+            target_agent = "p_1"
+            one_hot_goal = [0] * self.boxes
+            if self.params['num_puppets'] > 0:
+                one_hot_goal[self.agent_goal[target_agent]] = 1
+            self.infos['p_0']["target"] = one_hot_goal
+            self.infos['p_0']["vision"] = int(self.currently_visible)
+            real_boxes = [self.grid.get(box + 1, y) for box in range(self.boxes)]
+
+            real_box_rewards = [box.get_reward() if box is not None and hasattr(box, "get_reward") else 0 for box in real_boxes]
+            if self.params['num_puppets'] > 0:
+                all_rewards_seen = [self.last_seen_reward[target_agent + str(box)] for box in range(self.boxes)]
+            else:
+                all_rewards_seen = [0] * self.boxes
+            self.infos['p_0']["loc"] = [
+                [1, 0] if reward == self.bigReward else
+                [0, 1] if reward == self.smallReward else
+                [0, 0]
+                for reward in real_box_rewards
+            ]
+            self.infos['p_0']["b-loc"] = [
+                [1, 0] if reward == self.bigReward else
+                [0, 1] if reward == self.smallReward else
+                [0, 0]
+                for reward in all_rewards_seen
+            ]
+            self.infos['p_0']["exist"] = [1 if self.bigReward in real_box_rewards else 0,
+                                          1 if self.smallReward in real_box_rewards else 0]
+            self.infos['p_0']["b-exist"] = [1 if self.bigReward in all_rewards_seen else 0,
+                                            1 if self.smallReward in all_rewards_seen else 0]
 
         # clear puppets from obs, rewards, dones, infos
 

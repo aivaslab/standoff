@@ -190,6 +190,7 @@ def process_activations(path, epoch_numbers, repetitions):
                         plt.ylabel('Dimension 2')
                         plt.tight_layout()
                         plt.savefig(os.path.join(path, f"{act_key}-tsne-colored-by-{other_key}.png"))
+                        plt.close()
 
 
                         result_key = f"{other_key}"
@@ -226,6 +227,7 @@ def process_activations(path, epoch_numbers, repetitions):
                         y_label_pos = ax.yaxis.get_label().get_position()
                         ax.yaxis.get_label().set_position((y_label_pos[0] + offset, y_label_pos[1]))
                         plt.savefig(os.path.join(path, f"{other_key}-{act_key}.png"))
+                        plt.close()
 
 
                 sum_results = []
@@ -260,3 +262,4 @@ def process_activations(path, epoch_numbers, repetitions):
                 y_label_pos = ax.yaxis.get_label().get_position()
                 ax.yaxis.get_label().set_position((y_label_pos[0] + offset, y_label_pos[1]))
                 plt.savefig(os.path.join(path, f"{act_key}-entropy_heatmap.png"))
+                plt.close()

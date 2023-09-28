@@ -239,7 +239,8 @@ class MiniStandoffEnv(para_MultiGridEnv):
         counter = 1
         instantiated_perms = index_permutations(perms, (self.current_param_group_pos // len(self.delays)))
         self.infos['p_0']['perm'] = str(instantiated_perms)
-        self.infos['p_0']['delay'] = str(delays)
+        delay = list(delays)
+        self.infos['p_0']['delay'] = delay + [0] * (4 - len(delay))
         for b in range(2):
             # store the bait/swap locations
             self.infos['p_0'][f'p-b-{b}'] = -1
@@ -340,8 +341,8 @@ class MiniStandoffEnv(para_MultiGridEnv):
 
         # add timers for events
         self.timers = {}
-        curTime = 1
-        self.add_timer(["init"], 1)
+        curTime = 0
+        self.add_timer(["init"], 0)
         delay_position = 0
         for k, event in enumerate(events):
             self.add_timer(event, curTime, arg=event_args[k])
@@ -555,38 +556,8 @@ class MiniStandoffEnv(para_MultiGridEnv):
                 # tile = self.grid.get(x, y)
                 # we cannot track shouldAvoidBig etc here because the treat location might change
 
-        if self.record_oracle_labels and (self.step_count == self.end_at_frame or self.has_released):
-            target_agent = "p_1"
-            one_hot_goal = [0] * self.boxes
-            if self.params['num_puppets'] > 0:
-                one_hot_goal[self.agent_goal[target_agent]] = 1
-            self.infos['p_0']["target"] = one_hot_goal
-            while (len(self.visible_event_list) < 4):
-                self.visible_event_list.insert(0, 0)
-            self.infos['p_0']["vision"] = self.visible_event_list[:4]
-            real_boxes = [self.grid.get(box + 1, y) for box in range(self.boxes)]
 
-            real_box_rewards = [box.get_reward() if box is not None and hasattr(box, "get_reward") else 0 for box in real_boxes]
-            if self.params['num_puppets'] > 0:
-                all_rewards_seen = [self.last_seen_reward[target_agent + str(box)] for box in range(self.boxes)]
-            else:
-                all_rewards_seen = [0] * self.boxes
-            self.infos['p_0']["loc"] = [
-                [1, 0] if reward == self.bigReward else
-                [0, 1] if reward == self.smallReward else
-                [0, 0]
-                for reward in real_box_rewards
-            ]
-            self.infos['p_0']["b-loc"] = [
-                [1, 0] if reward == self.bigReward else
-                [0, 1] if reward == self.smallReward else
-                [0, 0]
-                for reward in all_rewards_seen
-            ]
-            self.infos['p_0']["exist"] = [1 if self.bigReward in real_box_rewards else 0,
-                                          1 if self.smallReward in real_box_rewards else 0]
-            self.infos['p_0']["b-exist"] = [1 if self.bigReward in all_rewards_seen else 0,
-                                            1 if self.smallReward in all_rewards_seen else 0]
+
             #print(self.step_count, self.infos['p_0']["exist"], self.infos['p_0']["b-exist"], self.infos['p_0']["target"], self.infos['p_0']["vision"], self.infos['p_0']["loc"], self.infos['p_0']["b-loc"])
         if self.record_info:
             if name == "rel":
