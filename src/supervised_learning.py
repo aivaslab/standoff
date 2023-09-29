@@ -92,7 +92,8 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
 
         data_name = f'{configName}'
         informedness = data_name[3:-1]
-        mapping = {'T': 2, 'F': 1, 'N': 0, 't': 2, 'f': 1, 'n': 0}
+        mapping = {'T': 2, 'F': 1, 'N': 0, 't': 2, 'f': 1, 'n': 0, '0': 0, '1': 1}
+        # we just get opponents directly from num_puppets later
         informedness = [mapping[char] for char in informedness]
 
         #print('data name', data_name)
@@ -565,9 +566,9 @@ class RNNModel(nn.Module):
         out, _ = self.rnn(x)
         outputs = self.fc_main_output(out[:, -1, :])
 
-        if not self.oracle_is_target and self.oracle_layer != 1:
-            out = torch.cat((out, oracle_inputs), dim=-1)
-        elif self.oracle_is_target:
+        #if not self.oracle_is_target and self.oracle_layer != 1:
+        #    out = torch.cat((out, oracle_inputs), dim=-1)
+        if self.oracle_is_target:
             oracle_outputs = self.fc_oracle_output(out)
             oracle_outputs = oracle_outputs.view(oracle_outputs.size(0), -1)
             outputs = torch.cat((outputs, oracle_outputs), dim=1)

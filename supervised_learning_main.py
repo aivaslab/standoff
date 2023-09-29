@@ -230,7 +230,7 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
                         if key not in activation_data:
                             activation_data[key] = []
                         activation_data[key].append(act_label.cpu().numpy().reshape(batch_size, -1))
-                        print(key, act_label.shape)
+                        #print(key, act_label.shape)
 
                 if i == num_activation_batches - 1:
                         handle.remove()
@@ -419,10 +419,14 @@ def get_descendants(category, op, categories):
         return []
 
     descendants = []
-    for potential_descendant in categories:
-        if tgt in potential_descendant and src not in potential_descendant:
-            descendants.append(potential_descendant)
-    return descendants
+    # below technique gets all categories with the change, not just one otherwise identical (usually 6)
+
+    #for potential_descendant in categories:
+    #    if tgt in potential_descendant and src not in potential_descendant:
+    #        descendants.append(potential_descendant)
+    direct_descendant = category.replace(src, tgt)
+    return [direct_descendant]
+    #return descendants
 
 def calculate_statistics(df, last_epoch_df, params, skip_3x=True, skip_2x1=False, key_param=None, skip_1x=True, record_delta_pi=True):
     '''
@@ -444,7 +448,7 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=True, skip_2x1=False
             last_epoch_df[param] = last_epoch_df[param].astype('category')
     params = [param for param in params if param not in ['delay', 'perm']]
 
-    print('params:', params)
+    #print('params:', params)
 
     param_pairs = itertools.combinations(params, 2)
     param_triples = itertools.combinations(params, 3)
@@ -534,36 +538,32 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=True, skip_2x1=False
             # todo: if delay_2nd_bait or first_swap are na, just make them 0? shouldn't affect anything
             print('calculating delta preds')
 
-            translation_dict = {
-                'Fn': 'Fn',
-                'Nf': 'Nf',
-                'Ff': 'Ff',
-                'Tn': 'Tn',
-                'Tf': 'Tf',
-                'Ft': 'Ft',
-                'Tt': 'Tt',
-                'Nt': 'Nt',
-                'Nn': 'Nn'
-            }
+            set1 = ['T', 'F', 'N']
+            set2 = ['t', 'f', 'n']
+            set3 = ['0', '1']
+            combinations = list(itertools.product(set1, set2, set3))
+            combinations_str = [''.join(combo) for combo in combinations]
 
-            operators = ['T-F', 't-f', 'F-N', 'f-n', 'T-N', 't-n']
+            operators = ['T-F', 't-f', 'F-N', 'f-n', 'T-N', 't-n', '1-0']
 
             for key_val in unique_vals[key_param]: # for each train regime, etc
 
                 required_columns = [f'pred_{i}' for i in range(5)]
                 perm_keys = ['p-b-0', 'p-b-1', 'p-s-0', 'p-s-1', 'delay_2nd_bait', 'first_swap', 'first_bait_size', 'delay']
                 # the p-x-y columns show which location is selected for each bait and swap, or -1 if none (only applicable to swaps)
+                #print(last_epoch_df.columns, key_param, key_val)
                 subset = last_epoch_df[last_epoch_df[key_param] == key_val]
                 subset['pred'] = subset['pred'].apply(convert_to_numeric).astype(np.int8)
-                subset['informedness'] = subset['informedness'].replace(translation_dict)
+                #subset['informedness'] = subset['informedness'].replace(translation_dict)
                 conv = pd.concat([subset, pd.get_dummies(subset['pred'], prefix='pred')], axis=1)
-                subset = conv[required_columns + ['informedness', 'correctSelection'] + perm_keys]
 
                 for col in required_columns: # a model might not predict all 5 values
                     if col not in conv.columns:
                         conv[col] = 0
+                subset = conv[required_columns + ['informedness', 'correctSelection', 'opponents'] + perm_keys]
 
-                # OPERATOR ONE
+
+                # OPERATOR PART
                 delta_mean = {key: [] for key in operators}
                 delta_std = {key: [] for key in operators}
                 delta_mean_correct = {key: [] for key in operators}
@@ -572,15 +572,29 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=True, skip_2x1=False
 
                     delta_preds = []
                     delta_preds_correct = []
-                    for key in translation_dict.values():
+                    for key in combinations_str:
                         # key is 1st position, descendents are 2nd
-                        descendants = get_descendants(key, op, translation_dict)
+                        descendants = get_descendants(key, op, combinations_str)
+
+                        mapping = {'T': 2, 'F': 1, 'N': 0, 't': 2, 'f': 1, 'n': 0, '0': 0, '1': 1}
+
+                        key = [mapping[char] for char in key]
+                        key_informedness = '[' + ' '.join(map(str, key[:2])) + ']'
+                        key_opponents = np.float64(key[2])
+
+                        descendants = [[mapping[char] for char in descendant] for descendant in descendants]
+                        descendant_informedness = ['[' + ' '.join(map(str, descendant[:2])) + ']' for descendant in descendants]
+                        descendant_opponents = [np.float64(descendant[2]) for descendant in descendants]
+
+                        # todo: only get one descendant
                         if len(descendants) < 1:
                             continue
-                        inf = subset[subset['informedness'] == key].groupby(perm_keys + ['informedness', 'correctSelection'], observed=True).mean().reset_index()
-                        print('ddd', descendants)
-                        noinf = subset[subset['informedness'].isin(descendants)].groupby(perm_keys + ['informedness', 'correctSelection'], observed=True).mean().reset_index()
-                        print('key', key, len(inf), len(noinf))
+
+                        inf = subset[(subset['informedness'] == key_informedness) & (subset['opponents'] == key_opponents)].groupby(perm_keys + ['informedness', 'opponents', 'correctSelection'], observed=True).mean().reset_index()
+                        noinf = subset[(subset['informedness'].isin(descendant_informedness)) &
+                            (subset['opponents'].isin(descendant_opponents))].groupby(perm_keys + ['informedness', 'opponents', 'correctSelection'], observed=True).mean().reset_index()
+                        #print('lens1', len(inf), len(noinf), len(subset))
+
 
                         merged_df = pd.merge(
                             inf,
@@ -590,18 +604,23 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=True, skip_2x1=False
                             how='inner',
                         )
 
-                        merged_df['changed_target'] = (
-                                    merged_df['correctSelection_m'] != merged_df['correctSelection']).astype(int)
+                        merged_df['changed_target'] = (merged_df['correctSelection_m'] != merged_df['correctSelection']).astype(int)
 
                         for i in range(5):
                             merged_df[f'pred_diff_{i}'] = abs(merged_df[f'pred_{i}_m'] - merged_df[f'pred_{i}'])
-                        merged_df['total_pred_diff'] = merged_df[[f'pred_diff_{idx}' for idx in range(5)]].sum(
-                            axis=1) / 2
-                        merged_df['total_pred_diff_correct'] = 1 - abs(
-                            merged_df['total_pred_diff'] - merged_df['changed_target'])
+                        merged_df['total_pred_diff'] = merged_df[[f'pred_diff_{idx}' for idx in range(5)]].sum(axis=1) / 2
+                        merged_df['total_pred_diff_correct'] = 1 - abs(merged_df['total_pred_diff'] - merged_df['changed_target'])
+
+                        print(op, key, descendants, len(merged_df['total_pred_diff']), np.mean(merged_df['total_pred_diff']), len(merged_df['changed_target']), np.mean(merged_df['changed_target']))
 
                         delta_preds.extend(merged_df['total_pred_diff'].tolist())
                         delta_preds_correct.extend(merged_df['total_pred_diff_correct'].tolist())
+
+                        if any(np.isnan(delta_preds)):
+                            print(f"Debug: 'delta_preds' contains NaNs")
+
+                        if any(np.isnan(delta_preds_correct)):
+                            print(f"Debug: 'delta_preds_correct' contains NaNs")
 
                     # these lines are wrong
                     delta_mean[op] = np.mean(delta_preds)
@@ -765,14 +784,14 @@ def write_metrics_to_file(filepath, df, ranges, params, stats, key_param=None, d
 
 def find_df_paths(directory, file_pattern):
     """Find all CSV files in a directory based on a pattern."""
-    return glob.glob(f"{directory}/{file_pattern}")
+    return glob.glob(f"{directory}\\{file_pattern}")
 
 
 def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, eval_sets=None,
                            load_path='supervised', oracle_labels=[], skip_train=True, batch_size=64,
                            prior_metrics=[], key_param=None, key_param_value=None, save_every=1, skip_calc=True,
                            use_ff=False, oracle_layer=0, skip_eval=False, oracle_is_target=False, skip_figures=True,
-                           act_label_names=[]):
+                           act_label_names=[], skip_activations=True):
 
     '''
     Runs a session of supervised learning. Different steps, such as whether we train+save models, evaluate models, or run statistics on evaluations, are optional.
@@ -817,14 +836,15 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
                             dfs_paths.extend(df_paths)
                             if epoch == epochs - 1:
                                 last_epoch_df_paths.extend(df_paths)
-            else:
+            if skip_train:
                 dfs_paths = find_df_paths(save_path, 'param_losses_*_*.csv')
-                print(save_path)
-                max_epoch = max(int(path.split('_')[-2]) for path in dfs_paths)
-                last_epoch_df_paths = [path for path in dfs_paths if int(path.split('_')[-2]) == max_epoch]
+                print('dfs paths', dfs_paths, save_path)
+                if len(dfs_paths):
+                    max_epoch = max(int(path.split('_')[-2]) for path in dfs_paths)
+                    last_epoch_df_paths = [path for path in dfs_paths if int(path.split('_')[-2]) == max_epoch]
 
-            if not skip_calc:
-                print('loading dfs...')
+            if not skip_calc and len(last_epoch_df_paths):
+                print('loading dfs...', dfs_paths)
 
                 df_list = [pd.read_csv(df_path) for df_path in dfs_paths]
                 combined_df = pd.concat(df_list, ignore_index=True)
@@ -856,8 +876,8 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
             print(e)
             traceback.print_exc()
 
-    print('corring activations...')
-    if not skip_calc:
+    if not skip_activations:
+        print('corring activations...')
         process_activations(save_path, [epochs-1], [0])
     return dfs_paths, last_epoch_df_paths
 

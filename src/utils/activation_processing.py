@@ -44,13 +44,13 @@ class MLP(nn.Module):
         x = self.fc2(x)
         return x
 
-def train_mlp(activations, other_data):
+def train_mlp(activations, other_data, patience=25, num_prints=5):
     # Parameters
-    input_size = activations.shape[1]  # Size of act_vector
-    output_size = other_data.shape[1]  # Size of other_vector
-    hidden_size = 128  # you can adjust this
-    learning_rate = 1e-2
-    num_epochs = 20
+    input_size = activations.shape[1]
+    output_size = other_data.shape[1]
+    hidden_size = 16
+    learning_rate = 1e-3
+    num_epochs = 1000
     batch_size = 32
 
     act_train, act_val, other_train, other_val = train_test_split(
@@ -67,34 +67,43 @@ def train_mlp(activations, other_data):
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
 
-    # Initialize model, loss and optimizer
     model = MLP(input_size, hidden_size, output_size)
     linear_model = LinearClassifier(input_size, output_size)
-    criterion = nn.MSELoss()  # Using Mean Squared Error as loss for regression
+    criterion = nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
-    # Training loop
+    best_val_loss = float('inf')
+    epochs_no_improve = 0
+
     for epoch in range(num_epochs):
-        linear_model.train()  # Set the model to training mode
+        model.train()
         for act_vector, other_vector in train_loader:
-            outputs = linear_model(act_vector)
+            outputs = model(act_vector)
             loss = criterion(outputs, other_vector)
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
 
-        # Validation
-        linear_model.eval()  # Set the model to evaluation mode
+        model.eval()
         val_losses = []
         with torch.no_grad():
             for act_vector, other_vector in val_loader:
-                outputs = linear_model(act_vector)
+                outputs = model(act_vector)
                 val_loss = criterion(outputs, other_vector)
                 val_losses.append(val_loss.item())
 
         avg_val_loss = sum(val_losses) / len(val_losses)
+        if (epoch + 1) % (num_epochs // num_prints) == 0:
+            print(f'Epoch [{epoch}/{num_epochs}], Training Loss: {loss.item():.4f}, Validation Loss: {avg_val_loss:.4f}' )
 
-        print(f'Epoch [{epoch + 1}/{num_epochs}], Training Loss: {loss.item():.4f}, Validation Loss: {avg_val_loss:.4f}')
+        if avg_val_loss < best_val_loss:
+            best_val_loss = avg_val_loss
+            epochs_no_improve = 0
+        else:
+            epochs_no_improve += 1
+            if epochs_no_improve == patience:
+                break
+    return 1 - best_val_loss
 
 
 def compute_vector_correlation(activation_scalars, other_data_vectors):
@@ -137,7 +146,7 @@ def get_integer_labels_for_data(data, unique_arrays):
 
     return integer_labels
 
-def process_activations(path, epoch_numbers, repetitions):
+def process_activations(path, epoch_numbers, repetitions, timesteps=4):
     for epoch_number in epoch_numbers:
         for repetition in repetitions:
             with open(os.path.join(path, f'activations_{epoch_number}_{repetition}.pkl'), 'rb') as f:
@@ -147,8 +156,8 @@ def process_activations(path, epoch_numbers, repetitions):
             correlation_data2 = {}
 
             correlation_data['activations_out'] = loaded_activation_data['activations_out'][0]
-            correlation_data['activations_hidden_short'] = loaded_activation_data['activations_hidden_short'][0]
-            correlation_data['activations_hidden_long'] = loaded_activation_data['activations_hidden_long'][0]
+            #correlation_data['activations_hidden_short'] = loaded_activation_data['activations_hidden_short'][0]
+            #correlation_data['activations_hidden_long'] = loaded_activation_data['activations_hidden_long'][0]
 
             correlation_data2['inputs'] = loaded_activation_data['inputs'][0]
             correlation_data2['labels'] = loaded_activation_data['labels'][0]
@@ -158,10 +167,14 @@ def process_activations(path, epoch_numbers, repetitions):
 
             for key in loaded_activation_data:
                 if "act_label_" in key:
-                    correlation_data2[key] = loaded_activation_data[key][0]
+                    data_array = np.array(loaded_activation_data[key][0])
+                    #print(data_array.shape)
+                    a_len = data_array.shape[-1]
+                    correlation_data2[key] = data_array[:, -(a_len // timesteps):]
+                    #print('shape', key, correlation_data2[key].shape)
 
 
-            activation_keys = ['activations_out', 'activations_hidden_short', 'activations_hidden_long']
+            activation_keys = ['activations_out']#, 'activations_hidden_short', 'activations_hidden_long']
 
 
             for act_key in activation_keys:
@@ -177,7 +190,8 @@ def process_activations(path, epoch_numbers, repetitions):
                         #print(act_key, other_key, len(activations), len(other_data))
 
                         assert activations.shape[0] == other_data.shape[0]
-                        #train_mlp(activations, other_data)
+                        #val_loss = train_mlp(activations, other_data)
+                        #print(act_key, other_key, val_loss)
 
                         unique_vectors = get_unique_arrays(other_data)
                         integer_labels = get_integer_labels_for_data(other_data, unique_vectors)

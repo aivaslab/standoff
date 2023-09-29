@@ -99,10 +99,29 @@ def load_dataframes(combined_path_list, value_names, key_param):
     combined_df['informedness'] = combined_df['informedness'].fillna('none')
     return combined_df
 
+def do_comparison(combined_path_list, last_path_list, regimes, key_param, exp_name, params, prior_metrics):
+    print('loading dataframes for final comparison')
+
+    combined_df = load_dataframes(combined_path_list, regimes.keys(), key_param)
+    last_epoch_df = load_dataframes(last_path_list, regimes.keys(), key_param)
+
+    create_combined_histogram(last_epoch_df, combined_df, key_param, os.path.join('supervised', exp_name))
+
+    avg_loss, variances, ranges_1, ranges_2, range_dict, range_dict3, stats, key_param_stats, oracle_stats, delta_sum, delta_x = calculate_statistics(
+        combined_df, last_epoch_df, list(set(params + prior_metrics + [key_param])),
+        skip_3x=True, key_param=key_param)  # todo: make it definitely save one fixed param eg oracle
+
+    combined_path = os.path.join('supervised', exp_name, 'c')
+    os.makedirs(combined_path, exist_ok=True)
+    write_metrics_to_file(os.path.join(combined_path, 'metrics.txt'), last_epoch_df, ranges_1, params, stats,
+                          key_param=key_param, d_s=delta_sum, d_x=delta_x)
+    save_figures(os.path.join(combined_path, 'figs'), combined_df, avg_loss, ranges_2, range_dict, range_dict3,
+                 params, last_epoch_df, num=12, key_param_stats=key_param_stats, oracle_stats=oracle_stats,
+                 key_param=key_param, delta_sum=delta_sum, delta_x=delta_x)
 
 
 def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, batch_size=64, desired_evals=5,
-                use_ff=False, skip_eval=False):
+                use_ff=False, skip_eval=False, skip_activations=False):
     """What is the overall performance of naive, off-the-shelf models on this task? Which parameters of competitive
     feeding settings are the most sensitive to overall model performance? To what extent are different models
     sensitive to different parameters? """
@@ -111,7 +130,7 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
               'second_swap_to_first_loc', 'delay_2nd_bait', 'first_bait_size',
               'uninformed_bait', 'uninformed_swap', 'first_swap']
     prior_metrics = ['shouldAvoidSmall', 'correctSelection', 'incorrectSelection',
-                     'shouldGetBig', 'informedness', 'p-b-0', 'p-b-1', 'p-s-0', 'p-s-1', 'delay']
+                     'shouldGetBig', 'informedness', 'p-b-0', 'p-b-1', 'p-s-0', 'p-s-1', 'delay', 'opponents']
 
     sub_regime_keys_new = [
         "Nn",
@@ -132,10 +151,16 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
         'Ft': 'Ft',
         'Tt': 'Tt'
     }
+    all_regimes = ['sl-' + x + '0' for x in sub_regime_keys_new] + ['sl-' + x + '1' for x in sub_regime_keys_new]
     regimes = {k: ['sl-' + x + '0' for x in sub_regime_keys_new] + ['sl-' + v + '1'] for k, v in sub_regime_mapping_new.items()}
     print('regimes:', regimes)
     regimes['direct'] = ['sl-' + x + '1' for x in sub_regime_keys_new]
     regimes['noOpponent'] = ['sl-' + x + '0' for x in sub_regime_keys_new]
+    regimes['everything'] = all_regimes
+
+    single_regimes = {k[3:]: [k] for k in all_regimes}
+    print('single regimes', single_regimes)
+    save_every = max(1, epochs // desired_evals)
 
     default_regime = regimes['Tt']
     pref_types = [
@@ -149,11 +174,24 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
         # ('varying', 'V'),
     ]
 
-    # generate supervised data
     labels = ['loc', 'vision', 'b-loc', 'target']
     oracles = labels + [None]
     oracle_names = [x if x is not None else "None" for x in oracles]
     conf = ScenarioConfigs()
+    exp_name = f'exp_{todo[0]}' if not use_ff else f'exp_{todo[0]}-f'
+    session_params = {
+        'repetitions': repetitions,
+        'epochs': epochs,
+        'skip_train': skip_train,
+        'skip_eval': skip_eval,
+        'batch_size': batch_size,
+        'prior_metrics': list(set(prior_metrics + labels)),
+        'save_every': save_every,
+        'skip_calc': skip_calc,
+        'use_ff': use_ff,
+        'act_label_names': labels,
+        'skip_activations': skip_activations,
+    }
     if 0 in todo:
         print('Generating datasets with labels', labels)
         os.makedirs('supervised', exist_ok=True)
@@ -166,58 +204,74 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
         print('Running hyperparameter search on all regimes, pref_types, role_types')
         run_hparam_search(trials=100, repetitions=3, log_file='hparam_file.txt', train_sets=regimes['direct'], epochs=20)
 
-    # Experiment 1
     if 1 in todo:
         print('Running experiment 1: varied models training directly on the test set')
 
-        # todo: add hparam search for many models, comparison between them?
-        save_every = max(1, epochs // desired_evals)
         combined_path_list = []
         last_path_list = []
         key_param = 'regime'
-        exp_name = 'exp_1' if not use_ff else 'exp_1-f'
 
         for regime in list(regimes.keys()):
             print('regime:', regime)
             combined_paths, last_epoch_paths = run_supervised_session(
                 save_path=os.path.join('supervised', exp_name, regime),
-                repetitions=repetitions,
-                epochs=epochs,
                 train_sets=regimes[regime],
-                eval_sets=regimes['direct'],
+                eval_sets=regimes['everything'],
                 oracle_labels=[None],
-                skip_train=skip_train,
-                skip_eval=skip_eval,
-                batch_size=batch_size,
-                prior_metrics=list(set(prior_metrics + labels)),
                 key_param=key_param,
                 key_param_value=regime,
-                save_every=save_every,
-                skip_calc=skip_calc,
-                use_ff=use_ff,
-                act_label_names=labels,
+                **session_params
             )
             last_path_list.append(last_epoch_paths)
             combined_path_list.append(combined_paths)
 
-        print('loading dataframes for final comparison')
+        do_comparison(combined_path_list, last_path_list, regimes, key_param, exp_name, params, prior_metrics)
 
-        combined_df = load_dataframes(combined_path_list, regimes.keys(), key_param)
-        last_epoch_df = load_dataframes(last_path_list, regimes.keys(), key_param)
+    if 51 in todo:
+        print('Running experiment 51: single models do not generalize')
 
-        create_combined_histogram(last_epoch_df, combined_df, key_param, os.path.join('supervised', exp_name))
-        # todo: add specific cell plots here
+        combined_path_list = []
+        last_path_list = []
+        key_param = 'regime'
 
-        avg_loss, variances, ranges_1, ranges_2, range_dict, range_dict3, stats, key_param_stats, oracle_stats, delta_sum, delta_x = calculate_statistics(
-            combined_df, last_epoch_df, list(set(params + prior_metrics + [key_param])),
-            skip_3x=True, key_param=key_param)  # todo: make it definitely save one fixed param eg oracle
+        for regime in list(single_regimes.keys()):
+            print('regime:', regime)
+            combined_paths, last_epoch_paths = run_supervised_session(
+                save_path=os.path.join('supervised', exp_name, regime),
+                train_sets=single_regimes[regime],
+                eval_sets=regimes['everything'],
+                oracle_labels=[None],
+                key_param=key_param,
+                key_param_value=regime,
+                **session_params
+            )
+            last_path_list.append(last_epoch_paths)
+            combined_path_list.append(combined_paths)
 
-        combined_path = os.path.join('supervised', exp_name, 'c')
-        os.makedirs(combined_path, exist_ok=True)
-        write_metrics_to_file(os.path.join(combined_path, 'metrics.txt'), last_epoch_df, ranges_1, params, stats,
-                              key_param=key_param, d_s=delta_sum, d_x=delta_x)
-        save_figures(os.path.join(combined_path, 'figs'), combined_df, avg_loss, ranges_2, range_dict, range_dict3,
-                     params, last_epoch_df, num=12, key_param_stats=key_param_stats, oracle_stats=oracle_stats, key_param=key_param, delta_sum=delta_sum, delta_x=delta_x)
+        do_comparison(combined_path_list, last_path_list, single_regimes, key_param, exp_name, params, prior_metrics)
+
+    if 52 in todo:
+        print('Running experiment 52: (small version of 51) single models do not generalize')
+
+        combined_path_list = []
+        last_path_list = []
+        key_param = 'regime'
+
+        for regime in list(single_regimes.keys())[:3]:
+            print('regime:', regime)
+            combined_paths, last_epoch_paths = run_supervised_session(
+                save_path=os.path.join('supervised', exp_name, regime),
+                train_sets=single_regimes[regime],
+                eval_sets=regimes['everything'],
+                oracle_labels=[None],
+                key_param=key_param,
+                key_param_value=regime,
+                **session_params
+            )
+            last_path_list.append(last_epoch_paths)
+            combined_path_list.append(combined_paths)
+
+        do_comparison(combined_path_list, last_path_list, single_regimes, key_param, exp_name, params, prior_metrics)
 
     if 11 in todo:
         print('Running experiment 11: train oracle label ')
@@ -385,4 +439,5 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
 
 
 if __name__ == '__main__':
-    experiments([11], repetitions=1, epochs=10, skip_train=False, skip_eval=False, skip_calc=False, batch_size=256, desired_evals=1, use_ff=False)
+    experiments([52], repetitions=1, epochs=20, skip_train=True, skip_eval=True, skip_calc=False, skip_activations=True,
+                batch_size=256, desired_evals=1, use_ff=False)

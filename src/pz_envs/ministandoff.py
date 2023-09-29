@@ -78,7 +78,7 @@ class MiniStandoffEnv(para_MultiGridEnv):
             self.conf = ScenarioConfigs()
         else:
             self.conf = conf
-        configs = conf.standoff
+        #configs = conf.standoff
         if agent_spawn_kwargs is None:
             agent_spawn_kwargs = {'top': (0, 0), 'size': (2, self.width)}
         self.agent_spawn_kwargs = agent_spawn_kwargs
@@ -310,7 +310,8 @@ class MiniStandoffEnv(para_MultiGridEnv):
                             empty_buckets.remove(event[2])
                     elif isinstance(event[x], int):
                         if event_type == "b" and x == 2:
-                            self.infos['p_0'][f'p-b-{baits_so_far}'] = event[x]
+                            self.infos['p_0'][f'p-b-{baits_so_far}'] = events[event[x]][2]
+                            event[x] = events[event[x]][2]
                         if event[0] != 'b':
                             # print(x, event[x], self.current_event_list_name, events, self.event_lists[self.current_event_list_name])
                             event[x] = events[event[x]][2]  # get a location from an index for first swap index number
@@ -556,11 +557,9 @@ class MiniStandoffEnv(para_MultiGridEnv):
                 # tile = self.grid.get(x, y)
                 # we cannot track shouldAvoidBig etc here because the treat location might change
 
-
-
             #print(self.step_count, self.infos['p_0']["exist"], self.infos['p_0']["b-exist"], self.infos['p_0']["target"], self.infos['p_0']["vision"], self.infos['p_0']["loc"], self.infos['p_0']["b-loc"])
         if self.record_info:
-            if name == "rel":
+            if self.step_count > 1:
                 # if agent's goal of player_1 matches big treat location, then shouldAvoidBig is True
                 if len(self.puppets):
                     self.infos['p_0']['puppet_goal'] = self.agent_goal[self.puppets[-1]]
