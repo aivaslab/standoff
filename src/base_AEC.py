@@ -1010,9 +1010,9 @@ class para_MultiGridEnv(ParallelEnv):
                                     self.infos[agent_name]["weakAccuracy"] = (
                                             box == self.infos[agent_name]["correctSelection"] or box ==
                                             self.infos[agent_name]["incorrectSelection"])
-                                    self.infos[agent_name]["selectedBig"] = (og_rwd == 100)
-                                    self.infos[agent_name]["selectedSmall"] = (og_rwd == self.smallReward)
-                                    self.infos[agent_name]["selectedNeither"] = (og_rwd < self.smallReward)
+                                    self.infos[agent_name]["selectedBig"] = (og_rwd > self.bigReward * 0.5)
+                                    self.infos[agent_name]["selectedSmall"] = (og_rwd > self.smallReward * 0.5 and og_rwd < self.bigReward * 0.5)
+                                    self.infos[agent_name]["selectedNeither"] = (og_rwd < self.smallReward * 0.5)
                                     self.infos[agent_name]["selectedPrevBig"] = (box in self.big_food_locations)
                                     self.infos[agent_name]["selectedPrevSmall"] = (box in self.small_food_locations)
                                     self.infos[agent_name]["selectedPrevNeither"] = not (
@@ -1112,6 +1112,7 @@ class para_MultiGridEnv(ParallelEnv):
             self.puppet_pathing(agent)
 
         if self.record_oracle_labels and ((self.step_count <= self.end_at_frame or self.end_at_frame == -1) or self.has_released):
+            tolerance = 6
             y = self.height // 2
             target_agent = "p_1"
             one_hot_goal = [0] * self.boxes
@@ -1133,15 +1134,17 @@ class para_MultiGridEnv(ParallelEnv):
                 for reward in real_box_rewards
             ]
             self.infos['p_0']["b-loc"] = [
-                [1, 0] if reward == self.bigReward else
-                [0, 1] if reward == self.smallReward else
+                [1, 0] if abs(reward - self.bigReward) < tolerance else
+                [0, 1] if abs(reward - self.smallReward) < tolerance else
                 [0, 0]
                 for reward in all_rewards_seen
             ]
             self.infos['p_0']["exist"] = [1 if self.bigReward in real_box_rewards else 0,
                                           1 if self.smallReward in real_box_rewards else 0]
-            self.infos['p_0']["b-exist"] = [1 if self.bigReward in all_rewards_seen else 0,
-                                            1 if self.smallReward in all_rewards_seen else 0]
+            self.infos['p_0']["b-exist"] = [
+                1 if any(abs(reward - self.bigReward) < tolerance for reward in all_rewards_seen) else 0,
+                1 if any(abs(reward - self.smallReward) < tolerance for reward in all_rewards_seen) else 0
+            ]
 
         # clear puppets from obs, rewards, dones, infos
 

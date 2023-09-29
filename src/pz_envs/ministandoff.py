@@ -579,27 +579,26 @@ class MiniStandoffEnv(para_MultiGridEnv):
 
             #print(self.step_count, self.infos['p_0']["exist"], self.infos['p_0']["b-exist"], self.infos['p_0']["target"], self.infos['p_0']["vision"], self.infos['p_0']["loc"], self.infos['p_0']["b-loc"])
         if self.record_info:
-            if self.step_count > 1:
-                # if agent's goal of player_1 matches big treat location, then shouldAvoidBig is True
-                if len(self.puppets):
-                    self.infos['p_0']['puppet_goal'] = self.agent_goal[self.puppets[-1]]
-                    if len(self.big_food_locations) > 0 and self.agent_goal[self.puppets[-1]] == \
-                            self.big_food_locations[-1]:
-                        self.infos['p_0']['shouldAvoidBig'] = not self.subject_is_dominant
-                        self.infos['p_0']['shouldGetBig'] = False
-                        self.infos['p_0']['shouldGetSmall'] = True
-                        self.infos['p_0']['shouldAvoidSmall'] = False
-                    elif len(self.small_food_locations) > 0 and self.agent_goal[self.puppets[-1]] == \
-                            self.small_food_locations[-1]:
-                        self.infos['p_0']['shouldAvoidSmall'] = not self.subject_is_dominant
-                        self.infos['p_0']['shouldAvoidBig'] = False
-                        self.infos['p_0']['shouldGetBig'] = True
-                        self.infos['p_0']['shouldGetSmall'] = False
-                    else:
-                        self.infos['p_0']['shouldAvoidBig'] = False
-                        self.infos['p_0']['shouldAvoidSmall'] = False
-                        self.infos['p_0']['shouldGetBig'] = True
-                        self.infos['p_0']['shouldGetSmall'] = False
+            # if agent's goal of player_1 matches big treat location, then shouldAvoidBig is True
+            if len(self.puppets):
+                self.infos['p_0']['puppet_goal'] = self.agent_goal[self.puppets[-1]]
+                if len(self.big_food_locations) > 0 and self.agent_goal[self.puppets[-1]] == \
+                        self.big_food_locations[-1]:
+                    self.infos['p_0']['shouldAvoidBig'] = not self.subject_is_dominant
+                    self.infos['p_0']['shouldGetBig'] = False
+                    self.infos['p_0']['shouldGetSmall'] = True
+                    self.infos['p_0']['shouldAvoidSmall'] = False
+                elif len(self.small_food_locations) > 0 and self.agent_goal[self.puppets[-1]] == \
+                        self.small_food_locations[-1]:
+                    self.infos['p_0']['shouldAvoidSmall'] = not self.subject_is_dominant
+                    self.infos['p_0']['shouldAvoidBig'] = False
+                    self.infos['p_0']['shouldGetBig'] = True
+                    self.infos['p_0']['shouldGetSmall'] = False
+                else:
+                    self.infos['p_0']['shouldAvoidBig'] = False
+                    self.infos['p_0']['shouldAvoidSmall'] = False
+                    self.infos['p_0']['shouldGetBig'] = True
+                    self.infos['p_0']['shouldGetSmall'] = False
 
             if len(self.big_food_locations) > 0 and len(self.small_food_locations) > 0:
                 if 'shouldAvoidBig' in self.infos['p_0'].keys() and self.infos['p_0']['shouldAvoidBig']:

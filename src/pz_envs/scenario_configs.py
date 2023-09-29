@@ -92,10 +92,12 @@ def count_permutations(event_list):
     return permutations
 
 
-def identify_counterfactuals(events):
+def identify_counterfactuals(events, fsb=False):
     knowledge = {'eb': False, 'es': False, 'lb': False, 'ls': False, 'cflb': False, 'cfls': False}
     vision = True
     treat_sizes = [-1 for _ in range(len(events))]
+
+    fsb_2nd_swap = False
 
     for k, event in enumerate(events):
         if event[0] == 'ob':
@@ -115,19 +117,19 @@ def identify_counterfactuals(events):
                     knowledge['ls'] = True
         elif event[0] == 'sw':
             if vision:
-                size = treat_sizes[event[1]]
+                size = treat_sizes[event[1]] if not fsb_2nd_swap else treat_sizes[firstswap]
                 if size == 1:
                     knowledge['eb'] = True
                     knowledge['lb'] = True
                     knowledge['cflb'] = False
-                    treat_sizes[k] = 1
+                    treat_sizes[k] = 1 #this event's size
                 elif size == 0:
                     knowledge['es'] = True
                     knowledge['ls'] = True
                     knowledge['cfls'] = False
-                    treat_sizes[k] = 0
-                if event[2] != 'e':
-                    size2 = treat_sizes[event[2]]
+                    treat_sizes[k] = 0 #this event's size
+                if event[2] != 'e': #if fsb or 2st1l event
+                    size2 = treat_sizes[event[2]] if not fsb_2nd_swap else treat_sizes[event[1]]
                     if size2 == 1:
                         knowledge['eb'] = True
                         knowledge['lb'] = True
@@ -137,7 +139,7 @@ def identify_counterfactuals(events):
                         knowledge['ls'] = True
                         knowledge['cfls'] = False
             else:
-                size = treat_sizes[event[1]]
+                size = treat_sizes[event[1]] if not fsb_2nd_swap else treat_sizes[firstswap]
                 if size == 1:
                     if knowledge['lb']:
                         knowledge['cflb'] = True
@@ -149,7 +151,7 @@ def identify_counterfactuals(events):
                     knowledge['ls'] = False
                     treat_sizes[k] = 0
                 if event[2] != 'e':
-                    size2 = treat_sizes[event[2]]
+                    size2 = treat_sizes[event[2]] if not fsb_2nd_swap else treat_sizes[event[1]]
                     if size2 == 1:
                         if knowledge['lb']:
                             knowledge['cflb'] = True
@@ -158,6 +160,9 @@ def identify_counterfactuals(events):
                         if knowledge['ls']:
                             knowledge['cfls'] = True
                         knowledge['ls'] = False
+            if fsb:
+                fsb_2nd_swap = True
+                firstswap = event[1]
 
     return knowledge['eb'], knowledge['es'], knowledge['lb'], knowledge['ls']#, knowledge['cflb'], knowledge['cfls']
 
@@ -279,6 +284,7 @@ class ScenarioConfigs:
                     first_swap_index = add_swap(events, swap_num, (swap_index, swap_location), uninformed_swap,
                                                 visible_swaps)
 
+
             if delay_2nd_bait:
                 bait_size = 1 - first_bait_size
                 index = add_bait(events, 1, bait_size, uninformed_bait, visible_baits, first_swap_index)
@@ -290,8 +296,9 @@ class ScenarioConfigs:
                 first_swap_index = add_swap(events, swap_num, (swap_index, swap_location), uninformed_swap, visible_swaps)
 
             events = remove_unnecessary_sequences(events)
-            self.event_list_knowledge[name] = identify_counterfactuals(events)
-
+            self.event_list_knowledge[name] = identify_counterfactuals(events, fsb=first_swap_is_both)
+            if name == 'b0w2v1f-5':
+                print(events, self.event_list_knowledge[name])
 
             self.all_event_lists[name] = events
             if visible_baits == 2 and visible_swaps == swaps:

@@ -183,6 +183,17 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
 
                             data_labels['informedness'].append(informedness)
                             data_labels['opponents'].append(params["num_puppets"])
+                            #print(informedness, params["num_puppets"], info['p_0']['shouldGetBig'], info['p_0']['shouldGetSmall'])
+                            if informedness[0] == 2 and params["num_puppets"] > 0:
+                                if info['p_0']['shouldGetBig']:
+                                    print('should avoid big here', info['p_0']['shouldGetBig'], info['p_0']['shouldGetSmall'],
+                                          configName, env.current_param_group_pos, env.current_event_list_name, env.current_param_group,
+
+                                          )
+                                    print(env.last_seen_reward)
+                                    print(info['p_0'])
+
+                                # Issue! Some of these say should get big. Why? We start seeing this at 151, and it immediately says get big is true.
                             break
 
                         pos += 1
