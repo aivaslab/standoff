@@ -285,6 +285,7 @@ class MiniStandoffEnv(para_MultiGridEnv):
                         was_empty = True
                         counter *= len(empty_buckets)
                         # used for both empty baits and swap locations
+                        #print('popping', empty_buckets, k, instantiated_perms[k])
                         event[x] = empty_buckets.pop(random.randrange(
                             len(empty_buckets)) if not self.deterministic else instantiated_perms[k])
                         if event_type == "b":
@@ -310,13 +311,20 @@ class MiniStandoffEnv(para_MultiGridEnv):
                             empty_buckets.remove(event[2])
                     elif isinstance(event[x], int):
                         if event_type == "b" and x == 2:
-                            self.infos['p_0'][f'p-b-{baits_so_far}'] = events[event[x]][2]
-                            event[x] = events[event[x]][2]
+                            self.infos['p_0'][f'p-b-{baits_so_far}'] = events[event[x]][1] #issue: this is the 2nd part of the swap, not the 1st, but is this all non-e baits?
+                            event[x] = events[event[x]][1]
                         if event[0] != 'b':
-                            # print(x, event[x], self.current_event_list_name, events, self.event_lists[self.current_event_list_name])
-                            event[x] = events[event[x]][2]  # get a location from an index for first swap index number
+                            #print(x, event[x], self.current_event_list_name, events, self.event_lists[self.current_event_list_name])
+                            temp_event = events[event[x]][2]  # get a location from an index for first swap index number
+                            #print(event[x])
                             if x == 2:
                                 self.infos['p_0'][f'p-s-{swaps_so_far}'] = event[x]
+
+                                # Special case: If we are swapping to a previous swap index, make sure we don't reuse one bait index
+                                if events[event[x]][0] == 'sw':
+                                    if event[1] == events[event[x]][2]:
+                                        temp_event = events[event[x]][1]
+                            event[x] = temp_event
 
 
 
@@ -510,6 +518,9 @@ class MiniStandoffEnv(para_MultiGridEnv):
 
         # oracle food location memory for puppet ai
         if name == "b" or name == "sw" or name == "rem" or (self.hidden is True and name == "re"):
+            for key, value in self.last_seen_reward.items():
+                self.last_seen_reward[key] = value - 1 # we discount older rewards to prefer new updates
+            did_swap = False
             for box in range(self.boxes):
                 x = box + 1
                 for agent in self.agents_and_puppets():
@@ -517,13 +528,21 @@ class MiniStandoffEnv(para_MultiGridEnv):
                         tile = self.grid.get(x, y)
                         # if hasattr(tile, "reward") and hasattr(tile, "size"):
                         if tile is not None and tile.type == "Goal":
-                            # size used to distinguish treats from boxes
-                            self.last_seen_reward[agent + str(box)] = tile.reward if isinstance(tile.reward, int) else 0
-
                             if name == "sw":
                                 for key, value in self.last_seen_reward.items():
-                                    if value == tile.reward:
-                                        self.last_seen_reward[key] = 0
+                                    if value == tile.reward and not did_swap:
+                                        # set to the other tile of this swap...
+                                        did_swap = True
+                                        b1 = agent + str(event[1])
+                                        b2 = agent + str(event[2])
+                                        tile2 = self.grid.get(event[2] + 1, y)
+
+                                        # we don't swap last seen rewards here because it's a visible swap and those might be missing
+                                        self.last_seen_reward[b1] = tile2.get_reward() if hasattr(tile2, 'get_reward') else 0
+                                        self.last_seen_reward[b2] = tile.get_reward() if hasattr(tile, 'get_reward') else 0
+                                        #print('swapped tiles', self.last_seen_reward)
+                            self.last_seen_reward[agent + str(box)] = tile.get_reward() if hasattr(tile, 'get_reward') else 0
+                            #print(self.last_seen_reward)
 
                             # print('rew update', agent, box, tile.reward)
                         elif not self.grid.get(x, y) and self.last_seen_reward[agent + str(box)] != 0:
@@ -536,11 +555,12 @@ class MiniStandoffEnv(para_MultiGridEnv):
             for box in range(self.boxes):
                 for agent in self.puppets:
                     reward = self.last_seen_reward[agent + str(box)]
-                    if (self.agent_goal[agent] != box) and (reward >= self.best_reward[agent]):
+                    if reward >= self.best_reward[agent]:
                         self.agent_goal[agent] = box
                         self.best_reward[agent] = reward
                         self.new_target = True
                         target_agent = agent
+                        #print('new target', self.best_reward[agent], self.agent_goal[agent], self.last_seen_reward)
         if self.new_target:
             self.new_target = False
             a = self.instance_from_name[target_agent]

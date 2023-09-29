@@ -662,7 +662,7 @@ class para_MultiGridEnv(ParallelEnv):
         """
         return self.agent_instances + self.puppet_instances[:self.params['num_puppets']]
 
-    def reset(self):
+    def reset(self, override_params=-1):
         """
         Reset needs to initialize the following attributes
         - agents
@@ -676,9 +676,12 @@ class para_MultiGridEnv(ParallelEnv):
 
         Here it sets up the state dictionary which is used by step() and the observations dictionary which is used by step() and observe()
         """
-        if self.target_param_group_count > -1 or not self.has_reset:
-            if (self.current_param_group_pos + 1 >= self.target_param_group_count) or not self.has_reset:
-                if self.has_reset:
+        if self.target_param_group_count > -1 or not self.has_reset or override_params > -1:
+            if (self.current_param_group_pos + 1 >= self.target_param_group_count) or not self.has_reset or override_params > -1:
+                if override_params > -1:
+                    print('overriding param group')
+                    self.current_param_group = override_params
+                elif self.has_reset:
                     self.current_param_group = (self.current_param_group + 1) % len(self.param_groups)
                 else:
                     self.current_param_group = 0
