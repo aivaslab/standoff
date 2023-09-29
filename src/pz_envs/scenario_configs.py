@@ -298,6 +298,9 @@ class ScenarioConfigs:
             events = remove_unnecessary_sequences(events)
             self.event_list_knowledge[name] = identify_counterfactuals(events, fsb=first_swap_is_both)
 
+            if name == 'b1w2v0d-1':
+                print(events)
+
             self.all_event_lists[name] = events
             if visible_baits == 2 and visible_swaps == swaps:
                 self.informed_event_lists[name] = events

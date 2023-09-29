@@ -1133,9 +1133,13 @@ class para_MultiGridEnv(ParallelEnv):
                 [0, 0]
                 for reward in real_box_rewards
             ]
+
+            max_small_reward = max([reward for reward in all_rewards_seen if abs(reward - self.smallReward) < tolerance], default=None)
+            max_big_reward = max([reward for reward in all_rewards_seen if abs(reward - self.bigReward) < tolerance], default=None)
+
             self.infos['p_0']["b-loc"] = [
-                [1, 0] if abs(reward - self.bigReward) < tolerance else
-                [0, 1] if abs(reward - self.smallReward) < tolerance else
+                [1, 0] if reward == max_big_reward else
+                [0, 1] if reward == max_small_reward else
                 [0, 0]
                 for reward in all_rewards_seen
             ]

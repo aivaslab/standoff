@@ -30,6 +30,20 @@ def one_hot(size, data):
     return np.eye(size)[data]
 
 
+def calculate_informedness(loc, b_loc):
+    informedness_result = []
+
+    for item in [[1, 0], [0, 1]]:  # For 'big' and 'small'
+
+        if item in loc and item in b_loc:
+            if loc.index(item) == b_loc.index(item):
+                informedness_result += [2] if item == [1, 0] else [2]
+            else:
+                informedness_result += [1] if item == [1, 0] else [1]
+        else:
+            informedness_result += [0] if item == [1, 0] else [0]
+
+    return informedness_result
 def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_extra_data=False, prior_metrics=[], conf=None):
     '''
     For all relevant variants, iterates through all possible permutations of environment reset configs and simulates
@@ -184,14 +198,25 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
                             data_labels['informedness'].append(informedness)
                             data_labels['opponents'].append(params["num_puppets"])
                             #print(informedness, params["num_puppets"], info['p_0']['shouldGetBig'], info['p_0']['shouldGetSmall'])
-                            if informedness[0] == 2 and params["num_puppets"] > 0:
+
+                            loc = info['p_0']['loc']
+                            b_loc = info['p_0']['b-loc']
+
+                            inf = calculate_informedness(loc, b_loc)
+                            if informedness != inf and params["num_puppets"] > 0:
+                                print('informedness mismatch', informedness, inf, loc, b_loc, params["num_puppets"], env.current_param_group_pos, env.current_param_group, configName, eName)
+                            if params["num_puppets"] == 0:
+                                if info['p_0']['shouldGetBig'] == False:
+                                    print('opponentless avoid', env.current_param_group_pos, env.current_param_group, configName, eName)
+
+                            '''if informedness[0] == 2 and params["num_puppets"] > 0:
                                 if info['p_0']['shouldGetBig']:
                                     print('should avoid big here', info['p_0']['shouldGetBig'], info['p_0']['shouldGetSmall'],
                                           configName, env.current_param_group_pos, env.current_event_list_name, env.current_param_group,
 
                                           )
                                     print(env.last_seen_reward)
-                                    print(info['p_0'])
+                                    print(info['p_0'])'''
 
                                 # Issue! Some of these say should get big. Why? We start seeing this at 151, and it immediately says get big is true.
                             break
