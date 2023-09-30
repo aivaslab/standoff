@@ -280,14 +280,15 @@ class MiniStandoffEnv(para_MultiGridEnv):
             else:
                 was_empty = False
                 for x in range(len(event)):
+                    #print(event, empty_buckets)
 
                     if event[x] == "e":
                         was_empty = True
                         counter *= len(empty_buckets)
                         # used for both empty baits and swap locations
                         #print('popping', empty_buckets, k, instantiated_perms[k])
-                        event[x] = empty_buckets.pop(random.randrange(
-                            len(empty_buckets)) if not self.deterministic else instantiated_perms[k])
+                        event[x] = float(empty_buckets.pop(random.randrange(
+                            len(empty_buckets)) if not self.deterministic else instantiated_perms[k]))
                         if event_type == "b":
                             self.infos['p_0'][f'p-b-{baits_so_far}'] = event[x]
                         elif event_type == "sw":
@@ -297,8 +298,10 @@ class MiniStandoffEnv(para_MultiGridEnv):
 
                         # if we are swapping to an empty bucket, and the prev bucket was not empty, make it empty
                         if event[0] == 'sw' and x == 2:
-                            if event[1] not in empty_buckets:
-                                empty_buckets.append(event[1])
+                            if int(event[1]) not in empty_buckets:
+                                #empty_buckets.append(int(event[1]))
+                                # this line commented out on sept 30 to prevent coincidental 2nd swap to 1st loc
+                                pass
 
                     elif event[x] == "else":
                         available_spots = [i for i in range(boxes) if i != event[x - 1]]
@@ -306,10 +309,10 @@ class MiniStandoffEnv(para_MultiGridEnv):
                             len(available_spots)) if not self.deterministic else instantiated_perms[k])
 
                         # if we are swapping to an empty bucket, and the prev bucket was not empty, make it empty
-                        if event[0] == 'sw' and x == 2 and event[1] not in empty_buckets and event[2] in empty_buckets:
-                            empty_buckets.append(event[1])
-                            empty_buckets.remove(event[2])
-                    elif isinstance(event[x], int):
+                        if event[0] == 'sw' and x == 2 and int(event[1]) not in empty_buckets and int(event[2]) in empty_buckets:
+                            empty_buckets.append(int(event[1]))
+                            empty_buckets.remove(int(event[2]))
+                    elif isinstance(event[x], int): # integers are used for indices, and floats for locations
                         if event_type == "b" and x == 2:
                             self.infos['p_0'][f'p-b-{baits_so_far}'] = events[event[x]][1] #issue: this is the 2nd part of the swap, not the 1st, but is this all non-e baits?
                             event[x] = events[event[x]][1]
@@ -324,13 +327,14 @@ class MiniStandoffEnv(para_MultiGridEnv):
                                 if events[event[x]][0] == 'sw':
                                     if event[1] == events[event[x]][2]:
                                         temp_event = events[event[x]][1]
-                            event[x] = temp_event
+                            event[x] = float(temp_event)
+                    #print('result', event, empty_buckets)
 
 
 
 
                 if event_type == "b":
-                    event_args[k] = bait_args[event[1]]  # get the size of the treat
+                    event_args[k] = bait_args[int(event[1])]  # get the size of the treat
                     # remove empty bucket for cases where event[x] wasn't e
                     if not was_empty:
                         #print(event, empty_buckets, instantiated_perms, k, instantiated_perms[k], len(empty_buckets))
@@ -446,7 +450,7 @@ class MiniStandoffEnv(para_MultiGridEnv):
                 self.has_baited = True
                 if self.record_info:
                     self.infos['p_0']['firstBaitReward'] = arg
-            self.put_obj(obj, x, y)
+            self.put_obj(obj, int(x), y)
             self.objs_to_hide.append(obj)
         elif name == "rem":
             x = event[1] + 1
@@ -474,14 +478,17 @@ class MiniStandoffEnv(para_MultiGridEnv):
             for box in range(self.boxes):
                 self.can_see[arg + str(box)] = False if "ob" in name else True
         elif name == "sw":
-            b1 = self.grid.get(event[1] + 1, y)
-            b2 = self.grid.get(event[2] + 1, y)
+            #print(event[1], event[2], 'should be floats!')
+            e1 = int(event[1])
+            e2 = int(event[2])
+            b1 = self.grid.get(e1 + 1, y)
+            b2 = self.grid.get(e2 + 1, y)
             if self.use_box_colors:
-                self.put_obj(b2, event[1] + 1, y)
-                self.put_obj(b1, event[2] + 1, y)
-                temp = self.box_color_order[event[1]]
-                self.box_color_order[event[1]] = self.box_color_order[event[2]]
-                self.box_color_order[event[2]] = temp
+                self.put_obj(b2, e1 + 1, y)
+                self.put_obj(b1, e2 + 1, y)
+                temp = self.box_color_order[e1]
+                self.box_color_order[e1] = self.box_color_order[e2]
+                self.box_color_order[e2] = temp
             else:
                 r1 = b1.reward if hasattr(b1, "reward") else 0
                 r2 = b2.reward if hasattr(b2, "reward") else 0
@@ -490,8 +497,8 @@ class MiniStandoffEnv(para_MultiGridEnv):
 
                 obj1 = Goal(reward=r2, size=r2 * 0.01, color='green', hide=self.hidden, sub_obs_reward=sr2)
                 obj2 = Goal(reward=r1, size=r1 * 0.01, color='green', hide=self.hidden, sub_obs_reward=sr1)
-                self.put_obj(obj1, event[1] + 1, y)
-                self.put_obj(obj2, event[2] + 1, y)
+                self.put_obj(obj1, e1 + 1, y)
+                self.put_obj(obj2, e2 + 1, y)
                 self.objs_to_hide.append(obj1)
                 self.objs_to_hide.append(obj2)
         elif name == "rel":
@@ -533,9 +540,9 @@ class MiniStandoffEnv(para_MultiGridEnv):
                                     if value == tile.reward and not did_swap:
                                         # set to the other tile of this swap...
                                         did_swap = True
-                                        b1 = agent + str(event[1])
-                                        b2 = agent + str(event[2])
-                                        tile2 = self.grid.get(event[2] + 1, y)
+                                        b1 = agent + str(int(event[1]))
+                                        b2 = agent + str(int(event[2]))
+                                        tile2 = self.grid.get(int(event[2]) + 1, y)
 
                                         # we don't swap last seen rewards here because it's a visible swap and those might be missing
                                         self.last_seen_reward[b1] = tile2.get_reward() if hasattr(tile2, 'get_reward') else 0
