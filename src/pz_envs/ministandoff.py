@@ -292,7 +292,7 @@ class MiniStandoffEnv(para_MultiGridEnv):
                         if event_type == "b":
                             self.infos['p_0'][f'p-b-{baits_so_far}'] = event[x]
                         elif event_type == "sw":
-                            self.infos['p_0'][f'p-s-{swaps_so_far}'] = event[x]
+                            self.infos['p_0'][f'p-s-{swaps_so_far}'] = event[x] # gets the popped value
                             if event[x] == 5:
                                 print('5 found e', event)
 
@@ -314,20 +314,22 @@ class MiniStandoffEnv(para_MultiGridEnv):
                             empty_buckets.remove(int(event[2]))
                     elif isinstance(event[x], int): # integers are used for indices, and floats for locations
                         if event_type == "b" and x == 2:
-                            self.infos['p_0'][f'p-b-{baits_so_far}'] = events[event[x]][1] #issue: this is the 2nd part of the swap, not the 1st, but is this all non-e baits?
+                            # delayed 2nd bait: we bait at the swap "from" location
+                            self.infos['p_0'][f'p-b-{baits_so_far}'] = events[event[x]][1]
                             event[x] = events[event[x]][1]
                         if event[0] != 'b':
                             #print(x, event[x], self.current_event_list_name, events, self.event_lists[self.current_event_list_name])
                             temp_event = events[event[x]][2]  # get a location from an index for first swap index number
                             #print(event[x])
                             if x == 2:
-                                self.infos['p_0'][f'p-s-{swaps_so_far}'] = event[x]
-
                                 # Special case: If we are swapping to a previous swap index, make sure we don't reuse one bait index
                                 if events[event[x]][0] == 'sw':
                                     if event[1] == events[event[x]][2]:
                                         temp_event = events[event[x]][1]
                             event[x] = float(temp_event)
+                            if x == 2:
+                                self.infos['p_0'][f'p-s-{swaps_so_far}'] = event[x]
+
                     #print('result', event, empty_buckets)
 
 

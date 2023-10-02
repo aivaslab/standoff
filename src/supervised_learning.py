@@ -25,6 +25,32 @@ import torch.nn.functional as F
 import torch
 
 
+def identify_mismatches(info, env, informedness, params, data_name, configName, eName, loc, b_loc):
+    inf = calculate_informedness(loc, b_loc)
+    if informedness != inf and params["num_puppets"] > 0:
+        print('informedness mismatch', informedness, inf, loc, b_loc, params["num_puppets"],
+              env.current_param_group_pos, env.current_param_group, configName, eName)
+    if params["num_puppets"] == 0:
+        if info['p_0']['shouldGetBig'] == False:
+            print('opponentless big avoid', env.current_param_group_pos, env.current_param_group, configName, eName)
+        if info['p_0']['shouldGetSmall'] != False:
+            print('opponentless small avoid', env.current_param_group_pos, env.current_param_group, configName, eName)
+    if params["num_puppets"] != int(data_name[-1]):
+        print('puppet mismatch', env.current_param_group_pos, env.current_param_group, configName, eName)
+    # next we check for mismatches in target location/size
+    if inf[0] == 2:
+        # we should get big here
+        if info['p_0']['shouldGetBig'] == True or info['p_0']['shouldGetSmall'] == False:
+            print('informed size mismatch', env.current_param_group_pos, env.current_param_group, configName, eName)
+    elif inf[0] < 2 and inf[1] == 2:
+        if (info['p_0']['shouldGetBig'] == False or info['p_0']['shouldGetSmall'] == True):
+            print('uninformed size mismatch', env.current_param_group_pos, env.current_param_group, configName, eName)
+    if info['p_0']['shouldGetBig']:
+        if info['p_0']['correctSelection'] != env.big_food_locations[-1]:
+            print('selection mismatch', env.big_food_locations, eName)
+    else:
+        if info['p_0']['correctSelection'] != env.small_food_locations[-1]:
+            print('selection mismatch', env.small_food_locations, eName)
 @lru_cache(maxsize=None)
 def one_hot(size, data):
     return np.eye(size)[data]
@@ -202,23 +228,8 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
                             loc = info['p_0']['loc']
                             b_loc = info['p_0']['b-loc']
 
-                            inf = calculate_informedness(loc, b_loc)
-                            if informedness != inf and params["num_puppets"] > 0:
-                                print('informedness mismatch', informedness, inf, loc, b_loc, params["num_puppets"], env.current_param_group_pos, env.current_param_group, configName, eName)
-                            if params["num_puppets"] == 0:
-                                if info['p_0']['shouldGetBig'] == False:
-                                    print('opponentless avoid', env.current_param_group_pos, env.current_param_group, configName, eName)
+                            identify_mismatches(info, env, informedness, params, data_name, configName, eName, loc, b_loc)
 
-                            '''if informedness[0] == 2 and params["num_puppets"] > 0:
-                                if info['p_0']['shouldGetBig']:
-                                    print('should avoid big here', info['p_0']['shouldGetBig'], info['p_0']['shouldGetSmall'],
-                                          configName, env.current_param_group_pos, env.current_event_list_name, env.current_param_group,
-
-                                          )
-                                    print(env.last_seen_reward)
-                                    print(info['p_0'])'''
-
-                                # Issue! Some of these say should get big. Why? We start seeing this at 151, and it immediately says get big is true.
                             break
 
                         pos += 1

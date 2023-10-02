@@ -586,9 +586,9 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=True, skip_2x1=False
                         descendant_informedness = ['[' + ' '.join(map(str, descendant[:2])) + ']' for descendant in descendants]
                         descendant_opponents = [np.float64(descendant[2]) for descendant in descendants]
 
-                        # todo: only get one descendant
                         if len(descendants) < 1:
                             continue
+
 
                         inf = subset[(subset['informedness'] == key_informedness) & (subset['opponents'] == key_opponents)].groupby(perm_keys + ['informedness', 'opponents', 'correctSelection'], observed=True).mean().reset_index()
                         noinf = subset[(subset['informedness'].isin(descendant_informedness)) &

@@ -328,9 +328,9 @@ class ScenarioConfigs:
             events = remove_unnecessary_sequences(events)
             self.event_list_knowledge[name] = identify_counterfactuals(events, fsb=first_swap_is_both, ss1=second_swap_to_first_loc, dsb=delay_2nd_bait)
 
-            if name == 'b1w2v1-2':
-                cf = identify_counterfactuals(events, fsb=first_swap_is_both, ss1=second_swap_to_first_loc, dsb=delay_2nd_bait, debug=True)
-                print(events, tuple_to_key(cf), self.event_list_knowledge[name])
+            #if name == 'b1w2v1-2':
+            #    cf = identify_counterfactuals(events, fsb=first_swap_is_both, ss1=second_swap_to_first_loc, dsb=delay_2nd_bait, debug=True)
+            #    print(events, tuple_to_key(cf), self.event_list_knowledge[name])
 
             self.all_event_lists[name] = events
             if visible_baits == 2 and visible_swaps == swaps:
