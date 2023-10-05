@@ -136,7 +136,7 @@ def do_comparison(combined_path_list, last_path_list, key_param_list, key_param,
     os.makedirs(combined_path, exist_ok=True)
     write_metrics_to_file(os.path.join(combined_path, 'metrics.txt'), last_epoch_df, ranges_1, params, stats,
                           key_param=key_param, d_s=delta_sum, d_x=delta_x)
-    save_figures(os.path.join(combined_path, 'figs'), combined_df, avg_loss, ranges_2, range_dict, range_dict3,
+    save_figures(combined_path, combined_df, avg_loss, ranges_2, range_dict, range_dict3,
                  params, last_epoch_df, num=12, key_param_stats=key_param_stats, oracle_stats=oracle_stats,
                  key_param=key_param, delta_sum=delta_sum, delta_x=delta_x)
 
@@ -174,6 +174,7 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
     }
     all_regimes = ['sl-' + x + '0' for x in sub_regime_keys_new] + ['sl-' + x + '1' for x in sub_regime_keys_new]
     regimes = {k: ['sl-' + x + '0' for x in sub_regime_keys_new] + ['sl-' + v + '1'] for k, v in sub_regime_mapping_new.items()}
+    mixed_regimes = regimes
     #print('regimes:', regimes)
     regimes['direct'] = ['sl-' + x + '1' for x in sub_regime_keys_new]
     regimes['noOpponent'] = ['sl-' + x + '0' for x in sub_regime_keys_new]
@@ -260,7 +261,7 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
         key_param = 'regime'
         key_param_list = []
 
-        for regime in list(single_regimes.keys()):
+        for regime in list(single_regimes.keys())[:-3]:
             print('regime:', regime)
             combined_paths, last_epoch_paths = run_supervised_session(
                 save_path=os.path.join('supervised', exp_name, regime),
@@ -315,6 +316,56 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
             combined_paths, last_epoch_paths = run_supervised_session(
                 save_path=os.path.join('supervised', exp_name, regime),
                 train_sets=single_regimes[regime],
+                eval_sets=regimes['everything'],
+                oracle_labels=[None],
+                key_param=key_param,
+                key_param_value=regime,
+                **session_params
+            )
+            last_path_list.append(last_epoch_paths)
+            combined_path_list.append(combined_paths)
+            key_param_list.append(regime)
+
+        do_comparison(combined_path_list, last_path_list, key_param_list, key_param, exp_name, params, prior_metrics)
+
+    if 54 in todo:
+        print('Running experiment 54: mixed models maybe generalize')
+
+        combined_path_list = []
+        last_path_list = []
+        key_param = 'regime'
+        key_param_list = []
+
+        for regime in list(mixed_regimes.keys()):
+            print('regime:', regime, 'train_sets:', mixed_regimes[regime])
+            combined_paths, last_epoch_paths = run_supervised_session(
+                save_path=os.path.join('supervised', exp_name, regime),
+                train_sets=mixed_regimes[regime],
+                eval_sets=regimes['everything'],
+                oracle_labels=[None],
+                key_param=key_param,
+                key_param_value=regime,
+                **session_params
+            )
+            last_path_list.append(last_epoch_paths)
+            combined_path_list.append(combined_paths)
+            key_param_list.append(regime)
+
+        do_comparison(combined_path_list, last_path_list, key_param_list, key_param, exp_name, params, prior_metrics)
+
+    if 55 in todo:
+        print('Running experiment 55: mixed models with oracle training maybe generalize')
+
+        combined_path_list = []
+        last_path_list = []
+        key_param = 'regime'
+        key_param_list = []
+
+        for regime in ['Tt']:
+            print('regime:', regime, 'train_sets:', mixed_regimes[regime])
+            combined_paths, last_epoch_paths = run_supervised_session(
+                save_path=os.path.join('supervised', exp_name, regime),
+                train_sets=mixed_regimes[regime],
                 eval_sets=regimes['everything'],
                 oracle_labels=[None],
                 key_param=key_param,

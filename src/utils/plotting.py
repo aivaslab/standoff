@@ -360,6 +360,40 @@ def save_delta_figures(dir, df_summary, df_x):
         plt.close()'''
 
 
+    # subfigs of accuracy across operators
+    for columns, colors, pathname in zip([['t', 'f'], ['tt', 'tf' , 'ft', 'ff']], [None, ['blue', 'lightgreen', 'lightblue', 'pink']], ['dpred', 'acc']):
+        nrows = len(df_x.keys())
+        ncols = len(list(df_x.items())[0][1]['operator'].unique())
+        fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(15, 1.2 * nrows))
+
+        for idx, (key_val, df) in enumerate(df_x.items()):
+            for col_idx, (_, row) in enumerate(df.iterrows()):  # Using iterrows to iterate over the DataFrame
+                if nrows > 1:
+                    ax = axes[idx, col_idx]
+                else:
+                    ax = axes[col_idx]
+                data = {col: [row[f'p{col}'], row[f'm{col}']] for col in columns}
+                tmp_df = pd.DataFrame(data, index=['+', '-'])
+
+                tmp_df.plot(kind='bar', stacked=True, ax=ax, width=0.6, legend=False, color=colors)
+                ax.set_ylim([0, 1])
+
+                if idx == nrows - 1:
+                    ax.set_xlabel(row['operator'])
+                else:
+                    ax.set_xticks([])
+                if col_idx == 0:
+                    ax.set_ylabel(key_val)
+                else:
+                    ax.set_yticks([])
+        handles, labels = ax.get_legend_handles_labels()
+        fig.legend(handles, labels, loc='upper center', ncol=3)
+        plt.tight_layout()
+        fig.subplots_adjust(hspace=0.08, wspace=0.05)
+        plt.savefig(os.path.join(dir, f'small_multiples-{pathname}.png'))
+        plt.close()
+
+    # heatmap versions
     for var in ['dpred', 'dpred_correct', 'dpred_accurate']:
         df_list = []
         for key_val, sub_df in df_x.items():
@@ -375,7 +409,7 @@ def save_delta_figures(dir, df_summary, df_x):
         annot_df = df.pivot(index="key_val", columns="operator", values="original_val")
 
         plt.figure(figsize=(12, 8))
-        ax = sns.heatmap(pivot_df, vmin=0, vmax=1, annot=annot_df, fmt='', cmap='crest', linewidths=0.5, linecolor='white')
+        ax = sns.heatmap(pivot_df, vmin=0, vmax=1, annot=annot_df, fmt='', cmap='RdBu', linewidths=0.5, linecolor='white')
         plt.title(f"Heatmap of " + var)
 
         plt.tight_layout()
@@ -578,19 +612,57 @@ def save_key_param_figures(save_dir, key_param_stats, oracle_stats, key_param):
             table_save_path = os.path.join(this_save_dir, f'{param}_{label}_table.csv')
             df.to_csv(table_save_path, index=False)
 
+            # produce typical heatmaps for accuracy
             if param == 'test_regime':
-                print('old plot')
-                df["accuracy mean"] = pd.to_numeric(df["accuracy mean"], errors='coerce')
-                df["accuracy std"] = pd.to_numeric(df["accuracy std"], errors='coerce')
-                df["Accuracy mean (Accuracy std)"] = df["accuracy mean"].map("{:.2f}".format) + " (" + df["accuracy std"].map("{:.2f}".format) + ")"
-                pivot_df = df.pivot(index=key_param, columns=param, values="Accuracy mean (Accuracy std)")
-                mean_values_df = pivot_df.applymap(lambda x: float(x.split(' ')[0]))
-                plt.figure(figsize=(22, 8))
-                ax = sns.heatmap(mean_values_df, annot=pivot_df, fmt='', cmap='viridis', linewidths=0.5, linecolor='white', vmin=0, vmax=1)
-                plt.title(f"Heatmap of {param} based on {key_param}")
-                plot_save_path = os.path.join(save_dir, f'{label}_{param}_heatmap.png')
+                for use_std in [True, False]:
+                    df["accuracy mean"] = pd.to_numeric(df["accuracy mean"], errors='coerce')
+                    df["accuracy std"] = pd.to_numeric(df["accuracy std"], errors='coerce')
+                    df["Accuracy mean (Accuracy std)"] = df["accuracy mean"].map("{:.2f}".format) + " (" + df["accuracy std"].map("{:.2f}".format) + ")"
+                    if use_std:
+                        pivot_df = df.pivot(index=key_param, columns=param, values="Accuracy mean (Accuracy std)")
+                        mean_values_df = pivot_df.applymap(lambda x: float(x.split(' ')[0]))
+                    else:
+                        pivot_df = df.pivot(index=key_param, columns=param, values="accuracy mean")
+                        mean_values_df = pivot_df
+                        pivot_df = pivot_df.applymap(lambda x: f"{x:2f}")
+
+                    plt.figure(figsize=(22, 8))
+                    ax = sns.heatmap(mean_values_df, annot=pivot_df, fmt='', cmap='RdBu', linewidths=0.5, linecolor='white', vmin=0, vmax=1)
+                    plt.title(f"Heatmap of {param} based on {key_param}")
+                    plot_save_path = os.path.join(save_dir, f'{label}_{param}_{use_std}_heatmap.png')
+                    plt.savefig(plot_save_path)
+                    plt.close()
+
+            if param == 'test_regime':
+                ncols = 3
+                nrows = len(df[key_param].unique()) // ncols
+                df_filtered = df[df[param].str.endswith('1')]
+                index_values = sorted(df_filtered[param].str[:-1].unique())
+
+                fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(15, 2 * nrows))
+                for k, key_param_val in enumerate(df[key_param].unique()):
+                    if nrows > 1:
+                        ax = axes[k // ncols, k % ncols]
+                    else:
+                        ax = axes[k]
+                    subset_df = df[(df[key_param] == key_param_val) & df[param].str.endswith('1')]
+                    #subset_df['param_first_two'] = subset_df[param].str[:2]
+                    subset_pivot = subset_df.pivot(index=subset_df[param].str[0], columns=subset_df[param].str[1],
+                                                   values='accuracy mean')
+
+                    subset_pivot = subset_pivot.reindex(index_values, axis=0).reindex(index_values, axis=1)
+
+                    sns.heatmap(subset_pivot, annot=True, fmt='.2f', cmap='RdBu', linewidths=0.5, linecolor='white',
+                                vmin=0, vmax=1, ax=ax)
+
+                    ax.set_title(f"{key_param_val}")
+                plt.tight_layout()
+                plot_save_path = os.path.join(save_dir, f'{label}_{param}_grids_small_multiples.png')
                 plt.savefig(plot_save_path)
                 plt.close()
+
+                pass
+
 
 
 def save_single_param_figures(save_dir, params, avg_loss, last_epoch_df):
