@@ -335,7 +335,7 @@ def plot_tsne(data, labels, index, color):
 
 
 def save_delta_figures(dir, df_summary, df_x):
-    for var in ['dpred', 'dpred_correct']:
+    '''for var in ['dpred', 'dpred_correct', 'dpred_accurate']:
         df_list = []
         for key_val, sub_df in df_summary.items():
             for _, row in sub_df.iterrows():
@@ -343,7 +343,7 @@ def save_delta_figures(dir, df_summary, df_x):
                 mean, std = row[var].strip().split(' ')
                 mean = float(mean)
                 std = float(std.strip('()'))
-                df_list.append([key_val, informedness, mean, std])
+                df_list.append([key_val, informedness, mean, std, row[var]])
 
         df = pd.DataFrame(df_list, columns=["key_val", "Informedness", "mean", "std"])
         pivot_df = df.pivot(index="key_val", columns="Informedness", values="mean")
@@ -357,9 +357,10 @@ def save_delta_figures(dir, df_summary, df_x):
         os.makedirs(dir, exist_ok=True)
         plot_save_path = os.path.join(dir, var + '_heatmap.png')
         plt.savefig(plot_save_path)
+        plt.close()'''
 
 
-    for var in ['dpred', 'dpred_correct']:
+    for var in ['dpred', 'dpred_correct', 'dpred_accurate']:
         df_list = []
         for key_val, sub_df in df_x.items():
             for _, row in sub_df.iterrows():
@@ -367,13 +368,14 @@ def save_delta_figures(dir, df_summary, df_x):
                 mean, std = row[var].strip().split(' ')
                 mean = float(mean)
                 std = float(std.strip('()'))
-                df_list.append([key_val, informedness, mean, std])
+                df_list.append([key_val, informedness, mean, std, row[var]])
 
-        df = pd.DataFrame(df_list, columns=["key_val", "operator", "mean", "std"])
+        df = pd.DataFrame(df_list, columns=["key_val", "operator", "mean", "std", "original_val"])
         pivot_df = df.pivot(index="key_val", columns="operator", values="mean")
+        annot_df = df.pivot(index="key_val", columns="operator", values="original_val")
 
-        plt.figure(figsize=(10, 8))
-        ax = sns.heatmap(pivot_df, vmin=0, vmax=1, annot=pivot_df, fmt='.2f', cmap='crest', linewidths=0.5, linecolor='white')
+        plt.figure(figsize=(12, 8))
+        ax = sns.heatmap(pivot_df, vmin=0, vmax=1, annot=annot_df, fmt='', cmap='crest', linewidths=0.5, linecolor='white')
         plt.title(f"Heatmap of " + var)
 
         plt.tight_layout()
@@ -381,6 +383,7 @@ def save_delta_figures(dir, df_summary, df_x):
         os.makedirs(dir, exist_ok=True)
         plot_save_path = os.path.join(dir, var + '_heatmap-ops.png')
         plt.savefig(plot_save_path)
+        plt.close()
 
 
 def save_double_param_figures(save_dir, top_pairs, avg_loss, last_epoch_df):
@@ -445,6 +448,25 @@ def save_key_param_heatmap(save_dir, key_param_stats, key_param):
     chars1 = ['T', 'F', 'N']
     chars2 = ['t', 'f', 'n']
 
+    '''kp stats looks like this:
+    save_dict[key_val]["informedness"] = {
+                            'mean': means.to_dict(),
+                            'std': stds.to_dict(),
+                            'q1': Q1.to_dict(),
+                            'q3': Q3.to_dict(),
+                            'ci': standard_errors.to_dict(),
+                        }'''
+    print('new heatmap')
+    if False:
+        df_list = []
+        for key, metrics_dict in key_param_stats.items():
+            for metric, value in metrics_dict["informedness"].items():
+                df_list.append({"key": key, "metric": metric, "value": value})
+        df = pd.DataFrame(df_list)
+
+        sns.heatmap(df.pivot("key", "metric", "value"), annot=True, cmap="coolwarm")
+        plt.show()
+
     # Initialize an empty 3x3 matrix
     if False:
         for param in list(next(iter(key_param_stats.values())).keys()):
@@ -479,6 +501,7 @@ def save_key_param_heatmap(save_dir, key_param_stats, key_param):
             fig.tight_layout()
             file_path = os.path.join(os.getcwd(), this_save_dir, f'heatmap_inffy_{param}.png')
             plt.savefig(file_path)
+            plt.close()
 
 
 def save_key_param_figures(save_dir, key_param_stats, oracle_stats, key_param):
@@ -489,20 +512,8 @@ def save_key_param_figures(save_dir, key_param_stats, oracle_stats, key_param):
 
     n_groups = len(list(key_param_stats.keys()))
 
-    sub_regime_mapping = {
-        'noInfo': '',
-        'bigExist': 'eb',
-        'smallExist': 'es',
-        'bothExist': 'eb-es',
-        'bigExistBigLoc': 'eb-lb',
-        'smallExistSmallLoc': 'es-ls',
-        'bothExistBigLoc': 'eb-es-lb',
-        'bothExistSmallLoc': 'eb-es-ls',
-        'bothExistBothLoc': 'eb-es-lb-ls'
-    }
-    reverse_mapping = {v: k for k, v in sub_regime_mapping.items()}
-
     for param in list(next(iter(key_param_stats.values())).keys()):
+
 
         labels = list(key_param_stats.keys())
         param_vals = list(key_param_stats[next(iter(key_param_stats))][param]['mean'].keys())
@@ -563,21 +574,23 @@ def save_key_param_figures(save_dir, key_param_stats, oracle_stats, key_param):
                     df_list.append([key_val, param_val, f"{mean}", f"{ci}"])
 
             df = pd.DataFrame(df_list, columns=[key_param, param, "accuracy mean", "accuracy std"])
-            if param == "informedness":
-                df[param] = df[param].replace(reverse_mapping)
 
             table_save_path = os.path.join(this_save_dir, f'{param}_{label}_table.csv')
             df.to_csv(table_save_path, index=False)
 
-        if False:
-            df["Accuracy mean (Accuracy std)"] = df["accuracy mean"] + " (" + df["accuracy std"] + ")"
-            pivot_df = df.pivot(index=key_param, columns=param, values="Accuracy mean (Accuracy std)")
-            mean_values_df = pivot_df.applymap(lambda x: float(x.split(' ')[0]))
-            plt.figure(figsize=(10, 8))
-            ax = sns.heatmap(mean_values_df, annot=pivot_df, fmt='', cmap='coolwarm', linewidths=0.5, linecolor='white')
-            plt.title(f"Heatmap of {param} based on {key_param}")
-            plot_save_path = os.path.join(this_save_dir, f'{param}_heatmap.png')
-            plt.savefig(plot_save_path)
+            if param == 'test_regime':
+                print('old plot')
+                df["accuracy mean"] = pd.to_numeric(df["accuracy mean"], errors='coerce')
+                df["accuracy std"] = pd.to_numeric(df["accuracy std"], errors='coerce')
+                df["Accuracy mean (Accuracy std)"] = df["accuracy mean"].map("{:.2f}".format) + " (" + df["accuracy std"].map("{:.2f}".format) + ")"
+                pivot_df = df.pivot(index=key_param, columns=param, values="Accuracy mean (Accuracy std)")
+                mean_values_df = pivot_df.applymap(lambda x: float(x.split(' ')[0]))
+                plt.figure(figsize=(22, 8))
+                ax = sns.heatmap(mean_values_df, annot=pivot_df, fmt='', cmap='viridis', linewidths=0.5, linecolor='white', vmin=0, vmax=1)
+                plt.title(f"Heatmap of {param} based on {key_param}")
+                plot_save_path = os.path.join(save_dir, f'{label}_{param}_heatmap.png')
+                plt.savefig(plot_save_path)
+                plt.close()
 
 
 def save_single_param_figures(save_dir, params, avg_loss, last_epoch_df):

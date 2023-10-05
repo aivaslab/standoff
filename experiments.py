@@ -1,3 +1,4 @@
+import ast
 import json
 import os
 import pickle
@@ -83,6 +84,19 @@ def add_label_and_combine_dfs(df_list, params, label):
 
     return combined_df
 
+def string_to_list(s):
+    """Converts the string format [2 2] to a list [2, 2]."""
+    s = s.replace(' ', ',')
+    try:
+        return ast.literal_eval(s)
+    except (SyntaxError, ValueError):
+        return None
+
+def informedness_to_str(informedness_list):
+    mapping = {0: 'N', 1: 'F', 2: 'T'}
+    first_val = mapping[informedness_list[0]]
+    second_val = mapping[informedness_list[1]].lower()
+    return first_val + second_val
 
 def load_dataframes(combined_path_list, value_names, key_param):
     df_list = []
@@ -90,26 +104,33 @@ def load_dataframes(combined_path_list, value_names, key_param):
     replace_dict = {'1': 1, '0': 0}
     for df_paths, value_name in zip(combined_path_list, value_names):
         for df_path in df_paths:
+            repetition = int(df_path.split('_')[-1][:1])
+            #note that this only supports single digits
             chunks = pd.read_csv(df_path, chunksize=10000)
             for chunk in chunks:
                 chunk.replace(replace_dict, inplace=True)
-                chunk = chunk.assign(**{key_param: value_name})
+                chunk['test_regime'] = chunk.apply(
+                    lambda row: informedness_to_str(string_to_list(row['informedness'])) + str(row['opponents']),
+                    axis=1
+                )
+                chunk = chunk.assign(**{key_param: value_name, 'repetition': repetition})
                 df_list.append(chunk)
     combined_df = pd.concat(df_list, ignore_index=True)
     combined_df['informedness'] = combined_df['informedness'].fillna('none')
+    #print('combined df cols', combined_df.columns)
     return combined_df
 
-def do_comparison(combined_path_list, last_path_list, regimes, key_param, exp_name, params, prior_metrics):
+def do_comparison(combined_path_list, last_path_list, key_param_list, key_param, exp_name, params, prior_metrics):
     print('loading dataframes for final comparison')
 
-    combined_df = load_dataframes(combined_path_list, regimes.keys(), key_param)
-    last_epoch_df = load_dataframes(last_path_list, regimes.keys(), key_param)
+    combined_df = load_dataframes(combined_path_list, key_param_list, key_param)
+    last_epoch_df = load_dataframes(last_path_list, key_param_list, key_param)
 
     create_combined_histogram(last_epoch_df, combined_df, key_param, os.path.join('supervised', exp_name))
 
     avg_loss, variances, ranges_1, ranges_2, range_dict, range_dict3, stats, key_param_stats, oracle_stats, delta_sum, delta_x = calculate_statistics(
         combined_df, last_epoch_df, list(set(params + prior_metrics + [key_param])),
-        skip_3x=True, key_param=key_param)  # todo: make it definitely save one fixed param eg oracle
+        skip_3x=True, skip_1x=True, key_param=key_param)  # todo: make it definitely save one fixed param eg oracle
 
     combined_path = os.path.join('supervised', exp_name, 'c')
     os.makedirs(combined_path, exist_ok=True)
@@ -128,7 +149,7 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
 
     params = ['visible_baits', 'swaps', 'visible_swaps', 'first_swap_is_both',
               'second_swap_to_first_loc', 'delay_2nd_bait', 'first_bait_size',
-              'uninformed_bait', 'uninformed_swap', 'first_swap']
+              'uninformed_bait', 'uninformed_swap', 'first_swap', 'test_regime']
     prior_metrics = ['shouldAvoidSmall', 'correctSelection', 'incorrectSelection',
                      'shouldGetBig', 'informedness', 'p-b-0', 'p-b-1', 'p-s-0', 'p-s-1', 'delay', 'opponents']
 
@@ -153,13 +174,17 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
     }
     all_regimes = ['sl-' + x + '0' for x in sub_regime_keys_new] + ['sl-' + x + '1' for x in sub_regime_keys_new]
     regimes = {k: ['sl-' + x + '0' for x in sub_regime_keys_new] + ['sl-' + v + '1'] for k, v in sub_regime_mapping_new.items()}
-    print('regimes:', regimes)
+    #print('regimes:', regimes)
     regimes['direct'] = ['sl-' + x + '1' for x in sub_regime_keys_new]
     regimes['noOpponent'] = ['sl-' + x + '0' for x in sub_regime_keys_new]
     regimes['everything'] = all_regimes
 
     single_regimes = {k[3:]: [k] for k in all_regimes}
-    print('single regimes', single_regimes)
+
+    single_regimes['everything'] = regimes['everything']
+    single_regimes['noOpponent'] = regimes['noOpponent']
+    single_regimes['opponent'] = regimes['direct']
+    #print('single regimes', single_regimes)
     save_every = max(1, epochs // desired_evals)
 
     default_regime = regimes['Tt']
@@ -233,6 +258,7 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
         combined_path_list = []
         last_path_list = []
         key_param = 'regime'
+        key_param_list = []
 
         for regime in list(single_regimes.keys()):
             print('regime:', regime)
@@ -247,8 +273,9 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
             )
             last_path_list.append(last_epoch_paths)
             combined_path_list.append(combined_paths)
+            key_param_list.append(regime)
 
-        do_comparison(combined_path_list, last_path_list, single_regimes, key_param, exp_name, params, prior_metrics)
+        do_comparison(combined_path_list, last_path_list, key_param_list, key_param, exp_name, params, prior_metrics)
 
     if 52 in todo:
         print('Running experiment 52: (small version of 51) single models do not generalize')
@@ -256,9 +283,10 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
         combined_path_list = []
         last_path_list = []
         key_param = 'regime'
+        key_param_list = []
 
-        for regime in list(single_regimes.keys())[:3]:
-            print('regime:', regime)
+        for regime in list(single_regimes.keys())[:2]:
+            print('regime:', regime, 'train_sets:', single_regimes[regime])
             combined_paths, last_epoch_paths = run_supervised_session(
                 save_path=os.path.join('supervised', exp_name, regime),
                 train_sets=single_regimes[regime],
@@ -270,8 +298,34 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
             )
             last_path_list.append(last_epoch_paths)
             combined_path_list.append(combined_paths)
+            key_param_list.append(regime)
 
-        do_comparison(combined_path_list, last_path_list, single_regimes, key_param, exp_name, params, prior_metrics)
+        do_comparison(combined_path_list, last_path_list, key_param_list, key_param, exp_name, params, prior_metrics)
+
+    if 53 in todo:
+        print('Running experiment 53: (small version of 51 on many) multi models do generalize')
+
+        combined_path_list = []
+        last_path_list = []
+        key_param = 'regime'
+        key_param_list = []
+
+        for regime in list(single_regimes.keys())[-3:]:
+            print('regime:', regime, 'train_sets:', single_regimes[regime])
+            combined_paths, last_epoch_paths = run_supervised_session(
+                save_path=os.path.join('supervised', exp_name, regime),
+                train_sets=single_regimes[regime],
+                eval_sets=regimes['everything'],
+                oracle_labels=[None],
+                key_param=key_param,
+                key_param_value=regime,
+                **session_params
+            )
+            last_path_list.append(last_epoch_paths)
+            combined_path_list.append(combined_paths)
+            key_param_list.append(regime)
+
+        do_comparison(combined_path_list, last_path_list, key_param_list, key_param, exp_name, params, prior_metrics)
 
     if 11 in todo:
         print('Running experiment 11: train oracle label ')
@@ -439,5 +493,5 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
 
 
 if __name__ == '__main__':
-    experiments([52], repetitions=1, epochs=20, skip_train=True, skip_eval=True, skip_calc=False, skip_activations=True,
+    experiments([53], repetitions=3, epochs=50, skip_train=True, skip_eval=True, skip_calc=True, skip_activations=True,
                 batch_size=256, desired_evals=1, use_ff=False)

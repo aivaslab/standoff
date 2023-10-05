@@ -36,7 +36,7 @@ class HumanPlayer:
         self.episode_count += 1
 
 
-TILE_SIZE = 20
+TILE_SIZE = 14
 
 env_config = {
     "env_class": "MiniStandoffEnv",
@@ -74,7 +74,7 @@ configs = conf.standoff
 
 # configName = 'all'
 # reset_configs = {**configs["defaults"],  **configs[configName]}
-configName = 'sl-es1'
+configName = 'sl-Nf0'
 events = conf.stages[configName]['events']
 reset_configs = configs[conf.stages[configName]['params']]
 params = configs[conf.stages[configName]['params']]
@@ -124,9 +124,15 @@ save_directory = "saved_images"
 if not os.path.exists(save_directory):
     os.makedirs(save_directory)
 
+env.reset(override_params=13)
+env.current_param_group_pos = 58
+env.deterministic_seed = env.current_param_group_pos
+env.record_oracle_labels = True
+
 for i in range(100):
     obs = env.reset()
-    print(env_name, env.gaze_highlighting, env.persistent_gaze_highlighting, env.opponent_visible_decs,
+    print(env_name, env.configName, env.current_event_list_name, env.current_param_group, 'pos', env.current_param_group_pos, env.param_groups[env.current_param_group]['params'],
+          env.gaze_highlighting, env.persistent_gaze_highlighting, env.opponent_visible_decs,
           env.subject_visible_decs, env.persistent_treat_images)
 
     # print(np.round(obs['player_0'] * 10).sum(axis=0).astype(int))
@@ -139,7 +145,7 @@ for i in range(100):
         player_action = human.action_step(np.array(img))
         agent_actions = {'p_0': player_action}
         next_obs, rew, done, info = env.step(agent_actions)
-        # print(info)
+        print(info)
         human.save_step(obs['p_0'], player_action, rew['p_0'], done)
         image_path = os.path.join(save_directory, f"{env_name}_{env.step_count}.png")
         img.save(image_path)

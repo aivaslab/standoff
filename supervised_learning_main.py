@@ -1,6 +1,7 @@
 import glob
 import itertools
 import pickle
+import re
 
 import sys
 import os
@@ -9,7 +10,7 @@ from functools import lru_cache
 
 import pandas as pd
 import heapq
-
+import ast
 from scipy.stats import sem, t
 
 from src.utils.activation_processing import process_activations
@@ -263,12 +264,12 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
 
     df = pd.DataFrame(param_losses_list)
     print('saving csv...')
+    print('cols', df.columns)
     df.to_csv(os.path.join(model_save_path, f'param_losses_{epoch_number}_{repetition}.csv'), index=False)
     df_paths.append(os.path.join(model_save_path, f'param_losses_{epoch_number}_{repetition}.csv'))
     print('saving activations...')
     with open(os.path.join(model_save_path, f'activations_{epoch_number}_{repetition}.pkl'), 'wb') as f:
         pickle.dump(activation_data, f)
-    print('finished')
     return df_paths
 
 
@@ -428,6 +429,19 @@ def get_descendants(category, op, categories):
     return [direct_descendant]
     #return descendants
 
+def extract_last_value_from_list_str(val):
+    if not isinstance(val, str):
+        return val
+
+    pattern = r'\[(.*)\]'
+    match = re.match(pattern, val)
+    if match:
+        values = match.group(1).split()
+        if len(values) == 4:
+            return values[-1]
+    return val
+
+
 def calculate_statistics(df, last_epoch_df, params, skip_3x=True, skip_2x1=False, key_param=None, skip_1x=True, record_delta_pi=True):
     '''
     Calculates various statistics from datasets of model outputs detailing model performance.
@@ -440,6 +454,8 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=True, skip_2x1=False
     range_dict3 = {}
 
     print('calculating statistics...')
+    for col in last_epoch_df.columns:
+        last_epoch_df[col] = last_epoch_df[col].apply(extract_last_value_from_list_str)
 
     print('making categorical')
     for param in params:
@@ -465,6 +481,7 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=True, skip_2x1=False
     }
 
     unique_vals = {param: df[param].unique() for param in params}
+    #print('found unique vals', unique_vals)
 
     if not skip_1x:
         print('calculating single params')
@@ -513,21 +530,23 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=True, skip_2x1=False
                 for acc_type, save_dict in zip(['accuracy', 'o_acc'], [key_param_stats, oracle_key_param_stats]):
                     for key_val in unique_vals[key_param]:
                         subset = last_epoch_df[last_epoch_df[key_param] == key_val]
-                        grouped = subset.groupby(param)[acc_type]
-                        means = grouped.mean()
-                        stds = grouped.std()
+                        grouped = subset.groupby(['repetition', param])[acc_type]
+                        repetition_means = grouped.mean()
+                        overall_means = repetition_means.groupby(level=param).mean()
+                        means_std = repetition_means.groupby(level=param).std()
+                        Q1 = grouped.quantile(0.25).groupby(level=param).mean()
+                        Q3 = grouped.quantile(0.75).groupby(level=param).mean()
                         counts = grouped.size()
-                        z_value = 1.96  # For a 95% CI
-                        standard_errors = z_value * np.sqrt(means * (1 - means) / counts)
 
-                        Q1 = grouped.quantile(0.25)
-                        Q3 = grouped.quantile(0.75)
+                        z_value = 1.96  # For a 95% CI
+                        standard_errors = (z_value * np.sqrt(repetition_means  * (1 - repetition_means ) / counts)).groupby(level=param).mean()
+
 
                         if key_val not in save_dict:
                             save_dict[key_val] = {}
                         save_dict[key_val][param] = {
-                            'mean': means.to_dict(),
-                            'std': stds.to_dict(),
+                            'mean': overall_means.to_dict(),
+                            'std': means_std.to_dict(),
                             'q1': Q1.to_dict(),
                             'q3': Q3.to_dict(),
                             'ci': standard_errors.to_dict(),
@@ -545,97 +564,122 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=True, skip_2x1=False
             combinations_str = [''.join(combo) for combo in combinations]
 
             operators = ['T-F', 't-f', 'F-N', 'f-n', 'T-N', 't-n', '1-0']
+            required_columns = [f'pred_{i}' for i in range(5)]
+            perm_keys = ['p-b-0', 'p-b-1', 'p-s-0', 'p-s-1', 'delay_2nd_bait', 'first_swap', 'first_bait_size', 'delay']
 
             for key_val in unique_vals[key_param]: # for each train regime, etc
+                unique_repetitions = last_epoch_df['repetition'].unique()
 
-                required_columns = [f'pred_{i}' for i in range(5)]
-                perm_keys = ['p-b-0', 'p-b-1', 'p-s-0', 'p-s-1', 'delay_2nd_bait', 'first_swap', 'first_bait_size', 'delay']
-                # the p-x-y columns show which location is selected for each bait and swap, or -1 if none (only applicable to swaps)
-                #print(last_epoch_df.columns, key_param, key_val)
-                subset = last_epoch_df[last_epoch_df[key_param] == key_val]
-                subset['pred'] = subset['pred'].apply(convert_to_numeric).astype(np.int8)
-                #subset['informedness'] = subset['informedness'].replace(translation_dict)
-                conv = pd.concat([subset, pd.get_dummies(subset['pred'], prefix='pred')], axis=1)
+                delta_mean_rep = {key: [] for key in operators}
+                delta_std_rep = {key: [] for key in operators}
+                delta_mean_correct_rep = {key: [] for key in operators}
+                delta_std_correct_rep = {key: [] for key in operators}
+                delta_mean_accurate_rep = {key: [] for key in operators}
+                delta_std_accurate_rep = {key: [] for key in operators}
 
-                for col in required_columns: # a model might not predict all 5 values
-                    if col not in conv.columns:
-                        conv[col] = 0
-                subset = conv[required_columns + ['informedness', 'correctSelection', 'opponents'] + perm_keys]
+                delta_mean = [{key: [] for key in operators} for _ in unique_repetitions]
+                delta_mean_correct = [{key: [] for key in operators} for _ in unique_repetitions]
+                delta_mean_accurate = [{key: [] for key in operators} for _ in unique_repetitions]
+                for rep in unique_repetitions:
+                    subset_rep = last_epoch_df[last_epoch_df['repetition'] == rep]
+
+                    #print(subset_rep.columns, key_param, key_val)
+                    subset = subset_rep[subset_rep[key_param] == key_val]
+                    subset['pred'] = subset['pred'].apply(convert_to_numeric).astype(np.int8)
+                    conv = pd.concat([subset, pd.get_dummies(subset['pred'], prefix='pred')], axis=1)
+
+                    for col in required_columns: # a model might not predict all 5 values
+                        if col not in conv.columns:
+                            conv[col] = 0
+                    subset = conv[required_columns + ['informedness', 'correctSelection', 'opponents', 'accuracy'] + perm_keys]
+
+                    # OPERATOR PART
+                    for op in operators:
+
+                        delta_preds = []
+                        delta_preds_correct = []
+                        delta_preds_accurate = []
+                        for key in combinations_str:
+                            # key is 1st position, descendents are 2nd
+                            descendants = get_descendants(key, op, combinations_str)
+
+                            mapping = {'T': 2, 'F': 1, 'N': 0, 't': 2, 'f': 1, 'n': 0, '0': 0, '1': 1}
+
+                            key = [mapping[char] for char in key]
+                            key_informedness = '[' + ' '.join(map(str, key[:2])) + ']'
+                            key_opponents = np.float64(key[2])
+                            if '0' not in op and key_opponents == 0:
+                                # for most operators, we only use cases with opponents present
+                                continue
+
+                            descendants = [[mapping[char] for char in descendant] for descendant in descendants]
+                            descendant_informedness = ['[' + ' '.join(map(str, descendant[:2])) + ']' for descendant in descendants]
+                            descendant_opponents = [np.float64(descendant[2]) for descendant in descendants]
+
+                            if len(descendants) < 1:
+                                continue
 
 
-                # OPERATOR PART
-                delta_mean = {key: [] for key in operators}
-                delta_std = {key: [] for key in operators}
-                delta_mean_correct = {key: [] for key in operators}
-                delta_std_correct = {key: [] for key in operators}
+                            inf = subset[(subset['informedness'] == key_informedness) & (subset['opponents'] == key_opponents)].groupby(perm_keys + ['informedness', 'opponents', 'correctSelection'], observed=True).mean().reset_index()
+                            noinf = subset[(subset['informedness'].isin(descendant_informedness)) &
+                                (subset['opponents'].isin(descendant_opponents))].groupby(perm_keys + ['informedness', 'opponents', 'correctSelection'], observed=True).mean().reset_index()
+                            #print('lens1', len(inf), len(noinf), len(subset))
+
+
+                            merged_df = pd.merge(
+                                inf,
+                                noinf,
+                                on=perm_keys,
+                                suffixes=('_m', ''),
+                                how='inner',
+                            )
+
+                            merged_df['changed_target'] = (merged_df['correctSelection_m'] != merged_df['correctSelection']).astype(int)
+
+
+                            for i in range(5):
+                                merged_df[f'pred_diff_{i}'] = abs(merged_df[f'pred_{i}_m'] - merged_df[f'pred_{i}'])
+                            merged_df['total_pred_diff'] = merged_df[[f'pred_diff_{idx}' for idx in range(5)]].sum(axis=1) / 2
+                            merged_df['total_pred_diff_correct'] = 1 - abs(merged_df['total_pred_diff'] - merged_df['changed_target'])
+                            merged_df['total_pred_diff_accurate'] = merged_df['total_pred_diff_correct'] * merged_df['accuracy'] * merged_df['accuracy_m']
+
+                            #print(op, key, descendants, np.mean(merged_df['changed_target']))
+
+                            delta_preds.extend(merged_df['total_pred_diff'].tolist())
+                            delta_preds_correct.extend(merged_df['total_pred_diff_correct'].tolist())
+                            delta_preds_accurate.extend(merged_df['total_pred_diff_accurate'].tolist())
+
+                        # first level aggregate: for each operator, within one repetition
+                        delta_mean[int(rep)][op] = np.mean(delta_preds)
+                        delta_mean_correct[int(rep)][op] = np.mean(delta_preds_correct)
+                        delta_mean_accurate[int(rep)][op] = np.mean(delta_preds_accurate)
+
+                # second level aggregate: over one repetition
+
                 for op in operators:
+                    op_values_mean = [rep_dict[op] for rep_dict in delta_mean]
+                    op_values_mean_correct = [rep_dict[op] for rep_dict in delta_mean_correct]
+                    op_values_mean_accurate = [rep_dict[op] for rep_dict in delta_mean_accurate]
 
-                    delta_preds = []
-                    delta_preds_correct = []
-                    for key in combinations_str:
-                        # key is 1st position, descendents are 2nd
-                        descendants = get_descendants(key, op, combinations_str)
+                    delta_mean_rep[op] = np.mean(op_values_mean)
+                    delta_std_rep[op] = np.std(op_values_mean)
 
-                        mapping = {'T': 2, 'F': 1, 'N': 0, 't': 2, 'f': 1, 'n': 0, '0': 0, '1': 1}
+                    delta_mean_correct_rep[op] = np.mean(op_values_mean_correct)
+                    delta_std_correct_rep[op] = np.std(op_values_mean_correct)
 
-                        key = [mapping[char] for char in key]
-                        key_informedness = '[' + ' '.join(map(str, key[:2])) + ']'
-                        key_opponents = np.float64(key[2])
-
-                        descendants = [[mapping[char] for char in descendant] for descendant in descendants]
-                        descendant_informedness = ['[' + ' '.join(map(str, descendant[:2])) + ']' for descendant in descendants]
-                        descendant_opponents = [np.float64(descendant[2]) for descendant in descendants]
-
-                        if len(descendants) < 1:
-                            continue
+                    delta_mean_accurate_rep[op] = np.mean(op_values_mean_accurate)
+                    delta_std_accurate_rep[op] = np.std(op_values_mean_accurate)
 
 
-                        inf = subset[(subset['informedness'] == key_informedness) & (subset['opponents'] == key_opponents)].groupby(perm_keys + ['informedness', 'opponents', 'correctSelection'], observed=True).mean().reset_index()
-                        noinf = subset[(subset['informedness'].isin(descendant_informedness)) &
-                            (subset['opponents'].isin(descendant_opponents))].groupby(perm_keys + ['informedness', 'opponents', 'correctSelection'], observed=True).mean().reset_index()
-                        #print('lens1', len(inf), len(noinf), len(subset))
-
-
-                        merged_df = pd.merge(
-                            inf,
-                            noinf,
-                            on=perm_keys,
-                            suffixes=('_m', ''),
-                            how='inner',
-                        )
-
-                        merged_df['changed_target'] = (merged_df['correctSelection_m'] != merged_df['correctSelection']).astype(int)
-
-                        for i in range(5):
-                            merged_df[f'pred_diff_{i}'] = abs(merged_df[f'pred_{i}_m'] - merged_df[f'pred_{i}'])
-                        merged_df['total_pred_diff'] = merged_df[[f'pred_diff_{idx}' for idx in range(5)]].sum(axis=1) / 2
-                        merged_df['total_pred_diff_correct'] = 1 - abs(merged_df['total_pred_diff'] - merged_df['changed_target'])
-
-                        print(op, key, descendants, len(merged_df['total_pred_diff']), np.mean(merged_df['total_pred_diff']), len(merged_df['changed_target']), np.mean(merged_df['changed_target']))
-
-                        delta_preds.extend(merged_df['total_pred_diff'].tolist())
-                        delta_preds_correct.extend(merged_df['total_pred_diff_correct'].tolist())
-
-                        if any(np.isnan(delta_preds)):
-                            print(f"Debug: 'delta_preds' contains NaNs")
-
-                        if any(np.isnan(delta_preds_correct)):
-                            print(f"Debug: 'delta_preds_correct' contains NaNs")
-
-                    # these lines are wrong
-                    delta_mean[op] = np.mean(delta_preds)
-                    delta_std[op] = np.std(delta_preds)
-                    delta_mean_correct[op] = np.mean(delta_preds_correct)
-                    delta_std_correct[op] = np.std(delta_preds_correct)
-                    # all these are for one operator
-
+                # third level aggregate: all key_vals
                 delta_operator_summary[key_val] = pd.DataFrame({
-                    'operator': list(delta_mean.keys()),
-                    'dpred': [f"{delta_mean[key]} ({delta_std[key]})" for key in delta_mean.keys()],
-                    'dpred_correct': [f"{delta_mean_correct[key]} ({delta_std_correct[key]})" for key in
-                                      delta_mean_correct.keys()]
+                    'operator': list(delta_mean_rep.keys()),
+                    'dpred': [f"{delta_mean_rep[key]:.2f} ({delta_std_rep[key]:.2f})" for key in delta_mean_rep.keys()],
+                    'dpred_correct': [f"{delta_mean_correct_rep[key]:.2f} ({delta_std_correct_rep[key]:.2f})" for key in delta_mean_correct_rep.keys()],
+                    'dpred_accurate': [f"{delta_mean_accurate_rep[key]:.2f} ({delta_std_accurate_rep[key]:.2f})" for key in delta_mean_accurate_rep.keys()]
                 })
-                print('do', delta_operator_summary[key_val])
+
+                print('do', key_val, delta_operator_summary[key_val])
 
 
                 # CATEGORY ONE
@@ -674,6 +718,9 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=True, skip_2x1=False
                 delta_mean_correct = {key: np.mean(val) for key, val in delta_preds_correct.items()}
                 delta_std_correct = {key: np.std(val) for key, val in delta_preds_correct.items()}
 
+                delta_mean_accurate = {key: np.mean(val) for key, val in delta_preds_correct.items()}
+                delta_std_accurate = {key: np.std(val) for key, val in delta_preds_correct.items()}
+
                 df_summary[key_val] = pd.DataFrame({
                     'Informedness': list(delta_mean.keys()),
                     'dpred': [f"{delta_mean[key]} ({delta_std[key]})" for key in delta_mean.keys()],
@@ -683,7 +730,6 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=True, skip_2x1=False
                 # todo: add informedness operators, rather than just category
                 print(df_summary[key_val])
 
-    print('finished')
     return avg_loss, variances, ranges_1, ranges_2, range_dict, range_dict3, stats, key_param_stats, oracle_key_param_stats, df_summary, delta_operator_summary
 
 
@@ -854,6 +900,7 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
                 replace_dict = {'1': 1, '0': 0}
                 combined_df.replace(replace_dict, inplace=True)
                 last_epoch_df.replace(replace_dict, inplace=True)
+                combined_df[key_param] = key_param_value
                 last_epoch_df[key_param] = key_param_value
                 # print('join replace took', time.time()-cur_time)
                 # print('last_df cols', last_epoch_df.columns, last_epoch_df.t)
