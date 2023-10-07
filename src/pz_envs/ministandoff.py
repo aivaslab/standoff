@@ -122,8 +122,7 @@ class MiniStandoffEnv(para_MultiGridEnv):
         self.agent_goal, self.last_seen_reward, self.can_see, self.best_reward = {}, {}, {}, {}
         boxes = self.params["boxes"]
         for agent in self.agents_and_puppets():
-            self.agent_goal[agent] = self.deterministic_seed % boxes if self.deterministic else random.choice(
-                range(boxes))
+            self.agent_goal[agent] = 2 #self.deterministic_seed % boxes if self.deterministic else random.choice(range(boxes))
             self.best_reward[agent] = -100
             for box in range(boxes):
                 self.last_seen_reward[agent + str(box)] = -100
@@ -557,7 +556,7 @@ class MiniStandoffEnv(para_MultiGridEnv):
                         elif not self.grid.get(x, y) and self.last_seen_reward[agent + str(box)] != 0:
                             self.last_seen_reward[agent + str(box)] = 0
                             if self.agent_goal[agent] == box:
-                                self.agent_goal[agent] = -1
+                                self.agent_goal[agent] = 2
                                 self.best_reward[agent] = -100
 
             self.new_target = False

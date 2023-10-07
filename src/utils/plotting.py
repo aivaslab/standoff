@@ -1,5 +1,7 @@
+import math
+
 import numpy as np
-from matplotlib import pyplot as plt
+from matplotlib import pyplot as plt, gridspec
 from stable_baselines3.common.results_plotter import load_results, ts2xy
 import os
 import pandas as pd
@@ -361,25 +363,63 @@ def save_delta_figures(dir, df_summary, df_x):
 
 
     # subfigs of accuracy across operators
-    for columns, colors, pathname in zip([['t', 'f'], ['tt', 'tf' , 'ft', 'ff']], [None, ['blue', 'lightgreen', 'lightblue', 'pink']], ['dpred', 'acc']):
-        nrows = len(df_x.keys())
-        ncols = len(list(df_x.items())[0][1]['operator'].unique())
+    all_cols = ['t', 'f', 'tt', 'tf', 'ft', 'ff']
+    p_cols = ['p' + col for col in all_cols]
+    m_cols = ['m' + col for col in all_cols]
+    new_cols = p_cols + m_cols
+
+    # generate ideal row
+    df_x2 = df_x.copy()
+    row_df = list(df_x2.items())[0][1]
+    print('row df', row_df)
+    df_x2['ideal'] = {}
+    for col_idx, (_, row) in enumerate(row_df.iterrows()):
+        op = row['operator']
+        op_dict = {}
+
+        op_dict['pt'] = row['pt'] + row['pf']
+        op_dict['pf'] = 0
+        op_dict['mt'] = 0
+        op_dict['mf'] = row['mt'] + row['mf']
+        op_dict['ptt'] = row['ptt'] + row['pft'] + row['ptf']
+        op_dict['ptf'] = 0
+        op_dict['pft'] = 0
+        op_dict['pff'] = 0
+        op_dict['mtt'] = row['mtt'] + row['mft'] + row['mtf']
+        op_dict['mtf'] = 0
+        op_dict['mft'] = 0
+        op_dict['mff'] = 0
+        op_dict['operator'] = op
+
+        df_x2['ideal'][op] = op_dict
+    df_x2['ideal'] = pd.DataFrame(df_x2['ideal']).transpose()
+    print('ideal df', df_x2['ideal'])
+
+    colmap = {'t': 'Δb', 'f': '=b', 'tt': '1-1', 'tf': '1-0', 'ft': '0-1', 'ff': '0-0'}
+
+    for columns, colors, pathname in zip([['t', 'f'], ['tt', 'tf', 'ft', 'ff']], [None, ['blue', 'lightgreen', 'lightblue', 'pink']], ['dpred', 'acc']):
+        nrows = len(df_x2.keys())
+        ncols = len(list(df_x2.items())[0][1]['operator'].unique())
         fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(15, 1.2 * nrows))
 
-        for idx, (key_val, df) in enumerate(df_x.items()):
-            for col_idx, (_, row) in enumerate(df.iterrows()):  # Using iterrows to iterate over the DataFrame
+        for idx, (key_val, df) in enumerate(df_x2.items()):
+            for col_idx, (_, row) in enumerate(df.iterrows()): # row is each operator
                 if nrows > 1:
                     ax = axes[idx, col_idx]
                 else:
                     ax = axes[col_idx]
-                data = {col: [row[f'p{col}'], row[f'm{col}']] for col in columns}
-                tmp_df = pd.DataFrame(data, index=['+', '-'])
+                data = {colmap[col]: [row[f'p{col}'], row[f'm{col}']] for col in columns}
+                tmp_df = pd.DataFrame(data, index=['Δb*', '=b*'])
 
                 tmp_df.plot(kind='bar', stacked=True, ax=ax, width=0.6, legend=False, color=colors)
                 ax.set_ylim([0, 1])
 
+                op = row['operator']
+                if op == '0-1':
+                    op = 'Op-NoOp'
+
                 if idx == nrows - 1:
-                    ax.set_xlabel(row['operator'])
+                    ax.set_xlabel(op)
                 else:
                     ax.set_xticks([])
                 if col_idx == 0:
@@ -614,54 +654,89 @@ def save_key_param_figures(save_dir, key_param_stats, oracle_stats, key_param):
 
             # produce typical heatmaps for accuracy
             if param == 'test_regime':
-                for use_std in [True, False]:
-                    df["accuracy mean"] = pd.to_numeric(df["accuracy mean"], errors='coerce')
-                    df["accuracy std"] = pd.to_numeric(df["accuracy std"], errors='coerce')
-                    df["Accuracy mean (Accuracy std)"] = df["accuracy mean"].map("{:.2f}".format) + " (" + df["accuracy std"].map("{:.2f}".format) + ")"
-                    if use_std:
-                        pivot_df = df.pivot(index=key_param, columns=param, values="Accuracy mean (Accuracy std)")
-                        mean_values_df = pivot_df.applymap(lambda x: float(x.split(' ')[0]))
-                    else:
-                        pivot_df = df.pivot(index=key_param, columns=param, values="accuracy mean")
-                        mean_values_df = pivot_df
-                        pivot_df = pivot_df.applymap(lambda x: f"{x:2f}")
+                for use_zero_op in [True, False]:
+                    for use_std in [True, False]:
+                        df["accuracy mean"] = pd.to_numeric(df["accuracy mean"], errors='coerce')
+                        df["accuracy std"] = pd.to_numeric(df["accuracy std"], errors='coerce')
+                        df["Accuracy mean (Accuracy std)"] = df["accuracy mean"].map("{:.2f}".format) + " (" + df["accuracy std"].map("{:.2f}".format) + ")"
+                        df_filtered = df[df[param].astype(str).str.endswith('1')] if not use_zero_op else df
+                        if use_std:
+                            pivot_df = df_filtered.pivot(index=key_param, columns=param, values="Accuracy mean (Accuracy std)")
+                            mean_values_df = pivot_df.applymap(lambda x: float(x.split(' ')[0]))
+                        else:
+                            pivot_df = df_filtered.pivot(index=key_param, columns=param, values="accuracy mean")
+                            mean_values_df = pivot_df
+                            pivot_df = pivot_df.applymap(lambda x: f"{x:.2f}")
 
-                    plt.figure(figsize=(22, 8))
-                    ax = sns.heatmap(mean_values_df, annot=pivot_df, fmt='', cmap='RdBu', linewidths=0.5, linecolor='white', vmin=0, vmax=1)
-                    plt.title(f"Heatmap of {param} based on {key_param}")
-                    plot_save_path = os.path.join(save_dir, f'{label}_{param}_{use_std}_heatmap.png')
-                    plt.savefig(plot_save_path)
-                    plt.close()
+                        plt.figure(figsize=(22, 8))
+                        ax = sns.heatmap(mean_values_df, annot=pivot_df, fmt='', cmap='RdBu', linewidths=0.5, linecolor='white', vmin=0, vmax=1)
+                        plt.title(f"Heatmap of {param} based on {key_param}")
+                        plot_save_path = os.path.join(save_dir, f'{label}_{param}_{use_std}_{use_zero_op}_heatmap.png')
+                        plt.savefig(plot_save_path)
+                        plt.close()
 
             if param == 'test_regime':
-                ncols = 3
-                nrows = len(df[key_param].unique()) // ncols
-                df_filtered = df[df[param].str.endswith('1')]
-                index_values = sorted(df_filtered[param].str[:-1].unique())
+                regimes = df[key_param].unique()
+                custom_col_order = ['t', 'f', 'n']
+                custom_row_order = ['T', 'F', 'N']
+                if "Nt" in regimes:
+                    regimes = ['Tt', 'Tf', 'Tn', 'Ft', 'Ff', 'Fn', 'Nt', 'Nf', 'Nn']
+                elif "Nt0" in regimes:
+                    regimes = ['Tt0', 'Tf0', 'Tn0', 'Ft0', 'Ff0', 'Fn0', 'Nt0', 'Nf0', 'Nn0', 'Tt1', 'Tf1', 'Tn1', 'Ft1', 'Ff1', 'Fn1', 'Nt1', 'Nf1', 'Nn1']
 
-                fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(15, 2 * nrows))
-                for k, key_param_val in enumerate(df[key_param].unique()):
-                    if nrows > 1:
-                        ax = axes[k // ncols, k % ncols]
-                    else:
-                        ax = axes[k]
-                    subset_df = df[(df[key_param] == key_param_val) & df[param].str.endswith('1')]
-                    #subset_df['param_first_two'] = subset_df[param].str[:2]
-                    subset_pivot = subset_df.pivot(index=subset_df[param].str[0], columns=subset_df[param].str[1],
-                                                   values='accuracy mean')
+                ncols = min(3, len(regimes))
+                nrows = math.ceil(len(regimes) / ncols)
+                for do_both_opponent_types in [True, False]:
+                    all_filters = ['0', '1'] if do_both_opponent_types else ['1']
+                    fig = plt.figure(figsize=(15, 2 * nrows))
+                    gs = gridspec.GridSpec(nrows, ncols, wspace=0.2, hspace=0.4)
+                    for k, key_param_val in enumerate(regimes):
+                        if nrows == 1 and ncols > 1:
+                            ax_main = plt.subplot(gs[k])
+                        elif ncols == 1 and nrows > 1:
+                            ax_main = plt.subplot(gs[k // ncols])
+                        else:
+                            ax_main = plt.subplot(gs[k // ncols, k % ncols])
+                        ax_main.set_title(f"Training: {key_param_val}")
+                        inner_gs = gridspec.GridSpecFromSubplotSpec(1, len(all_filters), subplot_spec=ax_main, wspace=0.2, hspace=0.6, height_ratios=[0.8])
+                        for ending_idx, filter in enumerate(all_filters):
+                            ax = plt.subplot(inner_gs[ending_idx])
+                            #pos = ax.get_position()
+                            #shift_amount = 0.05
+                            #new_position = [pos.x0, pos.y0 - shift_amount, pos.width, pos.height - shift_amount]
+                            #ax.set_position(new_position)
+                            df_filtered = df[df[param].str.endswith(filter)]
+                            subset_df = df_filtered[(df_filtered[key_param] == key_param_val)]
+                            subset_df['param_char1'] = subset_df[param].str[0]
+                            subset_df['param_char2'] = subset_df[param].str[1]
+                            subset_pivot = subset_df.pivot(index='param_char1', columns='param_char2', values='accuracy mean')
 
-                    subset_pivot = subset_pivot.reindex(index_values, axis=0).reindex(index_values, axis=1)
+                            subset_pivot = subset_pivot.reindex(custom_row_order)
+                            subset_pivot = subset_pivot.reindex(columns=custom_col_order)
 
-                    sns.heatmap(subset_pivot, annot=True, fmt='.2f', cmap='RdBu', linewidths=0.5, linecolor='white',
-                                vmin=0, vmax=1, ax=ax)
+                            sns.heatmap(subset_pivot, annot=True, fmt='.2f', cmap='RdBu', linewidths=0.5, linecolor='white', vmin=0, vmax=1, ax=ax, cbar=False)
 
-                    ax.set_title(f"{key_param_val}")
-                plt.tight_layout()
-                plot_save_path = os.path.join(save_dir, f'{label}_{param}_grids_small_multiples.png')
-                plt.savefig(plot_save_path)
-                plt.close()
 
-                pass
+                            if len(all_filters) < 2:
+                                ax.set_xlabel("")
+                            else:
+                                ax.set_xlabel(f"No Opponent" if ending_idx == 0 else "Opponent", labelpad=2)
+                            ax.set_ylabel("")
+                            ax.xaxis.tick_top()
+                            if ending_idx == 1:
+                                ax.set_yticks([])
+
+                        center_x = (ax_main.get_position().x0 + ax_main.get_position().x1) / 2
+                        top_y = ax_main.get_position().y1 + 0.03
+
+                        fig.text(center_x, top_y, f"Training: {key_param_val}",
+                                 ha='center',
+                                 va='bottom',
+                                 fontsize=12,
+                                 fontweight='bold')
+                    plot_save_path = os.path.join(save_dir, f'{label}_{param}_{do_both_opponent_types}_grids_small_multiples.png')
+                    plt.savefig(plot_save_path)
+                    plt.close()
 
 
 

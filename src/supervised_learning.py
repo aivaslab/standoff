@@ -587,6 +587,8 @@ class RNNModel(nn.Module):
 
         self.rnn = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
 
+        print('oracle_is_target', oracle_is_target, 'hidden_size', hidden_size)
+
         self.fc_main_output = nn.Linear(hidden_size + oracle_len if self.oracle_layer == 0 and not oracle_is_target else hidden_size,
                             int(output_len) if not oracle_is_target else int(output_len))
 

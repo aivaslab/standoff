@@ -367,7 +367,7 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
                 save_path=os.path.join('supervised', exp_name, regime),
                 train_sets=mixed_regimes[regime],
                 eval_sets=regimes['everything'],
-                oracle_labels=[None],
+                oracle_labels=['b-loc'],
                 key_param=key_param,
                 key_param_value=regime,
                 **session_params
@@ -544,5 +544,5 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
 
 
 if __name__ == '__main__':
-    experiments([53], repetitions=3, epochs=50, skip_train=True, skip_eval=True, skip_calc=True, skip_activations=True,
+    experiments([54], repetitions=3, epochs=50, skip_train=True, skip_eval=True, skip_calc=True, skip_activations=True,
                 batch_size=256, desired_evals=1, use_ff=False)

@@ -970,7 +970,7 @@ def find_df_paths(directory, file_pattern):
 def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, eval_sets=None,
                            load_path='supervised', oracle_labels=[], skip_train=True, batch_size=64,
                            prior_metrics=[], key_param=None, key_param_value=None, save_every=1, skip_calc=True,
-                           use_ff=False, oracle_layer=0, skip_eval=False, oracle_is_target=False, skip_figures=True,
+                           use_ff=False, oracle_layer=0, skip_eval=False, oracle_is_target=True, skip_figures=True,
                            act_label_names=[], skip_activations=True):
 
     '''
