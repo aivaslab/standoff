@@ -74,7 +74,7 @@ configs = conf.standoff
 
 # configName = 'all'
 # reset_configs = {**configs["defaults"],  **configs[configName]}
-configName = 'sl-Nf0'
+configName = 'sl-Nf1'
 events = conf.stages[configName]['events']
 reset_configs = configs[conf.stages[configName]['params']]
 params = configs[conf.stages[configName]['params']]
@@ -145,7 +145,7 @@ for i in range(100):
         player_action = human.action_step(np.array(img))
         agent_actions = {'p_0': player_action}
         next_obs, rew, done, info = env.step(agent_actions)
-        print(info)
+        print(env.agent_goal)
         human.save_step(obs['p_0'], player_action, rew['p_0'], done)
         image_path = os.path.join(save_directory, f"{env_name}_{env.step_count}.png")
         img.save(image_path)

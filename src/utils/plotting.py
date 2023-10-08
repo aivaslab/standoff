@@ -369,10 +369,10 @@ def save_delta_figures(dir, df_summary, df_x):
     new_cols = p_cols + m_cols
 
     # generate ideal row
-    df_x2 = df_x.copy()
-    row_df = list(df_x2.items())[0][1]
+    #df_x2 = df_x.copy()
+    row_df = list(df_x.items())[0][1]
     print('row df', row_df)
-    df_x2['ideal'] = {}
+    temp = {}
     for col_idx, (_, row) in enumerate(row_df.iterrows()):
         op = row['operator']
         op_dict = {}
@@ -391,18 +391,18 @@ def save_delta_figures(dir, df_summary, df_x):
         op_dict['mff'] = 0
         op_dict['operator'] = op
 
-        df_x2['ideal'][op] = op_dict
-    df_x2['ideal'] = pd.DataFrame(df_x2['ideal']).transpose()
-    print('ideal df', df_x2['ideal'])
+        temp[op] = op_dict
+    temp = pd.DataFrame(temp).transpose()
+    df_x2 = [('ideal', temp)] + list(df_x.items())
 
     colmap = {'t': 'Δb', 'f': '=b', 'tt': '1-1', 'tf': '1-0', 'ft': '0-1', 'ff': '0-0'}
 
     for columns, colors, pathname in zip([['t', 'f'], ['tt', 'tf', 'ft', 'ff']], [None, ['blue', 'lightgreen', 'lightblue', 'pink']], ['dpred', 'acc']):
-        nrows = len(df_x2.keys())
-        ncols = len(list(df_x2.items())[0][1]['operator'].unique())
+        nrows = len(df_x2)
+        ncols = len(df_x2[0][1]['operator'].unique())
         fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(15, 1.2 * nrows))
 
-        for idx, (key_val, df) in enumerate(df_x2.items()):
+        for idx, (key_val, df) in enumerate(df_x2):
             for col_idx, (_, row) in enumerate(df.iterrows()): # row is each operator
                 if nrows > 1:
                     ax = axes[idx, col_idx]
@@ -410,12 +410,14 @@ def save_delta_figures(dir, df_summary, df_x):
                     ax = axes[col_idx]
                 data = {colmap[col]: [row[f'p{col}'], row[f'm{col}']] for col in columns}
                 tmp_df = pd.DataFrame(data, index=['Δb*', '=b*'])
+                if idx == 0:
+                    ax.set_facecolor('gray')
 
                 tmp_df.plot(kind='bar', stacked=True, ax=ax, width=0.6, legend=False, color=colors)
                 ax.set_ylim([0, 1])
 
                 op = row['operator']
-                if op == '0-1':
+                if op == '1-0':
                     op = 'Op-NoOp'
 
                 if idx == nrows - 1:
@@ -727,7 +729,7 @@ def save_key_param_figures(save_dir, key_param_stats, oracle_stats, key_param):
                                 ax.set_yticks([])
 
                         center_x = (ax_main.get_position().x0 + ax_main.get_position().x1) / 2
-                        top_y = ax_main.get_position().y1 + 0.03
+                        top_y = ax_main.get_position().y1 + 0.02
 
                         fig.text(center_x, top_y, f"Training: {key_param_val}",
                                  ha='center',

@@ -553,7 +553,7 @@ class MiniStandoffEnv(para_MultiGridEnv):
                             #print(self.last_seen_reward)
 
                             # print('rew update', agent, box, tile.reward)
-                        elif not self.grid.get(x, y) and self.last_seen_reward[agent + str(box)] != 0:
+                        elif not tile and self.last_seen_reward[agent + str(box)] != 0:
                             self.last_seen_reward[agent + str(box)] = 0
                             if self.agent_goal[agent] == box:
                                 self.agent_goal[agent] = 2
