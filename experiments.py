@@ -1,4 +1,5 @@
 import ast
+import copy
 import json
 import os
 import pickle
@@ -8,7 +9,7 @@ import pandas as pd
 
 from src.pz_envs import ScenarioConfigs
 from src.supervised_learning import gen_data
-from src.utils.plotting import create_combined_histogram
+from src.utils.plotting import create_combined_histogram, plot_progression
 from supervised_learning_main import run_supervised_session, calculate_statistics, write_metrics_to_file, save_figures, \
     train_model
 import numpy as np
@@ -120,7 +121,7 @@ def load_dataframes(combined_path_list, value_names, key_param):
     #print('combined df cols', combined_df.columns)
     return combined_df
 
-def do_comparison(combined_path_list, last_path_list, key_param_list, key_param, exp_name, params, prior_metrics):
+def do_comparison(combined_path_list, last_path_list, key_param_list, key_param, exp_name, params, prior_metrics, used_regimes=None):
     print('loading dataframes for final comparison')
 
     combined_df = load_dataframes(combined_path_list, key_param_list, key_param)
@@ -130,7 +131,7 @@ def do_comparison(combined_path_list, last_path_list, key_param_list, key_param,
 
     avg_loss, variances, ranges_1, ranges_2, range_dict, range_dict3, stats, key_param_stats, oracle_stats, delta_sum, delta_x = calculate_statistics(
         combined_df, last_epoch_df, list(set(params + prior_metrics + [key_param])),
-        skip_3x=True, skip_1x=True, key_param=key_param)  # todo: make it definitely save one fixed param eg oracle
+        skip_3x=True, skip_1x=True, key_param=key_param, used_regimes=used_regimes, savepath=os.path.join('supervised', exp_name))
 
     combined_path = os.path.join('supervised', exp_name, 'c')
     os.makedirs(combined_path, exist_ok=True)
@@ -154,7 +155,7 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
     prior_metrics = ['shouldAvoidSmall', 'correctSelection', 'incorrectSelection',
                      'shouldGetBig', 'informedness', 'p-b-0', 'p-b-1', 'p-s-0', 'p-s-1', 'delay', 'opponents']
 
-    sub_regime_keys_new = [
+    sub_regime_keys = [
         "Nn",
         "Fn", "Nf",
         "Tn", "Nt",
@@ -162,21 +163,21 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
         "Tf", "Ft",
         "Tt"
     ]
-    all_regimes = ['sl-' + x + '0' for x in sub_regime_keys_new] + ['sl-' + x + '1' for x in sub_regime_keys_new]
-    mixed_regimes = {k: ['sl-' + x + '0' for x in sub_regime_keys_new] + ['sl-' + k + '1'] for k in sub_regime_keys_new}
+    all_regimes = ['sl-' + x + '0' for x in sub_regime_keys] + ['sl-' + x + '1' for x in sub_regime_keys]
+    mixed_regimes = {k: ['sl-' + x + '0' for x in sub_regime_keys] + ['sl-' + k + '1'] for k in sub_regime_keys}
     #print('regimes:', regimes)
     regimes = {}
-    regimes['direct'] = ['sl-' + x + '1' for x in sub_regime_keys_new]
-    regimes['noOpponent'] = ['sl-' + x + '0' for x in sub_regime_keys_new]
+    regimes['direct'] = ['sl-' + x + '1' for x in sub_regime_keys]
+    regimes['noOpponent'] = ['sl-' + x + '0' for x in sub_regime_keys]
     regimes['everything'] = all_regimes
-    regimes['identity'] = ['sl-' + x + '0' for x in sub_regime_keys_new] + ['Tt1', 'Ff1', 'Nn1']
+    regimes['identity'] = ['sl-' + x + '0' for x in sub_regime_keys] + ['Tt1', 'Ff1', 'Nn1']
 
     single_regimes = {k[3:]: [k] for k in all_regimes}
     leave_one_out_regimes = {}
-    for i in range(len(sub_regime_keys_new)):
-        regime_name = "lo_" + sub_regime_keys_new[i]
-        leave_one_out_regimes[regime_name] = ['sl-' + x + '0' for x in sub_regime_keys_new]
-        ones = ['sl-' + x + '1' for j, x in enumerate(sub_regime_keys_new) if j != i]
+    for i in range(len(sub_regime_keys)):
+        regime_name = "lo_" + sub_regime_keys[i]
+        leave_one_out_regimes[regime_name] = ['sl-' + x + '0' for x in sub_regime_keys]
+        ones = ['sl-' + x + '1' for j, x in enumerate(sub_regime_keys) if j != i]
         leave_one_out_regimes[regime_name].extend(ones)
 
     pref_types = [
@@ -251,6 +252,7 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
         last_path_list = []
         key_param = 'regime'
         key_param_list = []
+        used_regimes = []
 
         for regime in list(single_regimes.keys()):
             print('regime:', regime)
@@ -266,8 +268,9 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
             last_path_list.append(last_epoch_paths)
             combined_path_list.append(combined_paths)
             key_param_list.append(regime)
+            used_regimes.append(single_regimes[regime])
 
-        do_comparison(combined_path_list, last_path_list, key_param_list, key_param, exp_name, params, prior_metrics)
+        do_comparison(combined_path_list, last_path_list, key_param_list, key_param, exp_name, params, prior_metrics, used_regimes)
 
     if 52 in todo:
         print('Running experiment 52: (small version of 51) single models do not generalize')
@@ -353,7 +356,7 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
         key_param_list = []
         session_params['oracle_is_target'] = True
 
-        for regime in ['Tt']:
+        for regime in ['Nn']:
             print('regime:', regime, 'train_sets:', mixed_regimes[regime])
             combined_paths, last_epoch_paths = run_supervised_session(
                 save_path=os.path.join('supervised', exp_name, regime),
@@ -378,7 +381,7 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
         key_param = 'regime'
         key_param_list = []
 
-        for regime in list(mixed_regimes.keys()):
+        for regime in list(leave_one_out_regimes.keys()):
             print('regime:', regime, 'train_sets:', leave_one_out_regimes[regime])
             combined_paths, last_epoch_paths = run_supervised_session(
                 save_path=os.path.join('supervised', exp_name, regime),
@@ -395,8 +398,73 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
 
         do_comparison(combined_path_list, last_path_list, key_param_list, key_param, exp_name, params, prior_metrics)
 
+    if 57 in todo:
+        print('Running experiment 57: progression')
+
+        key_param = 'regime'
+        all_accuracies = {}
+        save_file = os.path.join('supervised', exp_name, 'prog.pkl')
+        image_file = os.path.join('supervised', exp_name, 'prog.png')
+
+        session_params['skip_calc'] = True
+        session_params['skip_activations'] = True
+
+        for progression_trial in range(3):
+            base_regimes = ['sl-' + x + '0' for x in sub_regime_keys]
+            add_regimes = ['sl-' + x + '1' for x in sub_regime_keys]
+            random.shuffle(add_regimes)
+
+            prog_regimes = [[x for x in base_regimes]]
+            for idx in range(9):
+                prog_regimes.append(copy.copy(prog_regimes[idx]))
+                prog_regimes[idx + 1].append(add_regimes.pop())
+
+            for oracle in [0, 1]:
+                prog_accuracies = []
+                last_path_list = []
+                key_param_list = []
+                session_params['oracle_is_target'] = bool(oracle)
+                for regime in range(10):
+                    print('regime:', regime, 'train_sets:', prog_regimes[regime])
+                    _, last_epoch_paths = run_supervised_session(
+                        save_path=os.path.join('supervised', exp_name, str(oracle) + '_' + str(progression_trial) + '_' + str(regime)),
+                        train_sets=prog_regimes[regime],
+                        eval_sets=regimes['direct'],
+                        oracle_labels=[None if not oracle else 'b-loc'],
+                        key_param=key_param,
+                        key_param_value=str(regime),
+                        **session_params
+                    )
+                    last_path_list.append(last_epoch_paths)
+                    key_param_list.append(str(regime))
+
+                    replace_dict = {'1': 1, '0': 0}
+                    #print('last path', last_epoch_paths)
+                    df_list = []
+                    if len(last_epoch_paths):
+                        for df_path in last_epoch_paths:
+                            chunks = pd.read_csv(df_path, chunksize=10000)
+                            for chunk in chunks:
+                                chunk.replace(replace_dict, inplace=True)
+                                df_list.append(chunk)
+                        combined_df = pd.concat(df_list, ignore_index=True)
+                        avg_accuracy = combined_df['accuracy'].mean()
+                        print('avg_accuracy', avg_accuracy)
+                        prog_accuracies.append(avg_accuracy)
+
+                all_accuracies[str(oracle) + '_' + str(progression_trial)] = prog_accuracies
+
+            with open(save_file, 'wb') as f:
+                pickle.dump(all_accuracies, f)
+
+            plot_progression(save_file, image_file)
+
+
+
+        do_comparison(combined_path_list, last_path_list, key_param_list, key_param, exp_name, params, prior_metrics)
+
 
 
 if __name__ == '__main__':
-    experiments([56], repetitions=3, epochs=100, skip_train=False, skip_eval=False, skip_calc=False, skip_activations=False,
+    experiments([51], repetitions=1, epochs=50, skip_train=True, skip_eval=True, skip_calc=True, skip_activations=True,
                 batch_size=256, desired_evals=1, use_ff=False)

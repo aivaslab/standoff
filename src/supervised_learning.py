@@ -199,20 +199,21 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
                         eName = env.current_event_list_name
                         tq.update(1)
                     prev_param_group = env.current_param_group
-                    this_ob = np.zeros((frames, *obs['p_0'].shape))
+                    this_ob = np.zeros((1 + frames, *obs['p_0'].shape))
                     pos = 0
+
 
                     temp_labels = {label: [] for label in check_labels}
 
-                    while pos < frames:
-                        next_obs, _, _, info = env.step({'p_0': 2})
-                        this_ob[pos, :, :, :] = next_obs['p_0']
+                    while pos <= frames:
+                        this_ob[pos, :, :, :] = obs['p_0']
+                        obs, _, _, info = env.step({'p_0': 2})
 
                         for label in check_labels:
                             temp_labels[label].append(info['p_0'][label])
 
 
-                        if pos == frames - 1 or env.has_released:
+                        if pos == frames or env.has_released:
                             data_obs.append(serialize_data(this_ob.astype(np.uint8)))
                             data_params.append(eName)
                             for label in onehot_labels:
@@ -550,7 +551,7 @@ class RNNModel(nn.Module):
                        'lr': lr, 'batch_size': batch_size, 'oracle_is_target': oracle_is_target}
 
         input_size = 7
-        self.input_frames = 4
+        self.input_frames = 5
 
 
         self.oracle_layer = oracle_layer

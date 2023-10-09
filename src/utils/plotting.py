@@ -1,4 +1,5 @@
 import math
+import pickle
 
 import numpy as np
 from matplotlib import pyplot as plt, gridspec
@@ -8,6 +9,7 @@ import pandas as pd
 import json
 import seaborn as sns
 from stable_baselines3.common.monitor import get_monitor_files
+import matplotlib.colors as mcolors
 
 
 def moving_average(values, window):
@@ -41,7 +43,23 @@ def plot_results(log_folder, title='Learning Curve'):
     plt.show()
     plt.close()
 
+def plot_regime_lengths(regime_lengths, grouped, savepath):
+    regime_names = list(grouped.index)
+    accuracies = list(grouped.values)
 
+    # Matching regimes and extracting lengths
+    lengths = [regime_lengths[regime] for regime in regime_names]
+
+    # Plotting
+    plt.scatter(lengths, accuracies)
+    for i, regime in enumerate(regime_names):
+        plt.annotate(regime, (lengths[i], accuracies[i]))
+
+    plt.xlabel('Regime Length')
+    plt.ylabel('Accuracy')
+    plt.title('Scatterplot of Regime Length vs. Accuracy')
+    plt.savefig(savepath)
+    plt.close()
 def plot_split(indexer, df, mypath, title, window, values=None, use_std=True):
     if values is None:
         values = ["accuracy"]
@@ -59,6 +77,42 @@ def plot_split(indexer, df, mypath, title, window, values=None, use_std=True):
     name = title + values[0]
     plt.savefig(os.path.join(mypath, name))
     plt.close()
+
+
+def plot_progression(path, save_path):
+    with open(path, 'rb') as f:
+        loaded_accuracies = pickle.load(f)
+
+    blue_gradient = mcolors.LinearSegmentedColormap.from_list("blue_gradient", ["darkblue", "lightblue"])
+    orange_gradient = mcolors.LinearSegmentedColormap.from_list("orange_gradient", ["darkorange", "lightsalmon"])
+
+    oracle_gradients = {
+        '0': blue_gradient,
+        '1': orange_gradient
+    }
+    legend_handles = {'0': None, '1': None}
+
+    for k, (key, values) in enumerate(loaded_accuracies.items()):
+        oracle = key.split('_')[0]
+        num_points = len(values)
+        colors = oracle_gradients[oracle](np.linspace(0, 1, num_points))
+        x_values = range(num_points)
+
+        label = 'No Oracle' if oracle == '0' else 'Oracle' if legend_handles[oracle] is None else None
+
+        if num_points > 0:
+            line, = plt.plot(x_values, values, color=colors[k], label=label)
+
+            if label:
+                legend_handles[oracle] = line
+
+    plt.legend(handles=[legend_handles['0'], legend_handles['1']], labels=['No Oracle', 'Oracle'])
+    plt.xticks(range(10))
+
+    plt.xlabel('Number of Opponent Regimes')
+    plt.ylabel('Mean Accuracy (with opponent)')
+    plt.title('Progression Trial Accuracies')
+    plt.savefig(save_path)
 
 
 def plot_merged(indexer, df, mypath, title, window, values=None,
@@ -429,7 +483,7 @@ def save_delta_figures(dir, df_summary, df_x):
                 else:
                     ax.set_yticks([])
         handles, labels = ax.get_legend_handles_labels()
-        fig.legend(handles, labels, loc='upper center', ncol=3)
+        fig.legend(handles, labels, loc='upper right', ncol=3, bbox_to_anchor=(0.5, -0.05))
         plt.tight_layout()
         fig.subplots_adjust(hspace=0.08, wspace=0.05)
         plt.savefig(os.path.join(dir, f'small_multiples-{pathname}.png'))
@@ -685,6 +739,8 @@ def save_key_param_figures(save_dir, key_param_stats, oracle_stats, key_param):
                     regimes = ['Tt', 'Tf', 'Tn', 'Ft', 'Ff', 'Fn', 'Nt', 'Nf', 'Nn']
                 elif "Nt0" in regimes:
                     regimes = ['Tt0', 'Tf0', 'Tn0', 'Ft0', 'Ff0', 'Fn0', 'Nt0', 'Nf0', 'Nn0', 'Tt1', 'Tf1', 'Tn1', 'Ft1', 'Ff1', 'Fn1', 'Nt1', 'Nf1', 'Nn1']
+                elif "lo_Nt" in regimes:
+                    regimes = ['lo_' + x for x in ['Tt', 'Tf', 'Tn', 'Ft', 'Ff', 'Fn', 'Nt', 'Nf', 'Nn']]
 
                 ncols = min(3, len(regimes))
                 nrows = math.ceil(len(regimes) / ncols)
@@ -721,15 +777,17 @@ def save_key_param_figures(save_dir, key_param_stats, oracle_stats, key_param):
 
                             if len(all_filters) < 2:
                                 ax.set_xlabel("")
-                            else:
+                            elif k // ncols == ncols - 1:
                                 ax.set_xlabel(f"No Opponent" if ending_idx == 0 else "Opponent", labelpad=2)
+                            else:
+                                ax.set_xlabel("")
                             ax.set_ylabel("")
                             ax.xaxis.tick_top()
                             if ending_idx == 1:
                                 ax.set_yticks([])
 
                         center_x = (ax_main.get_position().x0 + ax_main.get_position().x1) / 2
-                        top_y = ax_main.get_position().y1 + 0.02
+                        top_y = ax_main.get_position().y1 + 0.04
 
                         fig.text(center_x, top_y, f"Training: {key_param_val}",
                                  ha='center',

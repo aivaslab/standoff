@@ -10,12 +10,11 @@ from functools import lru_cache
 
 import pandas as pd
 import heapq
-import ast
 from scipy.stats import sem, t
 
 from src.utils.activation_processing import process_activations
 from src.utils.plotting import save_double_param_figures, save_single_param_figures, save_fixed_double_param_figures, \
-    save_fixed_triple_param_figures, save_key_param_figures, save_delta_figures
+    save_fixed_triple_param_figures, save_key_param_figures, save_delta_figures, plot_regime_lengths
 
 sys.path.append(os.getcwd())
 
@@ -135,7 +134,7 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
     for val_set_name in test_sets:
         dir = os.path.join(load_path, val_set_name)
         data.append(np.load(os.path.join(dir, 'obs.npz'), mmap_mode='r')['arr_0'])
-        labels.append(np.load(os.path.join(dir, 'label-' + target_label + '.npz'), mmap_mode='r')['arr_0'])
+        labels.append(np.load(os.path.join(dir, 'label-' + target_label + '.npz'), mmap_mode='r')['arr_0']) #todo: try labelcheck
         params.append(np.load(os.path.join(dir, 'params.npz'), mmap_mode='r')['arr_0'])
         for metric in set(prior_metrics):
             metric_data = np.load(os.path.join(dir, 'label-' + metric + '.npz'), mmap_mode='r')['arr_0']
@@ -277,7 +276,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
                 model_kwargs=None,
                 oracle_labels=[], repetition=0, use_ff=False,
                 save_models=True, save_every=5, record_loss=False,
-                oracle_is_target=False):
+                oracle_is_target=False, batches=1000):
     use_cuda = torch.cuda.is_available()
     if len(oracle_labels) == 0 or oracle_labels[0] == None:
         oracle_labels = []
@@ -301,8 +300,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
 
     train_dataset = TrainDatasetBig(data, labels, params, oracles)
     del data, labels, params, oracles
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True,
-                              num_workers=0)  # can't use more on windows
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=0)  # can't use more on windows
 
     if record_loss:
         train_size = int(0.8 * len(train_dataset))
@@ -327,7 +325,39 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
     t = tqdm.trange(num_epochs * len(train_loader))
     avg_epoch_loss = 100
 
-    for epoch in range(num_epochs):
+    iter_loader = iter(train_loader)
+
+    for batch in range(batches):
+        total_loss = 0.0
+        try:
+            inputs, target_labels, _, oracles, _ = next(iter_loader)
+        except StopIteration:
+            iter_loader = iter(train_loader)
+            inputs, target_labels, _, oracles, _ = next(iter_loader)
+        inputs, target_labels, oracles = inputs.to(device), target_labels.to(device), oracles.to(device)
+        if not oracle_is_target:
+            outputs = model(inputs, oracles)
+            loss = criterion(outputs, torch.argmax(target_labels, dim=1))
+        else:
+            outputs = model(inputs, None)
+            typical_outputs = outputs[:, :5]
+            oracle_outputs = outputs[:, 5:]
+            typical_loss = criterion(typical_outputs, torch.argmax(target_labels, dim=1))
+            oracle_loss = oracle_criterion(oracle_outputs, oracles)
+            loss = typical_loss + oracle_loss
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+        t.update(1)
+
+        if record_loss:
+            total_loss += loss.item()
+        if save_models and (batch % (len(train_loader)) == len(train_loader) - 1):
+            os.makedirs(save_path, exist_ok=True)
+            torch.save([model.kwargs, model.state_dict()],
+                       os.path.join(save_path, f'{repetition}-model_epoch{epochs-1}.pt'))
+
+    '''for epoch in range(num_epochs):
         total_loss = 0.0
         for i, (inputs, target_labels, _, oracles, _) in enumerate(train_loader):
             inputs, target_labels, oracles = inputs.to(device), target_labels.to(device), oracles.to(device)
@@ -352,7 +382,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
             os.makedirs(save_path, exist_ok=True)
             torch.save([model.kwargs, model.state_dict()],
                        os.path.join(save_path, f'{repetition}-model_epoch{epoch}.pt'))
-        torch.cuda.empty_cache()
+        torch.cuda.empty_cache()'''
 
     if record_loss:
         with torch.no_grad():
@@ -437,12 +467,13 @@ def extract_last_value_from_list_str(val):
     match = re.match(pattern, val)
     if match:
         values = match.group(1).split()
-        if len(values) == 4:
+        if True: # len(values) == 4:
             return values[-1]
     return val
 
 
-def calculate_statistics(df, last_epoch_df, params, skip_3x=True, skip_2x1=False, key_param=None, skip_1x=True, record_delta_pi=True):
+
+def calculate_statistics(df, last_epoch_df, params, skip_3x=True, skip_2x1=False, key_param=None, skip_1x=True, record_delta_pi=True, used_regimes=None, savepath=None):
     '''
     Calculates various statistics from datasets of model outputs detailing model performance.
     '''
@@ -453,9 +484,15 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=True, skip_2x1=False
     range_dict = {}
     range_dict3 = {}
 
+    check_labels = ['p-s-0', 'target', 'delay', 'b-loc', 'p-b-0', 'p-b-1', 'p-s-1', 'shouldAvoidSmall', 'shouldGetBig', 'vision', 'loc']
+
+
+
+
     print('calculating statistics...')
     for col in last_epoch_df.columns:
-        last_epoch_df[col] = last_epoch_df[col].apply(extract_last_value_from_list_str)
+        if col in check_labels:
+            last_epoch_df[col] = last_epoch_df[col].apply(extract_last_value_from_list_str)
 
     print('making categorical')
     for param in params:
@@ -465,6 +502,7 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=True, skip_2x1=False
     params = [param for param in params if param not in ['delay', 'perm']]
 
     #print('params:', params)
+
 
     param_pairs = itertools.combinations(params, 2)
     param_triples = itertools.combinations(params, 3)
@@ -479,6 +517,21 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=True, skip_2x1=False
         'accuracy_correlations': target_correlations,
         'vars': variable_columns
     }
+    if used_regimes:
+        print('calculating regime size')
+        regime_lengths = {}
+        grouped = last_epoch_df.groupby(['regime'])['accuracy'].mean()
+        print(grouped)
+        for regime_item in used_regimes:
+            regime_length = 0
+            for data_name in regime_item:
+                pathy = os.path.join('supervised/', data_name, 'params.npz')
+                regime_items = np.load(pathy, mmap_mode='r')['arr_0']
+                regime_length += len(regime_items)
+            regime_lengths[regime_item[0][3:]] = regime_length
+            print(regime_item, regime_length)
+        plot_regime_lengths(regime_lengths, grouped, savepath + 'scatter.png')
+
 
     unique_vals = {param: df[param].unique() for param in params}
     #print('found unique vals', unique_vals)
