@@ -95,7 +95,7 @@ def plot_progression(path, save_path):
     print(loaded_accuracies)
     n = len(loaded_accuracies) // 2
     print('n', n)
-    fig, axes = plt.subplots(1, n + 1, figsize=(2.5*(n+1), 2.5))
+    fig, axes = plt.subplots(1, n + 1, figsize=(2.1*(n+1), 2.5))
 
     for k, (key, values) in enumerate(loaded_accuracies.items()):
         oracle = key.split('_')[0]
@@ -110,7 +110,7 @@ def plot_progression(path, save_path):
             ax.set_ylim(0.4, 1.0)
             if k // 2 == 0 and cur == 0:
                 ax.set_yticks(np.arange(0.4, 1.05, 0.2))
-                ax.set_ylabel('Mean Accuracy (with opponent)')
+                ax.set_ylabel('Mean Accuracy (op)')
             else:
                 ax.set_yticks([])
             if num_points > 0:
@@ -125,8 +125,8 @@ def plot_progression(path, save_path):
     plt.legend(handles=valid_handles, labels=valid_labels, loc='lower right')
 
     #plt.title('Progression Trial Accuracies')
-    plt.tight_layout(rect=[0, 0.1, 1, 0.95])
-    fig.text(0.5, 0.04, 'Number of Opponent Regimes', ha='center', va='center', fontsize=12)
+    plt.tight_layout(rect=[0, 0.1, 1, 0.98])
+    fig.text(0.5, 0.05, 'Number of Opponent Regimes', ha='center', va='center', fontsize=12)
     plt.savefig(save_path)
     plt.close()
 
