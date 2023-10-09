@@ -119,8 +119,10 @@ def plot_progression(path, save_path):
                 if label:
                     legend_handles[oracle] = line
 
+    valid_handles = [handle for handle in [legend_handles['0'], legend_handles['1']] if handle is not None]
+    valid_labels = ['No Oracle' if handle == legend_handles['0'] else 'Oracle' for handle in valid_handles]
 
-    plt.legend(handles=[legend_handles['0'], legend_handles['1']], labels=['No Oracle', 'Oracle'], loc='lower right')
+    plt.legend(handles=valid_handles, labels=valid_labels, loc='lower right')
 
     #plt.title('Progression Trial Accuracies')
     plt.tight_layout(rect=[0, 0.1, 1, 0.95])
