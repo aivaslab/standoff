@@ -938,6 +938,12 @@ def save_figures(path, df, avg_loss, ranges, range_dict, range_dict3, params, la
     save_fixed_triple_param_figures(path, top_n_ranges3, df, avg_loss, last_epoch_df)
 
 
+def decode_param(tensor):
+    byte_list = tensor.tolist()
+    byte_list = [b for b in byte_list if b != 0]
+    char_list = [chr(c) for c in byte_list]
+    return ''.join(char_list)
+
 def write_metrics_to_file(filepath, df, ranges, params, stats, key_param=None, d_s=None, d_x=None):
     '''
     Produces a file showing several interesting metrics from the session(s)
@@ -948,6 +954,7 @@ def write_metrics_to_file(filepath, df, ranges, params, stats, key_param=None, d
         std_accuracy = df2['accuracy'].std()
         f.write(f"Average accuracy: {mean_accuracy} ({std_accuracy})\n")
 
+        df2['param'] = df2['param'].apply(decode_param)
         param_stats = df2.groupby('param')['accuracy'].agg(['mean', 'std', 'count'])
         perfect_accuracy_tasks = param_stats[param_stats['mean'] == 1.0]
         f.write(f"Number of tasks with perfect accuracy: {len(perfect_accuracy_tasks)}\n\n")
