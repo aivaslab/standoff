@@ -92,6 +92,11 @@ def plot_progression(path, save_path):
     }
     legend_handles = {'0': None, '1': None}
 
+    print(loaded_accuracies)
+    n = len(loaded_accuracies) // 2
+    print('n', n)
+    fig, axes = plt.subplots(1, n + 1, figsize=(5*(n+1), 5))
+
     for k, (key, values) in enumerate(loaded_accuracies.items()):
         oracle = key.split('_')[0]
         num_points = len(values)
@@ -100,19 +105,28 @@ def plot_progression(path, save_path):
 
         label = 'No Oracle' if oracle == '0' else 'Oracle' if legend_handles[oracle] is None else None
 
-        if num_points > 0:
-            line, = plt.plot(x_values, values, color=colors[k], label=label)
+        for cur, ax in enumerate([axes[k // 2], axes[-1]]):
+            ax.set_xticks(range(10))
+            ax.set_ylim(0.4, 1.0)
+            if k // 2 == 0 and cur == 0:
+                ax.set_yticks(np.arange(0.4, 1.05, 0.2))
+                ax.set_ylabel('Mean Accuracy (with opponent)')
+            else:
+                ax.set_yticks([])
+            if num_points > 0:
+                line, = ax.plot(x_values, values, color=colors[k], label=label)
 
-            if label:
-                legend_handles[oracle] = line
+                if label:
+                    legend_handles[oracle] = line
 
-    plt.legend(handles=[legend_handles['0'], legend_handles['1']], labels=['No Oracle', 'Oracle'])
-    plt.xticks(range(10))
 
-    plt.xlabel('Number of Opponent Regimes')
-    plt.ylabel('Mean Accuracy (with opponent)')
-    plt.title('Progression Trial Accuracies')
+    plt.legend(handles=[legend_handles['0'], legend_handles['1']], labels=['No Oracle', 'Oracle'], loc='lower right')
+
+    #plt.title('Progression Trial Accuracies')
+    plt.tight_layout(rect=[0, 0.1, 1, 0.95])
+    fig.text(0.5, 0.04, 'Number of Opponent Regimes', ha='center', va='center', fontsize=12)
     plt.savefig(save_path)
+    plt.close()
 
 
 def plot_merged(indexer, df, mypath, title, window, values=None,
@@ -483,7 +497,7 @@ def save_delta_figures(dir, df_summary, df_x):
                 else:
                     ax.set_yticks([])
         handles, labels = ax.get_legend_handles_labels()
-        fig.legend(handles, labels, loc='upper right', ncol=3, bbox_to_anchor=(0.5, -0.05))
+        fig.legend(handles, labels, loc='upper right', ncol=3)
         plt.tight_layout()
         fig.subplots_adjust(hspace=0.08, wspace=0.05)
         plt.savefig(os.path.join(dir, f'small_multiples-{pathname}.png'))
