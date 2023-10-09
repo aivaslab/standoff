@@ -1028,7 +1028,7 @@ def write_metrics_to_file(filepath, df, ranges, params, stats, key_param=None, d
 
 def find_df_paths(directory, file_pattern):
     """Find all CSV files in a directory based on a pattern."""
-    return glob.glob(f"{directory}\\{file_pattern}")
+    return glob.glob(os.path.join(directory, file_pattern))
 
 
 def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, eval_sets=None,
