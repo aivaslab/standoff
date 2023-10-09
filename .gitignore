@@ -141,3 +141,5 @@ dmypy.json
 *.npz
 *.h5
 *.pkl
+*.zip
+*.zip
