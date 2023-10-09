@@ -77,14 +77,6 @@ def run_hparam_search(trials=64, repetitions=3, log_file='hparam_search_log.txt'
             traceback.print_exc()
 
 
-def add_label_and_combine_dfs(df_list, params, label):
-    # Add 'regime' column to each DataFrame and combine them
-    for i, df in enumerate(df_list):
-        df[label] = params[i]
-    combined_df = pd.concat(df_list)
-
-    return combined_df
-
 def string_to_list(s):
     """Converts the string format [2 2] to a list [2, 2]."""
     s = s.replace(' ', ',')
@@ -408,8 +400,9 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
 
         session_params['skip_calc'] = True
         session_params['skip_activations'] = True
+        session_params['repetitions'] = 1
 
-        for progression_trial in range(3):
+        for progression_trial in range(5):
             base_regimes = ['sl-' + x + '0' for x in sub_regime_keys]
             add_regimes = ['sl-' + x + '1' for x in sub_regime_keys]
             random.shuffle(add_regimes)
@@ -459,12 +452,6 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
 
             plot_progression(save_file, image_file)
 
-
-
-        do_comparison(combined_path_list, last_path_list, key_param_list, key_param, exp_name, params, prior_metrics)
-
-
-
 if __name__ == '__main__':
-    experiments([51], repetitions=1, epochs=50, skip_train=True, skip_eval=True, skip_calc=True, skip_activations=True,
+    experiments([57], repetitions=1, epochs=50, skip_train=False, skip_eval=False, skip_calc=False, skip_activations=True,
                 batch_size=256, desired_evals=1, use_ff=False)
