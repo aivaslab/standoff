@@ -453,5 +453,5 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
             plot_progression(save_file, image_file)
 
 if __name__ == '__main__':
-    experiments([57], repetitions=1, epochs=50, skip_train=False, skip_eval=False, skip_calc=False, skip_activations=True,
+    experiments([0], repetitions=1, epochs=50, skip_train=False, skip_eval=False, skip_calc=False, skip_activations=True,
                 batch_size=256, desired_evals=1, use_ff=False)
