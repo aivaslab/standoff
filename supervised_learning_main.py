@@ -754,15 +754,15 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=True, skip_2x1=False
                             merged_df['dpred_m_t'] = (merged_df['changed_target'] == 0) * (merged_df['total_pred_diff'])
                             merged_df['dpred_m_f'] = (merged_df['changed_target'] == 0) * (1 - merged_df['total_pred_diff'])
 
-                            merged_df['total_pred_diff_p_T_T'] = (merged_df['changed_target']) * (merged_df['accuracy']) * (merged_df['accuracy_m'])
-                            merged_df['total_pred_diff_p_T_F'] = (merged_df['changed_target']) * (merged_df['accuracy']) * (1-merged_df['accuracy_m'])
-                            merged_df['total_pred_diff_p_F_T'] = (merged_df['changed_target']) * (1-merged_df['accuracy']) * (merged_df['accuracy_m'])
-                            merged_df['total_pred_diff_p_F_F'] = (merged_df['changed_target']) * (1-merged_df['accuracy']) * (1-merged_df['accuracy_m'])
+                            merged_df['total_pred_diff_p_T_T'] = (merged_df['changed_target']) * (merged_df['accuracy_m']) * (merged_df['accuracy'])
+                            merged_df['total_pred_diff_p_T_F'] = (merged_df['changed_target']) * (merged_df['accuracy_m']) * (1-merged_df['accuracy'])
+                            merged_df['total_pred_diff_p_F_T'] = (merged_df['changed_target']) * (1-merged_df['accuracy_m']) * (merged_df['accuracy'])
+                            merged_df['total_pred_diff_p_F_F'] = (merged_df['changed_target']) * (1-merged_df['accuracy_m']) * (1-merged_df['accuracy'])
 
-                            merged_df['total_pred_diff_m_T_T'] = (1-merged_df['changed_target']) * (merged_df['accuracy']) * (merged_df['accuracy_m'])
-                            merged_df['total_pred_diff_m_T_F'] = (1-merged_df['changed_target']) * (merged_df['accuracy']) * (1-merged_df['accuracy_m'])
-                            merged_df['total_pred_diff_m_F_T'] = (1-merged_df['changed_target']) * (1-merged_df['accuracy']) * (merged_df['accuracy_m'])
-                            merged_df['total_pred_diff_m_F_F'] = (1-merged_df['changed_target']) * (1-merged_df['accuracy']) * (1-merged_df['accuracy_m'])
+                            merged_df['total_pred_diff_m_T_T'] = (1-merged_df['changed_target']) * (merged_df['accuracy_m']) * (merged_df['accuracy'])
+                            merged_df['total_pred_diff_m_T_F'] = (1-merged_df['changed_target']) * (merged_df['accuracy_m']) * (1-merged_df['accuracy'])
+                            merged_df['total_pred_diff_m_F_T'] = (1-merged_df['changed_target']) * (1-merged_df['accuracy_m']) * (merged_df['accuracy'])
+                            merged_df['total_pred_diff_m_F_F'] = (1-merged_df['changed_target']) * (1-merged_df['accuracy_m']) * (1-merged_df['accuracy'])
 
 
                             #print(op, key, descendants, np.mean(merged_df['changed_target']))
