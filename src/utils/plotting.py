@@ -95,7 +95,7 @@ def plot_progression(path, save_path):
     print(loaded_accuracies)
     n = len(loaded_accuracies) // 2
     print('n', n)
-    fig, axes = plt.subplots(1, n + 1, figsize=(5*(n+1), 5))
+    fig, axes = plt.subplots(1, n + 1, figsize=(2.5*(n+1), 2.5))
 
     for k, (key, values) in enumerate(loaded_accuracies.items()):
         oracle = key.split('_')[0]
@@ -463,14 +463,18 @@ def save_delta_figures(dir, df_summary, df_x):
 
         temp[op] = op_dict
     temp = pd.DataFrame(temp).transpose()
-    df_x2 = [('ideal', temp)] + list(df_x.items())
+
+    all_regimes = df_x.keys()
+    if "direct" in all_regimes:
+        all_regimes = ['noOpponent', 'direct', 'everything']
+    df_x2 = [('ideal', temp)] + [(reg, df_x[reg]) for reg in all_regimes]
 
     colmap = {'t': 'Δb', 'f': '=b', 'tt': '1-1', 'tf': '1-0', 'ft': '0-1', 'ff': '0-0'}
 
     for columns, colors, pathname in zip([['t', 'f'], ['tt', 'tf', 'ft', 'ff']], [None, ['blue', 'lightgreen', 'lightblue', 'pink']], ['dpred', 'acc']):
         nrows = len(df_x2)
         ncols = len(df_x2[0][1]['operator'].unique())
-        fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(15, 1.2 * nrows))
+        fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(10, 1.2 * nrows))
 
         for idx, (key_val, df) in enumerate(df_x2):
             for col_idx, (_, row) in enumerate(df.iterrows()): # row is each operator
@@ -481,7 +485,7 @@ def save_delta_figures(dir, df_summary, df_x):
                 data = {colmap[col]: [row[f'p{col}'], row[f'm{col}']] for col in columns}
                 tmp_df = pd.DataFrame(data, index=['Δb*', '=b*'])
                 if idx == 0:
-                    ax.set_facecolor('gray')
+                    ax.set_facecolor('0.9')
 
                 tmp_df.plot(kind='bar', stacked=True, ax=ax, width=0.6, legend=False, color=colors)
                 ax.set_ylim([0, 1])
@@ -495,13 +499,17 @@ def save_delta_figures(dir, df_summary, df_x):
                 else:
                     ax.set_xticks([])
                 if col_idx == 0:
-                    ax.set_ylabel(key_val)
+                    if 'direct' in all_regimes:
+                        this_name = {'ideal': 'ideal', 'noOpponent': 'no opponent', 'direct': 'opponent', 'everything': 'everything'}[key_val]
+                    else:
+                        this_name = key_val
+                    ax.set_ylabel(this_name)
                 else:
                     ax.set_yticks([])
         handles, labels = ax.get_legend_handles_labels()
-        fig.legend(handles, labels, loc='upper right', ncol=3)
+        fig.legend(handles, labels, loc='upper right', ncol=4)
         plt.tight_layout()
-        fig.subplots_adjust(hspace=0.08, wspace=0.05)
+        fig.subplots_adjust(hspace=0.09, wspace=0.06, top=0.92)
         plt.savefig(os.path.join(dir, f'small_multiples-{pathname}.png'))
         plt.close()
 
@@ -757,13 +765,15 @@ def save_key_param_figures(save_dir, key_param_stats, oracle_stats, key_param):
                     regimes = ['Tt0', 'Tf0', 'Tn0', 'Ft0', 'Ff0', 'Fn0', 'Nt0', 'Nf0', 'Nn0', 'Tt1', 'Tf1', 'Tn1', 'Ft1', 'Ff1', 'Fn1', 'Nt1', 'Nf1', 'Nn1']
                 elif "lo_Nt" in regimes:
                     regimes = ['lo_' + x for x in ['Tt', 'Tf', 'Tn', 'Ft', 'Ff', 'Fn', 'Nt', 'Nf', 'Nn']]
+                elif "direct" in regimes:
+                    regimes = ['noOpponent', 'direct', 'everything']
 
                 ncols = min(3, len(regimes))
                 nrows = math.ceil(len(regimes) / ncols)
                 for do_both_opponent_types in [True, False]:
                     all_filters = ['0', '1'] if do_both_opponent_types else ['1']
                     fig = plt.figure(figsize=(15, 2 * nrows))
-                    gs = gridspec.GridSpec(nrows, ncols, wspace=0.2, hspace=0.4)
+                    gs = gridspec.GridSpec(nrows, ncols, wspace=0.2, hspace=0.4, top=0.75, left=0.1, right=0.9) # might mess up if ncols > 1
                     for k, key_param_val in enumerate(regimes):
                         if nrows == 1 and ncols > 1:
                             ax_main = plt.subplot(gs[k])
@@ -771,7 +781,11 @@ def save_key_param_figures(save_dir, key_param_stats, oracle_stats, key_param):
                             ax_main = plt.subplot(gs[k // ncols])
                         else:
                             ax_main = plt.subplot(gs[k // ncols, k % ncols])
-                        ax_main.set_title(f"Training: {key_param_val}")
+                        if "direct" in regimes:
+                            regime_name = {'noOpponent': 'no opponent', 'direct': 'opponent', 'everything': 'everything'}[key_param_val]
+                        else:
+                            regime_name = key_param_val
+                        #ax_main.set_title(f"Training: {regime_name}")
                         inner_gs = gridspec.GridSpecFromSubplotSpec(1, len(all_filters), subplot_spec=ax_main, wspace=0.2, hspace=0.6, height_ratios=[0.8])
                         for ending_idx, filter in enumerate(all_filters):
                             ax = plt.subplot(inner_gs[ending_idx])
@@ -793,7 +807,7 @@ def save_key_param_figures(save_dir, key_param_stats, oracle_stats, key_param):
 
                             if len(all_filters) < 2:
                                 ax.set_xlabel("")
-                            elif k // ncols == ncols - 1:
+                            elif (k // ncols == (ncols - 1)) or nrows < 2:
                                 ax.set_xlabel(f"No Opponent" if ending_idx == 0 else "Opponent", labelpad=2)
                             else:
                                 ax.set_xlabel("")
@@ -803,14 +817,16 @@ def save_key_param_figures(save_dir, key_param_stats, oracle_stats, key_param):
                                 ax.set_yticks([])
 
                         center_x = (ax_main.get_position().x0 + ax_main.get_position().x1) / 2
-                        top_y = ax_main.get_position().y1 + 0.04
+                        top_y = ax_main.get_position().y1 + 0.16
 
-                        fig.text(center_x, top_y, f"Training: {key_param_val}",
+                        fig.text(center_x, top_y, f"Training: {regime_name}",
                                  ha='center',
                                  va='bottom',
                                  fontsize=12,
                                  fontweight='bold')
                     plot_save_path = os.path.join(save_dir, f'{label}_{param}_{do_both_opponent_types}_grids_small_multiples.png')
+                    #plt.subplots_adjust(top=0.8, bottom=0.1) # does nothing
+                    fig.subplots_adjust(left=0.1, right=0.9)
                     plt.savefig(plot_save_path)
                     plt.close()
 
