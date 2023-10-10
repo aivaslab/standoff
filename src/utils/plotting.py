@@ -476,6 +476,9 @@ def save_delta_figures(dir, df_summary, df_x):
         ncols = len(df_x2[0][1]['operator'].unique())
         fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(10, 1.2 * nrows))
 
+        fig.text(0.02, 0.5, 'training set', ha='center', va='center', rotation='vertical', fontsize=12)
+        fig.text(0.5, 0.03, 'informedness operator', ha='center', va='center', fontsize=12)
+
         for idx, (key_val, df) in enumerate(df_x2):
             for col_idx, (_, row) in enumerate(df.iterrows()): # row is each operator
                 if nrows > 1:
@@ -509,7 +512,7 @@ def save_delta_figures(dir, df_summary, df_x):
         handles, labels = ax.get_legend_handles_labels()
         fig.legend(handles, labels, loc='upper right', ncol=4)
         plt.tight_layout()
-        fig.subplots_adjust(hspace=0.09, wspace=0.06, top=0.92)
+        fig.subplots_adjust(hspace=0.09, wspace=0.06, top=0.92, left=0.09, bottom=0.3)
         plt.savefig(os.path.join(dir, f'small_multiples-{pathname}.png'))
         plt.close()
 
@@ -733,6 +736,7 @@ def save_key_param_figures(save_dir, key_param_stats, oracle_stats, key_param):
             df.to_csv(table_save_path, index=False)
 
             # produce typical heatmaps for accuracy
+            big_mode = True
             if param == 'test_regime':
                 for use_zero_op in [True, False]:
                     for use_std in [True, False]:
@@ -763,6 +767,19 @@ def save_key_param_figures(save_dir, key_param_stats, oracle_stats, key_param):
                     regimes = ['Tt', 'Tf', 'Tn', 'Ft', 'Ff', 'Fn', 'Nt', 'Nf', 'Nn']
                 elif "Nt0" in regimes:
                     regimes = ['Tt0', 'Tf0', 'Tn0', 'Ft0', 'Ff0', 'Fn0', 'Nt0', 'Nf0', 'Nn0', 'Tt1', 'Tf1', 'Tn1', 'Ft1', 'Ff1', 'Fn1', 'Nt1', 'Nf1', 'Nn1']
+                    print('calculating asymmetry')
+                    asymmetry_dict = {}
+                    for regime_A in regimes:
+                        for regime_B in regimes:
+                            if regime_A != regime_B:
+                                accuracy_A_B = df[(df[key_param] == regime_A) & (df['test_regime'] == regime_B)]['accuracy mean'].values[0]
+                                accuracy_B_A = df[(df[key_param] == regime_B) & (df['test_regime'] == regime_A)]['accuracy mean'].values[0]
+                                asymmetry = accuracy_A_B - accuracy_B_A
+                                asymmetry_dict[(regime_A, regime_B)] = asymmetry
+                    print(asymmetry_dict)
+                    sorted_asymmetries = sorted(asymmetry_dict.keys(), key=lambda x: (regimes.index(x[0]), regimes.index(x[1])))
+                    for key in sorted_asymmetries:
+                        print(f"{key[0]}, {key[1]}: {asymmetry_dict[key]}")
                 elif "lo_Nt" in regimes:
                     regimes = ['lo_' + x for x in ['Tt', 'Tf', 'Tn', 'Ft', 'Ff', 'Fn', 'Nt', 'Nf', 'Nn']]
                 elif "direct" in regimes:
@@ -772,8 +789,14 @@ def save_key_param_figures(save_dir, key_param_stats, oracle_stats, key_param):
                 nrows = math.ceil(len(regimes) / ncols)
                 for do_both_opponent_types in [True, False]:
                     all_filters = ['0', '1'] if do_both_opponent_types else ['1']
-                    fig = plt.figure(figsize=(15, 2 * nrows))
-                    gs = gridspec.GridSpec(nrows, ncols, wspace=0.2, hspace=0.4, top=0.75, left=0.1, right=0.9) # might mess up if ncols > 1
+                    if big_mode:
+                        fig = plt.figure(figsize=(10, 2.3 * nrows))
+                    else:
+                        fig = plt.figure(figsize=(15, 2 * nrows))
+                    if big_mode:
+                        gs = gridspec.GridSpec(nrows, ncols, wspace=0.2, hspace=0.3, top=1.0 - (0.25 / nrows), bottom=0.12, left=0.03, right=1.0)
+                    else:
+                        gs = gridspec.GridSpec(nrows, ncols, wspace=0.2, hspace=0.4, top=0.75, left=0.1, right=0.9) # might mess up if ncols > 1
                     for k, key_param_val in enumerate(regimes):
                         if nrows == 1 and ncols > 1:
                             ax_main = plt.subplot(gs[k])
@@ -785,39 +808,42 @@ def save_key_param_figures(save_dir, key_param_stats, oracle_stats, key_param):
                             regime_name = {'noOpponent': 'no opponent', 'direct': 'opponent', 'everything': 'everything'}[key_param_val]
                         else:
                             regime_name = key_param_val
-                        #ax_main.set_title(f"Training: {regime_name}")
                         inner_gs = gridspec.GridSpecFromSubplotSpec(1, len(all_filters), subplot_spec=ax_main, wspace=0.2, hspace=0.6, height_ratios=[0.8])
                         for ending_idx, filter in enumerate(all_filters):
                             ax = plt.subplot(inner_gs[ending_idx])
-                            #pos = ax.get_position()
-                            #shift_amount = 0.05
-                            #new_position = [pos.x0, pos.y0 - shift_amount, pos.width, pos.height - shift_amount]
-                            #ax.set_position(new_position)
                             df_filtered = df[df[param].str.endswith(filter)]
                             subset_df = df_filtered[(df_filtered[key_param] == key_param_val)]
                             subset_df['param_char1'] = subset_df[param].str[0]
                             subset_df['param_char2'] = subset_df[param].str[1]
                             subset_pivot = subset_df.pivot(index='param_char1', columns='param_char2', values='accuracy mean')
 
+                            subset_pivot = subset_pivot / 5
                             subset_pivot = subset_pivot.reindex(custom_row_order)
                             subset_pivot = subset_pivot.reindex(columns=custom_col_order)
 
                             sns.heatmap(subset_pivot, annot=True, fmt='.2f', cmap='RdBu', linewidths=0.5, linecolor='white', vmin=0, vmax=1, ax=ax, cbar=False)
 
-
                             if len(all_filters) < 2:
                                 ax.set_xlabel("")
-                            elif (k // ncols == (ncols - 1)) or nrows < 2:
+                            elif ((k // ncols) == (len(regimes) // ncols)) or nrows < 2:
                                 ax.set_xlabel(f"No Opponent" if ending_idx == 0 else "Opponent", labelpad=2)
                             else:
                                 ax.set_xlabel("")
                             ax.set_ylabel("")
                             ax.xaxis.tick_top()
-                            if ending_idx == 1:
+                            if (big_mode and (k // ncols != 0)):
+                                ax.set_xticks([])
+                            if ending_idx == 1 or (big_mode and (k % ncols != 0)):
                                 ax.set_yticks([])
 
                         center_x = (ax_main.get_position().x0 + ax_main.get_position().x1) / 2
-                        top_y = ax_main.get_position().y1 + 0.16
+                        if not big_mode:
+                            top_y = ax_main.get_position().y1 + (0.16 / ncols)
+                        else:
+                            if k // ncols == 0:
+                                top_y = ax_main.get_position().y1 + 0.14 / ncols
+                            else:
+                                top_y = ax_main.get_position().y1 + 0.03 / ncols
 
                         fig.text(center_x, top_y, f"Training: {regime_name}",
                                  ha='center',
@@ -825,8 +851,7 @@ def save_key_param_figures(save_dir, key_param_stats, oracle_stats, key_param):
                                  fontsize=12,
                                  fontweight='bold')
                     plot_save_path = os.path.join(save_dir, f'{label}_{param}_{do_both_opponent_types}_grids_small_multiples.png')
-                    #plt.subplots_adjust(top=0.8, bottom=0.1) # does nothing
-                    fig.subplots_adjust(left=0.1, right=0.9)
+                    fig.subplots_adjust(left=0.0, right=1.0, top=1.0, bottom=0.03)
                     plt.savefig(plot_save_path)
                     plt.close()
 

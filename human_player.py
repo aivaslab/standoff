@@ -74,7 +74,7 @@ configs = conf.standoff
 
 # configName = 'all'
 # reset_configs = {**configs["defaults"],  **configs[configName]}
-configName = 'sl-Nn1'
+configName = 'sl-Nf0'
 events = conf.stages[configName]['events']
 reset_configs = configs[conf.stages[configName]['params']]
 params = configs[conf.stages[configName]['params']]
