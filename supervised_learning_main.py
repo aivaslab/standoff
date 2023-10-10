@@ -276,7 +276,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
                 model_kwargs=None,
                 oracle_labels=[], repetition=0, use_ff=False,
                 save_models=True, save_every=5, record_loss=False,
-                oracle_is_target=False, batches=5500):
+                oracle_is_target=False, batches=2500):
     use_cuda = torch.cuda.is_available()
     if len(oracle_labels) == 0 or oracle_labels[0] == None:
         oracle_labels = []

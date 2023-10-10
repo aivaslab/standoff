@@ -512,7 +512,7 @@ def save_delta_figures(dir, df_summary, df_x):
         handles, labels = ax.get_legend_handles_labels()
         fig.legend(handles, labels, loc='upper right', ncol=4)
         plt.tight_layout()
-        fig.subplots_adjust(hspace=0.09, wspace=0.06, top=0.92, left=0.09, bottom=0.3)
+        fig.subplots_adjust(hspace=0.12, wspace=0.06, top=0.92, left=0.09, bottom=0.18)
         plt.savefig(os.path.join(dir, f'small_multiples-{pathname}.png'))
         plt.close()
 
