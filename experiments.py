@@ -121,6 +121,16 @@ def do_comparison(combined_path_list, last_path_list, key_param_list, key_param,
 
     create_combined_histogram(last_epoch_df, combined_df, key_param, os.path.join('supervised', exp_name))
 
+    key_param_stats_special = []
+    if exp_name == "exp_53":
+        print("special stats...")
+        for special_exp in ["exp_51", "exp_54"]:
+            _, _, _, _, _, _, _, key_param_stats, _, _, _ = calculate_statistics(
+                combined_df, last_epoch_df, list(set(params + prior_metrics + [key_param])),
+                skip_3x=True, skip_1x=True, key_param=key_param, used_regimes=used_regimes,
+                savepath=os.path.join('supervised', exp_name))
+            key_param_stats_special.append(key_param_stats)
+
     avg_loss, variances, ranges_1, ranges_2, range_dict, range_dict3, stats, key_param_stats, oracle_stats, delta_sum, delta_x = calculate_statistics(
         combined_df, last_epoch_df, list(set(params + prior_metrics + [key_param])),
         skip_3x=True, skip_1x=True, key_param=key_param, used_regimes=used_regimes, savepath=os.path.join('supervised', exp_name))
@@ -131,7 +141,7 @@ def do_comparison(combined_path_list, last_path_list, key_param_list, key_param,
                           key_param=key_param, d_s=delta_sum, d_x=delta_x)
     save_figures(combined_path, combined_df, avg_loss, ranges_2, range_dict, range_dict3,
                  params, last_epoch_df, num=12, key_param_stats=key_param_stats, oracle_stats=oracle_stats,
-                 key_param=key_param, delta_sum=delta_sum, delta_x=delta_x)
+                 key_param=key_param, delta_sum=delta_sum, delta_x=delta_x, key_param_stats_special=key_param_stats_special)
 
 
 def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, batch_size=64, desired_evals=5,
@@ -162,7 +172,7 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
     regimes['direct'] = ['sl-' + x + '1' for x in sub_regime_keys]
     regimes['noOpponent'] = ['sl-' + x + '0' for x in sub_regime_keys]
     regimes['everything'] = all_regimes
-    regimes['identity'] = ['sl-' + x + '0' for x in sub_regime_keys] + ['sl-Tt1', 'sl-Ff1', 'sl-Nn1']
+    #regimes['identity'] = ['sl-' + x + '0' for x in sub_regime_keys] + ['sl-Tt1', 'sl-Ff1', 'sl-Nn1']
     hregime = {}
     hregime['homogeneous'] = ['sl-Tt0', 'sl-Ff0', 'sl-Nn0', 'sl-Tt1', 'sl-Ff1', 'sl-Nn1']
 
@@ -187,7 +197,6 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
 
     labels = ['loc', 'vision', 'b-loc', 'target']
     oracles = labels + [None]
-    oracle_names = [x if x is not None else "None" for x in oracles]
     conf = ScenarioConfigs()
     exp_name = f'exp_{todo[0]}' if not use_ff else f'exp_{todo[0]}-f'
     session_params = {
@@ -424,6 +433,7 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
                 session_params['oracle_is_target'] = bool(oracle)
                 for regime in range(10):
                     print('regime:', regime, 'train_sets:', prog_regimes[regime])
+
                     _, last_epoch_paths = run_supervised_session(
                         save_path=os.path.join('supervised', exp_name, str(oracle) + '_' + str(progression_trial) + '_' + str(regime)),
                         train_sets=prog_regimes[regime],
@@ -536,5 +546,5 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
         do_comparison(combined_path_list, last_path_list, key_param_list, key_param, exp_name, params, prior_metrics)
 
 if __name__ == '__main__':
-    experiments([53], repetitions=3, epochs=50, skip_train=False, skip_eval=False, skip_calc=False, skip_activations=False,
+    experiments([51], repetitions=3, epochs=50, skip_train=True, skip_eval=True, skip_calc=True, skip_activations=True,
                 batch_size=256, desired_evals=1, use_ff=False)

@@ -95,7 +95,24 @@ def plot_progression(path, save_path):
     print(loaded_accuracies)
     n = len(loaded_accuracies) // 2
     print('n', n)
-    fig, axes = plt.subplots(1, n + 1, figsize=(2.1*(n+1), 2.5), wspace=0.06)
+    fig, axes = plt.subplots(1, n + 1, figsize=(2.1*(n+1), 2.5))
+    fig.subplots_adjust(wspace=0.06)
+
+    mean_accuracies = {'0': [], '1': []}
+    timestep_counts = {'0': 0, '1': 0}
+
+    # Calculate mean accuracies for each label
+    for key, values in loaded_accuracies.items():
+        oracle = key.split('_')[0]
+        if values:  # Ensure non-empty values
+            if len(mean_accuracies[oracle]) == 0:
+                mean_accuracies[oracle] = np.zeros(len(values))
+            mean_accuracies[oracle] += values
+            timestep_counts[oracle] += 1
+
+    for oracle in mean_accuracies:
+        if timestep_counts[oracle] > 0:
+            mean_accuracies[oracle] /= timestep_counts[oracle]
 
     for k, (key, values) in enumerate(loaded_accuracies.items()):
         oracle = key.split('_')[0]
@@ -105,7 +122,7 @@ def plot_progression(path, save_path):
 
         label = 'No Oracle' if oracle == '0' else 'Oracle' if legend_handles[oracle] is None else None
 
-        for cur, ax in enumerate([axes[k // 2], axes[-1]]):
+        for cur, ax in enumerate([axes[k // 2]]): #, axes[-1]
             ax.set_xticks(range(10))
             ax.set_ylim(0.4, 1.0)
             if k // 2 == 0 and cur == 0:
@@ -118,6 +135,12 @@ def plot_progression(path, save_path):
 
                 if label:
                     legend_handles[oracle] = line
+
+
+        axes[-1].set_xticks(range(10))
+        axes[-1].set_ylim(0.4, 1.0)
+        axes[-1].set_yticks([])
+        axes[-1].plot(x_values, mean_accuracies[oracle], '--', color=colors[k], label=label)
 
     valid_handles = [handle for handle in [legend_handles['0'], legend_handles['1']] if handle is not None]
     valid_labels = ['No Oracle' if handle == legend_handles['0'] else 'Oracle' for handle in valid_handles]
@@ -660,12 +683,19 @@ def save_key_param_heatmap(save_dir, key_param_stats, key_param):
             plt.savefig(file_path)
             plt.close()
 
+def df_list_from_stat_dict(stat_dict, param):
+    df_list = []
+    for key_val in stat_dict.keys():
+        for param_val in stat_dict[key_val][param]['mean'].keys():
+            mean = stat_dict[key_val][param]['mean'][param_val]
+            ci = stat_dict[key_val][param]['std'][param_val]
+            df_list.append([key_val, param_val, f"{mean}", f"{ci}"])
 
-def save_key_param_figures(save_dir, key_param_stats, oracle_stats, key_param):
+def save_key_param_figures(save_dir, key_param_stats, oracle_stats, key_param, key_param_stats_special=[]):
     save_key_param_heatmap(save_dir, key_param_stats, key_param)
     this_save_dir = os.path.join(save_dir, 'key_param')
     os.makedirs(this_save_dir, exist_ok=True)
-    print('saving key param figures')
+    print('saving key param figures', this_save_dir)
 
     n_groups = len(list(key_param_stats.keys()))
 
@@ -723,12 +753,8 @@ def save_key_param_figures(save_dir, key_param_stats, oracle_stats, key_param):
         plt.savefig(file_path)
 
         for stat_dict, label in zip([key_param_stats, oracle_stats], ['accuracy', 'o_acc']):
-            df_list = []
-            for key_val in stat_dict.keys():
-                for param_val in stat_dict[key_val][param]['mean'].keys():
-                    mean = stat_dict[key_val][param]['mean'][param_val]
-                    ci = stat_dict[key_val][param]['std'][param_val]
-                    df_list.append([key_val, param_val, f"{mean}", f"{ci}"])
+
+            df_list = df_list_from_stat_dict(stat_dict, param)
 
             df = pd.DataFrame(df_list, columns=[key_param, param, "accuracy mean", "accuracy std"])
 
@@ -737,6 +763,9 @@ def save_key_param_figures(save_dir, key_param_stats, oracle_stats, key_param):
 
             # produce typical heatmaps for accuracy
             big_mode = True
+            desired_order = ['Tt0', 'Tf0', 'Tn0', 'Ft0', 'Ff0', 'Fn0', 'Nt0', 'Nf0', 'Nn0', 'Tt1', 'Tf1', 'Tn1', 'Ft1', 'Ff1', 'Fn1', 'Nt1', 'Nf1', 'Nn1']
+            special = True
+
             if param == 'test_regime':
                 for use_zero_op in [True, False]:
                     for use_std in [True, False]:
@@ -753,8 +782,42 @@ def save_key_param_figures(save_dir, key_param_stats, oracle_stats, key_param):
                             pivot_df = pivot_df.applymap(lambda x: f"{x:.2f}")
 
                         plt.figure(figsize=(22, 8))
+
+                        if use_zero_op:
+                            original_row_order = pivot_df.index.tolist()
+                            if 'Tt' in original_row_order:
+                                desired_row_order = ['Tt', 'Tf', 'Tn', 'Ft', 'Ff', 'Fn', 'Nt', 'Nf', 'Nn']
+                                row_name_dict = {x: 'contrast-' + x for x in desired_row_order}
+
+                            elif 'Tt0' in original_row_order:
+                                desired_row_order = desired_order
+                                row_name_dict = {x: 'single-' + x for x in desired_row_order}
+                            else:
+                                desired_row_order = original_row_order
+                                row_name_dict = {'noOpponent': 'full-noop', 'direct': 'full-op', 'everything': 'full-both'}
+
+                            pivot_df = pivot_df.reindex(columns=desired_order, index=desired_row_order)
+                            mean_values_df = mean_values_df.reindex(columns=desired_order, index=desired_row_order)
+
+                            pivot_df = pivot_df.rename(index=row_name_dict)
+                            mean_values_df = mean_values_df.rename(index=row_name_dict)
+
+                            #row_minima = mean_values_df.min(axis=1)
+                            #mean_values_df['min'] = row_minima
+                            #pivot_df['min'] = row_minima.map("{:.2f}".format)
+
                         ax = sns.heatmap(mean_values_df, annot=pivot_df, fmt='', cmap='RdBu', linewidths=0.5, linecolor='white', vmin=0, vmax=1)
-                        plt.title(f"Heatmap of {param} based on {key_param}")
+                        ax.set_yticklabels(ax.get_yticklabels(), rotation=0)
+                        ax.set_xlabel("Test regime")
+                        ax.set_ylabel("Training dataset")
+
+                        ax.hlines(9, *ax.get_xlim(), color='white', linewidth=6)
+                        ax.vlines(9, *ax.get_ylim(), color='white', linewidth=6)
+
+                        cbar = ax.collections[0].colorbar
+                        cbar.ax.set_orientation('horizontal')
+
+                        plt.title(f"Test regime accuracy of each training dataset")
                         plot_save_path = os.path.join(save_dir, f'{label}_{param}_{use_std}_{use_zero_op}_heatmap.png')
                         plt.savefig(plot_save_path)
                         plt.close()

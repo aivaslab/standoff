@@ -198,7 +198,7 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=4):
 
                         plt.figure(figsize=(10, 6))
                         labels = correlation_data2[other_key]
-                        plt.scatter(tsne_values[:, 0], tsne_values[:, 1], c=integer_labels, edgecolors='black', cmap='viridis')
+                        plt.scatter(tsne_values[:, 0], tsne_values[:, 1], c=integer_labels, edgecolors='black', cmap='tab10')
                         plt.title(f't-SNE of {act_key} colored by {other_key}')
                         plt.xlabel('Dimension 1')
                         plt.ylabel('Dimension 2')

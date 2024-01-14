@@ -276,7 +276,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
                 model_kwargs=None,
                 oracle_labels=[], repetition=0, use_ff=False,
                 save_models=True, save_every=5, record_loss=False,
-                oracle_is_target=False, batches=2500):
+                oracle_is_target=False, batches=5000):
     use_cuda = torch.cuda.is_available()
     if len(oracle_labels) == 0 or oracle_labels[0] == None:
         oracle_labels = []
@@ -320,6 +320,16 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
     oracle_criterion = nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
+    if False: # if loading previous model, only for progressions
+        last_digit = int(save_path[-1])
+        print(last_digit)
+        if last_digit > 0:
+            save_path2 = save_path[:-1] + str(last_digit - 1)
+            filename = os.path.join(save_path2, f'{repetition}-model_epoch{epochs - 1}.pt')
+            loaded_model_info = torch.load(filename, map_location=device)
+            loaded_model_kwargs, loaded_model_state_dict = loaded_model_info
+            model.load_state_dict(loaded_model_state_dict)
+
     num_epochs = epochs
 
     t = tqdm.trange(num_epochs * len(train_loader))
@@ -344,7 +354,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
             oracle_outputs = outputs[:, 5:]
             typical_loss = criterion(typical_outputs, torch.argmax(target_labels, dim=1))
             oracle_loss = oracle_criterion(oracle_outputs, oracles)
-            loss = typical_loss + oracle_loss
+            loss = typical_loss + 10 * oracle_loss
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
@@ -486,9 +496,6 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=True, skip_2x1=False
 
     check_labels = ['p-s-0', 'target', 'delay', 'b-loc', 'p-b-0', 'p-b-1', 'p-s-1', 'shouldAvoidSmall', 'shouldGetBig', 'vision', 'loc']
 
-
-
-
     print('calculating statistics...')
     for col in last_epoch_df.columns:
         if col in check_labels:
@@ -594,7 +601,6 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=True, skip_2x1=False
                         z_value = 1.96  # For a 95% CI
                         standard_errors = (z_value * np.sqrt(repetition_means  * (1 - repetition_means ) / counts)).groupby(level=param).mean()
 
-
                         if key_val not in save_dict:
                             save_dict[key_val] = {}
                         save_dict[key_val][param] = {
@@ -607,321 +613,341 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=True, skip_2x1=False
                         # dict order is key_val > param > mean/std > param_val
 
         if record_delta_pi:
-            # todo: if delay_2nd_bait or first_swap are na, just make them 0? shouldn't affect anything
-            print('calculating delta preds')
+            delta_pi_stats(unique_vals, key_param, last_epoch_df, delta_operator_summary, df_summary)
 
-            set1 = ['T', 'F', 'N']
-            set2 = ['t', 'f', 'n']
-            set3 = ['0', '1']
-            combinations = list(itertools.product(set1, set2, set3))
-            combinations_str = [''.join(combo) for combo in combinations]
-
-            operators = ['T-F', 't-f', 'F-N', 'f-n', 'T-N', 't-n', '1-0']
-            required_columns = [f'pred_{i}' for i in range(5)]
-            perm_keys = ['p-b-0', 'p-b-1', 'p-s-0', 'p-s-1', 'delay_2nd_bait', 'first_swap', 'first_bait_size', 'delay']
-
-            for key_val in unique_vals[key_param]: # for each train regime, etc
-                unique_repetitions = last_epoch_df['repetition'].unique()
-
-                delta_mean_rep = {key: [] for key in operators}
-                delta_std_rep = {key: [] for key in operators}
-                delta_mean_correct_rep = {key: [] for key in operators}
-                delta_std_correct_rep = {key: [] for key in operators}
-                delta_mean_accurate_rep = {key: [] for key in operators}
-                delta_std_accurate_rep = {key: [] for key in operators}
-
-                delta_mean_p_t_rep = {key: [] for key in operators}
-                delta_mean_p_f_rep = {key: [] for key in operators}
-                delta_mean_m_t_rep = {key: [] for key in operators}
-                delta_mean_m_f_rep = {key: [] for key in operators}
-
-                delta_mean_p_t_t_rep = {key: [] for key in operators}
-                delta_mean_p_t_f_rep = {key: [] for key in operators}
-                delta_mean_p_f_t_rep = {key: [] for key in operators}
-                delta_mean_p_f_f_rep = {key: [] for key in operators}
-
-                delta_mean_m_t_t_rep = {key: [] for key in operators}
-                delta_mean_m_t_f_rep = {key: [] for key in operators}
-                delta_mean_m_f_t_rep = {key: [] for key in operators}
-                delta_mean_m_f_f_rep = {key: [] for key in operators}
-
-                delta_mean = [{key: [] for key in operators} for _ in unique_repetitions]
-                delta_mean_correct = [{key: [] for key in operators} for _ in unique_repetitions]
-                delta_mean_accurate = [{key: [] for key in operators} for _ in unique_repetitions]
-
-                dpred_mean_p_t = [{key: [] for key in operators} for _ in unique_repetitions]
-                dpred_mean_p_f = [{key: [] for key in operators} for _ in unique_repetitions]
-                dpred_mean_m_t = [{key: [] for key in operators} for _ in unique_repetitions]
-                dpred_mean_m_f = [{key: [] for key in operators} for _ in unique_repetitions]
-
-                dpred_mean_p_t_t = [{key: [] for key in operators} for _ in unique_repetitions]
-                dpred_mean_p_t_f = [{key: [] for key in operators} for _ in unique_repetitions]
-                dpred_mean_p_f_t = [{key: [] for key in operators} for _ in unique_repetitions]
-                dpred_mean_p_f_f = [{key: [] for key in operators} for _ in unique_repetitions]
-
-                dpred_mean_m_t_t = [{key: [] for key in operators} for _ in unique_repetitions]
-                dpred_mean_m_t_f = [{key: [] for key in operators} for _ in unique_repetitions]
-                dpred_mean_m_f_t = [{key: [] for key in operators} for _ in unique_repetitions]
-                dpred_mean_m_f_f = [{key: [] for key in operators} for _ in unique_repetitions]
-
-                for rep in unique_repetitions:
-                    subset_rep = last_epoch_df[last_epoch_df['repetition'] == rep]
-
-                    #print(subset_rep.columns, key_param, key_val)
-                    subset = subset_rep[subset_rep[key_param] == key_val]
-                    subset['pred'] = subset['pred'].apply(convert_to_numeric).astype(np.int8)
-                    conv = pd.concat([subset, pd.get_dummies(subset['pred'], prefix='pred')], axis=1)
-
-                    for col in required_columns: # a model might not predict all 5 values
-                        if col not in conv.columns:
-                            conv[col] = 0
-                    subset = conv[required_columns + ['informedness', 'correctSelection', 'opponents', 'accuracy'] + perm_keys]
-
-                    # OPERATOR PART
-                    for op in operators:
-
-                        delta_preds = []
-                        delta_preds_correct = []
-                        delta_preds_accurate = []
-
-                        dpred_p_t = []
-                        dpred_p_f = []
-                        dpred_m_t = []
-                        dpred_m_f = []
-
-                        dpred_p_t_t = []
-                        dpred_p_t_f = []
-                        dpred_p_f_t = []
-                        dpred_p_f_f = []
-
-                        dpred_m_t_t = []
-                        dpred_m_t_f = []
-                        dpred_m_f_t = []
-                        dpred_m_f_f = []
-
-                        for key in combinations_str:
-                            # key is 1st position, descendents are 2nd
-                            descendants = get_descendants(key, op, combinations_str)
-
-                            mapping = {'T': 2, 'F': 1, 'N': 0, 't': 2, 'f': 1, 'n': 0, '0': 0, '1': 1}
-
-                            key = [mapping[char] for char in key]
-                            key_informedness = '[' + ' '.join(map(str, key[:2])) + ']'
-                            key_opponents = np.float64(key[2])
-                            if '0' not in op and key_opponents == 0:
-                                # for most operators, we only use cases with opponents present
-                                continue
-
-                            descendants = [[mapping[char] for char in descendant] for descendant in descendants]
-                            descendant_informedness = ['[' + ' '.join(map(str, descendant[:2])) + ']' for descendant in descendants]
-                            descendant_opponents = [np.float64(descendant[2]) for descendant in descendants]
-
-                            if len(descendants) < 1:
-                                continue
-
-
-                            inf = subset[(subset['informedness'] == key_informedness) & (subset['opponents'] == key_opponents)].groupby(perm_keys + ['informedness', 'opponents', 'correctSelection'], observed=True).mean().reset_index()
-                            noinf = subset[(subset['informedness'].isin(descendant_informedness)) &
-                                (subset['opponents'].isin(descendant_opponents))].groupby(perm_keys + ['informedness', 'opponents', 'correctSelection'], observed=True).mean().reset_index()
-                            #print('lens1', len(inf), len(noinf), len(subset))
-
-
-                            merged_df = pd.merge(
-                                inf,
-                                noinf,
-                                on=perm_keys,
-                                suffixes=('_m', ''),
-                                how='inner',
-                            )
-
-                            merged_df['changed_target'] = (merged_df['correctSelection_m'] != merged_df['correctSelection']).astype(int)
-
-
-                            for i in range(5):
-                                merged_df[f'pred_diff_{i}'] = abs(merged_df[f'pred_{i}_m'] - merged_df[f'pred_{i}'])
-                            merged_df['total_pred_diff'] = merged_df[[f'pred_diff_{idx}' for idx in range(5)]].sum(axis=1) / 2
-                            delta_preds.extend(merged_df['total_pred_diff'].tolist())
-                            merged_df['total_pred_diff_correct'] = 1 - abs(merged_df['total_pred_diff'] - merged_df['changed_target'])
-                            delta_preds_correct.extend(merged_df['total_pred_diff_correct'].tolist())
-                            merged_df['total_pred_diff_accurate'] = merged_df['total_pred_diff_correct'] * merged_df['accuracy'] * merged_df['accuracy_m']
-                            delta_preds_accurate.extend(merged_df['total_pred_diff_accurate'].tolist())
-
-
-                            merged_df['changed_target'] = merged_df['changed_target'].astype(bool)
-
-                            merged_df['dpred_p_t'] = (merged_df['changed_target'] == 1) * (merged_df['total_pred_diff'])
-                            merged_df['dpred_p_f'] = (merged_df['changed_target'] == 1) * (1 - merged_df['total_pred_diff'])
-                            merged_df['dpred_m_t'] = (merged_df['changed_target'] == 0) * (merged_df['total_pred_diff'])
-                            merged_df['dpred_m_f'] = (merged_df['changed_target'] == 0) * (1 - merged_df['total_pred_diff'])
-
-                            merged_df['total_pred_diff_p_T_T'] = (merged_df['changed_target']) * (merged_df['accuracy_m']) * (merged_df['accuracy'])
-                            merged_df['total_pred_diff_p_T_F'] = (merged_df['changed_target']) * (merged_df['accuracy_m']) * (1-merged_df['accuracy'])
-                            merged_df['total_pred_diff_p_F_T'] = (merged_df['changed_target']) * (1-merged_df['accuracy_m']) * (merged_df['accuracy'])
-                            merged_df['total_pred_diff_p_F_F'] = (merged_df['changed_target']) * (1-merged_df['accuracy_m']) * (1-merged_df['accuracy'])
-
-                            merged_df['total_pred_diff_m_T_T'] = (1-merged_df['changed_target']) * (merged_df['accuracy_m']) * (merged_df['accuracy'])
-                            merged_df['total_pred_diff_m_T_F'] = (1-merged_df['changed_target']) * (merged_df['accuracy_m']) * (1-merged_df['accuracy'])
-                            merged_df['total_pred_diff_m_F_T'] = (1-merged_df['changed_target']) * (1-merged_df['accuracy_m']) * (merged_df['accuracy'])
-                            merged_df['total_pred_diff_m_F_F'] = (1-merged_df['changed_target']) * (1-merged_df['accuracy_m']) * (1-merged_df['accuracy'])
-
-
-                            #print(op, key, descendants, np.mean(merged_df['changed_target']))
-                            dpred_p_t.extend(merged_df['dpred_p_t'].tolist())
-                            dpred_p_f.extend(merged_df['dpred_p_f'].tolist())
-                            dpred_m_t.extend(merged_df['dpred_m_t'].tolist())
-                            dpred_m_f.extend(merged_df['dpred_m_f'].tolist())
-
-                            dpred_p_t_t.extend(merged_df['total_pred_diff_p_T_T'].tolist())
-                            dpred_p_t_f.extend(merged_df['total_pred_diff_p_T_F'].tolist())
-                            dpred_p_f_t.extend(merged_df['total_pred_diff_p_F_T'].tolist())
-                            dpred_p_f_f.extend(merged_df['total_pred_diff_p_F_F'].tolist())
-                            dpred_m_t_t.extend(merged_df['total_pred_diff_m_T_T'].tolist())
-                            dpred_m_t_f.extend(merged_df['total_pred_diff_m_T_F'].tolist())
-                            dpred_m_f_t.extend(merged_df['total_pred_diff_m_F_T'].tolist())
-                            dpred_m_f_f.extend(merged_df['total_pred_diff_m_F_F'].tolist())
-
-                        # first level aggregate: for each operator, within one repetition
-                        r = int(rep)
-                        delta_mean[r][op] = np.mean(delta_preds)
-                        delta_mean_correct[r][op] = np.mean(delta_preds_correct)
-                        delta_mean_accurate[r][op] = np.mean(delta_preds_accurate)
-
-                        dpred_mean_p_t[r][op] = np.mean(dpred_p_t)
-                        dpred_mean_p_f[r][op] = np.mean(dpred_p_f)
-                        dpred_mean_m_t[r][op] = np.mean(dpred_m_t)
-                        dpred_mean_m_f[r][op] = np.mean(dpred_m_f)
-
-                        dpred_mean_p_t_t[r][op] = np.mean(dpred_p_t_t)
-                        dpred_mean_p_t_f[r][op] = np.mean(dpred_p_t_f)
-                        dpred_mean_p_f_t[r][op] = np.mean(dpred_p_f_t)
-                        dpred_mean_p_f_f[r][op] = np.mean(dpred_p_f_f)
-
-                        dpred_mean_m_t_t[r][op] = np.mean(dpred_m_t_t)
-                        dpred_mean_m_t_f[r][op] = np.mean(dpred_m_t_f)
-                        dpred_mean_m_f_t[r][op] = np.mean(dpred_m_f_t)
-                        dpred_mean_m_f_f[r][op] = np.mean(dpred_m_f_f)
-
-                # second level aggregate: over one repetition
-
-                for op in operators:
-                    op_values_mean = [rep_dict[op] for rep_dict in delta_mean]
-                    op_values_mean_correct = [rep_dict[op] for rep_dict in delta_mean_correct]
-                    op_values_mean_accurate = [rep_dict[op] for rep_dict in delta_mean_accurate]
-
-                    op_values_mean_pt = [rep_dict[op] for rep_dict in dpred_mean_p_t]
-                    op_values_mean_pf = [rep_dict[op] for rep_dict in dpred_mean_p_f]
-                    op_values_mean_mt = [rep_dict[op] for rep_dict in dpred_mean_m_t]
-                    op_values_mean_mf = [rep_dict[op] for rep_dict in dpred_mean_m_f]
-
-                    op_values_mean_ptt = [rep_dict[op] for rep_dict in dpred_mean_p_t_t]
-                    op_values_mean_ptf = [rep_dict[op] for rep_dict in dpred_mean_p_t_f]
-                    op_values_mean_pft = [rep_dict[op] for rep_dict in dpred_mean_p_f_t]
-                    op_values_mean_pff = [rep_dict[op] for rep_dict in dpred_mean_p_f_f]
-                    op_values_mean_mtt = [rep_dict[op] for rep_dict in dpred_mean_m_t_t]
-                    op_values_mean_mtf = [rep_dict[op] for rep_dict in dpred_mean_m_t_f]
-                    op_values_mean_mft = [rep_dict[op] for rep_dict in dpred_mean_m_f_t]
-                    op_values_mean_mff = [rep_dict[op] for rep_dict in dpred_mean_m_f_f]
-
-                    delta_mean_rep[op] = np.mean(op_values_mean)
-                    delta_std_rep[op] = np.std(op_values_mean)
-
-                    delta_mean_correct_rep[op] = np.mean(op_values_mean_correct)
-                    delta_std_correct_rep[op] = np.std(op_values_mean_correct)
-
-                    delta_mean_accurate_rep[op] = np.mean(op_values_mean_accurate)
-                    delta_std_accurate_rep[op] = np.std(op_values_mean_accurate)
-
-                    delta_mean_p_t_rep[op] = np.mean(op_values_mean_pt)
-                    delta_mean_p_f_rep[op] = np.mean(op_values_mean_pf)
-                    delta_mean_m_t_rep[op] = np.mean(op_values_mean_mt)
-                    delta_mean_m_f_rep[op] = np.mean(op_values_mean_mf)
-
-                    delta_mean_p_t_t_rep[op] = np.mean(op_values_mean_ptt)
-                    delta_mean_p_t_f_rep[op] = np.mean(op_values_mean_ptf)
-                    delta_mean_p_f_t_rep[op] = np.mean(op_values_mean_pft)
-                    delta_mean_p_f_f_rep[op] = np.mean(op_values_mean_pff)
-                    delta_mean_m_t_t_rep[op] = np.mean(op_values_mean_mtt)
-                    delta_mean_m_t_f_rep[op] = np.mean(op_values_mean_mtf)
-                    delta_mean_m_f_t_rep[op] = np.mean(op_values_mean_mft)
-                    delta_mean_m_f_f_rep[op] = np.mean(op_values_mean_mff)
-
-
-                # third level aggregate: all key_vals
-                delta_operator_summary[key_val] = pd.DataFrame({
-                    'operator': list(delta_mean_rep.keys()),
-                    'dpred': [f"{delta_mean_rep[key]:.2f} ({delta_std_rep[key]:.2f})" for key in delta_mean_rep.keys()],
-                    'dpred_correct': [f"{delta_mean_correct_rep[key]:.2f} ({delta_std_correct_rep[key]:.2f})" for key in delta_mean_correct_rep.keys()],
-                    'dpred_accurate': [f"{delta_mean_accurate_rep[key]:.2f} ({delta_std_accurate_rep[key]:.2f})" for key in delta_mean_accurate_rep.keys()],
-                    'ptt': [delta_mean_p_t_t_rep[key] for key in delta_mean_p_t_t_rep.keys()],
-                    'ptf': [delta_mean_p_t_f_rep[key] for key in delta_mean_p_t_f_rep.keys()],
-                    'pft': [delta_mean_p_f_t_rep[key] for key in delta_mean_p_f_t_rep.keys()],
-                    'pff': [delta_mean_p_f_f_rep[key] for key in delta_mean_p_f_f_rep.keys()],
-                    'mtt': [delta_mean_m_t_t_rep[key] for key in delta_mean_m_t_t_rep.keys()],
-                    'mtf': [delta_mean_m_t_f_rep[key] for key in delta_mean_m_t_f_rep.keys()],
-                    'mft': [delta_mean_m_f_t_rep[key] for key in delta_mean_m_f_t_rep.keys()],
-                    'mff': [delta_mean_m_f_f_rep[key] for key in delta_mean_m_f_f_rep.keys()],
-                    'pt': [delta_mean_p_t_rep[key] for key in delta_mean_p_t_rep.keys()],
-                    'pf': [delta_mean_p_f_rep[key] for key in delta_mean_p_f_rep.keys()],
-                    'mt': [delta_mean_m_t_rep[key] for key in delta_mean_m_t_rep.keys()],
-                    'mf': [delta_mean_m_f_rep[key] for key in delta_mean_m_f_rep.keys()],
-                })
-
-                print('do', key_val, delta_operator_summary[key_val])
-
-
-                # CATEGORY ONE
-
-                #for col in perm_keys + ['informedness', 'correctSelection']:
-                #    print(f"{col} has {subset[col].nunique()} unique values:", subset[col].unique())
-
-                inf = subset[subset['informedness'] == 'Tt'].groupby(perm_keys + ['informedness', 'correctSelection'], observed=True).mean().reset_index()
-                noinf = subset[subset['informedness'] != 'Tt'].groupby(perm_keys + ['informedness', 'correctSelection'], observed=True).mean().reset_index()
-
-                merged_df = pd.merge(
-                    inf,
-                    noinf,
-                    on=perm_keys,
-                    suffixes=('_m', ''),
-                    how='inner',
-                )
-
-                merged_df['changed_target'] = (merged_df['correctSelection_m'] != merged_df['correctSelection']).astype(int)
-
-                for i in range(5):
-                    merged_df[f'pred_diff_{i}'] = abs(merged_df[f'pred_{i}_m'] - merged_df[f'pred_{i}'])
-                merged_df['total_pred_diff'] = merged_df[[f'pred_diff_{idx}' for idx in range(5)]].sum(axis=1) / 2
-                merged_df['total_pred_diff_correct'] = 1 - abs(merged_df['total_pred_diff'] - merged_df['changed_target'])
-
-                delta_preds = {}
-                delta_preds_correct = {}
-
-                for key in merged_df['informedness'].unique():
-                    delta_preds[key] = merged_df.loc[merged_df['informedness'] == key, 'total_pred_diff'].tolist()
-                    delta_preds_correct[key] = merged_df.loc[merged_df['informedness'] == key, 'total_pred_diff_correct'].tolist()
-
-                delta_mean = {key: np.mean(val) for key, val in delta_preds.items()}
-                delta_std = {key: np.std(val) for key, val in delta_preds.items()}
-
-                delta_mean_correct = {key: np.mean(val) for key, val in delta_preds_correct.items()}
-                delta_std_correct = {key: np.std(val) for key, val in delta_preds_correct.items()}
-
-                delta_mean_accurate = {key: np.mean(val) for key, val in delta_preds_correct.items()}
-                delta_std_accurate = {key: np.std(val) for key, val in delta_preds_correct.items()}
-
-                df_summary[key_val] = pd.DataFrame({
-                    'Informedness': list(delta_mean.keys()),
-                    'dpred': [f"{delta_mean[key]} ({delta_std[key]})" for key in delta_mean.keys()],
-                    'dpred_correct': [f"{delta_mean_correct[key]} ({delta_std_correct[key]})" for key in delta_mean_correct.keys()]
-                })
-
-                # todo: add informedness operators, rather than just category
-                print(df_summary[key_val])
 
     return avg_loss, variances, ranges_1, ranges_2, range_dict, range_dict3, stats, key_param_stats, oracle_key_param_stats, df_summary, delta_operator_summary
 
+def delta_pi_stats(unique_vals, key_param, last_epoch_df, delta_operator_summary, df_summary):
+    # todo: if delay_2nd_bait or first_swap are na, just make them 0? shouldn't affect anything
+    print('calculating delta preds')
+
+    set1 = ['T', 'F', 'N']
+    set2 = ['t', 'f', 'n']
+    set3 = ['0', '1']
+    combinations = list(itertools.product(set1, set2, set3))
+    combinations_str = [''.join(combo) for combo in combinations]
+
+    operators = ['T-F', 't-f', 'F-N', 'f-n', 'T-N', 't-n', '1-0']
+    required_columns = [f'pred_{i}' for i in range(5)]
+    perm_keys = ['p-b-0', 'p-b-1', 'p-s-0', 'p-s-1', 'delay_2nd_bait', 'first_swap', 'first_bait_size', 'delay']
+
+    for key_val in unique_vals[key_param]:  # for each train regime, etc
+        unique_repetitions = last_epoch_df['repetition'].unique()
+
+        delta_mean_rep = {key: [] for key in operators}
+        delta_std_rep = {key: [] for key in operators}
+        delta_mean_correct_rep = {key: [] for key in operators}
+        delta_std_correct_rep = {key: [] for key in operators}
+        delta_mean_accurate_rep = {key: [] for key in operators}
+        delta_std_accurate_rep = {key: [] for key in operators}
+
+        delta_mean_p_t_rep = {key: [] for key in operators}
+        delta_mean_p_f_rep = {key: [] for key in operators}
+        delta_mean_m_t_rep = {key: [] for key in operators}
+        delta_mean_m_f_rep = {key: [] for key in operators}
+
+        delta_mean_p_t_t_rep = {key: [] for key in operators}
+        delta_mean_p_t_f_rep = {key: [] for key in operators}
+        delta_mean_p_f_t_rep = {key: [] for key in operators}
+        delta_mean_p_f_f_rep = {key: [] for key in operators}
+
+        delta_mean_m_t_t_rep = {key: [] for key in operators}
+        delta_mean_m_t_f_rep = {key: [] for key in operators}
+        delta_mean_m_f_t_rep = {key: [] for key in operators}
+        delta_mean_m_f_f_rep = {key: [] for key in operators}
+
+        delta_mean = [{key: [] for key in operators} for _ in unique_repetitions]
+        delta_mean_correct = [{key: [] for key in operators} for _ in unique_repetitions]
+        delta_mean_accurate = [{key: [] for key in operators} for _ in unique_repetitions]
+
+        dpred_mean_p_t = [{key: [] for key in operators} for _ in unique_repetitions]
+        dpred_mean_p_f = [{key: [] for key in operators} for _ in unique_repetitions]
+        dpred_mean_m_t = [{key: [] for key in operators} for _ in unique_repetitions]
+        dpred_mean_m_f = [{key: [] for key in operators} for _ in unique_repetitions]
+
+        dpred_mean_p_t_t = [{key: [] for key in operators} for _ in unique_repetitions]
+        dpred_mean_p_t_f = [{key: [] for key in operators} for _ in unique_repetitions]
+        dpred_mean_p_f_t = [{key: [] for key in operators} for _ in unique_repetitions]
+        dpred_mean_p_f_f = [{key: [] for key in operators} for _ in unique_repetitions]
+
+        dpred_mean_m_t_t = [{key: [] for key in operators} for _ in unique_repetitions]
+        dpred_mean_m_t_f = [{key: [] for key in operators} for _ in unique_repetitions]
+        dpred_mean_m_f_t = [{key: [] for key in operators} for _ in unique_repetitions]
+        dpred_mean_m_f_f = [{key: [] for key in operators} for _ in unique_repetitions]
+
+        for rep in unique_repetitions:
+            subset_rep = last_epoch_df[last_epoch_df['repetition'] == rep]
+
+            # print(subset_rep.columns, key_param, key_val)
+            subset = subset_rep[subset_rep[key_param] == key_val]
+            subset['pred'] = subset['pred'].apply(convert_to_numeric).astype(np.int8)
+            conv = pd.concat([subset, pd.get_dummies(subset['pred'], prefix='pred')], axis=1)
+
+            for col in required_columns:  # a model might not predict all 5 values
+                if col not in conv.columns:
+                    conv[col] = 0
+            subset = conv[required_columns + ['informedness', 'correctSelection', 'opponents', 'accuracy'] + perm_keys]
+
+            # OPERATOR PART
+            for op in operators:
+
+                delta_preds = []
+                delta_preds_correct = []
+                delta_preds_accurate = []
+
+                dpred_p_t = []
+                dpred_p_f = []
+                dpred_m_t = []
+                dpred_m_f = []
+
+                dpred_p_t_t = []
+                dpred_p_t_f = []
+                dpred_p_f_t = []
+                dpred_p_f_f = []
+
+                dpred_m_t_t = []
+                dpred_m_t_f = []
+                dpred_m_f_t = []
+                dpred_m_f_f = []
+
+                for key in combinations_str:
+                    # key is 1st position, descendents are 2nd
+                    descendants = get_descendants(key, op, combinations_str)
+
+                    mapping = {'T': 2, 'F': 1, 'N': 0, 't': 2, 'f': 1, 'n': 0, '0': 0, '1': 1}
+
+                    key = [mapping[char] for char in key]
+                    key_informedness = '[' + ' '.join(map(str, key[:2])) + ']'
+                    key_opponents = np.float64(key[2])
+                    if '0' not in op and key_opponents == 0:
+                        # for most operators, we only use cases with opponents present
+                        continue
+
+                    descendants = [[mapping[char] for char in descendant] for descendant in descendants]
+                    descendant_informedness = ['[' + ' '.join(map(str, descendant[:2])) + ']' for descendant in
+                                               descendants]
+                    descendant_opponents = [np.float64(descendant[2]) for descendant in descendants]
+
+                    if len(descendants) < 1:
+                        continue
+
+                    inf = subset[
+                        (subset['informedness'] == key_informedness) & (subset['opponents'] == key_opponents)].groupby(
+                        perm_keys + ['informedness', 'opponents', 'correctSelection'],
+                        observed=True).mean().reset_index()
+                    noinf = subset[(subset['informedness'].isin(descendant_informedness)) &
+                                   (subset['opponents'].isin(descendant_opponents))].groupby(
+                        perm_keys + ['informedness', 'opponents', 'correctSelection'],
+                        observed=True).mean().reset_index()
+                    # print('lens1', len(inf), len(noinf), len(subset))
+
+                    merged_df = pd.merge(
+                        inf,
+                        noinf,
+                        on=perm_keys,
+                        suffixes=('_m', ''),
+                        how='inner',
+                    )
+
+                    merged_df['changed_target'] = (
+                                merged_df['correctSelection_m'] != merged_df['correctSelection']).astype(int)
+
+                    for i in range(5):
+                        merged_df[f'pred_diff_{i}'] = abs(merged_df[f'pred_{i}_m'] - merged_df[f'pred_{i}'])
+                    merged_df['total_pred_diff'] = merged_df[[f'pred_diff_{idx}' for idx in range(5)]].sum(axis=1) / 2
+                    delta_preds.extend(merged_df['total_pred_diff'].tolist())
+                    merged_df['total_pred_diff_correct'] = 1 - abs(
+                        merged_df['total_pred_diff'] - merged_df['changed_target'])
+                    delta_preds_correct.extend(merged_df['total_pred_diff_correct'].tolist())
+                    merged_df['total_pred_diff_accurate'] = merged_df['total_pred_diff_correct'] * merged_df[
+                        'accuracy'] * merged_df['accuracy_m']
+                    delta_preds_accurate.extend(merged_df['total_pred_diff_accurate'].tolist())
+
+                    merged_df['changed_target'] = merged_df['changed_target'].astype(bool)
+
+                    merged_df['dpred_p_t'] = (merged_df['changed_target'] == 1) * (merged_df['total_pred_diff'])
+                    merged_df['dpred_p_f'] = (merged_df['changed_target'] == 1) * (1 - merged_df['total_pred_diff'])
+                    merged_df['dpred_m_t'] = (merged_df['changed_target'] == 0) * (merged_df['total_pred_diff'])
+                    merged_df['dpred_m_f'] = (merged_df['changed_target'] == 0) * (1 - merged_df['total_pred_diff'])
+
+                    merged_df['total_pred_diff_p_T_T'] = (merged_df['changed_target']) * (merged_df['accuracy_m']) * (
+                    merged_df['accuracy'])
+                    merged_df['total_pred_diff_p_T_F'] = (merged_df['changed_target']) * (merged_df['accuracy_m']) * (
+                                1 - merged_df['accuracy'])
+                    merged_df['total_pred_diff_p_F_T'] = (merged_df['changed_target']) * (
+                                1 - merged_df['accuracy_m']) * (merged_df['accuracy'])
+                    merged_df['total_pred_diff_p_F_F'] = (merged_df['changed_target']) * (
+                                1 - merged_df['accuracy_m']) * (1 - merged_df['accuracy'])
+
+                    merged_df['total_pred_diff_m_T_T'] = (1 - merged_df['changed_target']) * (
+                    merged_df['accuracy_m']) * (merged_df['accuracy'])
+                    merged_df['total_pred_diff_m_T_F'] = (1 - merged_df['changed_target']) * (
+                    merged_df['accuracy_m']) * (1 - merged_df['accuracy'])
+                    merged_df['total_pred_diff_m_F_T'] = (1 - merged_df['changed_target']) * (
+                                1 - merged_df['accuracy_m']) * (merged_df['accuracy'])
+                    merged_df['total_pred_diff_m_F_F'] = (1 - merged_df['changed_target']) * (
+                                1 - merged_df['accuracy_m']) * (1 - merged_df['accuracy'])
+
+                    # print(op, key, descendants, np.mean(merged_df['changed_target']))
+                    dpred_p_t.extend(merged_df['dpred_p_t'].tolist())
+                    dpred_p_f.extend(merged_df['dpred_p_f'].tolist())
+                    dpred_m_t.extend(merged_df['dpred_m_t'].tolist())
+                    dpred_m_f.extend(merged_df['dpred_m_f'].tolist())
+
+                    dpred_p_t_t.extend(merged_df['total_pred_diff_p_T_T'].tolist())
+                    dpred_p_t_f.extend(merged_df['total_pred_diff_p_T_F'].tolist())
+                    dpred_p_f_t.extend(merged_df['total_pred_diff_p_F_T'].tolist())
+                    dpred_p_f_f.extend(merged_df['total_pred_diff_p_F_F'].tolist())
+                    dpred_m_t_t.extend(merged_df['total_pred_diff_m_T_T'].tolist())
+                    dpred_m_t_f.extend(merged_df['total_pred_diff_m_T_F'].tolist())
+                    dpred_m_f_t.extend(merged_df['total_pred_diff_m_F_T'].tolist())
+                    dpred_m_f_f.extend(merged_df['total_pred_diff_m_F_F'].tolist())
+
+                # first level aggregate: for each operator, within one repetition
+                r = int(rep)
+                delta_mean[r][op] = np.mean(delta_preds)
+                delta_mean_correct[r][op] = np.mean(delta_preds_correct)
+                delta_mean_accurate[r][op] = np.mean(delta_preds_accurate)
+
+                dpred_mean_p_t[r][op] = np.mean(dpred_p_t)
+                dpred_mean_p_f[r][op] = np.mean(dpred_p_f)
+                dpred_mean_m_t[r][op] = np.mean(dpred_m_t)
+                dpred_mean_m_f[r][op] = np.mean(dpred_m_f)
+
+                dpred_mean_p_t_t[r][op] = np.mean(dpred_p_t_t)
+                dpred_mean_p_t_f[r][op] = np.mean(dpred_p_t_f)
+                dpred_mean_p_f_t[r][op] = np.mean(dpred_p_f_t)
+                dpred_mean_p_f_f[r][op] = np.mean(dpred_p_f_f)
+
+                dpred_mean_m_t_t[r][op] = np.mean(dpred_m_t_t)
+                dpred_mean_m_t_f[r][op] = np.mean(dpred_m_t_f)
+                dpred_mean_m_f_t[r][op] = np.mean(dpred_m_f_t)
+                dpred_mean_m_f_f[r][op] = np.mean(dpred_m_f_f)
+
+        # second level aggregate: over one repetition
+
+        for op in operators:
+            op_values_mean = [rep_dict[op] for rep_dict in delta_mean]
+            op_values_mean_correct = [rep_dict[op] for rep_dict in delta_mean_correct]
+            op_values_mean_accurate = [rep_dict[op] for rep_dict in delta_mean_accurate]
+
+            op_values_mean_pt = [rep_dict[op] for rep_dict in dpred_mean_p_t]
+            op_values_mean_pf = [rep_dict[op] for rep_dict in dpred_mean_p_f]
+            op_values_mean_mt = [rep_dict[op] for rep_dict in dpred_mean_m_t]
+            op_values_mean_mf = [rep_dict[op] for rep_dict in dpred_mean_m_f]
+
+            op_values_mean_ptt = [rep_dict[op] for rep_dict in dpred_mean_p_t_t]
+            op_values_mean_ptf = [rep_dict[op] for rep_dict in dpred_mean_p_t_f]
+            op_values_mean_pft = [rep_dict[op] for rep_dict in dpred_mean_p_f_t]
+            op_values_mean_pff = [rep_dict[op] for rep_dict in dpred_mean_p_f_f]
+            op_values_mean_mtt = [rep_dict[op] for rep_dict in dpred_mean_m_t_t]
+            op_values_mean_mtf = [rep_dict[op] for rep_dict in dpred_mean_m_t_f]
+            op_values_mean_mft = [rep_dict[op] for rep_dict in dpred_mean_m_f_t]
+            op_values_mean_mff = [rep_dict[op] for rep_dict in dpred_mean_m_f_f]
+
+            delta_mean_rep[op] = np.mean(op_values_mean)
+            delta_std_rep[op] = np.std(op_values_mean)
+
+            delta_mean_correct_rep[op] = np.mean(op_values_mean_correct)
+            delta_std_correct_rep[op] = np.std(op_values_mean_correct)
+
+            delta_mean_accurate_rep[op] = np.mean(op_values_mean_accurate)
+            delta_std_accurate_rep[op] = np.std(op_values_mean_accurate)
+
+            delta_mean_p_t_rep[op] = np.mean(op_values_mean_pt)
+            delta_mean_p_f_rep[op] = np.mean(op_values_mean_pf)
+            delta_mean_m_t_rep[op] = np.mean(op_values_mean_mt)
+            delta_mean_m_f_rep[op] = np.mean(op_values_mean_mf)
+
+            delta_mean_p_t_t_rep[op] = np.mean(op_values_mean_ptt)
+            delta_mean_p_t_f_rep[op] = np.mean(op_values_mean_ptf)
+            delta_mean_p_f_t_rep[op] = np.mean(op_values_mean_pft)
+            delta_mean_p_f_f_rep[op] = np.mean(op_values_mean_pff)
+            delta_mean_m_t_t_rep[op] = np.mean(op_values_mean_mtt)
+            delta_mean_m_t_f_rep[op] = np.mean(op_values_mean_mtf)
+            delta_mean_m_f_t_rep[op] = np.mean(op_values_mean_mft)
+            delta_mean_m_f_f_rep[op] = np.mean(op_values_mean_mff)
+
+        # third level aggregate: all key_vals
+        delta_operator_summary[key_val] = pd.DataFrame({
+            'operator': list(delta_mean_rep.keys()),
+            'dpred': [f"{delta_mean_rep[key]:.2f} ({delta_std_rep[key]:.2f})" for key in delta_mean_rep.keys()],
+            'dpred_correct': [f"{delta_mean_correct_rep[key]:.2f} ({delta_std_correct_rep[key]:.2f})" for key in
+                              delta_mean_correct_rep.keys()],
+            'dpred_accurate': [f"{delta_mean_accurate_rep[key]:.2f} ({delta_std_accurate_rep[key]:.2f})" for key in
+                               delta_mean_accurate_rep.keys()],
+            'ptt': [delta_mean_p_t_t_rep[key] for key in delta_mean_p_t_t_rep.keys()],
+            'ptf': [delta_mean_p_t_f_rep[key] for key in delta_mean_p_t_f_rep.keys()],
+            'pft': [delta_mean_p_f_t_rep[key] for key in delta_mean_p_f_t_rep.keys()],
+            'pff': [delta_mean_p_f_f_rep[key] for key in delta_mean_p_f_f_rep.keys()],
+            'mtt': [delta_mean_m_t_t_rep[key] for key in delta_mean_m_t_t_rep.keys()],
+            'mtf': [delta_mean_m_t_f_rep[key] for key in delta_mean_m_t_f_rep.keys()],
+            'mft': [delta_mean_m_f_t_rep[key] for key in delta_mean_m_f_t_rep.keys()],
+            'mff': [delta_mean_m_f_f_rep[key] for key in delta_mean_m_f_f_rep.keys()],
+            'pt': [delta_mean_p_t_rep[key] for key in delta_mean_p_t_rep.keys()],
+            'pf': [delta_mean_p_f_rep[key] for key in delta_mean_p_f_rep.keys()],
+            'mt': [delta_mean_m_t_rep[key] for key in delta_mean_m_t_rep.keys()],
+            'mf': [delta_mean_m_f_rep[key] for key in delta_mean_m_f_rep.keys()],
+        })
+
+        print('do', key_val, delta_operator_summary[key_val])
+
+        # CATEGORY ONE
+
+        # for col in perm_keys + ['informedness', 'correctSelection']:
+        #    print(f"{col} has {subset[col].nunique()} unique values:", subset[col].unique())
+
+        inf = subset[subset['informedness'] == 'Tt'].groupby(perm_keys + ['informedness', 'correctSelection'],
+                                                             observed=True).mean().reset_index()
+        noinf = subset[subset['informedness'] != 'Tt'].groupby(perm_keys + ['informedness', 'correctSelection'],
+                                                               observed=True).mean().reset_index()
+
+        merged_df = pd.merge(
+            inf,
+            noinf,
+            on=perm_keys,
+            suffixes=('_m', ''),
+            how='inner',
+        )
+
+        merged_df['changed_target'] = (merged_df['correctSelection_m'] != merged_df['correctSelection']).astype(int)
+
+        for i in range(5):
+            merged_df[f'pred_diff_{i}'] = abs(merged_df[f'pred_{i}_m'] - merged_df[f'pred_{i}'])
+        merged_df['total_pred_diff'] = merged_df[[f'pred_diff_{idx}' for idx in range(5)]].sum(axis=1) / 2
+        merged_df['total_pred_diff_correct'] = 1 - abs(merged_df['total_pred_diff'] - merged_df['changed_target'])
+
+        delta_preds = {}
+        delta_preds_correct = {}
+
+        for key in merged_df['informedness'].unique():
+            delta_preds[key] = merged_df.loc[merged_df['informedness'] == key, 'total_pred_diff'].tolist()
+            delta_preds_correct[key] = merged_df.loc[
+                merged_df['informedness'] == key, 'total_pred_diff_correct'].tolist()
+
+        delta_mean = {key: np.mean(val) for key, val in delta_preds.items()}
+        delta_std = {key: np.std(val) for key, val in delta_preds.items()}
+
+        delta_mean_correct = {key: np.mean(val) for key, val in delta_preds_correct.items()}
+        delta_std_correct = {key: np.std(val) for key, val in delta_preds_correct.items()}
+
+        delta_mean_accurate = {key: np.mean(val) for key, val in delta_preds_correct.items()}
+        delta_std_accurate = {key: np.std(val) for key, val in delta_preds_correct.items()}
+
+        df_summary[key_val] = pd.DataFrame({
+            'Informedness': list(delta_mean.keys()),
+            'dpred': [f"{delta_mean[key]} ({delta_std[key]})" for key in delta_mean.keys()],
+            'dpred_correct': [f"{delta_mean_correct[key]} ({delta_std_correct[key]})" for key in
+                              delta_mean_correct.keys()]
+        })
+
+        # todo: add informedness operators, rather than just category
+        print(df_summary[key_val])
 
 def save_figures(path, df, avg_loss, ranges, range_dict, range_dict3, params, last_epoch_df, num=10,
-                 key_param_stats=None,  oracle_stats=None, key_param=None, delta_sum=None, delta_x=None):
+                 key_param_stats=None,  oracle_stats=None, key_param=None, delta_sum=None, delta_x=None,
+                 key_param_stats_special=[]):
     top_pairs = sorted(ranges.items(), key=lambda x: x[1], reverse=True)[:num]
     top_n_ranges = heapq.nlargest(num, range_dict, key=range_dict.get)
     top_n_ranges3 = heapq.nlargest(num, range_dict3, key=range_dict3.get)
@@ -930,7 +956,7 @@ def save_figures(path, df, avg_loss, ranges, range_dict, range_dict3, params, la
         save_delta_figures(path, delta_sum, delta_x)
 
     if key_param_stats is not None:
-        save_key_param_figures(path, key_param_stats, oracle_stats, key_param)
+        save_key_param_figures(path, key_param_stats, oracle_stats, key_param, key_param_stats_special=key_param_stats_special)
 
     save_double_param_figures(path, top_pairs, avg_loss, last_epoch_df)
     save_single_param_figures(path, params, avg_loss, last_epoch_df)
