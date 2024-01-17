@@ -483,7 +483,7 @@ def extract_last_value_from_list_str(val):
 
 
 
-def calculate_statistics(df, last_epoch_df, params, skip_3x=True, skip_2x1=False, key_param=None, skip_1x=True, record_delta_pi=True, used_regimes=None, savepath=None):
+def calculate_statistics(df, last_epoch_df, params, skip_3x=True, skip_2x1=False, key_param=None, skip_1x=True, record_delta_pi=False, used_regimes=None, savepath=None):
     '''
     Calculates various statistics from datasets of model outputs detailing model performance.
     '''
@@ -503,8 +503,8 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=True, skip_2x1=False
 
     print('making categorical')
     for param in params:
-        if df[param].dtype == 'object':
-            df[param] = df[param].astype('category')
+        if last_epoch_df[param].dtype == 'object':
+            #df[param] = df[param].astype('category')
             last_epoch_df[param] = last_epoch_df[param].astype('category')
     params = [param for param in params if param not in ['delay', 'perm']]
 
@@ -537,10 +537,11 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=True, skip_2x1=False
                 regime_length += len(regime_items)
             regime_lengths[regime_item[0][3:]] = regime_length
             print(regime_item, regime_length)
-        plot_regime_lengths(regime_lengths, grouped, savepath + 'scatter.png')
+        if False:
+            plot_regime_lengths(regime_lengths, grouped, savepath + 'scatter.png')
 
 
-    unique_vals = {param: df[param].unique() for param in params}
+    unique_vals = {param: last_epoch_df[param].unique() for param in params}
     #print('found unique vals', unique_vals)
 
     if not skip_1x:
@@ -588,6 +589,7 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=True, skip_2x1=False
             if param != key_param:
                 # Initializing a nested dictionary for each unique key_param value
                 for acc_type, save_dict in zip(['accuracy', 'o_acc'], [key_param_stats, oracle_key_param_stats]):
+                    #print(unique_vals)
                     for key_val in unique_vals[key_param]:
                         subset = last_epoch_df[last_epoch_df[key_param] == key_val]
                         grouped = subset.groupby(['repetition', param])[acc_type]
@@ -891,7 +893,7 @@ def delta_pi_stats(unique_vals, key_param, last_epoch_df, delta_operator_summary
             'mf': [delta_mean_m_f_rep[key] for key in delta_mean_m_f_rep.keys()],
         })
 
-        print('do', key_val, delta_operator_summary[key_val])
+        #print('do', key_val, delta_operator_summary[key_val])
 
         # CATEGORY ONE
 
@@ -942,8 +944,7 @@ def delta_pi_stats(unique_vals, key_param, last_epoch_df, delta_operator_summary
                               delta_mean_correct.keys()]
         })
 
-        # todo: add informedness operators, rather than just category
-        print(df_summary[key_val])
+        #print(df_summary[key_val])
 
 def save_figures(path, df, avg_loss, ranges, range_dict, range_dict3, params, last_epoch_df, num=10,
                  key_param_stats=None,  oracle_stats=None, key_param=None, delta_sum=None, delta_x=None,
@@ -1108,7 +1109,7 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
                                 last_epoch_df_paths.extend(df_paths)
             if skip_train:
                 dfs_paths = find_df_paths(save_path, 'param_losses_*_*.csv')
-                print('dfs paths', dfs_paths, save_path)
+                print('sup sess dfs paths', dfs_paths, save_path)
                 if len(dfs_paths):
                     max_epoch = max(int(path.split('_')[-2]) for path in dfs_paths)
                     last_epoch_df_paths = [path for path in dfs_paths if int(path.split('_')[-2]) == max_epoch]

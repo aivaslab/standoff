@@ -6,10 +6,11 @@ import pickle
 import traceback
 
 import pandas as pd
+import tqdm
 
 from src.pz_envs import ScenarioConfigs
 from src.supervised_learning import gen_data
-from src.utils.plotting import create_combined_histogram, plot_progression
+from src.utils.plotting import create_combined_histogram, plot_progression, save_key_param_figures
 from supervised_learning_main import run_supervised_session, calculate_statistics, write_metrics_to_file, save_figures, \
     train_model
 import numpy as np
@@ -95,6 +96,7 @@ def load_dataframes(combined_path_list, value_names, key_param):
     df_list = []
 
     replace_dict = {'1': 1, '0': 0}
+    tq = tqdm.trange(len(combined_path_list))
     for df_paths, value_name in zip(combined_path_list, value_names):
         for df_path in df_paths:
             repetition = int(df_path.split('_')[-1][:1])
@@ -108,10 +110,24 @@ def load_dataframes(combined_path_list, value_names, key_param):
                 )
                 chunk = chunk.assign(**{key_param: value_name, 'repetition': repetition})
                 df_list.append(chunk)
+        tq.update(1)
     combined_df = pd.concat(df_list, ignore_index=True)
     combined_df['informedness'] = combined_df['informedness'].fillna('none')
     #print('combined df cols', combined_df.columns)
     return combined_df
+
+def special_heatmap(df_path_list2, df_path_list, key_param='regime', key_param_list=[], exp_names=[], save_dir=None, params=None, used_regimes=None):
+    print('special heatmap', save_dir)
+    dfs = load_dataframes(df_path_list, key_param_list, key_param)
+    #dfs2 = load_dataframes(df_path_list2, key_param_list, key_param)
+
+    # next thing to check: print dfs and make sure it's same
+    print('loaded, calculating stats...')
+    _, _, _, _, _, _, _, key_param_stats, _, _, _ = calculate_statistics(
+        None, dfs, list(set(params + [key_param])), skip_3x=True, skip_1x=True, key_param=key_param, used_regimes=used_regimes)
+    print(key_param_stats)
+    save_key_param_figures(save_dir, key_param_stats, None, key_param)
+    print('done special')
 
 def do_comparison(combined_path_list, last_path_list, key_param_list, key_param, exp_name, params, prior_metrics, used_regimes=None):
     print('loading dataframes for final comparison')
@@ -121,15 +137,6 @@ def do_comparison(combined_path_list, last_path_list, key_param_list, key_param,
 
     create_combined_histogram(last_epoch_df, combined_df, key_param, os.path.join('supervised', exp_name))
 
-    key_param_stats_special = []
-    if exp_name == "exp_53":
-        print("special stats...")
-        for special_exp in ["exp_51", "exp_54"]:
-            _, _, _, _, _, _, _, key_param_stats, _, _, _ = calculate_statistics(
-                combined_df, last_epoch_df, list(set(params + prior_metrics + [key_param])),
-                skip_3x=True, skip_1x=True, key_param=key_param, used_regimes=used_regimes,
-                savepath=os.path.join('supervised', exp_name))
-            key_param_stats_special.append(key_param_stats)
 
     avg_loss, variances, ranges_1, ranges_2, range_dict, range_dict3, stats, key_param_stats, oracle_stats, delta_sum, delta_x = calculate_statistics(
         combined_df, last_epoch_df, list(set(params + prior_metrics + [key_param])),
@@ -141,7 +148,7 @@ def do_comparison(combined_path_list, last_path_list, key_param_list, key_param,
                           key_param=key_param, d_s=delta_sum, d_x=delta_x)
     save_figures(combined_path, combined_df, avg_loss, ranges_2, range_dict, range_dict3,
                  params, last_epoch_df, num=12, key_param_stats=key_param_stats, oracle_stats=oracle_stats,
-                 key_param=key_param, delta_sum=delta_sum, delta_x=delta_x, key_param_stats_special=key_param_stats_special)
+                 key_param=key_param, delta_sum=delta_sum, delta_x=delta_x)
 
 
 def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, batch_size=64, desired_evals=5,
@@ -172,9 +179,9 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
     regimes['direct'] = ['sl-' + x + '1' for x in sub_regime_keys]
     regimes['noOpponent'] = ['sl-' + x + '0' for x in sub_regime_keys]
     regimes['everything'] = all_regimes
-    #regimes['identity'] = ['sl-' + x + '0' for x in sub_regime_keys] + ['sl-Tt1', 'sl-Ff1', 'sl-Nn1']
     hregime = {}
     hregime['homogeneous'] = ['sl-Tt0', 'sl-Ff0', 'sl-Nn0', 'sl-Tt1', 'sl-Ff1', 'sl-Nn1']
+    #hregime['identity'] = ['sl-' + x + '0' for x in sub_regime_keys] + ['sl-Tt1', 'sl-Ff1', 'sl-Nn1']
 
     single_regimes = {k[3:]: [k] for k in all_regimes}
     leave_one_out_regimes = {}
@@ -224,6 +231,42 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
     if 'h' in todo:
         print('Running hyperparameter search on all regimes, pref_types, role_types')
         run_hparam_search(trials=100, repetitions=3, log_file='hparam_file.txt', train_sets=regimes['direct'], epochs=20)
+
+    if 's' in todo:
+        print('making combined heatmap')
+        names = ['exp_53', 'exp_51', 'exp_54', 'exp_59']#['exp_53']#, 'exp_51', 'exp_54',]
+        session_params['skip_train'] = True
+        session_params['skip_eval'] = True
+        session_params['skip_calc'] = True
+        key_param = 'regime'
+        df_path_list = []
+        df_path_list2 = []
+        #used_regimes = []
+        key_param_list = []
+        for dataset in names:
+            print(dataset)
+            cur_regimes = {'exp_54': mixed_regimes, 'exp_51': single_regimes, 'exp_53': regimes, 'exp_59': hregime}[dataset]
+
+            for regime in list(cur_regimes.keys()):
+                tset = cur_regimes[regime]
+                all_dfs, last_epoch_paths = run_supervised_session(
+                    save_path=os.path.join('supervised', dataset, regime),
+                    train_sets=tset,
+                    eval_sets=regimes['everything'],
+                    oracle_labels=[None],
+                    key_param=key_param,
+                    key_param_value=regime,
+                    **session_params
+                )
+                df_path_list2.append(all_dfs)
+                df_path_list.append(last_epoch_paths)
+                key_param_list.append(regime)
+
+        print(key_param_list)
+        path = os.path.join('supervised', 'special')
+        if not os.path.exists(path):
+            os.mkdir(path)
+        special_heatmap(df_path_list2, df_path_list, 'regime', key_param_list, names, path, params)
 
     if 1 in todo:
         print('Running experiment 1: varied models training directly on the test set')
@@ -546,5 +589,5 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
         do_comparison(combined_path_list, last_path_list, key_param_list, key_param, exp_name, params, prior_metrics)
 
 if __name__ == '__main__':
-    experiments([51], repetitions=3, epochs=50, skip_train=True, skip_eval=True, skip_calc=True, skip_activations=True,
+    experiments(['s'], repetitions=3, epochs=50, skip_train=True, skip_eval=True, skip_calc=True, skip_activations=True,
                 batch_size=256, desired_evals=1, use_ff=False)

@@ -690,6 +690,7 @@ def df_list_from_stat_dict(stat_dict, param):
             mean = stat_dict[key_val][param]['mean'][param_val]
             ci = stat_dict[key_val][param]['std'][param_val]
             df_list.append([key_val, param_val, f"{mean}", f"{ci}"])
+    return df_list
 
 def save_key_param_figures(save_dir, key_param_stats, oracle_stats, key_param, key_param_stats_special=[]):
     save_key_param_heatmap(save_dir, key_param_stats, key_param)
@@ -754,6 +755,9 @@ def save_key_param_figures(save_dir, key_param_stats, oracle_stats, key_param, k
 
         for stat_dict, label in zip([key_param_stats, oracle_stats], ['accuracy', 'o_acc']):
 
+            if stat_dict is None:
+                continue
+            print(param, 'ddd', stat_dict , 'shouldnt be none here')
             df_list = df_list_from_stat_dict(stat_dict, param)
 
             df = pd.DataFrame(df_list, columns=[key_param, param, "accuracy mean", "accuracy std"])
@@ -763,11 +767,15 @@ def save_key_param_figures(save_dir, key_param_stats, oracle_stats, key_param, k
 
             # produce typical heatmaps for accuracy
             big_mode = True
-            desired_order = ['Tt0', 'Tf0', 'Tn0', 'Ft0', 'Ff0', 'Fn0', 'Nt0', 'Nf0', 'Nn0', 'Tt1', 'Tf1', 'Tn1', 'Ft1', 'Ff1', 'Fn1', 'Nt1', 'Nf1', 'Nn1']
-            special = True
+
 
             if param == 'test_regime':
                 for use_zero_op in [True, False]:
+                    if use_zero_op:
+                        desired_order = ['Tt0', 'Tf0', 'Tn0', 'Ft0', 'Ff0', 'Fn0', 'Nt0', 'Nf0', 'Nn0', 'Tt1', 'Tf1',
+                                         'Tn1', 'Ft1', 'Ff1', 'Fn1', 'Nt1', 'Nf1', 'Nn1']
+                    else:
+                        desired_order = ['Tt1', 'Tf1', 'Tn1', 'Ft1', 'Ff1', 'Fn1', 'Nt1', 'Nf1', 'Nn1']
                     for use_std in [True, False]:
                         df["accuracy mean"] = pd.to_numeric(df["accuracy mean"], errors='coerce')
                         df["accuracy std"] = pd.to_numeric(df["accuracy std"], errors='coerce')
@@ -781,10 +789,26 @@ def save_key_param_figures(save_dir, key_param_stats, oracle_stats, key_param, k
                             mean_values_df = pivot_df
                             pivot_df = pivot_df.applymap(lambda x: f"{x:.2f}")
 
-                        plt.figure(figsize=(22, 8))
+                        # print(mean_values_df) this is empty dataframe?
 
-                        if use_zero_op:
-                            original_row_order = pivot_df.index.tolist()
+                        fig = plt.figure(figsize=(6, 12))
+                        heatmap_ax = fig.add_axes([0.0, 0.11, 1.0, 0.9])
+                        cbar_ax = fig.add_axes([0.0, 0.03, 1.0, 0.02])
+
+                        original_row_order = pivot_df.index.tolist()
+
+                        use_many_rows = True
+                        if use_many_rows:
+                            single_rows = ['Tt0', 'Tf0', 'Tn0', 'Ft0', 'Ff0', 'Fn0', 'Nt0', 'Nf0', 'Nn0', 'Tt1', 'Tf1', 'Tn1', 'Ft1', 'Ff1', 'Fn1', 'Nt1', 'Nf1', 'Nn1']
+                            contrast_rows = ['Tt', 'Tf', 'Tn', 'Ft', 'Ff', 'Fn', 'Nt', 'Nf', 'Nn']
+                            desired_row_order = ['noOpponent', 'direct', 'everything']
+                            desired_row_order.extend(single_rows)
+                            row_name_dict = {x: 'contrast-' + x for x in contrast_rows}
+                            desired_row_order.extend(contrast_rows)
+                            row_name_dict.update({x: 'single-' + x for x in single_rows})
+                            desired_row_order.extend(['homogeneous'])
+                            row_name_dict.update({'noOpponent': 'full-noop', 'direct': 'full-op', 'everything': 'full-both', 'homogeneous': 'homogeneous'})
+                        else:
                             if 'Tt' in original_row_order:
                                 desired_row_order = ['Tt', 'Tf', 'Tn', 'Ft', 'Ff', 'Fn', 'Nt', 'Nf', 'Nn']
                                 row_name_dict = {x: 'contrast-' + x for x in desired_row_order}
@@ -793,33 +817,39 @@ def save_key_param_figures(save_dir, key_param_stats, oracle_stats, key_param, k
                                 desired_row_order = desired_order
                                 row_name_dict = {x: 'single-' + x for x in desired_row_order}
                             else:
-                                desired_row_order = original_row_order
+                                desired_row_order = ['noOpponent', 'direct', 'everything']
                                 row_name_dict = {'noOpponent': 'full-noop', 'direct': 'full-op', 'everything': 'full-both'}
 
-                            pivot_df = pivot_df.reindex(columns=desired_order, index=desired_row_order)
-                            mean_values_df = mean_values_df.reindex(columns=desired_order, index=desired_row_order)
+                        pivot_df = pivot_df.reindex(columns=desired_order, index=desired_row_order)
+                        mean_values_df = mean_values_df.reindex(columns=desired_order, index=desired_row_order)
 
-                            pivot_df = pivot_df.rename(index=row_name_dict)
-                            mean_values_df = mean_values_df.rename(index=row_name_dict)
+                        pivot_df = pivot_df.rename(index=row_name_dict)
+                        mean_values_df = mean_values_df.rename(index=row_name_dict)
 
-                            #row_minima = mean_values_df.min(axis=1)
-                            #mean_values_df['min'] = row_minima
-                            #pivot_df['min'] = row_minima.map("{:.2f}".format)
+                        #row_minima = mean_values_df.min(axis=1)
+                        #mean_values_df['min'] = row_minima
+                        #pivot_df['min'] = row_minima.map("{:.2f}".format)
 
-                        ax = sns.heatmap(mean_values_df, annot=pivot_df, fmt='', cmap='RdBu', linewidths=0.5, linecolor='white', vmin=0, vmax=1)
-                        ax.set_yticklabels(ax.get_yticklabels(), rotation=0)
-                        ax.set_xlabel("Test regime")
-                        ax.set_ylabel("Training dataset")
+                        quadmesh = sns.heatmap(mean_values_df, annot=pivot_df, fmt='', cmap='RdBu', linewidths=0.5, linecolor='white', vmin=0, vmax=1, cbar=False, ax=heatmap_ax)
+                        quadmesh.set_yticklabels(quadmesh.get_yticklabels(), rotation=0)
+                        quadmesh.set_xlabel("Test regime", fontsize=10)
+                        quadmesh.set_ylabel("Training dataset", fontsize=10)
 
-                        ax.hlines(9, *ax.get_xlim(), color='white', linewidth=6)
-                        ax.vlines(9, *ax.get_ylim(), color='white', linewidth=6)
+                        quadmesh.hlines(3, *quadmesh.get_xlim(), color='white', linewidth=4)
+                        quadmesh.hlines(3+9, *quadmesh.get_xlim(), color='white', linewidth=4)
+                        quadmesh.hlines(3+18, *quadmesh.get_xlim(), color='white', linewidth=4)
+                        quadmesh.vlines(9, *quadmesh.get_ylim(), color='white', linewidth=4)
 
-                        cbar = ax.collections[0].colorbar
-                        cbar.ax.set_orientation('horizontal')
+                        #ax.set_title(f"Test regime accuracy of each training dataset", fontsize=12)
 
-                        plt.title(f"Test regime accuracy of each training dataset")
+
+                        #fig.colorbar(ax.collections[0], ax=ax, orientation='vertical').remove()
+                        plt.colorbar(quadmesh.collections[0], cax=cbar_ax, orientation='horizontal', cmap='RdBu')
+                        plt.tight_layout()
+
                         plot_save_path = os.path.join(save_dir, f'{label}_{param}_{use_std}_{use_zero_op}_heatmap.png')
-                        plt.savefig(plot_save_path)
+                        print('saving fig to', plot_save_path)
+                        plt.savefig(plot_save_path, bbox_inches='tight')
                         plt.close()
 
             if param == 'test_regime':
