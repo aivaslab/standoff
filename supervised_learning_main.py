@@ -5,6 +5,8 @@ import re
 
 import sys
 import os
+import time
+
 import numpy as np
 from functools import lru_cache
 
@@ -109,7 +111,7 @@ class SaveActivations:
 
 
 def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_path='', oracle_labels=[], repetition=0,
-                   epoch_number=0, prior_metrics=[], num_activation_batches=5, use_ff=False, oracle_is_target=False, act_label_names=[]):
+                   epoch_number=0, prior_metrics=[], num_activation_batches=180, use_ff=False, oracle_is_target=False, act_label_names=[], save_labels=True):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     special_criterion = nn.CrossEntropyLoss(reduction='none')
     oracle_criterion = nn.MSELoss(reduction='none')
@@ -152,7 +154,7 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
             combined_oracle_data = np.concatenate(oracle_data, axis=-1)
             oracles.append(combined_oracle_data)
 
-        if True: # save labels for comparison with activations
+        if save_labels: # save labels for comparison with activations
             act_label_data_dict = {}
             for act_label_name in act_label_names:
                 this_label = np.load(os.path.join(dir, 'label-' + act_label_name + '.npz'))['arr_0']
@@ -230,10 +232,10 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
                         if key not in activation_data:
                             activation_data[key] = []
                         activation_data[key].append(act_label.cpu().numpy().reshape(batch_size, -1))
-                        #print(key, act_label.shape)
+                        #print('shape', key, act_label.shape)
 
                 if i == num_activation_batches - 1:
-                        handle.remove()
+                    handle.remove()# temporary! don't leave
 
                 batch_param_losses = [
                     {
@@ -262,9 +264,17 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
     os.makedirs(model_save_path, exist_ok=True)
 
     df = pd.DataFrame(param_losses_list)
+    # weak attempt at shortening the data
+    df['loss'] = df['loss'].round(4)
+    df[['small_food_selected', 'big_food_selected', 'neither_food_selected']] = \
+        df[['small_food_selected', 'big_food_selected', 'neither_food_selected']].astype(int)
+
     print('saving csv...')
     #print('cols', df.columns)
-    df.to_csv(os.path.join(model_save_path, f'param_losses_{epoch_number}_{repetition}.csv'), index=False)
+    curtime = time.time()
+    df.to_csv(os.path.join(model_save_path, f'param_losses_{epoch_number}_{repetition}.csv'), index=False, compression='gzip')
+    print('compressed write time (gzip):', time.time()-curtime)
+
     df_paths.append(os.path.join(model_save_path, f'param_losses_{epoch_number}_{repetition}.csv'))
     print('saving activations...')
     with open(os.path.join(model_save_path, f'activations_{epoch_number}_{repetition}.pkl'), 'wb') as f:
@@ -1108,19 +1118,19 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
                             if epoch == epochs - 1:
                                 last_epoch_df_paths.extend(df_paths)
             if skip_train:
-                dfs_paths = find_df_paths(save_path, 'param_losses_*_*.csv')
+                dfs_paths = find_df_paths(save_path, 'param_losses_*_*.csv.gz')
                 print('sup sess dfs paths', dfs_paths, save_path)
                 if len(dfs_paths):
                     max_epoch = max(int(path.split('_')[-2]) for path in dfs_paths)
                     last_epoch_df_paths = [path for path in dfs_paths if int(path.split('_')[-2]) == max_epoch]
 
             if not skip_calc and len(last_epoch_df_paths):
-                print('loading dfs...', dfs_paths)
+                print('loading dfs (with gzip)...', dfs_paths)
 
-                df_list = [pd.read_csv(df_path) for df_path in dfs_paths]
+                df_list = [pd.read_csv(df_path, compression='gzip') for df_path in dfs_paths]
                 combined_df = pd.concat(df_list, ignore_index=True)
 
-                last_df_list = [pd.read_csv(df_path) for df_path in last_epoch_df_paths]
+                last_df_list = [pd.read_csv(df_path, compression='gzip') for df_path in last_epoch_df_paths]
                 last_epoch_df = pd.concat(last_df_list, ignore_index=True)
                 replace_dict = {'1': 1, '0': 0}
                 combined_df.replace(replace_dict, inplace=True)

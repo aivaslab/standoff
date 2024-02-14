@@ -605,21 +605,28 @@ class RNNModel(nn.Module):
                 x_t = self.pool(F.relu(self.conv2(x_t))) if self.use_pool else F.relu(self.conv2(x_t))
 
             flattened = x_t.view(x.size(0), -1)
-            if self.oracle_layer == 1:
-                flattened = torch.cat((flattened, oracle_inputs), dim=1)
+            #if self.oracle_layer == 1:
+            #    flattened = torch.cat((flattened, oracle_inputs), dim=1)
 
             conv_outputs.append(flattened)
         x = torch.stack(conv_outputs, dim=1)
 
         out, _ = self.rnn(x)
-        outputs = self.fc_main_output(out[:, -1, :])
+
+
 
         #if not self.oracle_is_target and self.oracle_layer != 1:
         #    out = torch.cat((out, oracle_inputs), dim=-1)
         if self.oracle_is_target:
             oracle_outputs = self.fc_oracle_output(out)
             oracle_outputs = oracle_outputs.view(oracle_outputs.size(0), -1)
-            outputs = torch.cat((outputs, oracle_outputs), dim=1)
+            newout = out[:, -1, :]
+            outputs = torch.cat((self.fc_main_output(newout), oracle_outputs), dim=1)
+        else:
+            newout = out[:, -1, :]
+            outputs = torch.cat((newout, oracle_inputs), dim=1)
+
+
 
         return outputs
 

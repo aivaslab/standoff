@@ -182,6 +182,8 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
     hregime = {}
     hregime['homogeneous'] = ['sl-Tt0', 'sl-Ff0', 'sl-Nn0', 'sl-Tt1', 'sl-Ff1', 'sl-Nn1']
     #hregime['identity'] = ['sl-' + x + '0' for x in sub_regime_keys] + ['sl-Tt1', 'sl-Ff1', 'sl-Nn1']
+    sregime = {}
+    sregime['special'] = ['sl-Tt0', 'sl-Tt1', 'sl-Nt0', 'sl-Nt1', 'sl-Nf0', 'sl-Nf1', 'sl-Nn0', 'sl-Nn1']
 
     single_regimes = {k[3:]: [k] for k in all_regimes}
     leave_one_out_regimes = {}
@@ -202,7 +204,7 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
         # ('varying', 'V'),
     ]
 
-    labels = ['loc', 'vision', 'b-loc', 'target']
+    labels = ['loc', 'vision', 'b-loc', 'target', 'opponents', 'informedness']
     oracles = labels + [None]
     conf = ScenarioConfigs()
     exp_name = f'exp_{todo[0]}' if not use_ff else f'exp_{todo[0]}-f'
@@ -419,6 +421,32 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
 
         do_comparison(combined_path_list, last_path_list, key_param_list, key_param, exp_name, params, prior_metrics)
 
+    if 85 in todo:
+        print('Running experiment 85: mixed models with oracle-supplied training maybe generalize')
+
+        combined_path_list = []
+        last_path_list = []
+        key_param = 'regime'
+        key_param_list = []
+        session_params['oracle_is_target'] = False
+
+        for regime in list(mixed_regimes.keys()):
+            print('regime:', regime, 'train_sets:', mixed_regimes[regime])
+            combined_paths, last_epoch_paths = run_supervised_session(
+                save_path=os.path.join('supervised', exp_name, regime),
+                train_sets=mixed_regimes[regime],
+                eval_sets=regimes['everything'],
+                oracle_labels=['b-loc'],
+                key_param=key_param,
+                key_param_value=regime,
+                **session_params
+            )
+            last_path_list.append(last_epoch_paths)
+            combined_path_list.append(combined_paths)
+            key_param_list.append(regime)
+
+        do_comparison(combined_path_list, last_path_list, key_param_list, key_param, exp_name, params, prior_metrics)
+
 
     if 56 in todo:
         print('Running experiment 56: odd-one-out')
@@ -562,6 +590,8 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
 
         do_comparison(combined_path_list, last_path_list, key_param_list, key_param, exp_name, params, prior_metrics)
 
+
+
     if 60 in todo:
         print('Running experiment 59: homogeneous with b-loc')
 
@@ -588,6 +618,58 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
 
         do_comparison(combined_path_list, last_path_list, key_param_list, key_param, exp_name, params, prior_metrics)
 
+    if 61 in todo:
+        print('Running experiment 59: homogeneous with b-loc (supplied)')
+
+        combined_path_list = []
+        last_path_list = []
+        key_param = 'regime'
+        key_param_list = []
+        session_params['oracle_is_target'] = True
+
+        for regime in list(hregime.keys()):
+            print('regime:', regime, 'train_sets:', hregime[regime])
+            combined_paths, last_epoch_paths = run_supervised_session(
+                save_path=os.path.join('supervised', exp_name, regime),
+                train_sets=hregime[regime],
+                eval_sets=regimes['everything'],
+                oracle_labels=['b-loc'],
+                key_param=key_param,
+                key_param_value=regime,
+                **session_params
+            )
+            last_path_list.append(last_epoch_paths)
+            combined_path_list.append(combined_paths)
+            key_param_list.append(regime)
+
+        do_comparison(combined_path_list, last_path_list, key_param_list, key_param, exp_name, params, prior_metrics)
+
+    if 62 in todo:
+        print('Running experiment 62: special')
+
+        combined_path_list = []
+        last_path_list = []
+        key_param = 'regime'
+        key_param_list = []
+        session_params['oracle_is_target'] = False
+
+        for regime in list(sregime.keys()):
+            print('regime:', regime, 'train_sets:', sregime[regime])
+            combined_paths, last_epoch_paths = run_supervised_session(
+                save_path=os.path.join('supervised', exp_name, regime),
+                train_sets=sregime[regime],
+                eval_sets=regimes['everything'],
+                oracle_labels=[None],
+                key_param=key_param,
+                key_param_value=regime,
+                **session_params
+            )
+            last_path_list.append(last_epoch_paths)
+            combined_path_list.append(combined_paths)
+            key_param_list.append(regime)
+
+        do_comparison(combined_path_list, last_path_list, key_param_list, key_param, exp_name, params, prior_metrics)
+
 if __name__ == '__main__':
-    experiments(['s'], repetitions=3, epochs=50, skip_train=True, skip_eval=True, skip_calc=True, skip_activations=True,
+    experiments([85], repetitions=1, epochs=50, skip_train=False, skip_eval=False, skip_calc=False, skip_activations=True,
                 batch_size=256, desired_evals=1, use_ff=False)
