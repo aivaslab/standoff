@@ -757,7 +757,6 @@ def save_key_param_figures(save_dir, key_param_stats, oracle_stats, key_param, k
 
             if stat_dict is None:
                 continue
-            print(param, 'ddd', stat_dict , 'shouldnt be none here')
             df_list = df_list_from_stat_dict(stat_dict, param)
 
             df = pd.DataFrame(df_list, columns=[key_param, param, "accuracy mean", "accuracy std"])

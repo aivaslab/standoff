@@ -176,6 +176,7 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
         'inputs': [],
         'labels': [],
         'oracles': [],
+        'pred': [],
     }
 
     for idx, _val_loader in enumerate(test_loaders):
@@ -223,6 +224,7 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
                     activation_data['activations_hidden_long'].append(
                         hook.activations_hidden[1].cpu().reshape(batch_size, -1))
                     activation_data['inputs'].append(inputs.cpu().numpy().reshape(batch_size, -1))
+                    activation_data['pred'].append(pred.numpy().reshape(batch_size, -1))
                     activation_data['labels'].append(labels.cpu().numpy().reshape(batch_size, -1))
                     activation_data['oracles'].append(oracles.cpu().numpy().reshape(batch_size, -1))
 
@@ -1118,7 +1120,7 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
                             if epoch == epochs - 1:
                                 last_epoch_df_paths.extend(df_paths)
             if skip_train:
-                dfs_paths = find_df_paths(save_path, 'param_losses_*_*.csv.gz')
+                dfs_paths = find_df_paths(save_path, 'param_losses_*_*.csv') #use  .csv.gz? I'm not sure why it sometimes wants this but sometimes not.
                 print('sup sess dfs paths', dfs_paths, save_path)
                 if len(dfs_paths):
                     max_epoch = max(int(path.split('_')[-2]) for path in dfs_paths)

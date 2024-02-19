@@ -554,6 +554,7 @@ class RNNModel(nn.Module):
         self.input_frames = 5
 
 
+
         self.oracle_layer = oracle_layer
         self.oracle_is_target = oracle_is_target
         self.is_fc = is_fc
@@ -624,9 +625,7 @@ class RNNModel(nn.Module):
             outputs = torch.cat((self.fc_main_output(newout), oracle_outputs), dim=1)
         else:
             newout = out[:, -1, :]
-            outputs = torch.cat((newout, oracle_inputs), dim=1)
-
-
+            outputs = self.fc_main_output(torch.cat((newout, oracle_inputs), dim=1))
 
         return outputs
 

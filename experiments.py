@@ -97,11 +97,12 @@ def load_dataframes(combined_path_list, value_names, key_param):
 
     replace_dict = {'1': 1, '0': 0}
     tq = tqdm.trange(len(combined_path_list))
+    print(combined_path_list)
     for df_paths, value_name in zip(combined_path_list, value_names):
         for df_path in df_paths:
             repetition = int(df_path.split('_')[-1][:1])
             #note that this only supports single digits
-            chunks = pd.read_csv(df_path, chunksize=10000)
+            chunks = pd.read_csv(df_path, chunksize=10000, compression='gzip')
             for chunk in chunks:
                 chunk.replace(replace_dict, inplace=True)
                 chunk['test_regime'] = chunk.apply(
@@ -671,5 +672,5 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
         do_comparison(combined_path_list, last_path_list, key_param_list, key_param, exp_name, params, prior_metrics)
 
 if __name__ == '__main__':
-    experiments([85], repetitions=1, epochs=50, skip_train=False, skip_eval=False, skip_calc=False, skip_activations=True,
+    experiments([59], repetitions=1, epochs=50, skip_train=True, skip_eval=True, skip_calc=True, skip_activations=False,
                 batch_size=256, desired_evals=1, use_ff=False)
