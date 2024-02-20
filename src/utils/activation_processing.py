@@ -415,7 +415,7 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=5):
                                 input_data = correlation_data2[key1]
                             for j, key2 in enumerate(keys):
                                 if compose:
-                                    input_data = np.concatenate(correlation_data2[key1], correlation_data2[key2])
+                                    input_data = np.concatenate([correlation_data2[key1], correlation_data2[key2]], axis=1)
                                     output_data = correlation_data2["labels"]
                                 else:
                                     output_data = correlation_data2[key2]
@@ -440,6 +440,16 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=5):
                 plt.ylabel('Input')
                 plt.tight_layout()
                 plt.savefig(os.path.join(path, f"f2f-{model_type}.png"))
+
+                val_loss_matrix = np.load(os.path.join(path, f"ff2l_loss_matrix_{model_type}.npy"))
+                plt.figure(figsize=(12, 8))
+                sns.heatmap(val_loss_matrix, annot=True, fmt=".2f", cmap="coolwarm",
+                            xticklabels=keys, yticklabels=keys1, vmin=0, vmax=0.25)
+                plt.title('FF2L Validation MSE')
+                plt.xlabel('Input2')
+                plt.ylabel('Input1')
+                plt.tight_layout()
+                plt.savefig(os.path.join(path, f"ff2l-{model_type}.png"))
 
             matrices = {model: np.load(os.path.join(path, f"val_loss_matrix_{model}.npy")) for model in models}
             for i, model1 in enumerate(models):
