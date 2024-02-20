@@ -389,7 +389,7 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=5):
             activation_keys = ['activations_out']#, 'activations_hidden_short', 'activations_hidden_long']
 
             # MLP F2F DATA
-            run = True
+            run = False
             models = ['linear', 'mlp1', 'mlp2', 'lstm']
             compose = True
 
@@ -431,36 +431,63 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=5):
                         np.save(os.path.join(path, f"f2f_loss_matrix_{model_type}.npy"), val_loss_matrix)
 
             for model_type in models:
+
+                keys = sorted(correlation_data2.keys())
+                size = len(keys)
+                if model_type == "lstm":
+                    keys1 = correlation_data_lstm.keys()
+                else:
+                    keys1 = keys
+
                 val_loss_matrix = np.load(os.path.join(path, f"f2f_loss_matrix_{model_type}.npy"))
                 plt.figure(figsize=(12, 8))
                 sns.heatmap(val_loss_matrix, annot=True, fmt=".2f", cmap="coolwarm",
                             xticklabels=keys, yticklabels=keys1, vmin=0, vmax=0.25)
-                plt.title('F2F Validation MSE')
+                plt.title(f'{model_type} Validation MSE')
                 plt.xlabel('Target')
                 plt.ylabel('Input')
                 plt.tight_layout()
                 plt.savefig(os.path.join(path, f"f2f-{model_type}.png"))
 
+                if model_type == "lstm":
+                    continue
                 val_loss_matrix = np.load(os.path.join(path, f"ff2l_loss_matrix_{model_type}.npy"))
                 plt.figure(figsize=(12, 8))
                 sns.heatmap(val_loss_matrix, annot=True, fmt=".2f", cmap="coolwarm",
                             xticklabels=keys, yticklabels=keys1, vmin=0, vmax=0.25)
-                plt.title('FF2L Validation MSE')
+                plt.title(f'{model_type} FF2L Validation MSE')
                 plt.xlabel('Input2')
                 plt.ylabel('Input1')
                 plt.tight_layout()
                 plt.savefig(os.path.join(path, f"ff2l-{model_type}.png"))
 
-            matrices = {model: np.load(os.path.join(path, f"val_loss_matrix_{model}.npy")) for model in models}
+            matrices = {model: np.load(os.path.join(path, f"f2f_loss_matrix_{model}.npy")) for model in models}
             for i, model1 in enumerate(models):
                 for j, model2 in enumerate(models):
                     if j <= i:  # This ensures we only consider each pair once, avoiding redundancy
                         continue
-                    val_loss_matrix = matrices[model2] - matrices[model1]
+
+                    keys = sorted(correlation_data2.keys())
+                    if model1 == "lstm" or model2 == "lstm":
+                        keys1 = sorted(correlation_data_lstm.keys())
+                    else:
+                        keys1 = keys
+
+                    val_loss_matrix_full = np.full((len(keys), len(keys)), np.nan)
+                    shared_keys_indices = [keys.index(key) for key in keys1]
+                    all_indices = [keys.index(key) for key in keys]
+                    lstm_keys_indices = [keys1.index(key) for key in keys1]
+
+                    for idx1, ldx1 in zip(shared_keys_indices, lstm_keys_indices):
+                        for idx2 in all_indices:
+                            if keys[idx1] in keys1:
+                                model1_index = ldx1 if model1 == "lstm" else idx1
+                                model2_index = ldx1 if model2 == "lstm" else idx1
+                                val_loss_matrix_full[idx1, idx2] = matrices[model2][model2_index, idx2] - matrices[model1][model1_index, idx2]
                     plt.figure(figsize=(12, 8))
-                    sns.heatmap(val_loss_matrix, annot=True, fmt=".2f", cmap="coolwarm",
-                                xticklabels=keys, yticklabels=keys1, vmin=0, vmax=0.25)
-                    plt.title('F2F Validation MSE')
+                    sns.heatmap(val_loss_matrix_full, annot=True, fmt=".2f", cmap="coolwarm_r",
+                                xticklabels=keys, yticklabels=keys, vmin=-0.06, vmax=0.06)
+                    plt.title(f'F2F Validation MSE ({model2} - {model1})')
                     plt.xlabel('Target')
                     plt.ylabel('Input')
                     plt.tight_layout()
