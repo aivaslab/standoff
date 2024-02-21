@@ -455,7 +455,7 @@ class MiniStandoffEnv(para_MultiGridEnv):
                     self.infos['p_0']['firstBaitReward'] = arg
             self.put_obj(obj, int(x), y)
             self.objs_to_hide.append(obj)
-            self.box_updated_this_timestep[event[2]] = True
+            self.box_updated_this_timestep[int(event[2])] = True
         elif name == "rem":
             x = event[1] + 1
             tile = self.grid.get(x, y)
@@ -466,7 +466,7 @@ class MiniStandoffEnv(para_MultiGridEnv):
                     self.small_food_locations.append(-1)
                     # this is a special case of removedUninformed1 where there is no correct solution.
             self.del_obj(x, y)
-            self.box_updated_this_timestep[event[1]] = True
+            self.box_updated_this_timestep[int(event[1])] = True
         elif name == "ob" or name == "re":
             #b = self.grid.get(*self.agent_door_pos[arg]) if arg in self.agent_door_pos.keys() else self.grid.get(3, self.height-3) # default for obscuring when no opponent
             # above line was used for hiding all doors

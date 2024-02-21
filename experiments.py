@@ -672,5 +672,5 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
         do_comparison(combined_path_list, last_path_list, key_param_list, key_param, exp_name, params, prior_metrics)
 
 if __name__ == '__main__':
-    experiments([59], repetitions=1, epochs=50, skip_train=True, skip_eval=True, skip_calc=True, skip_activations=False,
+    experiments([0], repetitions=1, epochs=50, skip_train=True, skip_eval=True, skip_calc=True, skip_activations=False,
                 batch_size=256, desired_evals=1, use_ff=False)

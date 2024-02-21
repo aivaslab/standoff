@@ -331,12 +331,14 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=5):
 
             keys_to_process = ['activations_out', 'activations_hidden_short', 'activations_hidden_long']
 
+            skip_model_dependent = True
 
             for key in keys_to_process:
                 if key in loaded_activation_data:
                     concatenated_array = np.concatenate(loaded_activation_data[key], axis=0)
                     correlation_data[key] = concatenated_array
-                    correlation_data2[key] = concatenated_array
+                    if not skip_model_dependent:
+                        correlation_data2[key] = concatenated_array
                     print(f'{key} shape:', concatenated_array.shape)
                     length = concatenated_array.shape[0]
 
@@ -344,6 +346,8 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=5):
             for key in keys_to_process2:
                 if key in loaded_activation_data:
                     if key == "pred":
+                        if skip_model_dependent:
+                            continue
                         arrays = []
                         for index in range(len(loaded_activation_data[key])):
                             data_array = np.array(loaded_activation_data[key][index]).astype(int)
@@ -374,7 +378,8 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=5):
                         else:
                             arrays.append(data_array[:, -(a_len // timesteps):])
                             hist_arrays.append(data_array[:, :])
-                    correlation_data2[new_key] = np.concatenate(arrays, axis=0)
+                    if key != "act_label_vision":
+                        correlation_data2[new_key] = np.concatenate(arrays, axis=0)
                     if key != "act_label_opponents" and key != "act_label_informedness":
                         correlation_data2[new_key + "_h"] = np.concatenate(hist_arrays, axis=0)
                         value = correlation_data2[new_key + "_h"]
