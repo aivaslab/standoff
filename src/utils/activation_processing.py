@@ -380,12 +380,12 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=5):
                             hist_arrays.append(data_array[:, :])
                     if key != "act_label_vision":
                         correlation_data2[new_key] = np.concatenate(arrays, axis=0)
+                        print('cor2shape', new_key, correlation_data2[new_key].shape)
                     if key != "act_label_opponents" and key != "act_label_informedness":
                         correlation_data2[new_key + "_h"] = np.concatenate(hist_arrays, axis=0)
                         value = correlation_data2[new_key + "_h"]
                         correlation_data_lstm[new_key + "_h"] = value.reshape(value.shape[0], 5, value.shape[1] // 5)
                         print('corlstmshape', new_key, correlation_data_lstm[new_key + "_h"].shape)
-                    print('cor2shape', new_key, correlation_data2[new_key].shape)
 
             correlation_data2["rand_vec5"] = np.random.randint(2, size=(length, 5))
             #pred_d = correlation_data2["pred"]
@@ -395,9 +395,9 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=5):
 
             # MLP F2F DATA
             run = True
-            #models = ['linear', 'mlp1', 'mlp2', 'lstm']
-            models = ['lstm']
-            compose = True
+            models = ['linear', 'mlp1', 'mlp2', 'lstm']
+            #models = ['lstm']
+            compose = False
 
             if run:
                 for model_type in models:
