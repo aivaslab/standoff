@@ -457,6 +457,7 @@ class para_MultiGridEnv(ParallelEnv):
         These attributes should not be changed after initialization.
         """
 
+        self.box_updated_this_timestep = None
         self.record_oracle_labels = False
         self.supervised_model = supervised_model
         self.past_observations = None
@@ -840,6 +841,8 @@ class para_MultiGridEnv(ParallelEnv):
         And any internal state used by observe() or render()
         '''
 
+        # reset box update vector
+        self.box_updated_this_timestep = [False for _ in range(self.boxes)]
         # activate timed events
         if str(self.step_count) in self.timers.keys():
             for event in self.timers[str(self.step_count)]:
@@ -1118,7 +1121,16 @@ class para_MultiGridEnv(ParallelEnv):
             one_hot_goal = [0] * self.boxes
             if self.params['num_puppets'] > 0:
                 one_hot_goal[self.agent_goal[target_agent]] = 1
-            self.infos['p_0']["target"] = one_hot_goal
+            self.infos['p_0']["target-loc"] = one_hot_goal
+            self.infos['p_0']["target-size"] = [self.infos['p_0']['shouldAvoidSmall'], self.infos['p_0']['shouldAvoidBig']]
+            self.infos['p_0']["box-updated"] = self.box_updated_this_timestep
+
+            if not self.currently_visible:
+                for i in range(self.boxes):
+                    if self.box_updated_this_timestep[i]:
+                        self.saw_last_update[i] = False
+
+            self.infos['p_0']["saw-last-update"] = self.saw_last_update
             self.infos['p_0']["vision"] = int(self.currently_visible)
             real_boxes = [self.grid.get(box + 1, y) for box in range(self.boxes)]
 

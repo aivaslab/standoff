@@ -389,18 +389,19 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=5):
             activation_keys = ['activations_out']#, 'activations_hidden_short', 'activations_hidden_long']
 
             # MLP F2F DATA
-            run = False
-            models = ['linear', 'mlp1', 'mlp2', 'lstm']
+            run = True
+            #models = ['linear', 'mlp1', 'mlp2', 'lstm']
+            models = ['lstm']
             compose = True
 
             if run:
                 for model_type in models:
-                    if compose and model_type == "lstm":
-                        continue
+                    #if compose and model_type == "lstm":
+                    #    continue
                     keys = sorted(correlation_data2.keys())
                     size = len(keys)
                     if model_type == "lstm":
-                        keys1 = correlation_data_lstm.keys()
+                        keys1 = sorted(correlation_data_lstm.keys())
                         size1 = len(keys1)
                     else:
                         size1 = size
@@ -411,18 +412,25 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=5):
                         for i, key1 in enumerate(keys1):
                             if model_type == "lstm":
                                 input_data = correlation_data_lstm[key1]
+                                realkeys = keys1
                             else:
                                 input_data = correlation_data2[key1]
-                            for j, key2 in enumerate(keys):
+                                realkeys = keys
+                            for j, key2 in enumerate(realkeys):
                                 if compose:
-                                    input_data = np.concatenate([correlation_data2[key1], correlation_data2[key2]], axis=1)
+                                    if model_type == "lstm":
+                                        if key2 not in keys1:
+                                            continue
+                                        input_data = np.concatenate([correlation_data_lstm[key1], correlation_data_lstm[key2]], axis=2)
+                                    else:
+                                        input_data = np.concatenate([correlation_data2[key1], correlation_data2[key2]], axis=1)
                                     output_data = correlation_data2["labels"]
                                 else:
                                     output_data = correlation_data2[key2]
                                 assert input_data.shape[0] == output_data.shape[0]
-                                print(key1, key2, input_data.shape)
                                 val_loss, train_losses, val_losses, val_losses_indy = train_mlp(input_data, output_data, num_epochs=25, model_type=model_type)
                                 val_loss_matrix[i, j] = val_loss
+                                print(key1, key2, input_data.shape, val_loss)
                                 pbar.update(1)
 
                     if compose:
@@ -435,7 +443,7 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=5):
                 keys = sorted(correlation_data2.keys())
                 size = len(keys)
                 if model_type == "lstm":
-                    keys1 = correlation_data_lstm.keys()
+                    keys1 = sorted(correlation_data_lstm.keys())
                 else:
                     keys1 = keys
 
@@ -449,12 +457,15 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=5):
                 plt.tight_layout()
                 plt.savefig(os.path.join(path, f"f2f-{model_type}.png"))
 
-                if model_type == "lstm":
-                    continue
+
                 val_loss_matrix = np.load(os.path.join(path, f"ff2l_loss_matrix_{model_type}.npy"))
+                order = keys1
+                if model_type == "lstm":
+                    order = ['b-loc_h', 'loc_h', 'target_h', 'vision_h']
+                    order_indices = [keys1.index(label) for label in order]
+                    val_loss_matrix = val_loss_matrix[:, :4][np.ix_(order_indices, order_indices)]
                 plt.figure(figsize=(12, 8))
-                sns.heatmap(val_loss_matrix, annot=True, fmt=".2f", cmap="coolwarm",
-                            xticklabels=keys, yticklabels=keys1, vmin=0, vmax=0.25)
+                sns.heatmap(val_loss_matrix, annot=True, fmt=".2f", cmap="coolwarm",xticklabels=keys if model_type != "lstm" else order, yticklabels=order, vmin=0, vmax=0.25)
                 plt.title(f'{model_type} FF2L Validation MSE')
                 plt.xlabel('Input2')
                 plt.ylabel('Input1')
@@ -485,7 +496,7 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=5):
                                 model2_index = ldx1 if model2 == "lstm" else idx1
                                 val_loss_matrix_full[idx1, idx2] = matrices[model2][model2_index, idx2] - matrices[model1][model1_index, idx2]
                     plt.figure(figsize=(12, 8))
-                    sns.heatmap(val_loss_matrix_full, annot=True, fmt=".2f", cmap="coolwarm_r",
+                    sns.heatmap(val_loss_matrix_full, annot=True, fmt=".2f", cmap="coolwarm",
                                 xticklabels=keys, yticklabels=keys, vmin=-0.06, vmax=0.06)
                     plt.title(f'F2F Validation MSE ({model2} - {model1})')
                     plt.xlabel('Target')

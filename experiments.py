@@ -205,7 +205,7 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
         # ('varying', 'V'),
     ]
 
-    labels = ['loc', 'vision', 'b-loc', 'target', 'opponents', 'informedness']
+    labels = ['loc', 'vision', 'b-loc', 'b-exist', 'exist', 'box-updated', 'saw-last-update', 'target-loc', 'target-size', 'opponents', 'informedness']
     oracles = labels + [None]
     conf = ScenarioConfigs()
     exp_name = f'exp_{todo[0]}' if not use_ff else f'exp_{todo[0]}-f'

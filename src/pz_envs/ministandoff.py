@@ -121,6 +121,7 @@ class MiniStandoffEnv(para_MultiGridEnv):
         """
         self.agent_goal, self.last_seen_reward, self.can_see, self.best_reward = {}, {}, {}, {}
         boxes = self.params["boxes"]
+        self.saw_last_update = [True for _ in range(boxes)]
         for agent in self.agents_and_puppets():
             self.agent_goal[agent] = 2 #self.deterministic_seed % boxes if self.deterministic else random.choice(range(boxes))
             self.best_reward[agent] = -100
@@ -228,6 +229,7 @@ class MiniStandoffEnv(para_MultiGridEnv):
 
         self.reset_vision()
 
+        self.box_updated_this_timestep = [False for _ in range(boxes)]
         ## Bucket location allocation for timers
         empty_buckets = [i for i in range(boxes)]
         event_args = [None for _ in range(len(events))]
@@ -453,6 +455,7 @@ class MiniStandoffEnv(para_MultiGridEnv):
                     self.infos['p_0']['firstBaitReward'] = arg
             self.put_obj(obj, int(x), y)
             self.objs_to_hide.append(obj)
+            self.box_updated_this_timestep[event[2]] = True
         elif name == "rem":
             x = event[1] + 1
             tile = self.grid.get(x, y)
@@ -463,6 +466,7 @@ class MiniStandoffEnv(para_MultiGridEnv):
                     self.small_food_locations.append(-1)
                     # this is a special case of removedUninformed1 where there is no correct solution.
             self.del_obj(x, y)
+            self.box_updated_this_timestep[event[1]] = True
         elif name == "ob" or name == "re":
             #b = self.grid.get(*self.agent_door_pos[arg]) if arg in self.agent_door_pos.keys() else self.grid.get(3, self.height-3) # default for obscuring when no opponent
             # above line was used for hiding all doors
@@ -484,6 +488,8 @@ class MiniStandoffEnv(para_MultiGridEnv):
             e2 = int(event[2])
             b1 = self.grid.get(e1 + 1, y)
             b2 = self.grid.get(e2 + 1, y)
+            self.box_updated_this_timestep[e1] = True
+            self.box_updated_this_timestep[e2] = True
             if self.use_box_colors:
                 self.put_obj(b2, e1 + 1, y)
                 self.put_obj(b1, e2 + 1, y)
