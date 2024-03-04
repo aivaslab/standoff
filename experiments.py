@@ -95,10 +95,13 @@ def informedness_to_str(informedness_list):
 def load_dataframes(combined_path_list, value_names, key_param):
     df_list = []
 
+    print('loading and assigning key param', key_param)
+
     replace_dict = {'1': 1, '0': 0}
     tq = tqdm.trange(len(combined_path_list))
     print(combined_path_list)
     for df_paths, value_name in zip(combined_path_list, value_names):
+        print('value name', value_name)
         for df_path in df_paths:
             repetition = int(df_path.split('_')[-1][:1])
             #note that this only supports single digits
@@ -152,7 +155,7 @@ def do_comparison(combined_path_list, last_path_list, key_param_list, key_param,
                  key_param=key_param, delta_sum=delta_sum, delta_x=delta_x)
 
 
-def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, batch_size=64, desired_evals=5,
+def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, skip_calc=False, batch_size=64, desired_evals=5,
                 use_ff=False, skip_eval=False, skip_activations=False):
     """What is the overall performance of naive, off-the-shelf models on this task? Which parameters of competitive
     feeding settings are the most sensitive to overall model performance? To what extent are different models
@@ -212,6 +215,7 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
     session_params = {
         'repetitions': repetitions,
         'epochs': epochs,
+        'batches': batches,
         'skip_train': skip_train,
         'skip_eval': skip_eval,
         'batch_size': batch_size,
@@ -671,6 +675,66 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
 
         do_comparison(combined_path_list, last_path_list, key_param_list, key_param, exp_name, params, prior_metrics)
 
+    if 63 in todo:
+        print('Running experiment 63: homogeneous with varied oracles and oracle types')
+
+        combined_path_list = []
+        last_path_list = []
+        key_param = 'oracle'
+        key_param_list = []
+        regime = 'homogeneous'
+
+        for oracle_label in ['', 'b-loc', 'loc', 'target-loc', 'target-size', 'b-exist']:
+            oracle_types = ['target', 'linear', 'early'] if oracle_label != '' else ['']
+            for oracle_type in oracle_types:
+                session_params['oracle_is_target'] = True if oracle_type == 'target' else False
+                this_name = oracle_label + '_' + oracle_type
+                print('regime:', regime, 'train_sets:', hregime[regime])
+                combined_paths, last_epoch_paths = run_supervised_session(
+                    save_path=os.path.join('supervised', exp_name, this_name),
+                    train_sets=hregime[regime],
+                    eval_sets=regimes['everything'],
+                    oracle_labels=[oracle_label] if oracle_label != '' else [],
+                    key_param=key_param,
+                    key_param_value=this_name,
+                    **session_params
+                )
+                last_path_list.append(last_epoch_paths)
+                combined_path_list.append(combined_paths)
+                key_param_list.append(this_name)
+
+        do_comparison(combined_path_list, last_path_list, key_param_list, key_param, exp_name, params, prior_metrics)
+
+    if 64 in todo:
+        print('Running experiment 64: tt with varied oracles and oracle types')
+
+        combined_path_list = []
+        last_path_list = []
+        key_param = 'oracle'
+        key_param_list = []
+        regime = 'Tt'
+
+        for oracle_label in ['b-loc', 'loc', 'target-loc', 'target-size', 'b-exist']:
+            oracle_types = ['linear', 'early'] if oracle_label != '' else ['']
+            for oracle_type in oracle_types:
+                session_params['oracle_is_target'] = True if oracle_type == 'target' else False
+                this_name = oracle_label + '_' + oracle_type
+                print('regime:', regime, 'train_sets:', mixed_regimes[regime])
+                combined_paths, last_epoch_paths = run_supervised_session(
+                    save_path=os.path.join('supervised', exp_name, this_name),
+                    train_sets=mixed_regimes[regime],
+                    eval_sets=regimes['everything'],
+                    oracle_labels=[oracle_label] if oracle_label != '' else [],
+                    key_param=key_param,
+                    key_param_value=this_name,
+                    **session_params
+                )
+                last_path_list.append(last_epoch_paths)
+                combined_path_list.append(combined_paths)
+                key_param_list.append(this_name)
+
+        do_comparison(combined_path_list, last_path_list, key_param_list, key_param, exp_name, params, prior_metrics)
+
 if __name__ == '__main__':
-    experiments([0], repetitions=1, epochs=50, skip_train=True, skip_eval=True, skip_calc=True, skip_activations=False,
+    experiments([59], repetitions=1, batches=10000, skip_train=True, skip_eval=True, skip_calc=True, skip_activations=False,
                 batch_size=256, desired_evals=1, use_ff=False)

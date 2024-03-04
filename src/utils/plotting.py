@@ -699,10 +699,11 @@ def save_key_param_figures(save_dir, key_param_stats, oracle_stats, key_param, k
     print('saving key param figures', this_save_dir)
 
     n_groups = len(list(key_param_stats.keys()))
+    print('key param keys', key_param_stats.keys())
 
     for param in list(next(iter(key_param_stats.values())).keys()):
 
-
+        print('trying param', param)
         labels = list(key_param_stats.keys())
         param_vals = list(key_param_stats[next(iter(key_param_stats))][param]['mean'].keys())
         bar_width = 0.8 / len(param_vals)
@@ -796,34 +797,37 @@ def save_key_param_figures(save_dir, key_param_stats, oracle_stats, key_param, k
 
                         original_row_order = pivot_df.index.tolist()
 
+                        use_special_rows = False
+
                         use_many_rows = True
-                        if use_many_rows:
-                            single_rows = ['Tt0', 'Tf0', 'Tn0', 'Ft0', 'Ff0', 'Fn0', 'Nt0', 'Nf0', 'Nn0', 'Tt1', 'Tf1', 'Tn1', 'Ft1', 'Ff1', 'Fn1', 'Nt1', 'Nf1', 'Nn1']
-                            contrast_rows = ['Tt', 'Tf', 'Tn', 'Ft', 'Ff', 'Fn', 'Nt', 'Nf', 'Nn']
-                            desired_row_order = ['noOpponent', 'direct', 'everything']
-                            desired_row_order.extend(single_rows)
-                            row_name_dict = {x: 'contrast-' + x for x in contrast_rows}
-                            desired_row_order.extend(contrast_rows)
-                            row_name_dict.update({x: 'single-' + x for x in single_rows})
-                            desired_row_order.extend(['homogeneous'])
-                            row_name_dict.update({'noOpponent': 'full-noop', 'direct': 'full-op', 'everything': 'full-both', 'homogeneous': 'homogeneous'})
-                        else:
-                            if 'Tt' in original_row_order:
-                                desired_row_order = ['Tt', 'Tf', 'Tn', 'Ft', 'Ff', 'Fn', 'Nt', 'Nf', 'Nn']
-                                row_name_dict = {x: 'contrast-' + x for x in desired_row_order}
-
-                            elif 'Tt0' in original_row_order:
-                                desired_row_order = desired_order
-                                row_name_dict = {x: 'single-' + x for x in desired_row_order}
-                            else:
+                        if use_special_rows:
+                            if use_many_rows:
+                                single_rows = ['Tt0', 'Tf0', 'Tn0', 'Ft0', 'Ff0', 'Fn0', 'Nt0', 'Nf0', 'Nn0', 'Tt1', 'Tf1', 'Tn1', 'Ft1', 'Ff1', 'Fn1', 'Nt1', 'Nf1', 'Nn1']
+                                contrast_rows = ['Tt', 'Tf', 'Tn', 'Ft', 'Ff', 'Fn', 'Nt', 'Nf', 'Nn']
                                 desired_row_order = ['noOpponent', 'direct', 'everything']
-                                row_name_dict = {'noOpponent': 'full-noop', 'direct': 'full-op', 'everything': 'full-both'}
+                                desired_row_order.extend(single_rows)
+                                row_name_dict = {x: 'contrast-' + x for x in contrast_rows}
+                                desired_row_order.extend(contrast_rows)
+                                row_name_dict.update({x: 'single-' + x for x in single_rows})
+                                desired_row_order.extend(['homogeneous'])
+                                row_name_dict.update({'noOpponent': 'full-noop', 'direct': 'full-op', 'everything': 'full-both', 'homogeneous': 'homogeneous'})
+                            else:
+                                if 'Tt' in original_row_order:
+                                    desired_row_order = ['Tt', 'Tf', 'Tn', 'Ft', 'Ff', 'Fn', 'Nt', 'Nf', 'Nn']
+                                    row_name_dict = {x: 'contrast-' + x for x in desired_row_order}
 
-                        pivot_df = pivot_df.reindex(columns=desired_order, index=desired_row_order)
-                        mean_values_df = mean_values_df.reindex(columns=desired_order, index=desired_row_order)
+                                elif 'Tt0' in original_row_order:
+                                    desired_row_order = desired_order
+                                    row_name_dict = {x: 'single-' + x for x in desired_row_order}
+                                else:
+                                    desired_row_order = ['noOpponent', 'direct', 'everything']
+                                    row_name_dict = {'noOpponent': 'full-noop', 'direct': 'full-op', 'everything': 'full-both'}
 
-                        pivot_df = pivot_df.rename(index=row_name_dict)
-                        mean_values_df = mean_values_df.rename(index=row_name_dict)
+                            pivot_df = pivot_df.reindex(columns=desired_order, index=desired_row_order)
+                            mean_values_df = mean_values_df.reindex(columns=desired_order, index=desired_row_order)
+
+                            pivot_df = pivot_df.rename(index=row_name_dict)
+                            mean_values_df = mean_values_df.rename(index=row_name_dict)
 
                         #row_minima = mean_values_df.min(axis=1)
                         #mean_values_df['min'] = row_minima

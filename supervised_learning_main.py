@@ -111,7 +111,8 @@ class SaveActivations:
 
 
 def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_path='', oracle_labels=[], repetition=0,
-                   epoch_number=0, prior_metrics=[], num_activation_batches=180, use_ff=False, oracle_is_target=False, act_label_names=[], save_labels=True):
+                   epoch_number=0, prior_metrics=[], num_activation_batches=180, use_ff=False, oracle_is_target=False, act_label_names=[], save_labels=True,
+                   oracle_early=False):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     special_criterion = nn.CrossEntropyLoss(reduction='none')
     oracle_criterion = nn.MSELoss(reduction='none')
@@ -296,6 +297,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
     batch_size = model_kwargs['batch_size']
     lr = model_kwargs['lr']
 
+
     for data_name in train_sets:
         dir = os.path.join(load_path, data_name)
         data.append(np.load(os.path.join(dir, 'obs.npz'), mmap_mode='r')['arr_0'])
@@ -322,6 +324,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
         test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=0)
 
     model_kwargs['oracle_len'] = 0 if len(oracle_labels) == 0 else len(train_dataset.oracles_list[0][0])
+    print('oracle length:', model_kwargs['oracle_len'])
     model_kwargs['output_len'] = 5  # np.prod(labels.shape[1:])
     model_kwargs['channels'] = 5  # np.prod(params.shape[2])
     model_kwargs['oracle_is_target'] = oracle_is_target
@@ -344,8 +347,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
 
     num_epochs = epochs
 
-    t = tqdm.trange(num_epochs * len(train_loader))
-    avg_epoch_loss = 100
+    t = tqdm.trange(batches)
 
     iter_loader = iter(train_loader)
 
@@ -358,6 +360,8 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
             inputs, target_labels, _, oracles, _ = next(iter_loader)
         inputs, target_labels, oracles = inputs.to(device), target_labels.to(device), oracles.to(device)
         if not oracle_is_target:
+            drop_mask = torch.bernoulli(0.5 * torch.ones_like(oracles)).to(device)
+            oracles = oracles * drop_mask
             outputs = model(inputs, oracles)
             loss = criterion(outputs, torch.argmax(target_labels, dim=1))
         else:
@@ -1073,8 +1077,8 @@ def find_df_paths(directory, file_pattern):
 def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, eval_sets=None,
                            load_path='supervised', oracle_labels=[], skip_train=True, batch_size=64,
                            prior_metrics=[], key_param=None, key_param_value=None, save_every=1, skip_calc=True,
-                           use_ff=False, oracle_layer=0, skip_eval=False, oracle_is_target=True, skip_figures=True,
-                           act_label_names=[], skip_activations=True):
+                           use_ff=False, oracle_early=False, skip_eval=False, oracle_is_target=True, skip_figures=True,
+                           act_label_names=[], skip_activations=True, batches=5000):
 
     '''
     Runs a session of supervised learning. Different steps, such as whether we train+save models, evaluate models, or run statistics on evaluations, are optional.
@@ -1087,12 +1091,11 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
     test_names = []
 
     num_random_tests = 1
-    lr = 0.002
 
     test = 0
     while test < num_random_tests:
         try:
-            model_kwargs = {"hidden_size": 32, "num_layers": 3, "kernels": 16, "kernel_size1": 3, "kernel_size2": 5, "stride1": 1, "pool_kernel_size": 3, "pool_stride": 1, "padding1": 1, "padding2": 1, "use_pool": False, "use_conv2": False, "kernels2": 16, "batch_size": 256, "lr": 0.001, "oracle_len": 0, "output_len": 5, "channels": 5}
+            model_kwargs = {"oracle_early": oracle_early, "hidden_size": 32, "num_layers": 3, "kernels": 16, "kernel_size1": 3, "kernel_size2": 5, "stride1": 1, "pool_kernel_size": 3, "pool_stride": 1, "padding1": 1, "padding2": 1, "use_pool": False, "use_conv2": False, "kernels2": 16, "batch_size": 256, "lr": 0.001, "oracle_len": 0, "output_len": 5, "channels": 5}
 
             model_name = "".join([str(x) + "," for x in model_kwargs.values()])
 
@@ -1101,7 +1104,7 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
             for repetition in range(repetitions):
                 if not skip_train:
                     train_model(train_sets, 'correctSelection', load_path=load_path,
-                                save_path=save_path, epochs=epochs, model_kwargs=model_kwargs,
+                                save_path=save_path, epochs=epochs, batches=batches, model_kwargs=model_kwargs,
                                 oracle_labels=oracle_labels, repetition=repetition, save_every=save_every,
                                 use_ff=use_ff, oracle_is_target=oracle_is_target)
                 if not skip_eval:
@@ -1115,7 +1118,8 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
                                                       prior_metrics=prior_metrics,
                                                       use_ff=use_ff,
                                                       oracle_is_target=oracle_is_target,
-                                                      act_label_names=act_label_names)
+                                                      act_label_names=act_label_names,
+                                                      oracle_early=oracle_early)
                             dfs_paths.extend(df_paths)
                             if epoch == epochs - 1:
                                 last_epoch_df_paths.extend(df_paths)
@@ -1147,8 +1151,7 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
                 avg_loss, variances, ranges_1, ranges_2, range_dict, range_dict3, stats, _, _, _, _ = calculate_statistics(
                     combined_df, last_epoch_df, params + prior_metrics, skip_3x=True)
 
-                write_metrics_to_file(os.path.join(save_path, 'metrics.txt'), last_epoch_df, ranges_1, params, stats,
-                                      key_param=key_param)
+                write_metrics_to_file(os.path.join(save_path, 'metrics.txt'), last_epoch_df, ranges_1, params, stats, key_param=key_param)
 
                 if not skip_figures:
                     save_figures(os.path.join(save_path, 'figs'), combined_df, avg_loss, ranges_2, range_dict, range_dict3,

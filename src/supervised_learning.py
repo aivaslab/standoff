@@ -539,8 +539,8 @@ class EvalDatasetBig(BaseDatasetBig):
 class RNNModel(nn.Module):
     def __init__(self, hidden_size, num_layers, output_len, channels, kernels=8, kernels2=8, kernel_size1=3,
                  kernel_size2=3, stride1=1, pool_kernel_size=2, pool_stride=2, padding1=0, padding2=0, use_pool=True,
-                 use_conv2=False, oracle_len=0, oracle_layer=0, is_fc=False, lr=0.0, batch_size=0.0,
-                 oracle_is_target=False):
+                 use_conv2=False, oracle_len=0, is_fc=False, lr=0.0, batch_size=0.0,
+                 oracle_is_target=False, oracle_early=False):
         super(RNNModel, self).__init__()
         self.kwargs = {'hidden_size': hidden_size, 'num_layers': num_layers,
                        'output_len': output_len, 'pool_kernel_size': pool_kernel_size,
@@ -548,14 +548,14 @@ class RNNModel(nn.Module):
                        'padding1': padding1, 'padding2': padding2, 'use_pool': use_pool, 'stride1': stride1,
                        'use_conv2': use_conv2, 'kernel_size1': kernel_size1,
                        'kernels2': kernels2, 'kernel_size2': kernel_size2, 'oracle_len': oracle_len, 'is_fc': is_fc,
-                       'lr': lr, 'batch_size': batch_size, 'oracle_is_target': oracle_is_target}
+                       'lr': lr, 'batch_size': batch_size, 'oracle_is_target': oracle_is_target, 'oracle_early': oracle_early}
 
         input_size = 7
         self.input_frames = 5
 
 
 
-        self.oracle_layer = oracle_layer
+        self.oracle_early = oracle_early
         self.oracle_is_target = oracle_is_target
         self.is_fc = is_fc
         self.use_pool = use_pool
@@ -584,12 +584,12 @@ class RNNModel(nn.Module):
             pool2_output_size = pool1_output_size
 
         input_size = kernels2 * pool2_output_size * pool2_output_size
-        if self.oracle_layer != 0 and not oracle_is_target:
+        if self.oracle_early:
             input_size += oracle_len
 
         self.rnn = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
 
-        self.fc_main_output = nn.Linear(hidden_size + oracle_len if self.oracle_layer == 0 and not oracle_is_target else hidden_size,
+        self.fc_main_output = nn.Linear(hidden_size + oracle_len if not self.oracle_early and not oracle_is_target else hidden_size,
                             int(output_len) if not oracle_is_target else int(output_len))
 
         if oracle_is_target:
@@ -606,15 +606,13 @@ class RNNModel(nn.Module):
                 x_t = self.pool(F.relu(self.conv2(x_t))) if self.use_pool else F.relu(self.conv2(x_t))
 
             flattened = x_t.view(x.size(0), -1)
-            #if self.oracle_layer == 1:
-            #    flattened = torch.cat((flattened, oracle_inputs), dim=1)
+            if self.oracle_early:
+                flattened = torch.cat((flattened, oracle_inputs), dim=1)
 
             conv_outputs.append(flattened)
         x = torch.stack(conv_outputs, dim=1)
 
         out, _ = self.rnn(x)
-
-
 
         #if not self.oracle_is_target and self.oracle_layer != 1:
         #    out = torch.cat((out, oracle_inputs), dim=-1)
@@ -623,9 +621,11 @@ class RNNModel(nn.Module):
             oracle_outputs = oracle_outputs.view(oracle_outputs.size(0), -1)
             newout = out[:, -1, :]
             outputs = torch.cat((self.fc_main_output(newout), oracle_outputs), dim=1)
-        else:
+        elif not self.oracle_early:
             newout = out[:, -1, :]
             outputs = self.fc_main_output(torch.cat((newout, oracle_inputs), dim=1))
+        else:
+            outputs = self.fc_main_output(out[:, -1, :])
 
         return outputs
 
