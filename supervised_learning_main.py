@@ -111,7 +111,7 @@ class SaveActivations:
 
 
 def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_path='', oracle_labels=[], repetition=0,
-                   epoch_number=0, prior_metrics=[], num_activation_batches=180, use_ff=False, oracle_is_target=False, act_label_names=[], save_labels=True,
+                   epoch_number=0, prior_metrics=[], num_activation_batches=-1, use_ff=False, oracle_is_target=False, act_label_names=[], save_labels=True,
                    oracle_early=False):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     special_criterion = nn.CrossEntropyLoss(reduction='none')
@@ -218,12 +218,13 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
 
                 tq.update(1)
 
-                if i < num_activation_batches:
+                if i < num_activation_batches or num_activation_batches < 0:
                     activation_data['activations_out'].append(hook.activations_out.cpu().reshape(batch_size, -1))
                     activation_data['activations_hidden_short'].append(
                         hook.activations_hidden[0].cpu().reshape(batch_size, -1))
                     activation_data['activations_hidden_long'].append(
                         hook.activations_hidden[1].cpu().reshape(batch_size, -1))
+                    print(inputs.cpu().numpy().shape)
                     activation_data['inputs'].append(inputs.cpu().numpy().reshape(batch_size, -1))
                     activation_data['pred'].append(pred.numpy().reshape(batch_size, -1))
                     activation_data['labels'].append(labels.cpu().numpy().reshape(batch_size, -1))
