@@ -77,6 +77,64 @@ class BasicCNN2(nn.Module):
         x = self.fc(x)
         return x
 
+class BasicCNN2m(nn.Module):
+    def __init__(self, input_channels, output_size):
+        super(BasicCNN2m, self).__init__()
+        self.conv1 = nn.Conv2d(input_channels, 8, kernel_size=3, stride=1, padding=1)
+        self.conv2 = nn.Conv2d(8, 16, kernel_size=3, stride=1, padding=1)
+        self.fc1 = nn.Linear(16 * 7 * 7, 32)
+        self.fc2 = nn.Linear(32, output_size)
+
+    def forward(self, x):
+        x = F.relu(self.conv1(x))
+        x = F.relu(self.conv2(x))
+        x = torch.flatten(x, 1)
+        x = self.fc2(F.relu(self.fc1(x)))
+        return x
+
+class MLP2bn(nn.Module):
+    def __init__(self, input_size, hidden_size, output_size):
+        super(MLP2bn, self).__init__()
+        self.fc1 = nn.Linear(input_size, hidden_size)
+        self.bn1 = nn.BatchNorm1d(hidden_size)
+        self.fc2 = nn.Linear(hidden_size, hidden_size)
+        self.fc3 = nn.Linear(hidden_size, output_size)
+
+    def forward(self, x):
+        x = F.relu(self.bn1(self.fc1(x)))
+        x = F.relu(self.fc2(x))
+        x = self.fc3(x)
+        return x
+
+class MLP2ln(nn.Module):
+    def __init__(self, input_size, hidden_size, output_size):
+        super(MLP2ln, self).__init__()
+        self.fc1 = nn.Linear(input_size, hidden_size)
+        self.ln1 = nn.LayerNorm(hidden_size)
+        self.fc2 = nn.Linear(hidden_size, hidden_size)
+        self.ln2 = nn.LayerNorm(hidden_size)
+        self.fc3 = nn.Linear(hidden_size, output_size)
+
+    def forward(self, x):
+        x = F.relu(self.ln1(self.fc1(x)))
+        x = F.relu(self.ln2(self.fc2(x)))
+        x = self.fc3(x)
+        return x
+
+class MLP2c(nn.Module):
+    def __init__(self, input_size1, input_size2, hidden_size, output_size):
+        super(MLP2c, self).__init__()
+        self.fc1 = nn.Linear(input_size1, hidden_size)
+        self.fc2 = nn.Linear(input_size2, hidden_size)
+        self.fc3 = nn.Linear(hidden_size*2, 32)
+        self.fc_out = nn.Linear(32, output_size)
+
+    def forward(self, input1, input2):
+        x = F.relu(self.fc1(input1))
+        y = F.relu(self.fc2(input2))
+        z = F.relu(self.fc3(torch.cat((x, y), dim=1)))
+        z = self.fc_out(z)
+        return z
 
 class MLP2(nn.Module):
     def __init__(self, input_size, hidden_size, output_size):
@@ -89,6 +147,36 @@ class MLP2(nn.Module):
         x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
         x = self.fc3(x)
+        return x
+
+class MLP2d(nn.Module):
+    def __init__(self, input_size, hidden_size, output_size, amount=0.1):
+        super(MLP2d, self).__init__()
+        self.fc1 = nn.Linear(input_size, hidden_size)
+        self.fc2 = nn.Linear(hidden_size, hidden_size)
+
+        self.dropout = nn.Dropout(amount)
+        self.fc3 = nn.Linear(hidden_size, output_size)
+
+    def forward(self, x):
+        x = F.relu(self.fc1(x))
+        x = F.relu(self.fc2(x))
+        x = self.fc3(self.dropout(x))
+        return x
+
+class MLP3(nn.Module):
+    def __init__(self, input_size, hidden_size, output_size):
+        super(MLP3, self).__init__()
+        self.fc1 = nn.Linear(input_size, hidden_size)
+        self.fc2 = nn.Linear(hidden_size, hidden_size)
+        self.fc3 = nn.Linear(hidden_size, hidden_size)
+        self.fc4 = nn.Linear(hidden_size, output_size)
+
+    def forward(self, x):
+        x = F.relu(self.fc1(x))
+        x = F.relu(self.fc2(x))
+        x = F.relu(self.fc3(x))
+        x = self.fc4(x)
         return x
 
 
@@ -109,18 +197,75 @@ class LSTMClassifier(nn.Module):
         return out
 
 
+class MultiHeadAttention(nn.Module):
+    def __init__(self, input_dim, num_heads):
+        super(MultiHeadAttention, self).__init__()
+        self.num_heads = num_heads
+        self.attention_head_size = int(input_dim / num_heads)
+        if self.attention_head_size == 0:
+            self.num_heads = 1
+            self.attention_head_size = input_dim
+        self.all_head_size = self.num_heads * self.attention_head_size
+
+        self.query = nn.Linear(input_dim, self.all_head_size)
+        self.key = nn.Linear(input_dim, self.all_head_size)
+        self.value = nn.Linear(input_dim, self.all_head_size)
+
+        self.softmax = nn.Softmax(dim=-1)
+
+    def forward(self, hidden_states):
+        mixed_query_layer = self.query(hidden_states)
+        mixed_key_layer = self.key(hidden_states)
+        mixed_value_layer = self.value(hidden_states)
+
+        query_layer = mixed_query_layer.view(-1, self.num_heads, self.attention_head_size)
+        key_layer = mixed_key_layer.view(-1, self.num_heads, self.attention_head_size)
+        value_layer = mixed_value_layer.view(-1, self.num_heads, self.attention_head_size)
+
+        attention_scores = torch.matmul(query_layer, key_layer.transpose(-1, -2))
+        attention_probs = self.softmax(attention_scores)
+
+        context_layer = torch.matmul(attention_probs, value_layer)
+        context_layer = context_layer.contiguous().view(-1, self.all_head_size)
+        return context_layer
+
+
+class TinyAttentionMLP(nn.Module):
+    def __init__(self, input_dim, output_dim, hidden_dim, num_heads):
+        super(TinyAttentionMLP, self).__init__()
+        self.attention = MultiHeadAttention(input_dim, num_heads)
+        self.layer_norm1 = nn.LayerNorm(input_dim)
+        self.fc1 = nn.Linear(input_dim, hidden_dim)
+        self.dropout = nn.Dropout(0.1)
+        self.layer_norm2 = nn.LayerNorm(hidden_dim)
+        self.fc2 = nn.Linear(hidden_dim, output_dim)
+
+    def forward(self, x):
+        attention_output = self.attention(x)
+        x = x + attention_output  # Skip connection
+        x = self.layer_norm1(x)
+
+        hidden = F.relu(self.fc1(x))
+        hidden = self.dropout(hidden)
+        hidden = self.layer_norm2(hidden)
+
+        output = self.fc2(hidden)
+        return output
+
 class NMSELoss(nn.Module):
     def __init__(self):
         super(NMSELoss, self).__init__()
 
     def forward(self, y_pred, y_true):
-        return torch.mean((y_pred - y_true) ** 2) / (torch.var(y_true) + 1e-8)
+        return torch.mean((y_pred - y_true)**2) / (torch.var(y_true) + 1e-8)
 
 
-def train_mlp(activations, other_data, regime_data, regime, patience=5, num_prints=5, num_epochs=25,
-              model_type="linear"):
+def train_mlp(activations, other_data, regime_data, regime, opponents_data, patience=5, num_prints=5, num_epochs=25,
+              model_type="linear", input_data2=None):
     # Parameters
     input_size = activations.shape[-1] if "conv" not in model_type else activations.shape[1]
+    if input_data2 is not None:
+        input_size2 = input_data2.shape[-1] if "conv" not in model_type else activations.shape[1]
     output_size = other_data.shape[1]
     hidden_size = 32
     learning_rate = 1e-3
@@ -130,28 +275,48 @@ def train_mlp(activations, other_data, regime_data, regime, patience=5, num_prin
     train_indices, val_indices = train_test_split(all_indices, test_size=0.10, random_state=42)
 
     if regime is not None:
+        zero_opponents_indices = np.where(np.all(opponents_data == 0, axis=1))[0]
         regime_indices = np.where(np.all(regime_data == regime, axis=1))[0]
-        regime_train_indices = np.intersect1d(train_indices, regime_indices)
+        combined_indices = np.union1d(regime_indices, zero_opponents_indices)
+        regime_train_indices = np.intersect1d(train_indices, combined_indices)
         act_train = activations[regime_train_indices]
         other_train = other_data[regime_train_indices]
+        if input_data2 is not None:
+            input2_train = input_data2[regime_train_indices]
     else:
         act_train = activations[train_indices]
         other_train = other_data[train_indices]
+        if input_data2 is not None:
+            input2_train = input_data2[train_indices]
 
     act_val = activations[val_indices]
     other_val = other_data[val_indices]
+    if input_data2 is not None:
+        input2_val = input_data2[val_indices]
 
     # print('size:', regime, activations.shape, other_data.shape, len(train_indices), len(act_train), len(act_val))
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-    train_dataset = TensorDataset(torch.tensor(act_train, dtype=torch.float32).to(device),
-                                  torch.tensor(other_train, dtype=torch.float32).to(device))
-    val_dataset = TensorDataset(torch.tensor(act_val, dtype=torch.float32).to(device),
-                                torch.tensor(other_val, dtype=torch.float32).to(device))
+    if input_data2 is not None:
+        train_dataset = TensorDataset(torch.tensor(act_train, dtype=torch.float32).to(device),
+                                      torch.tensor(input2_train, dtype=torch.float32).to(device),
+                                      torch.tensor(other_train, dtype=torch.float32).to(device))
+        val_dataset = TensorDataset(torch.tensor(act_val, dtype=torch.float32).to(device),
+                                    torch.tensor(input2_val, dtype=torch.float32).to(device),
+                                    torch.tensor(other_val, dtype=torch.float32).to(device))
+    else:
+        train_dataset = TensorDataset(torch.tensor(act_train, dtype=torch.float32).to(device),
+                                      torch.tensor(other_train, dtype=torch.float32).to(device))
+        val_dataset = TensorDataset(torch.tensor(act_val, dtype=torch.float32).to(device),
+                                    torch.tensor(other_val, dtype=torch.float32).to(device))
 
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+
+    l2_reg = False
+    if "l2reg" in model_type:
+        model_type = model_type.replace("l2reg", "")
+        l2_reg = True
 
     if model_type == "mlp1":
         model = MLP(input_size, hidden_size, output_size).to(device)
@@ -165,10 +330,34 @@ def train_mlp(activations, other_data, regime_data, regime, patience=5, num_prin
         model = BasicCNN1(input_size, output_size).to(device)
     elif model_type == "conv2":
         model = BasicCNN2(input_size, output_size).to(device)
+    elif model_type == "conv2m":
+        model = BasicCNN2m(input_size, output_size).to(device)
+    elif model_type == "mlp3":
+        model = MLP3(input_size, hidden_size, output_size).to(device)
+    elif model_type == "mlp2bn":
+        model = MLP2bn(input_size, hidden_size, output_size).to(device)
+    elif model_type == "mlp2s":
+        model = MLP2bn(input_size, 16, output_size).to(device)
+    elif model_type == "mlp2c5":
+        model = MLP2c(input_size, input_size2, 5, output_size).to(device)
+    elif model_type == "mlp2c10":
+        model = MLP2c(input_size, input_size2, 10, output_size).to(device)
+    elif model_type == "mlp2c16":
+        model = MLP2c(input_size, input_size2, 16, output_size).to(device)
+    elif model_type == "mlp2d":
+        model = MLP2d(input_size, hidden_size, output_size).to(device)
+    elif model_type == "mlp2d2":
+        model = MLP2d(input_size, hidden_size, output_size, amount=0.2).to(device)
+    elif model_type == "mlp2d3":
+        model = MLP2d(input_size, hidden_size, output_size, amount=0.3).to(device)
+    elif model_type == "mlp2ln":
+        model = MLP2ln(input_size, hidden_size, output_size).to(device)
+    elif model_type == "attn":
+        model = TinyAttentionMLP(input_size, output_size, hidden_size, 1).to(device)
     # criterion = nn.MSELoss()
     criterion = NMSELoss()
     slowcriterion = nn.MSELoss(reduction='none')
-    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay= 1e-5 if l2_reg else 0)
 
     best_val_loss = float('inf')
     epochs_no_improve = 0
@@ -179,8 +368,10 @@ def train_mlp(activations, other_data, regime_data, regime, patience=5, num_prin
     for epoch in range(num_epochs):
         model.train()
         epoch_train_losses = []
-        for act_vector, other_vector in train_loader:
-            outputs = model(act_vector)
+        for data in train_loader:
+            act_vector, *optional_data = data[:-1]
+            other_vector = data[-1]
+            outputs = model(act_vector, *optional_data) if input_data2 is not None else model(act_vector)
             loss = criterion(outputs, other_vector)
             epoch_train_losses.append(loss.item())
             optimizer.zero_grad()
@@ -191,15 +382,19 @@ def train_mlp(activations, other_data, regime_data, regime, patience=5, num_prin
         epoch_val_losses = []
         with torch.no_grad():
             if epoch == num_epochs - 1:
-                for act_vector, other_vector in val_loader:
-                    outputs = model(act_vector)
+                for data in val_loader:
+                    act_vector, *optional_data = data[:-1]
+                    other_vector = data[-1]
+                    outputs = model(act_vector, *optional_data) if input_data2 is not None else model(act_vector)
                     val_loss = criterion(outputs, other_vector)
                     val_loss_indy = slowcriterion(outputs, other_vector).mean(dim=1)
                     epoch_val_losses.append(val_loss.item())
                     last_epoch_val_losses.extend(val_loss_indy.tolist())
             else:
-                for act_vector, other_vector in val_loader:
-                    outputs = model(act_vector)
+                for data in val_loader:
+                    act_vector, *optional_data = data[:-1]
+                    other_vector = data[-1]
+                    outputs = model(act_vector, *optional_data) if input_data2 is not None else model(act_vector)
                     val_loss = criterion(outputs, other_vector)
                     epoch_val_losses.append(val_loss.item())
 
@@ -394,6 +589,7 @@ def get_keys(model_type, used_cor_inputs, correlation_data2, correlation_data_co
     input_keys = sorted(used_cor_inputs.keys())
     output_size = len(output_keys)
     input_size = len(output_keys)
+    second_input_keys = input_keys
     if not compose:
         cor2keys = sorted(correlation_data2.keys())
         input_size = len(cor2keys)
@@ -405,12 +601,12 @@ def get_keys(model_type, used_cor_inputs, correlation_data2, correlation_data_co
         output_size = len(input_keys)
     else:
         output_size = input_size
-        input_keys = output_keys
+        second_input_keys = input_keys
     if image_output:
         output_keys = sorted(correlation_data_conv.keys())
     else:
         output_keys = sorted(correlation_data2.keys())
-    return input_keys, output_keys, output_size, input_size
+    return input_keys, output_keys, output_size, input_size, second_input_keys
 
 
 def process_activations(path, epoch_numbers, repetitions, timesteps=5):
@@ -524,12 +720,13 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=5):
 
             # MLP F2F DATA
             remove_labels = []
-            run = False
-            models = ['linear', 'mlp1', 'mlp2']
-            # models = ['mlp2']
-            # models = ['conv2']
+            run = True
+            #models = ['mlp2', 'mlp2bn', 'mlp2d', 'mlp2d2', 'mlp2d3', 'mlp2ln', 'mlp2s', 'mlp3', 'mlp1', 'mlp2l2reg', 'linear', 'mlp2c5', 'mlp2c10', 'mlp2c16']
+            models = ['mlp2l2reg', 'linear', 'mlp1', 'mlp2ln', 'mlp2d2', 'mlp2d3']
+            models = ['mlp2d2']
+
             compose = False
-            split_by_regime = False
+            split_by_regime = True
             compose_targets = [None]
             # compose_targets = ['b-loc', 'target-size', 'target-loc', 'loc']
             # remove_labels = ['labels']
@@ -538,6 +735,7 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=5):
             image_inputs = False
             image_outputs = False
             num_epochs = 25
+            get_stats = True
 
             # skip down-stream labels for ff2f tests
             if compose:
@@ -565,7 +763,7 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=5):
                 print('running', "ff2" + str(compose_targets) if compose else "f2f", str(models), 'regime-split:',
                       split_by_regime, 'epochs:', num_epochs)
                 for model_type in models:
-                    keys1, output_keys, size1, size = get_keys(model_type, used_cor_inputs, correlation_data2,
+                    keys1, output_keys, size1, size, second_input_keys = get_keys(model_type, used_cor_inputs, correlation_data2,
                                                                correlation_data_conv, correlation_data_lstm, compose,
                                                                use_conv_inputs=image_inputs, image_output=image_outputs)
                     loss_matrices = {str(regime): pd.DataFrame(index=keys1, columns=output_keys) for regime in
@@ -580,11 +778,18 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=5):
                                 if model_type == "lstm":
                                     input_data = correlation_data_lstm[key1]
                                     regime_data = correlation_data_lstm["informedness"]
+                                    opponents_data = correlation_data_lstm["opponents"]
                                     realkeys = keys1
                                 else:
                                     input_data = used_cor_inputs[key1]
                                     regime_data = correlation_data2["informedness"]
+                                    opponents_data = correlation_data2["opponents"]
                                     realkeys = output_keys  # we want this to be cor2 keys but only if not comparative
+
+                                if compose:
+                                    realkeys = second_input_keys
+                                cat = "mlp2c" not in model_type
+                                print('concatenating:', cat)
 
                                 for j, key2 in enumerate(realkeys):
                                     if compose:
@@ -595,20 +800,24 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=5):
                                                 continue
                                             input_data = np.concatenate(
                                                 [correlation_data_lstm[key1], correlation_data_lstm[key2]], axis=2)
-                                        else:
-                                            input_data = np.concatenate([used_cor_inputs[key1], used_cor_inputs[key2]],
-                                                                        axis=1)
+                                        elif cat:
+                                            print(key1, key2)
+                                            input_data = np.concatenate([used_cor_inputs[key1], used_cor_inputs[key2]], axis=1)
+                                        elif not cat:
+                                            input_data = used_cor_inputs[key1]
+                                            input_data2 = used_cor_inputs[key2]
                                         output_data = correlation_data2[target]
                                     elif image_outputs:
                                         output_data = correlation_data_conv_flat[key2]
                                     else:
                                         output_data = correlation_data2[key2]
-
+                                    #if not cat:
+                                        #print("using key2", key2)
                                     for regime in unique_regimes:
                                         assert input_data.shape[0] == output_data.shape[0]
                                         val_loss, train_losses, val_losses, val_losses_indy = \
-                                            train_mlp(input_data, output_data, regime_data=regime_data, regime=regime,
-                                                      num_epochs=num_epochs, model_type=model_type)
+                                            train_mlp(input_data, output_data, regime_data=regime_data, regime=regime, opponents_data=opponents_data,
+                                                      num_epochs=num_epochs, model_type=model_type, input_data2=input_data2 if not cat else None,)
                                         loss_matrices[str(regime)].at[key1, key2] = val_loss
                                         print(key1, key2, input_data.shape, output_data.shape, val_loss)
                                         pbar.update(1)
@@ -626,77 +835,261 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=5):
                                     loss_matrices[str(regime)].to_csv(
                                         os.path.join(path, f"{name}f2f_loss_matrix_{model_type}.csv"))
 
+            histogram = []
+            histogram2 = []
+            if compose:
+                histogram = {target: [] for target in compose_targets}
+                histogram2 = {target: [] for target in compose_targets}
+
+            models_used = []
             for model_type in models:
-                keys1, keys, size1, size = get_keys(model_type, used_cor_inputs, correlation_data2,
+                keys1, keys, size1, size, input2keys = get_keys(model_type, used_cor_inputs, correlation_data2,
                                                     correlation_data_conv, correlation_data_lstm, compose,
                                                     use_conv_inputs=image_inputs, image_output=image_outputs)
 
-                # min_matrix_f2f = np.full((len(keys1), len(keys)), np.inf)
                 min_matrix_f2f = pd.DataFrame(np.inf, index=keys1, columns=keys)
-                # min_matrix_ff2l = np.full((len(keys1), len(keys1)), np.inf)
+                min_matrix_ff2l = {}
+                for target in compose_targets:
+                    min_matrix_ff2l[target] = pd.DataFrame(np.inf, index=keys1, columns=input2keys)
 
                 for regime in unique_regimes:
                     name = str(regime) if regime is not None else ""
-                    if image_inputs:
-                        name += "c"
-                        if not image_outputs:
-                            name += "v"
+                    name += "c" * bool(image_inputs) + "v" * (bool(image_inputs) and not image_outputs)
                     if not compose:
-                        print(f"trying to make {name}f2f-{model_type}.png")
-                        val_loss_matrix_f2f = pd.read_csv(os.path.join(path, f"{name}f2f_loss_matrix_{model_type}.csv"),
-                                                          index_col=0, header=0)
-                        plt.figure(figsize=(12, 8))
-                        sns.heatmap(val_loss_matrix_f2f, annot=True, fmt=".2f", cmap="coolwarm", vmin=0, vmax=1.)
-                        plt.title(f'{model_type} Validation MSE')
-                        plt.xlabel('Target')
-                        plt.ylabel('Input')
-                        plt.tight_layout()
-                        plt.savefig(os.path.join(path, f"{name}f2f-{model_type}.png"))
-                        min_matrix_f2f = min_matrix_f2f.combine(val_loss_matrix_f2f, np.minimum)
+                        matrix_path = os.path.join(path, f"{name}f2f_loss_matrix_{model_type}.csv")
+                        if os.path.exists(matrix_path):
+                            val_loss_matrix_f2f = pd.read_csv(matrix_path, index_col=0, header=0)
+                            min_matrix_f2f = min_matrix_f2f.combine(val_loss_matrix_f2f, np.minimum)
+                            if not get_stats:
+                                print(f"trying to make {name}f2f-{model_type}.png")
+                                plt.figure(figsize=(12, 8))
+                                sns.heatmap(val_loss_matrix_f2f, annot=True, fmt=".2f", cmap="coolwarm", vmin=0, vmax=1.)
+                                plt.title(f'{model_type} Validation MSE')
+                                plt.xlabel('Target')
+                                plt.ylabel('Input')
+                                plt.tight_layout()
+                                plt.savefig(os.path.join(path, f"{name}f2f-{model_type}.png"))
+                            else:
+                                #mat = val_loss_matrix_f2f.to_numpy().flatten()
+                                #mat = np.nan_to_num(mat, nan=np.nan, posinf=np.nan, neginf=np.nan)[np.isfinite(mat)]
+
+                                if str(regime) == str(unique_regimes[0]):
+                                    pass
+                                    #mat = min_matrix_f2f.to_numpy().flatten()
+                                    #mat = np.nan_to_num(mat, nan=np.nan, posinf=np.nan, neginf=np.nan)[np.isfinite(mat)]
+                                    #models_used.append(model_type)
+                                    #print(model_type, mat.mean(), mat.std(), (mat < 0.1).sum(), (mat < 0.05).sum(), (mat < 0.02).sum(), (mat < 0.01).sum())
+                                    #histogram.append(mat)
+                        else:
+                            print("couldn't find file", matrix_path)
                     if compose:
                         for target in compose_targets:
-                            print('rendering matrix for', target)
+                            matrix_path = os.path.join(path, f"{name}ff2l_{target}_loss_matrix_{model_type}.csv")
+                            if os.path.exists(matrix_path):
+                                val_loss_matrix_ff2l = pd.read_csv( matrix_path, index_col=0,header=0)
+                                min_matrix_ff2l[target] = min_matrix_ff2l[target].combine(val_loss_matrix_ff2l, np.minimum)
 
-                            val_loss_matrix_ff2l = pd.read_csv(
-                                os.path.join(path, f"{name}ff2l_{target}_loss_matrix_{model_type}.csv"), index_col=0,
-                                header=0)
-                            order = keys1
-                            if model_type == "lstm":
-                                pass
-                                # order = ['b-loc_h', 'loc_h', 'target_h', 'vision_h']
-                                # order_indices = [keys1.index(label) for label in order]
-                                # val_loss_matrix_ff2l = val_loss_matrix_ff2l[:, :len(order)][np.ix_(order_indices, order_indices)]
-                            plt.figure(figsize=(12, 8))
-                            sns.heatmap(val_loss_matrix_ff2l, annot=True, fmt=".2f", cmap="coolwarm", vmin=0, vmax=0.25)
-                            plt.title(f'{model_type} FF2F {target} Validation MSE')
-                            plt.xlabel('Input2')
-                            plt.ylabel('Input1')
-                            plt.tight_layout()
-                            plt.savefig(os.path.join(path, f"{name}ff2f-{target}-{model_type}.png"))
+                                if model_type == "lstm":
+                                    pass
+                                    # order = ['b-loc_h', 'loc_h', 'target_h', 'vision_h']
+                                    # order_indices = [keys1.index(label) for label in order]
+                                    # val_loss_matrix_ff2l = val_loss_matrix_ff2l[:, :len(order)][np.ix_(order_indices, order_indices)]
+                                if not get_stats:
+                                    print('rendering matrix for', target)
+                                    plt.figure(figsize=(12, 8))
+                                    sns.heatmap(val_loss_matrix_ff2l, annot=True, fmt=".2f", cmap="coolwarm", vmin=0, vmax=0.25)
+                                    plt.title(f'{model_type} FF2F {target} Validation MSE')
+                                    plt.xlabel('Input2')
+                                    plt.ylabel('Input1')
+                                    plt.tight_layout()
+                                    plt.savefig(os.path.join(path, f"{name}ff2f-{target}-{model_type}.png"))
+                                else:
+                                    mat = min_matrix_f2f.to_numpy().flatten()
+                                    mat = np.nan_to_num(mat, nan=np.nan, posinf=np.nan, neginf=np.nan)[np.isfinite(mat)]
+                                    print(model_type, mat.mean(), mat.std(), (mat < 0.1).sum(), (mat < 0.05).sum(), (mat < 0.02).sum(), (mat < 0.01).sum())
+                                    histogram[target].append(mat)
+                                    models_used.append(model)
+                            else:
+                                print("couldn't find file", matrix_path)
 
-                            min_matrix_ff2l = np.minimum(min_matrix_ff2l, val_loss_matrix_ff2l)
-
+                name = "c" * bool(image_inputs) + "v" * (bool(image_inputs) and not image_outputs)
                 # minimum matrices
                 if split_by_regime:
-                    plt.figure(figsize=(12, 8))
-                    sns.heatmap(min_matrix_f2f, annot=True, fmt=".2f", cmap="coolwarm",
-                                xticklabels=keys, yticklabels=keys1, vmin=0, vmax=0.25)
-                    plt.title(f'Minimum of Regimes {model_type} Validation MSE (F2F)')
-                    plt.xlabel('Target')
-                    plt.ylabel('Input')
-                    plt.tight_layout()
-                    plt.savefig(os.path.join(path, f"min_f2f-{model_type}.png"))
+                    if not compose:
+                        if not get_stats:
+                            plt.figure(figsize=(12, 8))
+                            sns.heatmap(min_matrix_f2f, annot=True, fmt=".2f", cmap="coolwarm",
+                                        xticklabels=keys, yticklabels=keys1, vmin=0, vmax=0.25)
+                            plt.title(f'Minimum of Regimes {model_type} Validation MSE (F2F)')
+                            plt.xlabel('Target')
+                            plt.ylabel('Input')
+                            plt.tight_layout()
+                            plt.savefig(os.path.join(path, f"min_{name}f2f-{model_type}.png"))
+                        else:
+                            mat = min_matrix_f2f.to_numpy().flatten()
+                            mat = np.nan_to_num(mat, nan=np.nan, posinf=np.nan, neginf=np.nan)[np.isfinite(mat)]
+                            print(model_type, mat.mean(), mat.std(), (mat < 0.1).sum(), (mat < 0.05).sum(), (mat < 0.02).sum(), (mat < 0.01).sum(), mat.shape)
+                            # we save both this min histogram... and we try to get the "None" histogram for this model type
+                            matrix_path = os.path.join(path, f"f2f_loss_matrix_{model_type}.csv")
+                            if os.path.exists(matrix_path):
+                                val_loss_matrix_f2f = pd.read_csv(matrix_path, index_col=0, header=0)
+                                mat2 = val_loss_matrix_f2f.to_numpy().flatten()
+                                mat2 = np.nan_to_num(mat2, nan=np.nan, posinf=np.nan, neginf=np.nan)[np.isfinite(mat2)]
+                            if mat.shape[0] != 0:
+                                histogram.append(mat)
+                                models_used.append(model_type)
+                                if os.path.exists(matrix_path):
+                                    histogram2.append(mat2)
 
-                    plt.figure(figsize=(12, 8))
-                    sns.heatmap(min_matrix_ff2l, annot=True, fmt=".2f", cmap="coolwarm",
-                                xticklabels=keys1, yticklabels=keys1, vmin=0, vmax=0.25)
-                    plt.title(f'Minimum of Regimes {model_type} FF2L Validation MSE')
-                    plt.xlabel('Input2')
-                    plt.ylabel('Input1')
-                    plt.tight_layout()
-                    plt.savefig(os.path.join(path, f"min_ff2l-{model_type}.png"))
+                    else:
+                        for target in compose_targets:
+                            if not get_stats:
+                                print('rendering min matrix for', target)
+                                plt.figure(figsize=(12, 8))
+                                sns.heatmap(min_matrix_ff2l[target], annot=True, fmt=".2f", cmap="coolwarm",
+                                            xticklabels=keys1, yticklabels=keys1, vmin=0, vmax=0.25)
+                                plt.title(f'Minimum of Regimes {model_type} FF2F {target} Validation MSE')
+                                plt.xlabel('Input2')
+                                plt.ylabel('Input1')
+                                plt.tight_layout()
+                                plt.savefig(os.path.join(path, f"min_{name}ff2f-{target}-{model_type}.png"))
+                            else:
+                                mat = min_matrix_ff2l[target].to_numpy().flatten()
+                                mat = np.nan_to_num(mat, nan=np.nan, posinf=np.nan, neginf=np.nan)
+                                mat = mat[np.isfinite(mat)]
+                                print(model_type, mat.mean(), mat.std(), (mat < 0.1).sum(), (mat < 0.05).sum(), (mat < 0.02).sum(), (mat < 0.01).sum())
+                                histogram[target].append(mat)
+                                models_used.append(model)
 
-            matrices = {model: pd.read_csv(os.path.join(path, f"f2f_loss_matrix_{model}.npy")) for model in models}
+            if get_stats:
+                # make a histogram of the min matrices
+                if compose:
+                    for target in compose_targets:
+                        try:
+                            name = "c" * bool(image_inputs) + "v" * (bool(image_inputs) and not image_outputs) + "r" * bool(split_by_regime)
+                            histogram_used = [np.nan_to_num(arr, nan=np.nan, posinf=np.nan, neginf=np.nan) for arr in histogram[target]]
+
+                            labels_array = np.concatenate([[mod] * len(data) for mod, data in zip(models_used, histogram_used)])
+                            flattened = np.concatenate(histogram_used)
+                            data_for_plotting = pd.DataFrame({
+                                'Values': flattened,
+                                'Labels': labels_array
+                            })
+                            plt.figure(figsize=(12, 6))
+                            ax = sns.histplot(data=data_for_plotting, x='Values', bins=20, binrange=(0, 0.4), hue='Labels', hue_order=models_used, element="bars", stat="count", multiple='dodge')
+                            plt.title('Comparison of Validation MSEs')
+                            plt.xlabel('NMSE Value')
+                            plt.ylabel('Count')
+                            plt.legend(title='Matrix')
+                            ax.legend(labels=models_used, title='Models', bbox_to_anchor=(0.6, 1), loc='upper left')
+                            plt.tight_layout()
+                            plt.savefig(os.path.join(path, f"{name}hist-{target}.png"))
+                        except BaseException as e:
+                            print("failed", target, e)
+                else:
+                    try:
+                        name = "c" * bool(image_inputs) + "v" * (bool(image_inputs) and not image_outputs) + "r" * bool(split_by_regime)
+                        histogram_used = [np.nan_to_num(arr, nan=np.nan, posinf=np.nan, neginf=np.nan) for arr in histogram]
+
+                        labels_array = np.concatenate([[mod] * len(data) for mod, data in zip(models_used, histogram_used)])
+                        flattened = np.concatenate(histogram_used)
+                        data_for_plotting = pd.DataFrame({
+                            'Values': flattened,
+                            'Labels': labels_array
+                        })
+                        plt.figure(figsize=(12, 6))
+                        ax = sns.histplot(data=data_for_plotting, x='Values', bins=20, binrange=(0, 0.99), shrink=0.8, hue='Labels',  hue_order=models_used, element="bars", stat="count", multiple='dodge')
+                        plt.title('Comparison of Validation MSEs')
+                        plt.xlabel('NMSE Value')
+                        plt.ylabel('Count')
+                        plt.legend(title='Matrix')
+                        ax.legend(labels=models_used, title='Models', bbox_to_anchor=(0.6, 1), loc='upper left')
+                        plt.tight_layout()
+                        plt.savefig(os.path.join(path, f"{name}hist-{target}.png"))
+
+                        print('fig')
+
+                        plt.figure(figsize=(10, 10))
+                        plt.plot([(0,0), (1,1)], c='black', linestyle='dashed', label='_nolegend_')
+                        differences = []
+                        num_rows, num_columns = min_matrix_f2f.shape
+                        for i, (minregime, allregimes) in enumerate(zip(histogram, histogram2)):
+                            for j, (min_val, all_val) in enumerate(zip(minregime, allregimes)):
+                                diff = min_val - all_val
+
+                                original_row = j // num_columns
+                                original_column = j % num_columns
+                                if original_row != original_column and min_val < 0.5:
+                                    differences.append((diff, i, original_row, original_column, j))  # Store difference along with indices
+                        top_differences = sorted(differences, reverse=False)[:1]
+                        print(top_differences)
+
+                        for i, (minregime, allregimes) in enumerate(zip(histogram, histogram2)):
+                            plt.scatter(allregimes, minregime, s=25, alpha=0.6)
+                            for diff, hist_idx, or_row, or_col, j in top_differences:
+                                if i == hist_idx:  # Check if this point belongs to the current histogram
+                                    plt.annotate(f'{keys[or_row]},{keys1[or_col]}', (allregimes[j], minregime[j]))
+                                    #todo: save models used for the best one
+
+                        minregime_array = np.array([minregime for minregime, _ in zip(histogram, histogram2)])
+                        allregimes_array = np.array([allregime for allregime, _ in zip(histogram2, histogram)])
+                        differences = minregime_array - allregimes_array
+
+                        indices_of_top_n = np.argsort(differences)[-5:]
+
+                        plt.xlabel('NMSE (trained on all)')
+                        plt.ylabel('NMSE (minimum of contrastive regimes)')
+                        plt.tight_layout()
+                        plt.ylim((-0.05, 1.1))
+                        plt.xlim((-0.05, 1.1))
+                        plt.legend(title='Model', labels=models_used)
+                        plt.savefig(os.path.join(path, f"{name}scatter-{target}.png"))
+
+                        num_models = len(histogram)
+
+                        # Set up the matplotlib figure
+                        plt.figure(figsize=(12, 8))
+
+                        # Calculating means and standard deviations
+                        means_minregime = [np.mean(minregime) for minregime in histogram]
+                        stds_minregime = [np.std(minregime) for minregime in histogram]
+                        means_allregimes = [np.mean(allregimes) for allregimes in histogram2]
+                        stds_allregimes = [np.std(allregimes) for allregimes in histogram2]
+
+                        print(means_minregime)
+                        print(means_allregimes)
+
+                        # Setting up the positions for the bars
+                        bar_width = 0.3  # Width of the bars
+                        index = np.arange(num_models)  # Model indices
+                        bar1_pos = index - bar_width / 2  # Positions for the minregime bars
+                        bar2_pos = index + bar_width / 2  # Positions for the allregimes bars
+
+                        # Creating the bars
+                        plt.bar(bar1_pos, means_minregime, bar_width, yerr=stds_minregime, capsize=5, label='MinRegime', alpha=0.6)
+                        plt.bar(bar2_pos, means_allregimes, bar_width, yerr=stds_allregimes, capsize=5, label='AllRegimes', alpha=0.6)
+
+                        # Improving the aesthetics
+                        plt.xlabel('Models')
+                        plt.ylabel('NMSE')
+                        plt.title('Comparison between MinRegime and AllRegimes for Each Model')
+                        plt.xticks(index, models_used, rotation=45)
+                        plt.legend()
+
+                        plt.tight_layout()
+                        plt.savefig(os.path.join(path, f"{name}bar-{target}.png"))
+
+                    except BaseException as e:
+                        print("failed", target, e)
+
+            print('finished')
+
+            name = ""
+            if image_inputs:
+                name += "c"
+                if not image_outputs:
+                    name += "v"
+            matrices = {model: pd.read_csv(os.path.join(path, f"{name}f2f_loss_matrix_{model}.csv")) for model in models}
             for i, model1 in enumerate(models):
                 for j, model2 in enumerate(models):
                     if j <= i:  # This ensures we only consider each pair once, avoiding redundancy
