@@ -16,7 +16,7 @@ import torch
 from sklearn.model_selection import train_test_split
 
 from src.utils.activation_models import MLP, LinearClassifier, MLP2d, MLP2c, MLP2bn, MLP3, BasicCNN2m, BasicCNN2, BasicCNN1, MLP2, LSTMClassifier, MLP2ln, TinyAttentionMLP
-from src.utils.activation_plotting import plot_info_matrices
+from src.utils.activation_plotting import plot_info_matrices, plot_histogram, plot_scatter, plot_bars
 
 
 class VectorDataset(Dataset):
