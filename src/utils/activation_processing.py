@@ -12,9 +12,11 @@ from sklearn.manifold import TSNE
 from sklearn.metrics import mutual_info_score
 from torch.utils.data import Dataset, DataLoader, TensorDataset
 import torch.nn as nn
-import torch.nn.functional as F
 import torch
 from sklearn.model_selection import train_test_split
+
+from src.utils.activation_models import MLP, LinearClassifier, MLP2d, MLP2c, MLP2bn, MLP3, BasicCNN2m, BasicCNN2, BasicCNN1, MLP2, LSTMClassifier, MLP2ln, TinyAttentionMLP
+from src.utils.activation_plotting import plot_info_matrices
 
 
 class VectorDataset(Dataset):
@@ -28,237 +30,12 @@ class VectorDataset(Dataset):
     def __getitem__(self, idx):
         return self.act_vectors[idx], self.other_vectors[idx]
 
-
-class LinearClassifier(nn.Module):
-    def __init__(self, input_size, output_size):
-        super(LinearClassifier, self).__init__()
-        self.fc = nn.Linear(input_size, output_size)
-
-    def forward(self, x):
-        return self.fc(x)
-
-
-class MLP(nn.Module):
-    def __init__(self, input_size, hidden_size, output_size):
-        super(MLP, self).__init__()
-        self.fc1 = nn.Linear(input_size, hidden_size)
-        self.fc2 = nn.Linear(hidden_size, output_size)
-
-    def forward(self, x):
-        x = F.relu(self.fc1(x))
-        x = self.fc2(x)
-        return x
-
-
-class BasicCNN1(nn.Module):
-    def __init__(self, input_channels, output_size):
-        super(BasicCNN1, self).__init__()
-        self.conv1 = nn.Conv2d(input_channels, 8, kernel_size=3, stride=1, padding=1)
-        self.fc = nn.Linear(8 * 7 * 7, output_size)
-
-    def forward(self, x):
-        x = F.relu(self.conv1(x))
-        x = torch.flatten(x, 1)
-        x = self.fc(x)
-        return x
-
-
-class BasicCNN2(nn.Module):
-    def __init__(self, input_channels, output_size):
-        super(BasicCNN2, self).__init__()
-        self.conv1 = nn.Conv2d(input_channels, 8, kernel_size=3, stride=1, padding=1)
-        self.conv2 = nn.Conv2d(8, 16, kernel_size=3, stride=1, padding=1)
-        self.fc = nn.Linear(16 * 7 * 7, output_size)
-
-    def forward(self, x):
-        x = F.relu(self.conv1(x))
-        x = F.relu(self.conv2(x))
-        x = torch.flatten(x, 1)
-        x = self.fc(x)
-        return x
-
-class BasicCNN2m(nn.Module):
-    def __init__(self, input_channels, output_size):
-        super(BasicCNN2m, self).__init__()
-        self.conv1 = nn.Conv2d(input_channels, 8, kernel_size=3, stride=1, padding=1)
-        self.conv2 = nn.Conv2d(8, 16, kernel_size=3, stride=1, padding=1)
-        self.fc1 = nn.Linear(16 * 7 * 7, 32)
-        self.fc2 = nn.Linear(32, output_size)
-
-    def forward(self, x):
-        x = F.relu(self.conv1(x))
-        x = F.relu(self.conv2(x))
-        x = torch.flatten(x, 1)
-        x = self.fc2(F.relu(self.fc1(x)))
-        return x
-
-class MLP2bn(nn.Module):
-    def __init__(self, input_size, hidden_size, output_size):
-        super(MLP2bn, self).__init__()
-        self.fc1 = nn.Linear(input_size, hidden_size)
-        self.bn1 = nn.BatchNorm1d(hidden_size)
-        self.fc2 = nn.Linear(hidden_size, hidden_size)
-        self.fc3 = nn.Linear(hidden_size, output_size)
-
-    def forward(self, x):
-        x = F.relu(self.bn1(self.fc1(x)))
-        x = F.relu(self.fc2(x))
-        x = self.fc3(x)
-        return x
-
-class MLP2ln(nn.Module):
-    def __init__(self, input_size, hidden_size, output_size):
-        super(MLP2ln, self).__init__()
-        self.fc1 = nn.Linear(input_size, hidden_size)
-        self.ln1 = nn.LayerNorm(hidden_size)
-        self.fc2 = nn.Linear(hidden_size, hidden_size)
-        self.ln2 = nn.LayerNorm(hidden_size)
-        self.fc3 = nn.Linear(hidden_size, output_size)
-
-    def forward(self, x):
-        x = F.relu(self.ln1(self.fc1(x)))
-        x = F.relu(self.ln2(self.fc2(x)))
-        x = self.fc3(x)
-        return x
-
-class MLP2c(nn.Module):
-    def __init__(self, input_size1, input_size2, hidden_size, output_size):
-        super(MLP2c, self).__init__()
-        self.fc1 = nn.Linear(input_size1, hidden_size)
-        self.fc2 = nn.Linear(input_size2, hidden_size)
-        self.fc3 = nn.Linear(hidden_size*2, 32)
-        self.fc_out = nn.Linear(32, output_size)
-
-    def forward(self, input1, input2):
-        x = F.relu(self.fc1(input1))
-        y = F.relu(self.fc2(input2))
-        z = F.relu(self.fc3(torch.cat((x, y), dim=1)))
-        z = self.fc_out(z)
-        return z
-
-class MLP2(nn.Module):
-    def __init__(self, input_size, hidden_size, output_size):
-        super(MLP2, self).__init__()
-        self.fc1 = nn.Linear(input_size, hidden_size)
-        self.fc2 = nn.Linear(hidden_size, hidden_size)
-        self.fc3 = nn.Linear(hidden_size, output_size)
-
-    def forward(self, x):
-        x = F.relu(self.fc1(x))
-        x = F.relu(self.fc2(x))
-        x = self.fc3(x)
-        return x
-
-class MLP2d(nn.Module):
-    def __init__(self, input_size, hidden_size, output_size, amount=0.1):
-        super(MLP2d, self).__init__()
-        self.fc1 = nn.Linear(input_size, hidden_size)
-        self.fc2 = nn.Linear(hidden_size, hidden_size)
-
-        self.dropout = nn.Dropout(amount)
-        self.fc3 = nn.Linear(hidden_size, output_size)
-
-    def forward(self, x):
-        x = F.relu(self.fc1(x))
-        x = F.relu(self.fc2(x))
-        x = self.fc3(self.dropout(x))
-        return x
-
-class MLP3(nn.Module):
-    def __init__(self, input_size, hidden_size, output_size):
-        super(MLP3, self).__init__()
-        self.fc1 = nn.Linear(input_size, hidden_size)
-        self.fc2 = nn.Linear(hidden_size, hidden_size)
-        self.fc3 = nn.Linear(hidden_size, hidden_size)
-        self.fc4 = nn.Linear(hidden_size, output_size)
-
-    def forward(self, x):
-        x = F.relu(self.fc1(x))
-        x = F.relu(self.fc2(x))
-        x = F.relu(self.fc3(x))
-        x = self.fc4(x)
-        return x
-
-
-class LSTMClassifier(nn.Module):
-    def __init__(self, input_size, hidden_size, output_size, num_layers=1):
-        super(LSTMClassifier, self).__init__()
-        self.hidden_size = hidden_size
-        self.num_layers = num_layers
-        self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
-        self.fc = nn.Linear(hidden_size, output_size)
-
-    def forward(self, x):
-        h0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(x.device)
-        c0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(x.device)
-
-        out, _ = self.lstm(x, (h0, c0))
-        out = self.fc(out[:, -1, :])
-        return out
-
-
-class MultiHeadAttention(nn.Module):
-    def __init__(self, input_dim, num_heads):
-        super(MultiHeadAttention, self).__init__()
-        self.num_heads = num_heads
-        self.attention_head_size = int(input_dim / num_heads)
-        if self.attention_head_size == 0:
-            self.num_heads = 1
-            self.attention_head_size = input_dim
-        self.all_head_size = self.num_heads * self.attention_head_size
-
-        self.query = nn.Linear(input_dim, self.all_head_size)
-        self.key = nn.Linear(input_dim, self.all_head_size)
-        self.value = nn.Linear(input_dim, self.all_head_size)
-
-        self.softmax = nn.Softmax(dim=-1)
-
-    def forward(self, hidden_states):
-        mixed_query_layer = self.query(hidden_states)
-        mixed_key_layer = self.key(hidden_states)
-        mixed_value_layer = self.value(hidden_states)
-
-        query_layer = mixed_query_layer.view(-1, self.num_heads, self.attention_head_size)
-        key_layer = mixed_key_layer.view(-1, self.num_heads, self.attention_head_size)
-        value_layer = mixed_value_layer.view(-1, self.num_heads, self.attention_head_size)
-
-        attention_scores = torch.matmul(query_layer, key_layer.transpose(-1, -2))
-        attention_probs = self.softmax(attention_scores)
-
-        context_layer = torch.matmul(attention_probs, value_layer)
-        context_layer = context_layer.contiguous().view(-1, self.all_head_size)
-        return context_layer
-
-
-class TinyAttentionMLP(nn.Module):
-    def __init__(self, input_dim, output_dim, hidden_dim, num_heads):
-        super(TinyAttentionMLP, self).__init__()
-        self.attention = MultiHeadAttention(input_dim, num_heads)
-        self.layer_norm1 = nn.LayerNorm(input_dim)
-        self.fc1 = nn.Linear(input_dim, hidden_dim)
-        self.dropout = nn.Dropout(0.1)
-        self.layer_norm2 = nn.LayerNorm(hidden_dim)
-        self.fc2 = nn.Linear(hidden_dim, output_dim)
-
-    def forward(self, x):
-        attention_output = self.attention(x)
-        x = x + attention_output  # Skip connection
-        x = self.layer_norm1(x)
-
-        hidden = F.relu(self.fc1(x))
-        hidden = self.dropout(hidden)
-        hidden = self.layer_norm2(hidden)
-
-        output = self.fc2(hidden)
-        return output
-
 class NMSELoss(nn.Module):
     def __init__(self):
         super(NMSELoss, self).__init__()
 
     def forward(self, y_pred, y_true):
         return torch.mean((y_pred - y_true)**2) / (torch.var(y_true) + 1e-8)
-
 
 def train_mlp(activations, other_data, regime_data, regime, opponents_data, patience=5, num_prints=5, num_epochs=25,
               model_type="linear", input_data2=None):
@@ -317,6 +94,13 @@ def train_mlp(activations, other_data, regime_data, regime, opponents_data, pati
     if "l2reg" in model_type:
         model_type = model_type.replace("l2reg", "")
         l2_reg = True
+
+    if 'e50' in model_type:
+        num_epochs = 50
+        model_type = model_type.replace("e50", "")
+    elif 'e100' in model_type:
+        num_epochs = 100
+        model_type = model_type.replace("e100", "")
 
     if model_type == "mlp1":
         model = MLP(input_size, hidden_size, output_size).to(device)
@@ -436,7 +220,6 @@ def get_unique_arrays(data):
     unique_arrays = []
 
     for item in data:
-        # Convert arrays to tuple for hashable comparison
         item_tuple = tuple(item)
 
         if item_tuple not in seen:
@@ -547,40 +330,7 @@ def run_mlp_test(correlation_data2, act_key, activations, path):
             confusion_matrix[i, j] = p_b_given_a
             confusion_matrix_n[i, j] = p_b_given_not_a
             ig_matrix[i, j] = information_gain(binary_correctness, model_a, model_b)
-    plt.figure(figsize=(20, 8))
-    plt.subplot(1, 2, 1)
-    sns.heatmap(confusion_matrix, annot=True, fmt=".2f", cmap="coolwarm_r",
-                xticklabels=models, yticklabels=models, vmin=0, vmax=1)
-    plt.title('Probability B is Correct, Given A is Correct')
-    plt.xlabel('Feature B')
-    plt.ylabel(f'Feature A (given condition correct, i.e. <{percentile} percentile MSE)')
-    plt.subplot(1, 2, 2)
-    sns.heatmap(confusion_matrix_n, annot=True, fmt=".2f", cmap="coolwarm_r",
-                xticklabels=models, yticklabels=models, vmin=0, vmax=1)
-    plt.title('Probability B is Correct, Given A is Incorrect')
-    plt.xlabel('Feature B')
-    plt.ylabel(f'Feature A (given condition incorrect, i.e. >= {percentile} percentile MSE)')
-    plt.tight_layout()
-    plt.savefig(os.path.join(path, f"mlp-confusion.png"))
-
-    plt.figure(figsize=(10, 8))
-    sns.heatmap((confusion_matrix - confusion_matrix_n) / (confusion_matrix + confusion_matrix_n), annot=True,
-                fmt=".2f", cmap="coolwarm_r",
-                xticklabels=models, yticklabels=models, vmin=-1, vmax=1)
-    plt.title('Influence of A on B')
-    plt.xlabel('Feature B')
-    plt.ylabel('Feature A')
-    plt.tight_layout()
-    plt.savefig(os.path.join(path, f"mlp-influence.png"))
-
-    plt.figure(figsize=(10, 8))
-    sns.heatmap(ig_matrix, annot=True, fmt=".2f", cmap="coolwarm_r", xticklabels=models, yticklabels=models, vmin=-1,
-                vmax=1)
-    plt.title('Information gain of B given A')
-    plt.xlabel('Feature B')
-    plt.ylabel('Feature A')
-    plt.tight_layout()
-    plt.savefig(os.path.join(path, f"mlp-infogain.png"))
+    plot_info_matrices(confusion_matrix, confusion_matrix_n, models, percentile, path, ig_matrix)
 
 
 def get_keys(model_type, used_cor_inputs, correlation_data2, correlation_data_conv, correlation_data_lstm, compose,
@@ -720,10 +470,9 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=5):
 
             # MLP F2F DATA
             remove_labels = []
-            run = True
-            #models = ['mlp2', 'mlp2bn', 'mlp2d', 'mlp2d2', 'mlp2d3', 'mlp2ln', 'mlp2s', 'mlp3', 'mlp1', 'mlp2l2reg', 'linear', 'mlp2c5', 'mlp2c10', 'mlp2c16']
-            models = ['mlp2l2reg', 'linear', 'mlp1', 'mlp2ln', 'mlp2d2', 'mlp2d3']
-            models = ['mlp2d2']
+            run = False
+            models = ['mlp2', 'mlp2bn', 'mlp2d', 'mlp2d2', 'mlp2d3', 'mlp2ln', 'mlp2s', 'mlp3', 'mlp1', 'mlp2l2reg', 'linear', 'mlp2c5', 'mlp2c10', 'mlp2c16', 'linearl2reg', 'mlp2dl2reg', 'mlp3l2reg', 'mlp1l2reg', 'mlp2e50', 'mlp2l2rege50', 'mlp3l2rege50', 'mlp1l2rege50']
+            #models = ['mlp2l2reg', 'linear', 'mlp1', 'mlp2ln', 'mlp2d2', 'mlp2d3']
 
             compose = False
             split_by_regime = True
@@ -870,12 +619,17 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=5):
                                 plt.tight_layout()
                                 plt.savefig(os.path.join(path, f"{name}f2f-{model_type}.png"))
                             else:
-                                #mat = val_loss_matrix_f2f.to_numpy().flatten()
-                                #mat = np.nan_to_num(mat, nan=np.nan, posinf=np.nan, neginf=np.nan)[np.isfinite(mat)]
+                                if not split_by_regime:
+                                    mat = val_loss_matrix_f2f.to_numpy().flatten()
+                                    mat = np.nan_to_num(mat, nan=np.nan, posinf=np.nan, neginf=np.nan)[np.isfinite(mat)]
+
+                                    print(model_type, mat.mean(), mat.std(), (mat < 0.1).sum(), (mat < 0.05).sum(), (mat < 0.02).sum(), (mat < 0.01).sum())
+                                    histogram.append(mat)
+                                    models_used.append(model_type)
 
                                 if str(regime) == str(unique_regimes[0]):
                                     pass
-                                    #mat = min_matrix_f2f.to_numpy().flatten()
+                                    mat = min_matrix_f2f.to_numpy().flatten()
                                     #mat = np.nan_to_num(mat, nan=np.nan, posinf=np.nan, neginf=np.nan)[np.isfinite(mat)]
                                     #models_used.append(model_type)
                                     #print(model_type, mat.mean(), mat.std(), (mat < 0.1).sum(), (mat < 0.05).sum(), (mat < 0.02).sum(), (mat < 0.01).sum())
@@ -967,128 +721,24 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=5):
                     for target in compose_targets:
                         try:
                             name = "c" * bool(image_inputs) + "v" * (bool(image_inputs) and not image_outputs) + "r" * bool(split_by_regime)
-                            histogram_used = [np.nan_to_num(arr, nan=np.nan, posinf=np.nan, neginf=np.nan) for arr in histogram[target]]
-
-                            labels_array = np.concatenate([[mod] * len(data) for mod, data in zip(models_used, histogram_used)])
-                            flattened = np.concatenate(histogram_used)
-                            data_for_plotting = pd.DataFrame({
-                                'Values': flattened,
-                                'Labels': labels_array
-                            })
-                            plt.figure(figsize=(12, 6))
-                            ax = sns.histplot(data=data_for_plotting, x='Values', bins=20, binrange=(0, 0.4), hue='Labels', hue_order=models_used, element="bars", stat="count", multiple='dodge')
-                            plt.title('Comparison of Validation MSEs')
-                            plt.xlabel('NMSE Value')
-                            plt.ylabel('Count')
-                            plt.legend(title='Matrix')
-                            ax.legend(labels=models_used, title='Models', bbox_to_anchor=(0.6, 1), loc='upper left')
-                            plt.tight_layout()
-                            plt.savefig(os.path.join(path, f"{name}hist-{target}.png"))
+                            plot_bars(histogram[target], histogram2, path, name, target, models_used)
                         except BaseException as e:
                             print("failed", target, e)
                 else:
                     try:
+                        print('len', len(histogram))
                         name = "c" * bool(image_inputs) + "v" * (bool(image_inputs) and not image_outputs) + "r" * bool(split_by_regime)
-                        histogram_used = [np.nan_to_num(arr, nan=np.nan, posinf=np.nan, neginf=np.nan) for arr in histogram]
 
-                        labels_array = np.concatenate([[mod] * len(data) for mod, data in zip(models_used, histogram_used)])
-                        flattened = np.concatenate(histogram_used)
-                        data_for_plotting = pd.DataFrame({
-                            'Values': flattened,
-                            'Labels': labels_array
-                        })
-                        plt.figure(figsize=(12, 6))
-                        ax = sns.histplot(data=data_for_plotting, x='Values', bins=20, binrange=(0, 0.99), shrink=0.8, hue='Labels',  hue_order=models_used, element="bars", stat="count", multiple='dodge')
-                        plt.title('Comparison of Validation MSEs')
-                        plt.xlabel('NMSE Value')
-                        plt.ylabel('Count')
-                        plt.legend(title='Matrix')
-                        ax.legend(labels=models_used, title='Models', bbox_to_anchor=(0.6, 1), loc='upper left')
-                        plt.tight_layout()
-                        plt.savefig(os.path.join(path, f"{name}hist-{target}.png"))
-
-                        print('fig')
-
-                        plt.figure(figsize=(10, 10))
-                        plt.plot([(0,0), (1,1)], c='black', linestyle='dashed', label='_nolegend_')
-                        differences = []
-                        num_rows, num_columns = min_matrix_f2f.shape
-                        for i, (minregime, allregimes) in enumerate(zip(histogram, histogram2)):
-                            for j, (min_val, all_val) in enumerate(zip(minregime, allregimes)):
-                                diff = min_val - all_val
-
-                                original_row = j // num_columns
-                                original_column = j % num_columns
-                                if original_row != original_column and min_val < 0.5:
-                                    differences.append((diff, i, original_row, original_column, j))  # Store difference along with indices
-                        top_differences = sorted(differences, reverse=False)[:1]
-                        print(top_differences)
-
-                        for i, (minregime, allregimes) in enumerate(zip(histogram, histogram2)):
-                            plt.scatter(allregimes, minregime, s=25, alpha=0.6)
-                            for diff, hist_idx, or_row, or_col, j in top_differences:
-                                if i == hist_idx:  # Check if this point belongs to the current histogram
-                                    plt.annotate(f'{keys[or_row]},{keys1[or_col]}', (allregimes[j], minregime[j]))
-                                    #todo: save models used for the best one
-
-                        minregime_array = np.array([minregime for minregime, _ in zip(histogram, histogram2)])
-                        allregimes_array = np.array([allregime for allregime, _ in zip(histogram2, histogram)])
-                        differences = minregime_array - allregimes_array
-
-                        indices_of_top_n = np.argsort(differences)[-5:]
-
-                        plt.xlabel('NMSE (trained on all)')
-                        plt.ylabel('NMSE (minimum of contrastive regimes)')
-                        plt.tight_layout()
-                        plt.ylim((-0.05, 1.1))
-                        plt.xlim((-0.05, 1.1))
-                        plt.legend(title='Model', labels=models_used)
-                        plt.savefig(os.path.join(path, f"{name}scatter-{target}.png"))
-
-                        num_models = len(histogram)
-
-                        # Set up the matplotlib figure
-                        plt.figure(figsize=(12, 8))
-
-                        # Calculating means and standard deviations
-                        means_minregime = [np.mean(minregime) for minregime in histogram]
-                        stds_minregime = [np.std(minregime) for minregime in histogram]
-                        means_allregimes = [np.mean(allregimes) for allregimes in histogram2]
-                        stds_allregimes = [np.std(allregimes) for allregimes in histogram2]
-
-                        print(means_minregime)
-                        print(means_allregimes)
-
-                        # Setting up the positions for the bars
-                        bar_width = 0.3  # Width of the bars
-                        index = np.arange(num_models)  # Model indices
-                        bar1_pos = index - bar_width / 2  # Positions for the minregime bars
-                        bar2_pos = index + bar_width / 2  # Positions for the allregimes bars
-
-                        # Creating the bars
-                        plt.bar(bar1_pos, means_minregime, bar_width, yerr=stds_minregime, capsize=5, label='MinRegime', alpha=0.6)
-                        plt.bar(bar2_pos, means_allregimes, bar_width, yerr=stds_allregimes, capsize=5, label='AllRegimes', alpha=0.6)
-
-                        # Improving the aesthetics
-                        plt.xlabel('Models')
-                        plt.ylabel('NMSE')
-                        plt.title('Comparison between MinRegime and AllRegimes for Each Model')
-                        plt.xticks(index, models_used, rotation=45)
-                        plt.legend()
-
-                        plt.tight_layout()
-                        plt.savefig(os.path.join(path, f"{name}bar-{target}.png"))
+                        plot_histogram(path, name, target, histogram, models_used)
+                        plot_scatter(histogram, histogram2, keys, keys1, min_matrix_f2f, models_used, path, name, target)
+                        plot_bars(histogram, histogram2, path, name, target, models_used)
 
                     except BaseException as e:
                         print("failed", target, e)
 
             print('finished')
 
-            name = ""
-            if image_inputs:
-                name += "c"
-                if not image_outputs:
-                    name += "v"
+            name = "c" * bool(image_inputs) + "v" * (bool(image_inputs) and not image_outputs)
             matrices = {model: pd.read_csv(os.path.join(path, f"{name}f2f_loss_matrix_{model}.csv")) for model in models}
             for i, model1 in enumerate(models):
                 for j, model2 in enumerate(models):
