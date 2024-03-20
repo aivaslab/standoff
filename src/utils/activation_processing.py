@@ -15,7 +15,7 @@ import torch.nn as nn
 import torch
 from sklearn.model_selection import train_test_split
 
-from src.utils.activation_models import MLP, LinearClassifier, MLP2d, MLP2c, MLP2bn, MLP3, BasicCNN2m, BasicCNN2, BasicCNN1, MLP2, LSTMClassifier, MLP2ln, TinyAttentionMLP
+from src.utils.activation_models import MLP, LinearClassifier, MLP2d, MLP2c, MLP2bn, MLP3, BasicCNN2m, BasicCNN2, BasicCNN1, MLP2, LSTMClassifier, MLP2ln, TinyAttentionMLP, LSTMClassifierDrop, RNNClassifier
 from src.utils.activation_plotting import plot_info_matrices, plot_histogram, plot_scatter, plot_bars
 
 
@@ -138,6 +138,16 @@ def train_mlp(activations, other_data, regime_data, regime, opponents_data, pati
         model = MLP2ln(input_size, hidden_size, output_size).to(device)
     elif model_type == "attn":
         model = TinyAttentionMLP(input_size, output_size, hidden_size, 1).to(device)
+    elif model_type == "lstmd1":
+        model = LSTMClassifierDrop(input_size, hidden_size, output_size, 1, 0.1).to(device)
+    elif model_type == "lstmd5":
+        model = LSTMClassifierDrop(input_size, hidden_size, output_size, 1, 0.5).to(device)
+    elif model_type == "rnn":
+        model = RNNClassifier(input_size, hidden_size, output_size, 1, 0.0).to(device)
+    elif model_type == "rnnd1":
+        model = RNNClassifier(input_size, hidden_size, output_size, 1, 0.1).to(device)
+    elif model_type == "rnnd5":
+        model = RNNClassifier(input_size, hidden_size, output_size, 1, 0.5).to(device)
     # criterion = nn.MSELoss()
     criterion = NMSELoss()
     slowcriterion = nn.MSELoss(reduction='none')
@@ -333,7 +343,7 @@ def run_mlp_test(correlation_data2, act_key, activations, path):
     plot_info_matrices(confusion_matrix, confusion_matrix_n, models, percentile, path, ig_matrix)
 
 
-def get_keys(model_type, used_cor_inputs, correlation_data2, correlation_data_conv, correlation_data_lstm, compose,
+def get_keys(model_type, used_cor_inputs, correlation_data2, correlation_data_conv, correlation_data_lstm,  correlation_data_lstm_inputs, correlation_data_lstm_outputs, compose,
              use_conv_inputs=False, image_output=False):
     output_keys = sorted(used_cor_inputs.keys())
     input_keys = sorted(used_cor_inputs.keys())
@@ -346,9 +356,9 @@ def get_keys(model_type, used_cor_inputs, correlation_data2, correlation_data_co
         if "conv" in model_type or use_conv_inputs:
             input_keys = sorted(correlation_data_conv.keys())
             output_size = len(input_keys)
-    elif model_type == "lstm":
-        input_keys = sorted(correlation_data_lstm.keys())
-        output_size = len(input_keys)
+    if "lstm" in model_type or "rnn" in model_type:
+        input_keys = sorted(correlation_data_lstm_inputs.keys())
+        return input_keys, input_keys, len(input_keys), len(input_keys), input_keys
     else:
         output_size = input_size
         second_input_keys = input_keys
@@ -368,6 +378,8 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=5):
             correlation_data = {}
             correlation_data2 = {}
             correlation_data_lstm = {}
+            correlation_data_lstm_inputs = {}
+            correlation_data_lstm_outputs = {}
             correlation_data_conv = {}
             correlation_data_conv_flat = {}
 
@@ -398,7 +410,7 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=5):
                         correlation_data2[key] = np.concatenate(arrays, axis=0)
 
                     elif key == "inputs":
-                        print(np.concatenate(loaded_activation_data[key], axis=0).shape)
+                        #print(np.concatenate(loaded_activation_data[key], axis=0).shape)
                         real_arrays = np.concatenate(loaded_activation_data[key], axis=0).reshape((-1, 5, 5, 7, 7))
 
                         correlation_data_conv[key + '_stacked'] = real_arrays.reshape((-1, 25, 7, 7))
@@ -417,11 +429,12 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=5):
                             correlation_data_conv_flat[f'{key}_c{c}_h'] = real_arrays[:, :, c, :, :].reshape(
                                 (-1, 5 * 7 * 7))
                         for k in correlation_data_conv.keys():
-                            print("conv shape", k, correlation_data_conv[k].shape)
+                            pass
+                            #print("conv shape", k, correlation_data_conv[k].shape)
                     else:
                         concatenated_array = np.concatenate(loaded_activation_data[key], axis=0)
                         correlation_data2[key] = concatenated_array
-                    print(f'{key} shape:', concatenated_array.shape)
+                    #print(f'{key} shape:', concatenated_array.shape)
 
             for key in loaded_activation_data:
                 new_key = key.replace("act_label_", "")
@@ -450,32 +463,52 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=5):
                             arrays.append(data_array[:, -(a_len // timesteps):])
                             hist_arrays.append(data_array[:, :])
                     if key != "act_label_vision" and key != "act_label_box-updated" and key != "act_label_exist":
+                        # these variables are always the same at the end of the task, but differ during
                         correlation_data2[new_key] = np.concatenate(arrays, axis=0)
-                        print('cor2shape', new_key, correlation_data2[new_key].shape)
+                        #print('cor2shape', new_key, correlation_data2[new_key].shape)
                     if key != "act_label_opponents" and key != "act_label_informedness":
                         correlation_data2[new_key + "_h"] = np.concatenate(hist_arrays, axis=0)
                         value = correlation_data2[new_key + "_h"]
-                        correlation_data_lstm[new_key + "_h"] = value.reshape(value.shape[0], 5, value.shape[1] // 5)
-                        print('corlstmshape', new_key, correlation_data_lstm[new_key + "_h"].shape)
+                        num_sequences, feature_dim_times_timesteps = value.shape
+                        feature_dim = feature_dim_times_timesteps // timesteps
+                        new_value = value.reshape((num_sequences, timesteps, feature_dim))
+                        correlation_data_lstm[new_key + "_h"] = new_value
+                        #print('corlstmshape', new_key, correlation_data_lstm[new_key + "_h"].shape)
+
+                        modified_sequences = np.zeros((num_sequences * timesteps, timesteps, feature_dim))
+                        modified_final = np.zeros((num_sequences * timesteps, feature_dim))
+                        for i in range(num_sequences):
+                            for num_steps in range(1, timesteps + 1):
+                                sequence = np.zeros((timesteps, feature_dim))
+                                sequence[-num_steps:] = new_value[i, :num_steps]
+                                modified_sequences[i * timesteps + (num_steps - 1)] = sequence
+                                modified_final[i * timesteps + (num_steps - 1)] = sequence[-1]
+
+                        correlation_data_lstm_inputs[new_key] = modified_sequences
+                        correlation_data_lstm_outputs[new_key] = modified_final
+                        #print('corstepsshape', new_key, correlation_data_lstm_inputs[new_key].shape)
+                        #print('corlastshape', new_key, correlation_data_lstm_outputs[new_key].shape)
 
             correlation_data2["rand_vec5"] = np.random.randint(2, size=(length, 5))
             correlation_data_conv["rand_vec5"] = np.random.randint(2, size=(length, 1, 7, 7))
             correlation_data_conv_flat["rand_vec5"] = np.random.randint(2, size=(length, 1 * 7 * 7))
-            pred_d = correlation_data_conv["inputs_c4_last"]
-            pred_d2 = correlation_data_conv_flat["inputs_c4_last"]
+            pred_d = correlation_data_lstm_inputs["vision"]
+            pred_d2 = correlation_data_lstm_outputs["vision"]
             random_indices = np.random.choice(len(pred_d), size=3, replace=False)
-            # print("pred datapoints:", pred_d[random_indices])
-            # print("pred datapoints:", pred_d2[random_indices])
+            #print("pred datapoints:", pred_d[random_indices])
+            #print("pred datapoints:", pred_d2[random_indices])
+            print(correlation_data_lstm_inputs.keys())
             activation_keys = ['activations_out']  # , 'activations_hidden_short', 'activations_hidden_long']
 
             # MLP F2F DATA
             remove_labels = []
-            run = False
-            models = ['mlp2', 'mlp2bn', 'mlp2d', 'mlp2d2', 'mlp2d3', 'mlp2ln', 'mlp2s', 'mlp3', 'mlp1', 'mlp2l2reg', 'linear', 'mlp2c5', 'mlp2c10', 'mlp2c16', 'linearl2reg', 'mlp2dl2reg', 'mlp3l2reg', 'mlp1l2reg', 'mlp2e50', 'mlp2l2rege50', 'mlp3l2rege50', 'mlp1l2rege50']
+            run = True
+            #models = ['mlp2', 'mlp2bn', 'mlp2d', 'mlp2d2', 'mlp2d3', 'mlp2ln', 'mlp2s', 'mlp3', 'mlp1', 'mlp2l2reg', 'linear', 'mlp2c5', 'mlp2c10', 'mlp2c16', 'linearl2reg', 'mlp2dl2reg', 'mlp3l2reg', 'mlp1l2reg', 'mlp2e50', 'mlp2l2rege50', 'mlp3l2rege50', 'mlp1l2rege50']
             #models = ['mlp2l2reg', 'linear', 'mlp1', 'mlp2ln', 'mlp2d2', 'mlp2d3']
+            models = ['lstm']
 
             compose = False
-            split_by_regime = True
+            split_by_regime = False
             compose_targets = [None]
             # compose_targets = ['b-loc', 'target-size', 'target-loc', 'loc']
             # remove_labels = ['labels']
@@ -505,6 +538,7 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=5):
 
             if split_by_regime:
                 unique_regimes = np.unique(correlation_data2['informedness'], axis=0)
+                # we don't have this for lstm data yet
             else:
                 unique_regimes = [None]
 
@@ -513,7 +547,7 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=5):
                       split_by_regime, 'epochs:', num_epochs)
                 for model_type in models:
                     keys1, output_keys, size1, size, second_input_keys = get_keys(model_type, used_cor_inputs, correlation_data2,
-                                                               correlation_data_conv, correlation_data_lstm, compose,
+                                                               correlation_data_conv, correlation_data_lstm, correlation_data_lstm_inputs, correlation_data_lstm_outputs, compose,
                                                                use_conv_inputs=image_inputs, image_output=image_outputs)
                     loss_matrices = {str(regime): pd.DataFrame(index=keys1, columns=output_keys) for regime in
                                      unique_regimes}
@@ -525,9 +559,9 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=5):
                             print("fitting combinations to target feature:", target)
                             for i, key1 in enumerate(keys1):
                                 if model_type == "lstm":
-                                    input_data = correlation_data_lstm[key1]
-                                    regime_data = correlation_data_lstm["informedness"]
-                                    opponents_data = correlation_data_lstm["opponents"]
+                                    input_data = correlation_data_lstm_inputs[key1]
+                                    regime_data = None#correlation_data_lstm_outputs["informedness"]
+                                    opponents_data = None#correlation_data_lstm_outputs["opponents"]
                                     realkeys = keys1
                                 else:
                                     input_data = used_cor_inputs[key1]
@@ -544,20 +578,21 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=5):
                                     if compose:
                                         if j < i:
                                             continue
-                                        if model_type == "lstm":
+                                        output_data = correlation_data2[target]
+                                        if "lstm" in model_type or "rnn" in model_type:
                                             if key2 not in keys1:
                                                 continue
-                                            input_data = np.concatenate(
-                                                [correlation_data_lstm[key1], correlation_data_lstm[key2]], axis=2)
+                                            input_data = np.concatenate([correlation_data_lstm[key1], correlation_data_lstm[key2]], axis=2)
                                         elif cat:
                                             print(key1, key2)
                                             input_data = np.concatenate([used_cor_inputs[key1], used_cor_inputs[key2]], axis=1)
                                         elif not cat:
                                             input_data = used_cor_inputs[key1]
                                             input_data2 = used_cor_inputs[key2]
-                                        output_data = correlation_data2[target]
                                     elif image_outputs:
                                         output_data = correlation_data_conv_flat[key2]
+                                    elif "lstm" in model_type or "rnn" in model_type:
+                                        output_data = correlation_data_lstm_outputs[key2]
                                     else:
                                         output_data = correlation_data2[key2]
                                     #if not cat:
@@ -593,7 +628,7 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=5):
             models_used = []
             for model_type in models:
                 keys1, keys, size1, size, input2keys = get_keys(model_type, used_cor_inputs, correlation_data2,
-                                                    correlation_data_conv, correlation_data_lstm, compose,
+                                                    correlation_data_conv, correlation_data_lstm, correlation_data_lstm_inputs, correlation_data_lstm_outputs, compose,
                                                     use_conv_inputs=image_inputs, image_output=image_outputs)
 
                 min_matrix_f2f = pd.DataFrame(np.inf, index=keys1, columns=keys)
