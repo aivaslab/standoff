@@ -505,7 +505,7 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=5):
             run = True
             #models = ['mlp2', 'mlp2bn', 'mlp2d', 'mlp2d2', 'mlp2d3', 'mlp2ln', 'mlp2s', 'mlp3', 'mlp1', 'mlp2l2reg', 'linear', 'mlp2c5', 'mlp2c10', 'mlp2c16', 'linearl2reg', 'mlp2dl2reg', 'mlp3l2reg', 'mlp1l2reg', 'mlp2e50', 'mlp2l2rege50', 'mlp3l2rege50', 'mlp1l2rege50']
             #models = ['mlp2l2reg', 'linear', 'mlp1', 'mlp2ln', 'mlp2d2', 'mlp2d3']
-            models = ['lstm']
+            models = ['lstmd1', 'lstmd5']
 
             compose = False
             split_by_regime = False
@@ -558,7 +558,7 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=5):
                         for target in compose_targets:
                             print("fitting combinations to target feature:", target)
                             for i, key1 in enumerate(keys1):
-                                if model_type == "lstm":
+                                if "lstm" in model_type or "rnn" in model_type:
                                     input_data = correlation_data_lstm_inputs[key1]
                                     regime_data = None#correlation_data_lstm_outputs["informedness"]
                                     opponents_data = None#correlation_data_lstm_outputs["opponents"]
