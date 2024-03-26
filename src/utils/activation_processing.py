@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 import scipy.stats
 import tqdm
+
 from scipy.stats import pearsonr, entropy
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -15,6 +16,7 @@ import torch.nn as nn
 import torch
 from sklearn.model_selection import train_test_split
 
+from src.mse_graph_search import f2f_best_first
 from src.utils.activation_models import MLP, LinearClassifier, MLP2d, MLP2c, MLP2bn, MLP3, BasicCNN2m, BasicCNN2, BasicCNN1, MLP2, LSTMClassifier, MLP2ln, TinyAttentionMLP, LSTMClassifierDrop, RNNClassifier
 from src.utils.activation_plotting import plot_info_matrices, plot_histogram, plot_scatter, plot_bars
 
@@ -369,7 +371,12 @@ def get_keys(model_type, used_cor_inputs, correlation_data2, correlation_data_co
     return input_keys, output_keys, output_size, input_size, second_input_keys
 
 
+
 def process_activations(path, epoch_numbers, repetitions, timesteps=5):
+
+    f2f_best_first(path, epoch_numbers, repetitions, timesteps=5, train_mlp=train_mlp)
+    print('done')
+
     for epoch_number in epoch_numbers:
         for repetition in repetitions:
             with open(os.path.join(path, f'activations_{epoch_number}_{repetition}.pkl'), 'rb') as f:
@@ -418,16 +425,12 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=5):
 
                         for t in range(5):
                             correlation_data_conv[f'{key}_t{t}'] = real_arrays[:, t, :, :, :].reshape((-1, 5, 7, 7))
-                            correlation_data_conv_flat[f'{key}_t{t}'] = real_arrays[:, t, :, :, :].reshape(
-                                (-1, 5 * 7 * 7))
+                            correlation_data_conv_flat[f'{key}_t{t}'] = real_arrays[:, t, :, :, :].reshape((-1, 5 * 7 * 7))
                         for c in range(real_arrays.shape[1]):
-                            correlation_data_conv[f'{key}_c{c}_last'] = real_arrays[:, -1, c, :, :].reshape(
-                                (-1, 1, 7, 7))
-                            correlation_data_conv_flat[f'{key}_c{c}_last'] = real_arrays[:, -1, c, :, :].reshape(
-                                (-1, 1 * 7 * 7))
+                            correlation_data_conv[f'{key}_c{c}_last'] = real_arrays[:, -1, c, :, :].reshape( (-1, 1, 7, 7))
+                            correlation_data_conv_flat[f'{key}_c{c}_last'] = real_arrays[:, -1, c, :, :].reshape( (-1, 1 * 7 * 7))
                             correlation_data_conv[f'{key}_c{c}_h'] = real_arrays[:, :, c, :, :].reshape((-1, 5, 7, 7))
-                            correlation_data_conv_flat[f'{key}_c{c}_h'] = real_arrays[:, :, c, :, :].reshape(
-                                (-1, 5 * 7 * 7))
+                            correlation_data_conv_flat[f'{key}_c{c}_h'] = real_arrays[:, :, c, :, :].reshape((-1, 5 * 7 * 7))
                         for k in correlation_data_conv.keys():
                             pass
                             #print("conv shape", k, correlation_data_conv[k].shape)
@@ -455,8 +458,7 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=5):
                             arrays.append(one_hot[:, -2:])
                             hist_arrays.append(one_hot[:, :])
                         elif key == "act_label_informedness":
-                            one_hot = np.eye(3)[data_array.reshape(-1)].reshape(data_array.shape[0],
-                                                                                data_array.shape[1] * 3)
+                            one_hot = np.eye(3)[data_array.reshape(-1)].reshape(data_array.shape[0],data_array.shape[1] * 3)
                             arrays.append(one_hot[:, -6:])
                             hist_arrays.append(one_hot[:, :])
                         else:
@@ -502,10 +504,10 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=5):
 
             # MLP F2F DATA
             remove_labels = []
-            run = True
-            #models = ['mlp2', 'mlp2bn', 'mlp2d', 'mlp2d2', 'mlp2d3', 'mlp2ln', 'mlp2s', 'mlp3', 'mlp1', 'mlp2l2reg', 'linear', 'mlp2c5', 'mlp2c10', 'mlp2c16', 'linearl2reg', 'mlp2dl2reg', 'mlp3l2reg', 'mlp1l2reg', 'mlp2e50', 'mlp2l2rege50', 'mlp3l2rege50', 'mlp1l2rege50']
-            #models = ['mlp2l2reg', 'linear', 'mlp1', 'mlp2ln', 'mlp2d2', 'mlp2d3']
-            models = ['lstmd1', 'lstmd5']
+            run = False
+            models = ['mlp2', 'mlp2bn', 'mlp2d', 'mlp2d2', 'mlp2d3', 'mlp2ln', 'mlp2s', 'mlp3', 'mlp1', 'mlp2l2reg', 'linear', 'mlp2c5', 'mlp2c10', 'mlp2c16', 'linearl2reg', 'mlp2dl2reg', 'mlp3l2reg', 'mlp1l2reg', 'mlp2e50', 'mlp2l2rege50', 'mlp3l2rege50', 'mlp1l2rege50']
+            #models = ['mlp2l2reg', 'mlp2ln', 'mlp2d']
+            #models = ['rnn', 'rnnd1', 'rnnd5', 'lstm', 'lstmd1', 'lstmd5']
 
             compose = False
             split_by_regime = False
