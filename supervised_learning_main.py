@@ -190,6 +190,7 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
             tq = tqdm.trange(len(_val_loader))
 
             for i, (inputs, labels, params, oracles, metrics, act_labels_dict) in enumerate(_val_loader):
+                real_batch_size = len(labels)
                 inputs, labels, oracles = inputs.to(device), labels.to(device), oracles.to(device)
 
 
@@ -219,23 +220,23 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
                 tq.update(1)
 
                 if i < num_activation_batches or num_activation_batches < 0:
-                    activation_data['activations_out'].append(hook.activations_out.cpu().reshape(batch_size, -1))
+                    activation_data['activations_out'].append(hook.activations_out.cpu().reshape(real_batch_size, -1))
                     activation_data['activations_hidden_short'].append(
-                        hook.activations_hidden[0].cpu().reshape(batch_size, -1))
+                        hook.activations_hidden[0].cpu().reshape(real_batch_size, -1))
                     activation_data['activations_hidden_long'].append(
-                        hook.activations_hidden[1].cpu().reshape(batch_size, -1))
-                    print(inputs.cpu().numpy().shape)
-                    activation_data['inputs'].append(inputs.cpu().numpy().reshape(batch_size, -1))
-                    activation_data['pred'].append(pred.numpy().reshape(batch_size, -1))
-                    activation_data['labels'].append(labels.cpu().numpy().reshape(batch_size, -1))
-                    activation_data['oracles'].append(oracles.cpu().numpy().reshape(batch_size, -1))
+                        hook.activations_hidden[1].cpu().reshape(real_batch_size, -1))
+                    #print(inputs.cpu().numpy().shape)
+                    activation_data['inputs'].append(inputs.cpu().numpy().reshape(real_batch_size, -1))
+                    activation_data['pred'].append(pred.numpy().reshape(real_batch_size, -1))
+                    activation_data['labels'].append(labels.cpu().numpy().reshape(real_batch_size, -1))
+                    activation_data['oracles'].append(oracles.cpu().numpy().reshape(real_batch_size, -1))
 
                     # Handle each act_label separately
                     for name, act_label in act_labels_dict.items():
                         key = f"act_label_{name}"
                         if key not in activation_data:
                             activation_data[key] = []
-                        activation_data[key].append(act_label.cpu().numpy().reshape(batch_size, -1))
+                        activation_data[key].append(act_label.cpu().numpy().reshape(real_batch_size, -1))
                         #print('shape', key, act_label.shape)
 
                 if i == num_activation_batches - 1:

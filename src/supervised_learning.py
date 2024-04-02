@@ -8,6 +8,7 @@ import os
 
 import pandas as pd
 
+from .utils.conversion import calculate_informedness
 from .utils.evaluation import get_relative_direction
 from torch.utils.data._utils.collate import default_collate
 
@@ -56,20 +57,7 @@ def one_hot(size, data):
     return np.eye(size)[data]
 
 
-def calculate_informedness(loc, b_loc):
-    informedness_result = []
 
-    for item in [[1, 0], [0, 1]]:  # For 'big' and 'small'
-
-        if item in loc and item in b_loc:
-            if loc.index(item) == b_loc.index(item):
-                informedness_result += [2] if item == [1, 0] else [2]
-            else:
-                informedness_result += [1] if item == [1, 0] else [1]
-        else:
-            informedness_result += [0] if item == [1, 0] else [0]
-
-    return informedness_result
 def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_extra_data=False, prior_metrics=[], conf=None):
     '''
     For all relevant variants, iterates through all possible permutations of environment reset configs and simulates
@@ -117,7 +105,7 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
     suffix = pref_type + role_type
 
     onehot_labels = ['correctSelection', 'incorrectSelection']
-    extra_labels = ['informedness', 'opponents']
+    extra_labels = ['opponents', 'last-vision-span']
 
     tq = tqdm.tqdm(range(sum(len(conf.stages[cc]['events']) for cc in conf.stages)))
     # tqdm not currently working with subject dominant and subject valence lists
@@ -222,7 +210,10 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
                             for label in check_labels:
                                 data_labels[label].append(np.stack(temp_labels[label]))
 
-                            data_labels['informedness'].append(informedness)
+                            #data_labels['informedness'].append(informedness)
+                            #if informedness != info['p_0']['informedness'] and params["num_puppets"] > 0:
+                            #    print('true inf:', informedness, 'step inf:', info['p_0']['informedness'], info['p_0']['loc'], info['p_0']['b-loc'], eName, 'v',
+                            #          temp_labels['vision'], 'bait', temp_labels['bait-treat'], 'swap', temp_labels['swap-treat'])
                             data_labels['opponents'].append(params["num_puppets"])
                             #print(informedness, params["num_puppets"], info['p_0']['shouldGetBig'], info['p_0']['shouldGetSmall'])
 

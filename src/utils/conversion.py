@@ -37,6 +37,20 @@ def get_json_params(path, args):
         args.ground_truth_modules = data['ground_truth_modules'] if 'ground_truth_modules' in data.keys() else False
     return model_class, configName, args
 
+def calculate_informedness(loc, b_loc):
+    informedness_result = []
+
+    for item in [[1, 0], [0, 1]]:  # For 'big' and 'small'
+
+        if item in loc and item in b_loc:
+            if loc.index(item) == b_loc.index(item):
+                informedness_result += [2] if item == [1, 0] else [2]
+            else:
+                informedness_result += [1] if item == [1, 0] else [1]
+        else:
+            informedness_result += [0] if item == [1, 0] else [0]
+
+    return informedness_result
 
 def make_env_comp(env_name, frames=1, vecNormalize=False, norm_rewards=False, size=32, style='rich', monitor_path='dir',
                   rank=-1, threads=1, load_path=None, reduce_color=False, skip_vecNorm=False, sl_module=None, label_dim=0):

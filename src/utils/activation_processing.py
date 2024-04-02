@@ -150,8 +150,8 @@ def train_mlp(activations, other_data, regime_data, regime, opponents_data, pati
         model = RNNClassifier(input_size, hidden_size, output_size, 1, 0.1).to(device)
     elif model_type == "rnnd5":
         model = RNNClassifier(input_size, hidden_size, output_size, 1, 0.5).to(device)
-    # criterion = nn.MSELoss()
-    criterion = NMSELoss()
+    criterion = nn.MSELoss()
+    #criterion = NMSELoss()
     slowcriterion = nn.MSELoss(reduction='none')
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay= 1e-5 if l2_reg else 0)
 

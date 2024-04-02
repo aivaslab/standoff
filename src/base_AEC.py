@@ -20,6 +20,7 @@ from .agents import occlude_mask
 import xxhash
 
 from src.rendering import SimpleImageViewer
+from .utils.conversion import calculate_informedness
 
 # from gym.envs.classic_control.rendering import SimpleImageViewer
 
@@ -843,6 +844,11 @@ class para_MultiGridEnv(ParallelEnv):
 
         # reset box update vector
         self.box_updated_this_timestep = [False for _ in range(self.boxes)]
+
+        self.bait_loc = [False for _ in range(self.boxes)]
+        self.swap_loc = [False for _ in range(self.boxes)]
+        self.treat_baited = [False for _ in range(2)]
+        self.treat_swapped = [False for _ in range(2)]
         # activate timed events
         if str(self.step_count) in self.timers.keys():
             for event in self.timers[str(self.step_count)]:
@@ -1125,6 +1131,16 @@ class para_MultiGridEnv(ParallelEnv):
             self.infos['p_0']["target-size"] = [self.infos['p_0']['shouldAvoidSmall'], self.infos['p_0']['shouldAvoidBig']]
             self.infos['p_0']["box-updated"] = self.box_updated_this_timestep
 
+
+            # this is wrong because we need to loop thru the whole thing to get vision start
+
+            self.infos['p_0']["swap-treat"] = self.treat_swapped
+            self.infos['p_0']["bait-treat"] = self.treat_baited
+            self.infos['p_0']["swap-loc"] = self.swap_loc
+            self.infos['p_0']["bait-loc"] = self.bait_loc
+
+            # todo: test each of these
+
             if not self.currently_visible:
                 for i in range(self.boxes):
                     if self.box_updated_this_timestep[i]:
@@ -1161,6 +1177,10 @@ class para_MultiGridEnv(ParallelEnv):
                 1 if any(abs(reward - self.bigReward) < tolerance for reward in all_rewards_seen) else 0,
                 1 if any(abs(reward - self.smallReward) < tolerance for reward in all_rewards_seen) else 0
             ]
+            #if self.params['num_puppets'] > 0:
+            #    print('calc:', self.infos['p_0']["loc"], self.infos['p_0']["b-loc"], calculate_informedness(self.infos['p_0']["loc"], self.infos['p_0']["b-loc"]), all_rewards_seen)
+
+            self.infos['p_0']["informedness"] = calculate_informedness(self.infos['p_0']["loc"], self.infos['p_0']["b-loc"])
 
         # clear puppets from obs, rewards, dones, infos
 

@@ -71,6 +71,10 @@ class MiniStandoffEnv(para_MultiGridEnv):
                          persistent_gaze_highlighting=persistent_gaze_highlighting,
                          supervised_model=supervised_model,
                          use_separate_reward_layers=use_separate_reward_layers)
+        self.treat_swapped = None
+        self.treat_baited = None
+        self.bait_loc = None
+        self.swap_loc = None
         self.stop_on_release = False
         self.new_target = None
         if conf == None:
@@ -432,6 +436,7 @@ class MiniStandoffEnv(para_MultiGridEnv):
                                  x, y)
                 else:
                     self.put_obj(Box(color="orange"), x, y)
+            self.vision_span_start = 0
             if self.record_info:
                 self.infos['p_0']['eName'] = self.current_event_list_name
                 self.infos['p_0']['shouldAvoidBig'] = False
@@ -456,6 +461,8 @@ class MiniStandoffEnv(para_MultiGridEnv):
             self.put_obj(obj, int(x), y)
             self.objs_to_hide.append(obj)
             self.box_updated_this_timestep[int(event[2])] = True
+            self.bait_loc = [zzz == event[2] for zzz in range(self.boxes)]
+            self.treat_baited = [arg == self.smallReward, arg == self.bigReward]
         elif name == "rem":
             x = event[1] + 1
             tile = self.grid.get(x, y)
@@ -476,10 +483,12 @@ class MiniStandoffEnv(para_MultiGridEnv):
                     b.state = 1
                     b.see_behind = lambda: False
                     self.currently_visible = False
+                    self.vision_span_start = 1000 # the last vision span starts never
                 elif name == "re":
                     b.state = 0
                     b.see_behind = lambda: True
                     self.currently_visible = True
+                    self.vision_span_start = self.step_count
             for box in range(self.boxes):
                 self.can_see[arg + str(box)] = False if "ob" in name else True
         elif name == "sw":
@@ -490,6 +499,8 @@ class MiniStandoffEnv(para_MultiGridEnv):
             b2 = self.grid.get(e2 + 1, y)
             self.box_updated_this_timestep[e1] = True
             self.box_updated_this_timestep[e2] = True
+
+            self.swap_loc = [x in [e1, e2] for x in range(self.boxes)]
             if self.use_box_colors:
                 self.put_obj(b2, e1 + 1, y)
                 self.put_obj(b1, e2 + 1, y)
@@ -504,6 +515,7 @@ class MiniStandoffEnv(para_MultiGridEnv):
 
                 obj1 = Goal(reward=r2, size=r2 * 0.01, color='green', hide=self.hidden, sub_obs_reward=sr2)
                 obj2 = Goal(reward=r1, size=r1 * 0.01, color='green', hide=self.hidden, sub_obs_reward=sr1)
+                self.treat_swapped = [self.smallReward in [r1, r2], self.bigReward in [r1, r2]]
                 self.put_obj(obj1, e1 + 1, y)
                 self.put_obj(obj2, e2 + 1, y)
                 self.objs_to_hide.append(obj1)
@@ -512,6 +524,8 @@ class MiniStandoffEnv(para_MultiGridEnv):
             if self.record_info:
                 self.infos['p_0']['eventVisibility'] = ''.join(
                     ['1' if x else '0' for x in self.visible_event_list])
+                self.infos['p_0']['last-vision-span'] = [int(x >= self.vision_span_start) for x in range(5)]
+                #print(self.infos['p_0']['eventVisibility'], self.infos['p_0']['last-vision-span'])
             for x, _y in self.released_tiles[arg]:
                 self.del_obj(x, _y)
             if arg == 0:
@@ -552,18 +566,19 @@ class MiniStandoffEnv(para_MultiGridEnv):
                                         tile2 = self.grid.get(int(event[2]) + 1, y)
 
                                         # we don't swap last seen rewards here because it's a visible swap and those might be missing
-                                        self.last_seen_reward[b1] = tile2.get_reward() if hasattr(tile2, 'get_reward') else 0
-                                        self.last_seen_reward[b2] = tile.get_reward() if hasattr(tile, 'get_reward') else 0
+                                        #self.last_seen_reward[b1] = tile2.get_reward() if hasattr(tile2, 'get_reward') else 0
+                                        #self.last_seen_reward[b2] = tile.get_reward() if hasattr(tile, 'get_reward') else 0
                                         #print('swapped tiles', self.last_seen_reward)
-                            self.last_seen_reward[agent + str(box)] = tile.get_reward() if hasattr(tile, 'get_reward') else 0
+                            if hasattr(tile, 'get_reward'):
+                                self.last_seen_reward[agent + str(box)] = tile.get_reward()
                             #print(self.last_seen_reward)
 
                             # print('rew update', agent, box, tile.reward)
-                        elif not tile and self.last_seen_reward[agent + str(box)] != 0:
+                        '''elif not tile and self.last_seen_reward[agent + str(box)] != 0:
                             self.last_seen_reward[agent + str(box)] = 0
-                            if self.agent_goal[agent] == box:
+                            if self.agent_goal[agent] == box: # our goal is this box, which was swapped with something, and it wasn't a real treat
                                 self.agent_goal[agent] = 2
-                                self.best_reward[agent] = -100
+                                self.best_reward[agent] = -100'''
 
             self.new_target = False
             for box in range(self.boxes):
