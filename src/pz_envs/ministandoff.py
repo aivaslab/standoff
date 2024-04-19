@@ -452,6 +452,7 @@ class MiniStandoffEnv(para_MultiGridEnv):
                 self.infos['p_0']['timestep'] = self.total_step_count
         elif name == 'b':
             x = event[2] + 1
+            loc = int(event[2])
             if self.sub_valence == 1:
                 sub_obs_reward = arg
             else:
@@ -463,20 +464,20 @@ class MiniStandoffEnv(para_MultiGridEnv):
                     self.infos['p_0']['firstBaitReward'] = arg
             self.put_obj(obj, int(x), y)
             self.objs_to_hide.append(obj)
-            self.box_updated_this_timestep[int(event[2])] = True
-            self.bait_loc = [int(box == event[2]) for box in range(self.boxes)]
-            self.treat_box[int(self.box_locations[event[2]])] = \
+            self.box_updated_this_timestep[loc] = True
+            self.bait_loc = [int(box == loc) for box in range(self.boxes)]
+            self.treat_box[int(self.box_locations[loc])] = \
                 [1, 0] if arg == self.bigReward else \
                 [0, 1] if arg == self.smallReward else \
                 [0, 0]
 
             if self.currently_visible:
-                self.i_b_treat_box[int(self.i_b_box_locations[event[2]])] = \
+                self.i_b_treat_box[int(self.i_b_box_locations[loc])] = \
                     [1, 0] if arg == self.bigReward else \
                     [0, 1] if arg == self.smallReward else \
                     [0, 0]
                 if self.params['num_puppets'] > 0:
-                    self.b_treat_box[int(self.b_box_locations[event[2]])] = \
+                    self.b_treat_box[int(self.b_box_locations[loc])] = \
                         [1, 0] if arg == self.bigReward else \
                         [0, 1] if arg == self.smallReward else \
                         [0, 0]

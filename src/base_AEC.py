@@ -1171,7 +1171,7 @@ class para_MultiGridEnv(ParallelEnv):
             #self.swap_history += [self.box_locations[:]]
             self.infos['p_0']["box-locations"] = self.box_locations
             self.infos['p_0']["b-box-locations"] = self.b_box_locations
-            self.infos['p_0']["i_b-box-locations"] = self.i_b_box_locations
+            self.infos['p_0']["i-b-box-locations"] = self.i_b_box_locations
 
             self.infos['p_0']["bait-loc"] = self.bait_loc
 
