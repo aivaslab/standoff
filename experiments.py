@@ -219,7 +219,11 @@ def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, sk
               'saw-last-update', 'target-loc', 'target-size', 'opponents',
               'informedness', 'swap-treat', 'swap-loc',
               'bait-loc', 'last-vision-span', 'i-informedness', 'i-b-loc',
-              'i-b-exist', 'i-target-loc', 'i-target-size']
+              'i-b-exist', 'i-target-loc', 'i-target-size',
+              "treat-box", "b-treat-box", "i-b-treat-box",
+              "target-box", "i-target-box",
+              "box-locations", "b-box-locations", "i-b-box-locations",
+              ]
     oracles = labels + [None]
     conf = ScenarioConfigs()
     exp_name = f'exp_{todo[0]}' if not use_ff else f'exp_{todo[0]}-f'

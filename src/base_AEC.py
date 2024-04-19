@@ -861,6 +861,8 @@ class para_MultiGridEnv(ParallelEnv):
         self.swap_loc = [False for _ in range(self.boxes)]
         self.swap_history = []
         self.box_locations = [i for i in range(self.boxes)]
+        self.b_box_locations = [i for i in range(self.boxes)]
+        self.i_b_box_locations = [i for i in range(self.boxes)]
         self.treat_baited = [False for _ in range(2)]
         self.treat_swapped = [False for _ in range(2)]
         # activate timed events
@@ -1168,6 +1170,9 @@ class para_MultiGridEnv(ParallelEnv):
 
             #self.swap_history += [self.box_locations[:]]
             self.infos['p_0']["box-locations"] = self.box_locations
+            self.infos['p_0']["b-box-locations"] = self.b_box_locations
+            self.infos['p_0']["i_b-box-locations"] = self.i_b_box_locations
+
             self.infos['p_0']["bait-loc"] = self.bait_loc
 
             self.infos['p_0']["treat-box"] = self.treat_box
