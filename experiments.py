@@ -88,6 +88,9 @@ def string_to_list(s):
 
 def informedness_to_str(informedness_list):
     mapping = {0: 'N', 1: 'F', 2: 'T'}
+    if isinstance(informedness_list[0], list):
+        # for some reason something in the Tt regime has an informedness list of length 5
+        informedness_list = informedness_list[-1]
     first_val = mapping[informedness_list[0]]
     second_val = mapping[informedness_list[1]].lower()
     return first_val + second_val
@@ -105,7 +108,11 @@ def load_dataframes(combined_path_list, value_names, key_param):
         for df_path in df_paths:
             repetition = int(df_path.split('_')[-1][:1])
             #note that this only supports single digits
-            chunks = pd.read_csv(df_path, chunksize=10000, compression='gzip')
+            try:
+                chunks = pd.read_csv(df_path, chunksize=10000, compression='gzip')
+            except:
+                chunks = pd.read_csv(df_path, chunksize=10000)
+
             for chunk in chunks:
                 chunk.replace(replace_dict, inplace=True)
                 chunk['test_regime'] = chunk.apply(
@@ -210,8 +217,9 @@ def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, sk
 
     labels = ['loc', 'vision', 'b-loc', 'b-exist', 'exist', 'box-updated',
               'saw-last-update', 'target-loc', 'target-size', 'opponents',
-              'informedness', 'swap-treat', 'bait-treat', 'swap-loc',
-              'bait-loc', 'last-vision-span']
+              'informedness', 'swap-treat', 'swap-loc',
+              'bait-loc', 'last-vision-span', 'i-informedness', 'i-b-loc',
+              'i-b-exist', 'i-target-loc', 'i-target-size']
     oracles = labels + [None]
     conf = ScenarioConfigs()
     exp_name = f'exp_{todo[0]}' if not use_ff else f'exp_{todo[0]}-f'
@@ -739,5 +747,5 @@ def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, sk
         do_comparison(combined_path_list, last_path_list, key_param_list, key_param, exp_name, params, prior_metrics)
 
 if __name__ == '__main__':
-    experiments([0], repetitions=1, batches=10000, skip_train=True, skip_eval=False, skip_calc=True, skip_activations=False,
+    experiments(['s'], repetitions=1, batches=10000, skip_train=True, skip_eval=True, skip_calc=True, skip_activations=True,
                 batch_size=256, desired_evals=1, use_ff=False)

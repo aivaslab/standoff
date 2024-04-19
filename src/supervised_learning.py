@@ -26,7 +26,7 @@ import torch.nn.functional as F
 import torch
 
 
-def identify_mismatches(info, env, informedness, params, data_name, configName, eName, loc, b_loc):
+def identify_mismatches(info, env, informedness, params, data_name, configName, eName, loc, b_loc, counts):
     inf = calculate_informedness(loc, b_loc)
     if informedness != inf and params["num_puppets"] > 0:
         print('informedness mismatch', informedness, inf, loc, b_loc, params["num_puppets"],
@@ -38,6 +38,15 @@ def identify_mismatches(info, env, informedness, params, data_name, configName, 
             print('opponentless small avoid', env.current_param_group_pos, env.current_param_group, configName, eName)
     if params["num_puppets"] != int(data_name[-1]):
         print('puppet mismatch', env.current_param_group_pos, env.current_param_group, configName, eName)
+    # look for accidentals:
+
+    counts['total'] += 1
+    if info['p_0']['target-size'][0] and inf[0] != 2:
+        counts['big'] += 1
+        #weirdly high for regime Nt1?
+    if info['p_0']['target-size'][1] and inf[1] != 2:
+        counts['small'] += 1
+
     # next we check for mismatches in target location/size
     if inf[0] == 2:
         # we should get big here
@@ -178,6 +187,7 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
                 #print('total_groups', total_groups)
                 check_labels = [x for x in all_labels if x not in posterior_metrics and x not in extra_labels and x not in onehot_labels]
 
+                counts = {'total': 0, 'big': 0, 'small': 0}
 
                 while True:
                     env.deterministic_seed = env.current_param_group_pos
@@ -220,7 +230,7 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
                             loc = info['p_0']['loc']
                             b_loc = info['p_0']['b-loc']
 
-                            identify_mismatches(info, env, informedness, params, data_name, configName, eName, loc, b_loc)
+                            identify_mismatches(info, env, informedness, params, data_name, configName, eName, loc, b_loc, counts)
 
                             break
 
@@ -243,6 +253,8 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
                     if env.current_param_group == total_groups - 1 and env.current_param_group_pos == env.target_param_group_count - 1:
                         # normally the while loop won't break because reset uses a modulus
                         break
+
+                print('regime', data_name, 'counts', counts)
 
         #print('len obs', data_name, params["num_puppets"], len(data_obs))
         this_path = os.path.join(path, data_name)

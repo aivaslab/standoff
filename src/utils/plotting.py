@@ -754,6 +754,8 @@ def save_key_param_figures(save_dir, key_param_stats, oracle_stats, key_param, k
         file_path = os.path.join(os.getcwd(), this_save_dir, f'reversed_key_{param}.png')
         plt.savefig(file_path)
 
+        all_stds = []
+
         for stat_dict, label in zip([key_param_stats, oracle_stats], ['accuracy', 'o_acc']):
 
             if stat_dict is None:
@@ -769,6 +771,7 @@ def save_key_param_figures(save_dir, key_param_stats, oracle_stats, key_param, k
             big_mode = True
 
 
+
             if param == 'test_regime':
                 for use_zero_op in [True, False]:
                     if use_zero_op:
@@ -782,6 +785,7 @@ def save_key_param_figures(save_dir, key_param_stats, oracle_stats, key_param, k
                         df["Accuracy mean (Accuracy std)"] = df["accuracy mean"].map("{:.2f}".format) + " (" + df["accuracy std"].map("{:.2f}".format) + ")"
                         df_filtered = df[df[param].astype(str).str.endswith('1')] if not use_zero_op else df
                         if use_std:
+                            all_stds.extend(df["accuracy std"].values.tolist())
                             pivot_df = df_filtered.pivot(index=key_param, columns=param, values="Accuracy mean (Accuracy std)")
                             mean_values_df = pivot_df.applymap(lambda x: float(x.split(' ')[0]))
                         else:
@@ -797,7 +801,7 @@ def save_key_param_figures(save_dir, key_param_stats, oracle_stats, key_param, k
 
                         original_row_order = pivot_df.index.tolist()
 
-                        use_special_rows = False
+                        use_special_rows = True
 
                         use_many_rows = True
                         if use_special_rows:
@@ -808,9 +812,9 @@ def save_key_param_figures(save_dir, key_param_stats, oracle_stats, key_param, k
                                 desired_row_order.extend(single_rows)
                                 row_name_dict = {x: 'contrast-' + x for x in contrast_rows}
                                 desired_row_order.extend(contrast_rows)
-                                row_name_dict.update({x: 'single-' + x for x in single_rows})
+                                row_name_dict.update({x: 'single-' + x.replace('0', '-a').replace('1', '-p') for x in single_rows})
                                 desired_row_order.extend(['homogeneous'])
-                                row_name_dict.update({'noOpponent': 'full-noop', 'direct': 'full-op', 'everything': 'full-both', 'homogeneous': 'homogeneous'})
+                                row_name_dict.update({'noOpponent': 'full-absent', 'direct': 'full-present', 'everything': 'full-both', 'homogeneous': 'homogeneous'})
                             else:
                                 if 'Tt' in original_row_order:
                                     desired_row_order = ['Tt', 'Tf', 'Tn', 'Ft', 'Ff', 'Fn', 'Nt', 'Nf', 'Nn']
@@ -825,6 +829,11 @@ def save_key_param_figures(save_dir, key_param_stats, oracle_stats, key_param, k
 
                             pivot_df = pivot_df.reindex(columns=desired_order, index=desired_row_order)
                             mean_values_df = mean_values_df.reindex(columns=desired_order, index=desired_row_order)
+
+                            new_column_names = {x: x.replace('1', '-p') for x in pivot_df.columns}
+
+                            pivot_df = pivot_df.rename(columns=new_column_names)
+                            mean_values_df = mean_values_df.rename(columns=new_column_names)
 
                             pivot_df = pivot_df.rename(index=row_name_dict)
                             mean_values_df = mean_values_df.rename(index=row_name_dict)
@@ -843,10 +852,6 @@ def save_key_param_figures(save_dir, key_param_stats, oracle_stats, key_param, k
                         quadmesh.hlines(3+18, *quadmesh.get_xlim(), color='white', linewidth=4)
                         quadmesh.vlines(9, *quadmesh.get_ylim(), color='white', linewidth=4)
 
-                        #ax.set_title(f"Test regime accuracy of each training dataset", fontsize=12)
-
-
-                        #fig.colorbar(ax.collections[0], ax=ax, orientation='vertical').remove()
                         plt.colorbar(quadmesh.collections[0], cax=cbar_ax, orientation='horizontal', cmap='RdBu')
                         plt.tight_layout()
 
@@ -854,6 +859,7 @@ def save_key_param_figures(save_dir, key_param_stats, oracle_stats, key_param, k
                         print('saving fig to', plot_save_path)
                         plt.savefig(plot_save_path, bbox_inches='tight')
                         plt.close()
+
 
             if param == 'test_regime':
                 regimes = df[key_param].unique()
@@ -870,7 +876,7 @@ def save_key_param_figures(save_dir, key_param_stats, oracle_stats, key_param, k
                             if regime_A != regime_B:
                                 accuracy_A_B = df[(df[key_param] == regime_A) & (df['test_regime'] == regime_B)]['accuracy mean'].values[0]
                                 accuracy_B_A = df[(df[key_param] == regime_B) & (df['test_regime'] == regime_A)]['accuracy mean'].values[0]
-                                asymmetry = accuracy_A_B - accuracy_B_A
+                                asymmetry = accuracy_A_B - accuracy_B_A # train a test b minus train b test a, so if positive, it's better to train a test b.
                                 asymmetry_dict[(regime_A, regime_B)] = asymmetry
                     print(asymmetry_dict)
                     sorted_asymmetries = sorted(asymmetry_dict.keys(), key=lambda x: (regimes.index(x[0]), regimes.index(x[1])))
@@ -950,6 +956,11 @@ def save_key_param_figures(save_dir, key_param_stats, oracle_stats, key_param, k
                     fig.subplots_adjust(left=0.0, right=1.0, top=1.0, bottom=0.03)
                     plt.savefig(plot_save_path)
                     plt.close()
+
+        # get stats about stds
+        all_stds_array = np.array(all_stds)
+        filtered_stds = all_stds_array[~np.isnan(all_stds_array)]
+        print('len', len(all_stds), len(filtered_stds), 'mean std', np.mean(filtered_stds), 'std_of_std', np.std(filtered_stds))
 
 
 

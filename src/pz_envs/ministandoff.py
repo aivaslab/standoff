@@ -126,7 +126,10 @@ class MiniStandoffEnv(para_MultiGridEnv):
         self.agent_goal, self.last_seen_reward, self.can_see, self.best_reward = {}, {}, {}, {}
         boxes = self.params["boxes"]
         self.saw_last_update = [True for _ in range(boxes)]
-        for agent in self.agents_and_puppets():
+
+
+        # we add 'i' as an imaginary agent
+        for agent in self.agents_and_puppets() + ['i']:
             self.agent_goal[agent] = 2 #self.deterministic_seed % boxes if self.deterministic else random.choice(range(boxes))
             self.best_reward[agent] = -100
             for box in range(boxes):
@@ -461,7 +464,23 @@ class MiniStandoffEnv(para_MultiGridEnv):
             self.put_obj(obj, int(x), y)
             self.objs_to_hide.append(obj)
             self.box_updated_this_timestep[int(event[2])] = True
-            self.bait_loc = [zzz == event[2] for zzz in range(self.boxes)]
+            self.bait_loc = [int(box == event[2]) for box in range(self.boxes)]
+            self.treat_box[int(self.box_locations[event[2]])] = \
+                [1, 0] if arg == self.bigReward else \
+                [0, 1] if arg == self.smallReward else \
+                [0, 0]
+
+            if self.currently_visible:
+                self.i_b_treat_box[int(self.i_b_box_locations[event[2]])] = \
+                    [1, 0] if arg == self.bigReward else \
+                    [0, 1] if arg == self.smallReward else \
+                    [0, 0]
+                if self.params['num_puppets'] > 0:
+                    self.b_treat_box[int(self.b_box_locations[event[2]])] = \
+                        [1, 0] if arg == self.bigReward else \
+                        [0, 1] if arg == self.smallReward else \
+                        [0, 0]
+
             self.treat_baited = [arg == self.smallReward, arg == self.bigReward]
         elif name == "rem":
             x = event[1] + 1
@@ -500,7 +519,14 @@ class MiniStandoffEnv(para_MultiGridEnv):
             self.box_updated_this_timestep[e1] = True
             self.box_updated_this_timestep[e2] = True
 
-            self.swap_loc = [x in [e1, e2] for x in range(self.boxes)]
+            self.swap_loc = [int(x in [e1, e2]) for x in range(self.boxes)]
+
+            self.box_locations[e1], self.box_locations[e2] = self.box_locations[e2], self.box_locations[e1]
+            if self.currently_visible:
+                self.i_b_box_locations[e1], self.i_b_box_locations[e2] = self.i_b_box_locations[e2], self.i_b_box_locations[e1]
+                if self.params['num_puppets'] > 0:
+                    self.b_box_locations[e1], self.b_box_locations[e2] = self.b_box_locations[e2], self.b_box_locations[e1]
+
             if self.use_box_colors:
                 self.put_obj(b2, e1 + 1, y)
                 self.put_obj(b1, e2 + 1, y)
@@ -545,13 +571,14 @@ class MiniStandoffEnv(para_MultiGridEnv):
             self.append_food_locs(obj, loc)  # appends to self.big_food_locations and self.small_food_locations
 
         # oracle food location memory for puppet ai
+        target_agents = []
         if name == "b" or name == "sw" or name == "rem" or (self.hidden is True and name == "re"):
             for key, value in self.last_seen_reward.items():
                 self.last_seen_reward[key] = value - 1 # we discount older rewards to prefer new updates
             did_swap = False
             for box in range(self.boxes):
                 x = box + 1
-                for agent in self.agents_and_puppets():
+                for agent in self.agents_and_puppets() + ['i']:
                     if self.can_see[agent + str(box)] and self.currently_visible:
                         tile = self.grid.get(x, y)
                         # if hasattr(tile, "reward") and hasattr(tile, "size"):
@@ -561,9 +588,9 @@ class MiniStandoffEnv(para_MultiGridEnv):
                                     if value == tile.reward and not did_swap:
                                         # set to the other tile of this swap...
                                         did_swap = True
-                                        b1 = agent + str(int(event[1]))
-                                        b2 = agent + str(int(event[2]))
-                                        tile2 = self.grid.get(int(event[2]) + 1, y)
+                                        #b1 = agent + str(int(event[1]))
+                                        #b2 = agent + str(int(event[2]))
+                                        #tile2 = self.grid.get(int(event[2]) + 1, y)
 
                                         # we don't swap last seen rewards here because it's a visible swap and those might be missing
                                         #self.last_seen_reward[b1] = tile2.get_reward() if hasattr(tile2, 'get_reward') else 0
@@ -582,27 +609,29 @@ class MiniStandoffEnv(para_MultiGridEnv):
 
             self.new_target = False
             for box in range(self.boxes):
-                for agent in self.puppets:
+                for agent in self.puppets + ['i']:
                     reward = self.last_seen_reward[agent + str(box)]
                     if reward >= self.best_reward[agent]:
                         self.agent_goal[agent] = box
                         self.best_reward[agent] = reward
                         self.new_target = True
-                        target_agent = agent
+                        target_agents.append(agent)
                         #print('new target', self.best_reward[agent], self.agent_goal[agent], self.last_seen_reward)
         if self.new_target:
             self.new_target = False
-            a = self.instance_from_name[target_agent]
-            if a.active:
-                x = self.agent_goal[target_agent] + 1
-                pgrid = self.grid.volatile
-                for _x in range(self.width):
-                    if _x != x:
-                        pgrid[_x, y] = True
-                        pgrid[_x, y + 1] = True
-                path = pathfind(pgrid, a.pos, (x, y), self.cached_paths)
-                # print('path', path)
-                self.infos[target_agent]["path"] = path
+            for target_agent in target_agents:
+                if target_agent != 'i':
+                    a = self.instance_from_name[target_agent]
+                    if a.active:
+                        x = self.agent_goal[target_agent] + 1
+                        pgrid = self.grid.volatile
+                        for _x in range(self.width):
+                            if _x != x:
+                                pgrid[_x, y] = True
+                                pgrid[_x, y + 1] = True
+                        path = pathfind(pgrid, a.pos, (x, y), self.cached_paths)
+                        # print('path', path)
+                        self.infos[target_agent]["path"] = path
                 # tile = self.grid.get(x, y)
                 # we cannot track shouldAvoidBig etc here because the treat location might change
 

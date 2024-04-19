@@ -95,6 +95,15 @@ def rotate_grid(grid, rot_k):
     else:
         return grid
 
+def convert_to_scalar(loc_list):
+    pattern_to_scalar = {
+        (1, 0): 2,
+        (0, 1): 1,
+        (0, 0): 0
+    }
+    scalar_list = [pattern_to_scalar[tuple(loc)] for loc in loc_list]
+    return scalar_list
+
 
 class MultiGrid:
     tile_cache = {}
@@ -722,6 +731,9 @@ class para_MultiGridEnv(ParallelEnv):
             for key in self.info_keywords:
                 self.infos['p_0'][key] = ''
         self.state = {agent: NONE for agent in self.agents_and_puppets()}
+        self.treat_box = [[0, 0] for x in range(5)]
+        self.b_treat_box = [[0, 0] for x in range(5)]
+        self.i_b_treat_box = [[0, 0] for x in range(5)]
         # we don't generate observations for puppets
 
         # self.observations = {agent: self.gen_agent_obs(a) for agent, a in zip(self.agents_and_puppets(), self.agent_and_puppet_instances())}
@@ -847,6 +859,8 @@ class para_MultiGridEnv(ParallelEnv):
 
         self.bait_loc = [False for _ in range(self.boxes)]
         self.swap_loc = [False for _ in range(self.boxes)]
+        self.swap_history = []
+        self.box_locations = [i for i in range(self.boxes)]
         self.treat_baited = [False for _ in range(2)]
         self.treat_swapped = [False for _ in range(2)]
         # activate timed events
@@ -1125,10 +1139,23 @@ class para_MultiGridEnv(ParallelEnv):
             y = self.height // 2
             target_agent = "p_1"
             one_hot_goal = [0] * self.boxes
+            one_hot_goal_imaginary = [0] * self.boxes
+
+            one_hot_goal_box = [0] * self.boxes
+            one_hot_goal_imaginary_box = [0] * self.boxes
+
             if self.params['num_puppets'] > 0:
                 one_hot_goal[self.agent_goal[target_agent]] = 1
+                one_hot_goal_box[self.box_locations[self.agent_goal[target_agent]]] = 1
+
+
+            one_hot_goal_imaginary[self.agent_goal['i']] = 1
+            one_hot_goal_imaginary_box[self.box_locations[self.agent_goal['i']]] = 1
+
             self.infos['p_0']["target-loc"] = one_hot_goal
-            self.infos['p_0']["target-size"] = [self.infos['p_0']['shouldAvoidSmall'], self.infos['p_0']['shouldAvoidBig']]
+            self.infos['p_0']["i-target-loc"] = one_hot_goal_imaginary
+            self.infos['p_0']["target-size"] = [self.infos['p_0']['shouldAvoidSmall'], self.infos['p_0']['shouldAvoidBig']] #is this imaginary?
+            #self.infos['p_0']["i-target-size"] = defined below
             self.infos['p_0']["box-updated"] = self.box_updated_this_timestep
 
 
@@ -1136,8 +1163,19 @@ class para_MultiGridEnv(ParallelEnv):
 
             self.infos['p_0']["swap-treat"] = self.treat_swapped
             self.infos['p_0']["bait-treat"] = self.treat_baited
+
             self.infos['p_0']["swap-loc"] = self.swap_loc
+
+            #self.swap_history += [self.box_locations[:]]
+            self.infos['p_0']["box-locations"] = self.box_locations
             self.infos['p_0']["bait-loc"] = self.bait_loc
+
+            self.infos['p_0']["treat-box"] = self.treat_box
+            self.infos['p_0']["b-treat-box"] = self.b_treat_box
+            self.infos['p_0']["i-b-treat-box"] = self.i_b_treat_box
+
+            self.infos['p_0']["target-box"] = one_hot_goal_box
+            self.infos['p_0']["i-target-box"] = one_hot_goal_imaginary_box
 
             # todo: test each of these
 
@@ -1155,6 +1193,9 @@ class para_MultiGridEnv(ParallelEnv):
                 all_rewards_seen = [self.last_seen_reward[target_agent + str(box)] for box in range(self.boxes)]
             else:
                 all_rewards_seen = [0] * self.boxes
+
+            all_rewards_seen_imaginary = [self.last_seen_reward['i' + str(box)] for box in range(self.boxes)]
+
             self.infos['p_0']["loc"] = [
                 [1, 0] if reward == self.bigReward else
                 [0, 1] if reward == self.smallReward else
@@ -1164,6 +1205,8 @@ class para_MultiGridEnv(ParallelEnv):
 
             max_small_reward = max([reward for reward in all_rewards_seen if abs(reward - self.smallReward) < tolerance], default=None)
             max_big_reward = max([reward for reward in all_rewards_seen if abs(reward - self.bigReward) < tolerance], default=None)
+            max_small_reward_i = max([reward for reward in all_rewards_seen_imaginary if abs(reward - self.smallReward) < tolerance], default=None)
+            max_big_reward_i = max([reward for reward in all_rewards_seen_imaginary if abs(reward - self.bigReward) < tolerance], default=None)
 
             self.infos['p_0']["b-loc"] = [
                 [1, 0] if reward == max_big_reward else
@@ -1171,16 +1214,38 @@ class para_MultiGridEnv(ParallelEnv):
                 [0, 0]
                 for reward in all_rewards_seen
             ]
+            self.infos['p_0']["i-b-loc"] = [
+                [1, 0] if reward == max_big_reward_i else
+                [0, 1] if reward == max_small_reward_i else
+                [0, 0]
+                for reward in all_rewards_seen_imaginary
+            ]
+
+            for name in ["loc", "b-loc", "i-b-loc"]:
+                self.infos['p_0']["scalar-" + name] = convert_to_scalar(self.infos['p_0'][name])
+                self.infos['p_0']["big-" + name] = [x[0] for x in self.infos['p_0'][name]]
+                self.infos['p_0']["small-" + name] = [x[1] for x in self.infos['p_0'][name]]
+                self.infos['p_0']["any-" + name] = [int(x != [0, 0]) for x in self.infos['p_0'][name]]
+
             self.infos['p_0']["exist"] = [1 if self.bigReward in real_box_rewards else 0,
                                           1 if self.smallReward in real_box_rewards else 0]
             self.infos['p_0']["b-exist"] = [
                 1 if any(abs(reward - self.bigReward) < tolerance for reward in all_rewards_seen) else 0,
                 1 if any(abs(reward - self.smallReward) < tolerance for reward in all_rewards_seen) else 0
             ]
-            #if self.params['num_puppets'] > 0:
-            #    print('calc:', self.infos['p_0']["loc"], self.infos['p_0']["b-loc"], calculate_informedness(self.infos['p_0']["loc"], self.infos['p_0']["b-loc"]), all_rewards_seen)
+            self.infos['p_0']["i-b-exist"] = [
+                1 if any(abs(reward - self.bigReward) < tolerance for reward in all_rewards_seen_imaginary) else 0,
+                1 if any(abs(reward - self.smallReward) < tolerance for reward in all_rewards_seen_imaginary) else 0
+            ]
+            imaginary_reward = real_box_rewards[self.agent_goal['i']]
+            self.infos['p_0']["i-target-size"] = [imaginary_reward == self.bigReward, imaginary_reward == self.smallReward]
+
+
+            if False and self.params['num_puppets'] == 0 and [1, 0] in self.infos['p_0']["i-b-loc"]:
+                print('calc:', self.infos['p_0']["loc"],'bloc', self.infos['p_0']["b-loc"], self.infos['p_0']["i-b-loc"],  'bexi', self.infos['p_0']["b-exist"], self.infos['p_0']["i-b-exist"], 'inf', calculate_informedness(self.infos['p_0']["loc"], self.infos['p_0']["b-loc"]), all_rewards_seen)
 
             self.infos['p_0']["informedness"] = calculate_informedness(self.infos['p_0']["loc"], self.infos['p_0']["b-loc"])
+            self.infos['p_0']["i-informedness"] = calculate_informedness(self.infos['p_0']["loc"], self.infos['p_0']["i-b-loc"])
 
         # clear puppets from obs, rewards, dones, infos
 

@@ -39,58 +39,7 @@ class NMSELoss(nn.Module):
     def forward(self, y_pred, y_true):
         return torch.mean((y_pred - y_true)**2) / (torch.var(y_true) + 1e-8)
 
-def train_mlp(activations, other_data, regime_data, regime, opponents_data, patience=5, num_prints=5, num_epochs=25,
-              model_type="linear", input_data2=None):
-    # Parameters
-    input_size = activations.shape[-1] if "conv" not in model_type else activations.shape[1]
-    if input_data2 is not None:
-        input_size2 = input_data2.shape[-1] if "conv" not in model_type else activations.shape[1]
-    output_size = other_data.shape[1]
-    hidden_size = 32
-    learning_rate = 1e-3
-    batch_size = 128
-
-    all_indices = np.arange(len(activations))
-    train_indices, val_indices = train_test_split(all_indices, test_size=0.10, random_state=42)
-
-    if regime is not None:
-        zero_opponents_indices = np.where(np.all(opponents_data == 0, axis=1))[0]
-        regime_indices = np.where(np.all(regime_data == regime, axis=1))[0]
-        combined_indices = np.union1d(regime_indices, zero_opponents_indices)
-        regime_train_indices = np.intersect1d(train_indices, combined_indices)
-        act_train = activations[regime_train_indices]
-        other_train = other_data[regime_train_indices]
-        if input_data2 is not None:
-            input2_train = input_data2[regime_train_indices]
-    else:
-        act_train = activations[train_indices]
-        other_train = other_data[train_indices]
-        if input_data2 is not None:
-            input2_train = input_data2[train_indices]
-
-    act_val = activations[val_indices]
-    other_val = other_data[val_indices]
-    if input_data2 is not None:
-        input2_val = input_data2[val_indices]
-
-    # print('size:', regime, activations.shape, other_data.shape, len(train_indices), len(act_train), len(act_val))
-
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    if input_data2 is not None:
-        train_dataset = TensorDataset(torch.tensor(act_train, dtype=torch.float32).to(device),
-                                      torch.tensor(input2_train, dtype=torch.float32).to(device),
-                                      torch.tensor(other_train, dtype=torch.float32).to(device))
-        val_dataset = TensorDataset(torch.tensor(act_val, dtype=torch.float32).to(device),
-                                    torch.tensor(input2_val, dtype=torch.float32).to(device),
-                                    torch.tensor(other_val, dtype=torch.float32).to(device))
-    else:
-        train_dataset = TensorDataset(torch.tensor(act_train, dtype=torch.float32).to(device),
-                                      torch.tensor(other_train, dtype=torch.float32).to(device))
-        val_dataset = TensorDataset(torch.tensor(act_val, dtype=torch.float32).to(device),
-                                    torch.tensor(other_val, dtype=torch.float32).to(device))
-
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+def get_model_type(model_type,  input_size, input_size2, output_size, hidden_size, device, num_epochs):
 
     l2_reg = False
     if "l2reg" in model_type:
@@ -150,8 +99,64 @@ def train_mlp(activations, other_data, regime_data, regime, opponents_data, pati
         model = RNNClassifier(input_size, hidden_size, output_size, 1, 0.1).to(device)
     elif model_type == "rnnd5":
         model = RNNClassifier(input_size, hidden_size, output_size, 1, 0.5).to(device)
+    return model, l2_reg, num_epochs
+
+def train_mlp(inputs, other_data, regime_data, regime, opponents_data, patience=2, num_prints=5, num_epochs=25,
+              model_type="linear", input_data2=None):
+    # Parameters
+    input_size = inputs.shape[-1] if "conv" not in model_type else inputs.shape[1]
+    if input_data2 is not None:
+        input_size2 = input_data2.shape[-1] if "conv" not in model_type else inputs.shape[1]
+    output_size = other_data.shape[1]
+    hidden_size = 32
+    learning_rate = 1e-3
+    batch_size = 128
+
+    all_indices = np.arange(len(inputs))
+    train_indices, val_indices = train_test_split(all_indices, test_size=0.10, random_state=42)
+
+    if regime is not None:
+        zero_opponents_indices = np.where(np.all(opponents_data == 0, axis=1))[0]
+        regime_indices = np.where(np.all(regime_data == regime, axis=1))[0]
+        combined_indices = np.union1d(regime_indices, zero_opponents_indices)
+        regime_train_indices = np.intersect1d(train_indices, combined_indices)
+        act_train = inputs[regime_train_indices]
+        other_train = other_data[regime_train_indices]
+        if input_data2 is not None:
+            input2_train = input_data2[regime_train_indices]
+    else:
+        act_train = inputs[train_indices]
+        other_train = other_data[train_indices]
+        if input_data2 is not None:
+            input2_train = input_data2[train_indices]
+
+    act_val = inputs[val_indices]
+    other_val = other_data[val_indices]
+    if input_data2 is not None:
+        input2_val = input_data2[val_indices]
+
+    # print('size:', regime, activations.shape, other_data.shape, len(train_indices), len(act_train), len(act_val))
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    if input_data2 is not None:
+        train_dataset = TensorDataset(torch.tensor(act_train, dtype=torch.float32).to(device),
+                                      torch.tensor(input2_train, dtype=torch.float32).to(device),
+                                      torch.tensor(other_train, dtype=torch.float32).to(device))
+        val_dataset = TensorDataset(torch.tensor(act_val, dtype=torch.float32).to(device),
+                                    torch.tensor(input2_val, dtype=torch.float32).to(device),
+                                    torch.tensor(other_val, dtype=torch.float32).to(device))
+    else:
+        train_dataset = TensorDataset(torch.tensor(act_train, dtype=torch.float32).to(device),
+                                      torch.tensor(other_train, dtype=torch.float32).to(device))
+        val_dataset = TensorDataset(torch.tensor(act_val, dtype=torch.float32).to(device),
+                                    torch.tensor(other_val, dtype=torch.float32).to(device))
+
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+
+    model, l2_reg, num_epochs = get_model_type(model_type, input_size, input_size2, output_size, hidden_size, device, num_epochs)
+
     criterion = nn.MSELoss()
-    #criterion = NMSELoss()
     slowcriterion = nn.MSELoss(reduction='none')
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay= 1e-5 if l2_reg else 0)
 
@@ -615,11 +620,9 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=5):
                                     if not image_outputs:
                                         name += "v"
                                 if compose:
-                                    loss_matrices[str(regime)].to_csv(
-                                        os.path.join(path, f"{name}ff2l_{target}_loss_matrix_{model_type}.csv"))
+                                    loss_matrices[str(regime)].to_csv(os.path.join(path, f"{name}ff2l_{target}_loss_matrix_{model_type}.csv"))
                                 else:
-                                    loss_matrices[str(regime)].to_csv(
-                                        os.path.join(path, f"{name}f2f_loss_matrix_{model_type}.csv"))
+                                    loss_matrices[str(regime)].to_csv(os.path.join(path, f"{name}f2f_loss_matrix_{model_type}.csv"))
 
             histogram = []
             histogram2 = []
