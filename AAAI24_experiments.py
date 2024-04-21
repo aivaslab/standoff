@@ -50,7 +50,7 @@ def run_hparam_search(trials=64, repetitions=3, log_file='hparam_search_log.txt'
             print('kwargs', model_kwargs)
             cumulative_val = 0.0
             for repetition in range(repetitions):
-                val_loss = train_model(train_sets, 'correctSelection', epochs=epochs, repetition=repetition,
+                val_loss = train_model(train_sets, 'correct-loc', epochs=epochs, repetition=repetition,
                                        save_models=False, record_loss=True, model_kwargs=model_kwargs)
                 cumulative_val += val_loss
             avg_val = cumulative_val / repetitions
@@ -106,7 +106,7 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
     params = ['visible_baits', 'swaps', 'visible_swaps', 'first_swap_is_both',
               'second_swap_to_first_loc', 'delay_2nd_bait', 'first_bait_size',
               'uninformed_bait', 'uninformed_swap', 'first_swap']
-    prior_metrics = ['shouldAvoidSmall', 'correctSelection', 'incorrectSelection',
+    prior_metrics = ['shouldAvoidSmall', 'correct-loc', 'incorrect-loc',
                      'shouldGetBig', 'informedness', 'p-b-0', 'p-b-1', 'p-s-0', 'p-b-1', 'delay']
 
     sub_regime_keys = [

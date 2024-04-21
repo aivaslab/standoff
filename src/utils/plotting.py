@@ -703,7 +703,7 @@ def save_key_param_figures(save_dir, key_param_stats, oracle_stats, key_param, k
 
     for param in list(next(iter(key_param_stats.values())).keys()):
 
-        print('trying param', param)
+        #print('trying param', param)
         labels = list(key_param_stats.keys())
         param_vals = list(key_param_stats[next(iter(key_param_stats))][param]['mean'].keys())
         bar_width = 0.8 / len(param_vals)

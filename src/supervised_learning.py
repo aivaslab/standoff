@@ -56,10 +56,10 @@ def identify_mismatches(info, env, informedness, params, data_name, configName, 
         if (info['p_0']['shouldGetBig'] == False or info['p_0']['shouldGetSmall'] == True):
             print('uninformed size mismatch', env.current_param_group_pos, env.current_param_group, configName, eName)
     if info['p_0']['shouldGetBig']:
-        if info['p_0']['correctSelection'] != env.big_food_locations[-1]:
+        if info['p_0']['correct-loc'] != env.big_food_locations[-1]:
             print('selection mismatch', env.big_food_locations, eName)
     else:
-        if info['p_0']['correctSelection'] != env.small_food_locations[-1]:
+        if info['p_0']['correct-loc'] != env.small_food_locations[-1]:
             print('selection mismatch', env.small_food_locations, eName)
 @lru_cache(maxsize=None)
 def one_hot(size, data):
@@ -113,7 +113,7 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
     all_path_infos = pd.DataFrame()
     suffix = pref_type + role_type
 
-    onehot_labels = ['correctSelection', 'incorrectSelection']
+    onehot_labels = ['correct-loc', 'incorrect-loc']
     extra_labels = ['opponents', 'last-vision-span']
 
     tq = tqdm.tqdm(range(sum(len(conf.stages[cc]['events']) for cc in conf.stages)))
@@ -168,7 +168,7 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
 
                 env = env_from_config(env_config)
                 env.record_oracle_labels = True
-                env.record_info = True  # used for correctSelection right now
+                env.record_info = True  # used for correct-loc right now
 
                 env.target_param_group_count = 20
                 env.param_groups = [ {'eLists': {n: events[n]},

@@ -199,38 +199,39 @@ def f2f_best_first(path, epoch_numbers, repetitions, timesteps=5, train_mlp=None
     data = load_data(path, epoch_numbers, repetitions, timesteps=5)
 
     ### START SPECIAL TRAIN
-    real_data = data['all']
+    if False:
+        real_data = data['all']
 
-    inputs = torch.from_numpy(real_data['image']['inputs']).float()
-    outputs = [
-        torch.from_numpy(real_data['box']['loc']).float(),
-        torch.from_numpy(real_data['box']['b-loc']).float(),
-        torch.from_numpy(real_data['box']['labels']).float(),
-    ]
-    train_losses, val_losses = train_mlp_tree(inputs, outputs, epochs=3)
+        inputs = torch.from_numpy(real_data['image']['inputs']).float()
+        outputs = [
+            torch.from_numpy(real_data['box']['loc']).float(),
+            torch.from_numpy(real_data['box']['b-loc']).float(),
+            torch.from_numpy(real_data['box']['labels']).float(),
+        ]
+        train_losses, val_losses = train_mlp_tree(inputs, outputs, epochs=3)
 
-    #train_losses_by_output = list(zip(*train_losses))
-    #val_losses_by_output = list(zip(*val_losses))
+        #train_losses_by_output = list(zip(*train_losses))
+        #val_losses_by_output = list(zip(*val_losses))
 
-    #train_losses_by_output = [[loss.item() for loss in losses] for losses in train_losses_by_output]
-    #val_losses_by_output = [[loss.item() for loss in losses] for losses in val_losses_by_output]
-    labels = ['loc', 'b-loc', 'labels']
+        #train_losses_by_output = [[loss.item() for loss in losses] for losses in train_losses_by_output]
+        #val_losses_by_output = [[loss.item() for loss in losses] for losses in val_losses_by_output]
+        labels = ['loc', 'b-loc', 'labels']
 
-    plt.figure(figsize=(10, 6))
-    for i, (t, v) in enumerate(zip(train_losses, val_losses)):
-        plt.plot(t, label=labels[i] + ' train')
-        plt.plot(v, label=labels[i] + ' val')
-    #total_losses = [sum(losses) for losses in zip(*train_losses_by_output)]
-    #plt.plot(total_losses, label='Total Loss', color='black', linewidth=2, linestyle='--')
-    plt.ylim([0, 3.2])
+        plt.figure(figsize=(10, 6))
+        for i, (t, v) in enumerate(zip(train_losses, val_losses)):
+            plt.plot(t, label=labels[i] + ' train')
+            plt.plot(v, label=labels[i] + ' val')
+        #total_losses = [sum(losses) for losses in zip(*train_losses_by_output)]
+        #plt.plot(total_losses, label='Total Loss', color='black', linewidth=2, linestyle='--')
+        plt.ylim([0, 3.2])
 
-    plt.xlabel('Epoch')
-    plt.ylabel('Loss')
-    plt.title('Loss per Output across Epochs')
-    plt.legend()
-    plt.show()
+        plt.xlabel('Epoch')
+        plt.ylabel('Loss')
+        plt.title('Loss per Output across Epochs')
+        plt.legend()
+        plt.show()
 
-    exit()
+        exit()
 
     ### END SPECIAL TRAIN
 
@@ -299,8 +300,8 @@ def f2f_best_first(path, epoch_numbers, repetitions, timesteps=5, train_mlp=None
                                 best_val_loss = val_loss_matrix_f2f.at[feature[0], current_feature_indy]
                                 done_dict[key] = best_val_loss
                     else:
-                        print('predicting', current_feature_indy, feature)
                         best_val_loss, _, _, _ = train_mlp(feature_data, output_data, regime_data=None, regime=None, opponents_data=None, num_epochs=5, model_type=model_type, )
+                        print('predicting', current_feature_indy, feature, best_val_loss)
                         done_dict[key] = best_val_loss
                     # print(next_feature_typed, current_node, best_val_loss)
 

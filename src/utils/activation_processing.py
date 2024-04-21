@@ -105,6 +105,7 @@ def train_mlp(inputs, other_data, regime_data, regime, opponents_data, patience=
               model_type="linear", input_data2=None):
     # Parameters
     input_size = inputs.shape[-1] if "conv" not in model_type else inputs.shape[1]
+    input_size2 = 0
     if input_data2 is not None:
         input_size2 = input_data2.shape[-1] if "conv" not in model_type else inputs.shape[1]
     output_size = other_data.shape[1]

@@ -12,9 +12,9 @@ def _process_info(infos: Dict[str, Any]) -> Dict[str, Any]:
     infos['avoidedSmall'] = infos['selectedBig'] or infos['selectedNeither']
     infos['avoidCorrect'] = (infos['avoidedBig'] and infos['shouldAvoidBig']) or (
             infos['avoidedSmall'] and infos['shouldAvoidSmall'])
-    infos['accuracy'] = 1 if infos['selection'] == infos['correctSelection'] else 0
-    infos['weakAccuracy'] = 1 if infos['selection'] == infos['correctSelection'] or infos['selection'] == infos[
-        'incorrectSelection'] else 0
+    infos['accuracy'] = 1 if infos['selection'] == infos['correct-loc'] else 0
+    infos['weakAccuracy'] = 1 if infos['selection'] == infos['correct-loc'] or infos['selection'] == infos[
+        'incorrect-loc'] else 0
     for i in range(5):
         infos[f'sel' + str(i)] = 1 if infos['selection'] == i else 0
 
@@ -192,9 +192,9 @@ def ground_truth_evals(eval_env, model, repetitions=25, memory=1, skip_to_releas
                     infos['avoidedSmall'] == infos['shouldAvoidSmall'])
             infos['normed_likelihood'] = infos['likelihood'] - max_likelihood
             infos['probability'] = math.exp(infos['normed_likelihood'])
-            infos['accuracy'] = 1 if infos['selection'] == infos['correctSelection'] else 0
-            infos['weakAccuracy'] = 1 if infos['selection'] == infos['correctSelection'] or infos['selection'] == \
-                                         infos['incorrectSelection'] else 0
+            infos['accuracy'] = 1 if infos['selection'] == infos['correct-loc'] else 0
+            infos['weakAccuracy'] = 1 if infos['selection'] == infos['correct-loc'] or infos['selection'] == \
+                                         infos['incorrect-loc'] else 0
 
             for i in range(5):
                 infos['sel' + str(i)] = 1 if infos['selection'] == i else 0

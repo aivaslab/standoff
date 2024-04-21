@@ -53,7 +53,7 @@ def run_hparam_search(trials=64, repetitions=3, log_file='hparam_search_log.txt'
             print('kwargs', model_kwargs)
             cumulative_val = 0.0
             for repetition in range(repetitions):
-                val_loss = train_model(train_sets, 'correctSelection', epochs=epochs, repetition=repetition,
+                val_loss = train_model(train_sets, 'correct-loc', epochs=epochs, repetition=repetition,
                                        save_models=False, record_loss=True, model_kwargs=model_kwargs)
                 cumulative_val += val_loss
             avg_val = cumulative_val / repetitions
@@ -172,7 +172,7 @@ def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, sk
     params = ['visible_baits', 'swaps', 'visible_swaps', 'first_swap_is_both',
               'second_swap_to_first_loc', 'delay_2nd_bait', 'first_bait_size',
               'uninformed_bait', 'uninformed_swap', 'first_swap', 'test_regime']
-    prior_metrics = ['shouldAvoidSmall', 'correctSelection', 'incorrectSelection',
+    prior_metrics = ['shouldAvoidSmall', 'correct-loc', 'incorrect-loc',
                      'shouldGetBig', 'informedness', 'p-b-0', 'p-b-1', 'p-s-0', 'p-s-1', 'delay', 'opponents']
 
     sub_regime_keys = [
@@ -223,6 +223,7 @@ def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, sk
               "treat-box", "b-treat-box", "i-b-treat-box",
               "target-box", "i-target-box",
               "box-locations", "b-box-locations", "i-b-box-locations",
+              "correct-box"
               ]
     oracles = labels + [None]
     conf = ScenarioConfigs()
@@ -751,5 +752,5 @@ def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, sk
         do_comparison(combined_path_list, last_path_list, key_param_list, key_param, exp_name, params, prior_metrics)
 
 if __name__ == '__main__':
-    experiments(['s'], repetitions=1, batches=10000, skip_train=True, skip_eval=True, skip_calc=True, skip_activations=True,
+    experiments([0], repetitions=1, batches=10000, skip_train=True, skip_eval=True, skip_calc=True, skip_activations=False,
                 batch_size=256, desired_evals=1, use_ff=False)

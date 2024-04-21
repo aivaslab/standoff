@@ -707,7 +707,7 @@ def delta_pi_stats(unique_vals, key_param, last_epoch_df, delta_operator_summary
             for col in required_columns:  # a model might not predict all 5 values
                 if col not in conv.columns:
                     conv[col] = 0
-            subset = conv[required_columns + ['informedness', 'correctSelection', 'opponents', 'accuracy'] + perm_keys]
+            subset = conv[required_columns + ['informedness', 'correct-loc', 'opponents', 'accuracy'] + perm_keys]
 
             # OPERATOR PART
             for op in operators:
@@ -754,11 +754,11 @@ def delta_pi_stats(unique_vals, key_param, last_epoch_df, delta_operator_summary
 
                     inf = subset[
                         (subset['informedness'] == key_informedness) & (subset['opponents'] == key_opponents)].groupby(
-                        perm_keys + ['informedness', 'opponents', 'correctSelection'],
+                        perm_keys + ['informedness', 'opponents', 'correct-loc'],
                         observed=True).mean().reset_index()
                     noinf = subset[(subset['informedness'].isin(descendant_informedness)) &
                                    (subset['opponents'].isin(descendant_opponents))].groupby(
-                        perm_keys + ['informedness', 'opponents', 'correctSelection'],
+                        perm_keys + ['informedness', 'opponents', 'correct-loc'],
                         observed=True).mean().reset_index()
                     # print('lens1', len(inf), len(noinf), len(subset))
 
@@ -771,7 +771,7 @@ def delta_pi_stats(unique_vals, key_param, last_epoch_df, delta_operator_summary
                     )
 
                     merged_df['changed_target'] = (
-                                merged_df['correctSelection_m'] != merged_df['correctSelection']).astype(int)
+                                merged_df['correct-loc_m'] != merged_df['correct-loc']).astype(int)
 
                     for i in range(5):
                         merged_df[f'pred_diff_{i}'] = abs(merged_df[f'pred_{i}_m'] - merged_df[f'pred_{i}'])
@@ -915,12 +915,12 @@ def delta_pi_stats(unique_vals, key_param, last_epoch_df, delta_operator_summary
 
         # CATEGORY ONE
 
-        # for col in perm_keys + ['informedness', 'correctSelection']:
+        # for col in perm_keys + ['informedness', 'correct-loc']:
         #    print(f"{col} has {subset[col].nunique()} unique values:", subset[col].unique())
 
-        inf = subset[subset['informedness'] == 'Tt'].groupby(perm_keys + ['informedness', 'correctSelection'],
+        inf = subset[subset['informedness'] == 'Tt'].groupby(perm_keys + ['informedness', 'correct-loc'],
                                                              observed=True).mean().reset_index()
-        noinf = subset[subset['informedness'] != 'Tt'].groupby(perm_keys + ['informedness', 'correctSelection'],
+        noinf = subset[subset['informedness'] != 'Tt'].groupby(perm_keys + ['informedness', 'correct-loc'],
                                                                observed=True).mean().reset_index()
 
         merged_df = pd.merge(
@@ -931,7 +931,7 @@ def delta_pi_stats(unique_vals, key_param, last_epoch_df, delta_operator_summary
             how='inner',
         )
 
-        merged_df['changed_target'] = (merged_df['correctSelection_m'] != merged_df['correctSelection']).astype(int)
+        merged_df['changed_target'] = (merged_df['correct-loc_m'] != merged_df['correct-loc']).astype(int)
 
         for i in range(5):
             merged_df[f'pred_diff_{i}'] = abs(merged_df[f'pred_{i}_m'] - merged_df[f'pred_{i}'])
@@ -1105,7 +1105,7 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
             last_epoch_df_paths = []
             for repetition in range(repetitions):
                 if not skip_train:
-                    train_model(train_sets, 'correctSelection', load_path=load_path,
+                    train_model(train_sets, 'correct-loc', load_path=load_path,
                                 save_path=save_path, epochs=epochs, batches=batches, model_kwargs=model_kwargs,
                                 oracle_labels=oracle_labels, repetition=repetition, save_every=save_every,
                                 use_ff=use_ff, oracle_is_target=oracle_is_target)
@@ -1113,7 +1113,7 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
                     for epoch in range(epochs):
                         if epoch % save_every == save_every - 1 or epoch == epochs - 1:
                             print('evaluating', epoch)
-                            df_paths = evaluate_model(eval_sets, 'correctSelection', load_path=load_path,
+                            df_paths = evaluate_model(eval_sets, 'correct-loc', load_path=load_path,
                                                       model_save_path=save_path,
                                                       oracle_labels=oracle_labels, repetition=repetition,
                                                       epoch_number=epoch,

@@ -18,9 +18,9 @@ class MiniStandoffEnv(para_MultiGridEnv):
     mission = "get the best food before your opponent"
     metadata = {'render_modes': ['human', 'rgb_array'], "name": "miniStandoffEnv"}
     info_keywords = ('minibatch', 'timestep',
-                     'shouldAvoidBig', 'shouldAvoidSmall', 'correctSelection', 'selection',
+                     'shouldAvoidBig', 'shouldAvoidSmall', 'correct-loc', 'selection',
                      'selectedBig', 'selectedSmall', 'selectedNeither',
-                     'selectedPrevBig', 'selectedPrevSmall', 'selectedPrevNeither', 'incorrectSelection',
+                     'selectedPrevBig', 'selectedPrevSmall', 'selectedPrevNeither', 'incorrect-loc',
                      'selectedSame', 'firstBaitReward', 'eventVisibility')
 
     def __init__(
@@ -446,8 +446,8 @@ class MiniStandoffEnv(para_MultiGridEnv):
                 self.infos['p_0']['shouldAvoidSmall'] = False
                 self.infos['p_0']['shouldGetBig'] = False
                 self.infos['p_0']['shouldGetSmall'] = False
-                self.infos['p_0']['correctSelection'] = -1
-                self.infos['p_0']['incorrectSelection'] = -1
+                self.infos['p_0']['correct-loc'] = -1
+                self.infos['p_0']['incorrect-loc'] = -1
                 self.infos['p_0']['minibatch'] = self.minibatch
                 self.infos['p_0']['timestep'] = self.total_step_count
         elif name == 'b':
@@ -661,34 +661,36 @@ class MiniStandoffEnv(para_MultiGridEnv):
 
             if len(self.big_food_locations) > 0 and len(self.small_food_locations) > 0:
                 if 'shouldAvoidBig' in self.infos['p_0'].keys() and self.infos['p_0']['shouldAvoidBig']:
-                    self.infos['p_0']['correctSelection'] = self.small_food_locations[-1]
-                    self.infos['p_0']['incorrectSelection'] = self.big_food_locations[-1]
+                    self.infos['p_0']['correct-loc'] = self.small_food_locations[-1]
+                    self.infos['p_0']['incorrect-loc'] = self.big_food_locations[-1]
                     self.infos['p_0']['shouldGetSmall'] = True
                     self.infos['p_0']['shouldGetBig'] = False
                 else:
-                    self.infos['p_0']['correctSelection'] = self.big_food_locations[-1]
-                    self.infos['p_0']['incorrectSelection'] = self.small_food_locations[-1]
+                    self.infos['p_0']['correct-loc'] = self.big_food_locations[-1]
+                    self.infos['p_0']['incorrect-loc'] = self.small_food_locations[-1]
                     self.infos['p_0']['shouldGetBig'] = True
                     self.infos['p_0']['shouldGetSmall'] = False
             elif len(self.small_food_locations) > 0:
                 if not self.infos['p_0']['shouldAvoidSmall']:
-                    self.infos['p_0']['correctSelection'] = self.small_food_locations[-1]
+                    self.infos['p_0']['correct-loc'] = self.small_food_locations[-1]
                     self.infos['p_0']['shouldGetSmall'] = True
                     self.infos['p_0']['shouldGetBig'] = False
-                    self.infos['p_0']['incorrectSelection'] = -1
+                    self.infos['p_0']['incorrect-loc'] = -1
                 else:
-                    self.infos['p_0']['correctSelection'] = -1
+                    self.infos['p_0']['correct-loc'] = -1
                     self.infos['p_0']['shouldGetBig'] = True
                     self.infos['p_0']['shouldGetSmall'] = False
-                    self.infos['p_0']['incorrectSelection'] = self.small_food_locations[-1]
+                    self.infos['p_0']['incorrect-loc'] = self.small_food_locations[-1]
             elif len(self.big_food_locations) > 0:
                 if not self.infos['p_0']['shouldAvoidBig']:
-                    self.infos['p_0']['correctSelection'] = self.big_food_locations[-1]
+                    self.infos['p_0']['correct-loc'] = self.big_food_locations[-1]
                     self.infos['p_0']['shouldGetBig'] = True
                     self.infos['p_0']['shouldGetSmall'] = False
-                    self.infos['p_0']['incorrectSelection'] = -1
+                    self.infos['p_0']['incorrect-loc'] = -1
                 else:
-                    self.infos['p_0']['correctSelection'] = -1
+                    self.infos['p_0']['correct-loc'] = -1
                     self.infos['p_0']['shouldGetSmall'] = True
                     self.infos['p_0']['shouldGetBig'] = False
-                    self.infos['p_0']['incorrectSelection'] = self.big_food_locations[-1]
+                    self.infos['p_0']['incorrect-loc'] = self.big_food_locations[-1]
+            self.infos['p_0']['correct-box'] = [0] * self.boxes
+            self.infos['p_0']['correct-box'][int(self.box_locations[int(self.infos['p_0']['correct-loc'])])] = 1

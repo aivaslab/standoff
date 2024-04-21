@@ -1030,11 +1030,11 @@ class para_MultiGridEnv(ParallelEnv):
                                         box = (agent.pos[0] - 2) / 2
                                     self.infos[agent_name]["selection"] = box
                                     self.infos[agent_name]["accuracy"] = (
-                                            box == self.infos[agent_name]["correctSelection"] or self.infos[agent_name][
-                                        "correctSelection"] == -1)
+                                            box == self.infos[agent_name]["correct-loc"] or self.infos[agent_name][
+                                        "correct-loc"] == -1)
                                     self.infos[agent_name]["weakAccuracy"] = (
-                                            box == self.infos[agent_name]["correctSelection"] or box ==
-                                            self.infos[agent_name]["incorrectSelection"])
+                                            box == self.infos[agent_name]["correct-loc"] or box ==
+                                            self.infos[agent_name]["incorrect-loc"])
                                     self.infos[agent_name]["selectedBig"] = (og_rwd > self.bigReward * 0.5)
                                     self.infos[agent_name]["selectedSmall"] = (og_rwd > self.smallReward * 0.5 and og_rwd < self.bigReward * 0.5)
                                     self.infos[agent_name]["selectedNeither"] = (og_rwd < self.smallReward * 0.5)
