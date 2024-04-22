@@ -225,6 +225,9 @@ def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, sk
               "box-locations", "b-box-locations", "i-b-box-locations",
               "correct-box"
               ]
+    for name in ["loc", "b-loc", "i-b-loc"]:
+        labels += ["scalar-" + name, "big-" + name, "small-" + name, "any-" + name,]
+
     oracles = labels + [None]
     conf = ScenarioConfigs()
     exp_name = f'exp_{todo[0]}' if not use_ff else f'exp_{todo[0]}-f'
