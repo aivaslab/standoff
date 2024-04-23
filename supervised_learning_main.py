@@ -137,7 +137,13 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
     for val_set_name in test_sets:
         dir = os.path.join(load_path, val_set_name)
         data.append(np.load(os.path.join(dir, 'obs.npz'), mmap_mode='r')['arr_0'])
-        labels.append(np.load(os.path.join(dir, 'label-' + target_label + '.npz'), mmap_mode='r')['arr_0']) #todo: try labelcheck
+        labels_raw = np.load(os.path.join(dir, 'label-' + target_label + '.npz'), mmap_mode='r')['arr_0'] #todo: try labelcheck
+        print('loaded eval labels', val_set_name, labels_raw.shape)
+        if len(labels_raw.shape) > 2:
+            labels.append(labels_raw[..., -1]) # use only the last timestep
+        else:
+            labels.append(labels_raw)
+        print('first', np.sum(labels_raw, axis=0))
         params.append(np.load(os.path.join(dir, 'params.npz'), mmap_mode='r')['arr_0'])
         for metric in set(prior_metrics):
             metric_data = np.load(os.path.join(dir, 'label-' + metric + '.npz'), mmap_mode='r')['arr_0']
@@ -190,9 +196,7 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
             tq = tqdm.trange(len(_val_loader))
 
             for i, (inputs, labels, params, oracles, metrics, act_labels_dict) in enumerate(_val_loader):
-                real_batch_size = len(labels)
                 inputs, labels, oracles = inputs.to(device), labels.to(device), oracles.to(device)
-
 
                 if not oracle_is_target:
                     outputs = model(inputs, oracles)
@@ -220,11 +224,11 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
                 tq.update(1)
 
                 if i < num_activation_batches or num_activation_batches < 0:
-                    activation_data['activations_out'].append(hook.activations_out.cpu().reshape(real_batch_size, -1))
-                    activation_data['activations_hidden_short'].append(
-                        hook.activations_hidden[0].cpu().reshape(real_batch_size, -1))
-                    activation_data['activations_hidden_long'].append(
-                        hook.activations_hidden[1].cpu().reshape(real_batch_size, -1))
+                    real_batch_size = len(labels)
+                    # commented these out because they take a while.
+                    #activation_data['activations_out'].append(hook.activations_out.cpu().reshape(real_batch_size, -1))
+                    #activation_data['activations_hidden_short'].append(hook.activations_hidden[0].cpu().reshape(real_batch_size, -1))
+                    #activation_data['activations_hidden_long'].append(hook.activations_hidden[1].cpu().reshape(real_batch_size, -1))
                     #print(inputs.cpu().numpy().shape)
                     activation_data['inputs'].append(inputs.cpu().numpy().reshape(real_batch_size, -1))
                     activation_data['pred'].append(pred.numpy().reshape(real_batch_size, -1))
@@ -239,8 +243,8 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
                         activation_data[key].append(act_label.cpu().numpy().reshape(real_batch_size, -1))
                         #print('shape', key, act_label.shape)
 
-                if i == num_activation_batches - 1:
-                    handle.remove()# temporary! don't leave
+                #if i == num_activation_batches - 1:
+                #    handle.remove()# temporary! don't leave
 
                 batch_param_losses = [
                     {
@@ -303,7 +307,11 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
     for data_name in train_sets:
         dir = os.path.join(load_path, data_name)
         data.append(np.load(os.path.join(dir, 'obs.npz'), mmap_mode='r')['arr_0'])
-        labels.append(np.load(os.path.join(dir, 'label-' + target_label + '.npz'), mmap_mode='r')['arr_0'])
+        labels_raw = np.load(os.path.join(dir, 'label-' + target_label + '.npz'), mmap_mode='r')['arr_0']
+        if len(labels_raw.shape) > 2:
+            labels.append(labels_raw[..., -1]) # use only the last timestep
+        else:
+            labels.append(labels_raw)
         params.append(np.load(os.path.join(dir, 'params.npz'), mmap_mode='r')['arr_0'])
         if oracle_labels:
             oracle_data = []
@@ -365,6 +373,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
             drop_mask = torch.bernoulli(0.5 * torch.ones_like(oracles)).to(device)
             oracles = oracles * drop_mask
             outputs = model(inputs, oracles)
+            #print(outputs.shape, target_labels.shape, torch.argmax(target_labels, dim=1))
             loss = criterion(outputs, torch.argmax(target_labels, dim=1))
         else:
             outputs = model(inputs, None)
@@ -1080,7 +1089,7 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
                            load_path='supervised', oracle_labels=[], skip_train=True, batch_size=64,
                            prior_metrics=[], key_param=None, key_param_value=None, save_every=1, skip_calc=True,
                            use_ff=False, oracle_early=False, skip_eval=False, oracle_is_target=True, skip_figures=True,
-                           act_label_names=[], skip_activations=True, batches=5000):
+                           act_label_names=[], skip_activations=True, batches=5000, label='correct-loc'):
 
     '''
     Runs a session of supervised learning. Different steps, such as whether we train+save models, evaluate models, or run statistics on evaluations, are optional.
@@ -1105,7 +1114,7 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
             last_epoch_df_paths = []
             for repetition in range(repetitions):
                 if not skip_train:
-                    train_model(train_sets, 'correct-loc', load_path=load_path,
+                    train_model(train_sets, label, load_path=load_path,
                                 save_path=save_path, epochs=epochs, batches=batches, model_kwargs=model_kwargs,
                                 oracle_labels=oracle_labels, repetition=repetition, save_every=save_every,
                                 use_ff=use_ff, oracle_is_target=oracle_is_target)
@@ -1113,7 +1122,7 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
                     for epoch in range(epochs):
                         if epoch % save_every == save_every - 1 or epoch == epochs - 1:
                             print('evaluating', epoch)
-                            df_paths = evaluate_model(eval_sets, 'correct-loc', load_path=load_path,
+                            df_paths = evaluate_model(eval_sets, label, load_path=load_path,
                                                       model_save_path=save_path,
                                                       oracle_labels=oracle_labels, repetition=repetition,
                                                       epoch_number=epoch,

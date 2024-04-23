@@ -692,5 +692,3 @@ class MiniStandoffEnv(para_MultiGridEnv):
                     self.infos['p_0']['shouldGetSmall'] = True
                     self.infos['p_0']['shouldGetBig'] = False
                     self.infos['p_0']['incorrect-loc'] = self.big_food_locations[-1]
-            self.infos['p_0']['correct-box'] = [0] * self.boxes
-            self.infos['p_0']['correct-box'][int(self.box_locations[int(self.infos['p_0']['correct-loc'])])] = 1

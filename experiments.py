@@ -223,7 +223,8 @@ def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, sk
               "treat-box", "b-treat-box", "i-b-treat-box",
               "target-box", "i-target-box",
               "box-locations", "b-box-locations", "i-b-box-locations",
-              "correct-box"
+              "correct-box", 'b-correct-box', 'i-b-correct-box',
+              "b-correct-loc", "i-b-correct-loc"
               ]
     for name in ["loc", "b-loc", "i-b-loc"]:
         labels += ["scalar-" + name, "big-" + name, "small-" + name, "any-" + name,]
@@ -335,6 +336,34 @@ def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, sk
                 oracle_labels=[None],
                 key_param=key_param,
                 key_param_value=regime,
+                **session_params
+            )
+            last_path_list.append(last_epoch_paths)
+            combined_path_list.append(combined_paths)
+            key_param_list.append(regime)
+            used_regimes.append(single_regimes[regime])
+
+        do_comparison(combined_path_list, last_path_list, key_param_list, key_param, exp_name, params, prior_metrics, used_regimes)
+
+    if 151 in todo:
+        print('Running experiment 151: single models do not generalize')
+
+        combined_path_list = []
+        last_path_list = []
+        key_param = 'regime'
+        key_param_list = []
+        used_regimes = []
+
+        for regime in list(single_regimes.keys()):
+            print('regime:', regime)
+            combined_paths, last_epoch_paths = run_supervised_session(
+                save_path=os.path.join('supervised', exp_name, regime),
+                train_sets=single_regimes[regime],
+                eval_sets=regimes['everything'],
+                oracle_labels=[None],
+                key_param=key_param,
+                key_param_value=regime,
+                label='correct-box',
                 **session_params
             )
             last_path_list.append(last_epoch_paths)
@@ -614,6 +643,33 @@ def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, sk
 
         do_comparison(combined_path_list, last_path_list, key_param_list, key_param, exp_name, params, prior_metrics)
 
+    if 159 in todo:
+        print('Running experiment 159: homogeneous but box location')
+
+        combined_path_list = []
+        last_path_list = []
+        key_param = 'regime'
+        key_param_list = []
+        session_params['oracle_is_target'] = False
+
+        for regime in list(hregime.keys()):
+            print('regime:', regime, 'train_sets:', hregime[regime])
+            combined_paths, last_epoch_paths = run_supervised_session(
+                save_path=os.path.join('supervised', exp_name, regime),
+                train_sets=hregime[regime],
+                eval_sets=regimes['everything'],
+                oracle_labels=[None],
+                key_param=key_param,
+                key_param_value=regime,
+                label='correct-box',
+                **session_params
+            )
+            last_path_list.append(last_epoch_paths)
+            combined_path_list.append(combined_paths)
+            key_param_list.append(regime)
+
+        do_comparison(combined_path_list, last_path_list, key_param_list, key_param, exp_name, params, prior_metrics)
+
 
 
     if 60 in todo:
@@ -755,5 +811,5 @@ def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, sk
         do_comparison(combined_path_list, last_path_list, key_param_list, key_param, exp_name, params, prior_metrics)
 
 if __name__ == '__main__':
-    experiments([0], repetitions=1, batches=10000, skip_train=True, skip_eval=True, skip_calc=True, skip_activations=False,
+    experiments([159], repetitions=1, batches=10000, skip_train=True, skip_eval=True, skip_calc=True, skip_activations=True,
                 batch_size=256, desired_evals=1, use_ff=False)

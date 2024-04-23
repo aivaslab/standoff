@@ -830,7 +830,7 @@ def save_key_param_figures(save_dir, key_param_stats, oracle_stats, key_param, k
                             pivot_df = pivot_df.reindex(columns=desired_order, index=desired_row_order)
                             mean_values_df = mean_values_df.reindex(columns=desired_order, index=desired_row_order)
 
-                            new_column_names = {x: x.replace('1', '-p') for x in pivot_df.columns}
+                            new_column_names = {x: x.replace('1', '-p').replace('0', '-a') for x in pivot_df.columns}
 
                             pivot_df = pivot_df.rename(columns=new_column_names)
                             mean_values_df = mean_values_df.rename(columns=new_column_names)
@@ -841,6 +841,7 @@ def save_key_param_figures(save_dir, key_param_stats, oracle_stats, key_param, k
                         #row_minima = mean_values_df.min(axis=1)
                         #mean_values_df['min'] = row_minima
                         #pivot_df['min'] = row_minima.map("{:.2f}".format)
+                        print(mean_values_df)
 
                         quadmesh = sns.heatmap(mean_values_df, annot=pivot_df, fmt='', cmap='RdBu', linewidths=0.5, linecolor='white', vmin=0, vmax=1, cbar=False, ax=heatmap_ax)
                         quadmesh.set_yticklabels(quadmesh.get_yticklabels(), rotation=0)

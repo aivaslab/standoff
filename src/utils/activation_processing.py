@@ -383,6 +383,9 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=5):
     f2f_best_first(path, epoch_numbers, repetitions, timesteps=5, train_mlp=train_mlp)
     print('done')
 
+    use_i = False
+    use_non_h = False
+
     for epoch_number in epoch_numbers:
         for repetition in repetitions:
             with open(os.path.join(path, f'activations_{epoch_number}_{repetition}.pkl'), 'rb') as f:
@@ -446,6 +449,8 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=5):
                     #print(f'{key} shape:', concatenated_array.shape)
 
             for key in loaded_activation_data:
+                if not use_i and "i-" in key:
+                    continue
                 new_key = key.replace("act_label_", "")
                 if "act_label_" in key:
                     arrays = []
@@ -454,8 +459,6 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=5):
                         data_array = np.array(loaded_activation_data[key][index]).astype(int)
                         a_len = data_array.shape[-1]
                         if new_key == 'inputs':
-                            # question: we have timestep, channel, x y
-                            # do we need batch
                             reshaped_array = data_array.reshape((5, 5, 7, 7))
                             arrays.append(reshaped_array)
 
@@ -472,7 +475,8 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=5):
                             hist_arrays.append(data_array[:, :])
                     if key != "act_label_vision" and key != "act_label_box-updated" and key != "act_label_exist":
                         # these variables are always the same at the end of the task, but differ during
-                        correlation_data2[new_key] = np.concatenate(arrays, axis=0)
+                        if use_non_h or new_key == "informedness" or new_key == "opponents": #this one gets used otherwise
+                            correlation_data2[new_key] = np.concatenate(arrays, axis=0)
                         #print('cor2shape', new_key, correlation_data2[new_key].shape)
                     if key != "act_label_opponents" and key != "act_label_informedness":
                         correlation_data2[new_key + "_h"] = np.concatenate(hist_arrays, axis=0)
@@ -510,8 +514,9 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=5):
 
             # MLP F2F DATA
             remove_labels = []
-            run = False
-            models = ['mlp2', 'mlp2bn', 'mlp2d', 'mlp2d2', 'mlp2d3', 'mlp2ln', 'mlp2s', 'mlp3', 'mlp1', 'mlp2l2reg', 'linear', 'mlp2c5', 'mlp2c10', 'mlp2c16', 'linearl2reg', 'mlp2dl2reg', 'mlp3l2reg', 'mlp1l2reg', 'mlp2e50', 'mlp2l2rege50', 'mlp3l2rege50', 'mlp1l2rege50']
+            run = True
+            models = ['mlp2']
+            #models = ['mlp2', 'mlp2bn', 'mlp2d', 'mlp2d2', 'mlp2d3', 'mlp2ln', 'mlp2s', 'mlp3', 'mlp1', 'mlp2l2reg', 'linear', 'mlp2c5', 'mlp2c10', 'mlp2c16', 'linearl2reg', 'mlp2dl2reg', 'mlp3l2reg', 'mlp1l2reg', 'mlp2e50', 'mlp2l2rege50', 'mlp3l2rege50', 'mlp1l2rege50']
             #models = ['mlp2l2reg', 'mlp2ln', 'mlp2d']
             #models = ['rnn', 'rnnd1', 'rnnd5', 'lstm', 'lstmd1', 'lstmd5']
 
@@ -557,6 +562,8 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=5):
                     keys1, output_keys, size1, size, second_input_keys = get_keys(model_type, used_cor_inputs, correlation_data2,
                                                                correlation_data_conv, correlation_data_lstm, correlation_data_lstm_inputs, correlation_data_lstm_outputs, compose,
                                                                use_conv_inputs=image_inputs, image_output=image_outputs)
+
+
                     loss_matrices = {str(regime): pd.DataFrame(index=keys1, columns=output_keys) for regime in
                                      unique_regimes}
                     # val_loss_matrix = np.zeros((size1, size))

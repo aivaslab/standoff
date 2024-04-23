@@ -28,8 +28,20 @@ TILE_PIXELS = 9
 NUM_ITERS = 100
 NONE = 4
 
-def second_largest_one_hot(arr):
-    return (arr == np.sort(np.unique(arr))[-2]).astype(int) if len(np.unique(arr)) > 1 else np.zeros_like(arr)
+def distribute_weights_to_second_largest(arr):
+    unique_values = np.unique(arr)
+    if len(unique_values) > 1:
+        second_largest = np.sort(unique_values)[-2]
+        weights = (arr == second_largest).astype(float)
+    else:
+        weights = np.ones_like(arr, dtype=float)
+        weights[2] = 0  # Set the weight at index 2 to zero
+
+    total_weight = np.sum(weights)
+    if total_weight > 0:
+        weights /= total_weight  # Normalize weights to sum to 1
+
+    return weights
 
 
 class ObjectRegistry:
@@ -1236,9 +1248,22 @@ class para_MultiGridEnv(ParallelEnv):
                 for reward in all_rewards_seen_imaginary
             ]
 
-            info["b-correct-loc"] = second_largest_one_hot(all_rewards_seen)
-            info["b-correct-box"] = [info["box-locations"] == 1 for x in info["b-correct-loc"]]
-            info["i-b-correct-loc"] = second_largest_one_hot(all_rewards_seen_imaginary)
+            #info['correct-box'][int(self.box_locations[int(self.infos['p_0']['correct-loc'])])] = 1
+            # correct-loc comes from ministandoff step following new target
+            info["b-correct-loc"] = distribute_weights_to_second_largest(all_rewards_seen)
+            info["i-b-correct-loc"] = distribute_weights_to_second_largest(all_rewards_seen_imaginary)
+            info['correct-box'] = [0] * self.boxes
+            info['b-correct-box'] = [0] * self.boxes
+            info['i-b-correct-box'] = [0] * self.boxes
+
+            # correct-loc is not one-hot, so we handle it differently:
+            info['correct-box'][info["box-locations"][info["correct-loc"]]] = 1
+            for box in range(self.boxes):
+                info['b-correct-box'][box] = info["b-correct-loc"][info["b-box-locations"][box]]
+                info['i-b-correct-box'][box] = info["i-b-correct-loc"][info["i-b-box-locations"][box]]
+
+            #info["b-correct-box"] = [info["box-locations"][k] if x == 1 else 0 for k, x in enumerate(info["b-correct-loc"])]
+            info["i-b-correct-box"] = [info["box-locations"][k] if x == 1 else 0 for k, x in enumerate(info["i-b-correct-loc"])]
 
             for name in ["loc", "b-loc", "i-b-loc"]:
                 info["scalar-" + name] = convert_to_scalar(info[name])

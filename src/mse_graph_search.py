@@ -246,7 +246,7 @@ def f2f_best_first(path, epoch_numbers, repetitions, timesteps=5, train_mlp=None
     feature_tree = {}
     done_dict = {} # stores mse for both input and output
 
-    val_loss_matrix_f2f = pd.read_csv(os.path.join(path, f"f2f_loss_matrix_mlp2.csv"), index_col=0, header=0)
+    #val_loss_matrix_f2f = pd.read_csv(os.path.join(path, f"f2f_loss_matrix_mlp2.csv"), index_col=0, header=0)
     #print(val_loss_matrix_f2f)
 
     heuristics = {} # stores MSE(inputs, key)
