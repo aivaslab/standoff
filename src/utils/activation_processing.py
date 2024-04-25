@@ -475,7 +475,7 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=5):
                             hist_arrays.append(data_array[:, :])
                     if key != "act_label_vision" and key != "act_label_box-updated" and key != "act_label_exist":
                         # these variables are always the same at the end of the task, but differ during
-                        if use_non_h or new_key == "informedness" or new_key == "opponents": #this one gets used otherwise
+                        if use_non_h or new_key == "i-informedness" or new_key == "opponents": #this one gets used otherwise
                             correlation_data2[new_key] = np.concatenate(arrays, axis=0)
                         #print('cor2shape', new_key, correlation_data2[new_key].shape)
                     if key != "act_label_opponents" and key != "act_label_informedness":
@@ -550,7 +550,7 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=5):
                 used_cor_inputs = correlation_data2
 
             if split_by_regime:
-                unique_regimes = np.unique(correlation_data2['informedness'], axis=0)
+                unique_regimes = np.unique(correlation_data2['i-informedness'], axis=0)
                 # we don't have this for lstm data yet
             else:
                 unique_regimes = [None]

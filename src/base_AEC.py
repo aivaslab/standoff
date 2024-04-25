@@ -30,6 +30,7 @@ NONE = 4
 
 def distribute_weights_to_second_largest(arr):
     unique_values = np.unique(arr)
+
     if len(unique_values) > 1:
         second_largest = np.sort(unique_values)[-2]
         weights = (arr == second_largest).astype(float)
@@ -754,9 +755,13 @@ class para_MultiGridEnv(ParallelEnv):
             for key in self.info_keywords:
                 self.infos['p_0'][key] = ''
         self.state = {agent: NONE for agent in self.agents_and_puppets()}
-        self.treat_box = [[0, 0] for x in range(5)]
-        self.b_treat_box = [[0, 0] for x in range(5)]
-        self.i_b_treat_box = [[0, 0] for x in range(5)]
+        self.treat_box = [[0, 0] for _ in range(5)]
+        self.b_treat_box = [[0, 0] for _ in range(5)]
+        self.i_b_treat_box = [[0, 0] for _ in range(5)]
+
+        self.box_locations = [i for i in range(5)]
+        self.b_box_locations = [i for i in range(5)]
+        self.i_b_box_locations = [i for i in range(5)]
         # we don't generate observations for puppets
 
         # self.observations = {agent: self.gen_agent_obs(a) for agent, a in zip(self.agents_and_puppets(), self.agent_and_puppet_instances())}
@@ -883,9 +888,6 @@ class para_MultiGridEnv(ParallelEnv):
         self.bait_loc = [False for _ in range(self.boxes)]
         self.swap_loc = [False for _ in range(self.boxes)]
         self.swap_history = []
-        self.box_locations = [i for i in range(self.boxes)]
-        self.b_box_locations = [i for i in range(self.boxes)]
-        self.i_b_box_locations = [i for i in range(self.boxes)]
         self.treat_baited = [False for _ in range(2)]
         self.treat_swapped = [False for _ in range(2)]
         # activate timed events
@@ -1180,22 +1182,22 @@ class para_MultiGridEnv(ParallelEnv):
             info = self.infos['p_0']
 
             info["target-loc"] = one_hot_goal
-            info["i-target-loc"] = one_hot_goal_imaginary
-            info["target-size"] = [info['shouldAvoidSmall'], info['shouldAvoidBig']] #is this imaginary?
+            info["i-target-loc"] = list(map(int, one_hot_goal_imaginary))
+            info["target-size"] = list(map(int, [info['shouldAvoidSmall'], info['shouldAvoidBig']])) #is this imaginary?
             #info["i-target-size"] = defined below
-            info["box-updated"] = self.box_updated_this_timestep
+            info["box-updated"] = list(map(int, self.box_updated_this_timestep))
 
-            info["swap-treat"] = self.treat_swapped
-            info["bait-treat"] = self.treat_baited
+            info["swap-treat"] = list(map(int, self.treat_swapped))
+            info["bait-treat"] = list(map(int, self.treat_baited))
 
-            info["swap-loc"] = self.swap_loc
+            info["swap-loc"] = list(map(int, self.swap_loc))
 
             #self.swap_history += [self.box_locations[:]]
             info["box-locations"] = self.box_locations
             info["b-box-locations"] = self.b_box_locations
             info["i-b-box-locations"] = self.i_b_box_locations
 
-            info["bait-loc"] = self.bait_loc
+            info["bait-loc"] = list(map(int, self.bait_loc))
 
             info["treat-box"] = self.treat_box
             info["b-treat-box"] = self.b_treat_box
@@ -1211,7 +1213,7 @@ class para_MultiGridEnv(ParallelEnv):
                     if self.box_updated_this_timestep[i]:
                         self.saw_last_update[i] = False
 
-            info["saw-last-update"] = self.saw_last_update
+            info["saw-last-update"] = list(map(int, self.saw_last_update))
             info["vision"] = int(self.currently_visible)
             real_boxes = [self.grid.get(box + 1, y) for box in range(self.boxes)]
 
@@ -1250,7 +1252,7 @@ class para_MultiGridEnv(ParallelEnv):
 
             #info['correct-box'][int(self.box_locations[int(self.infos['p_0']['correct-loc'])])] = 1
             # correct-loc comes from ministandoff step following new target
-            info["b-correct-loc"] = distribute_weights_to_second_largest(all_rewards_seen)
+            info["b-correct-loc"] = distribute_weights_to_second_largest(all_rewards_seen) if self.params['num_puppets'] > 0 else [1 / self.boxes] * self.boxes
             info["i-b-correct-loc"] = distribute_weights_to_second_largest(all_rewards_seen_imaginary)
             info['correct-box'] = [0] * self.boxes
             info['b-correct-box'] = [0] * self.boxes
@@ -1282,7 +1284,7 @@ class para_MultiGridEnv(ParallelEnv):
                 1 if any(abs(reward - self.smallReward) < tolerance for reward in all_rewards_seen_imaginary) else 0
             ]
             imaginary_reward = real_box_rewards[self.agent_goal['i']]
-            info["i-target-size"] = [imaginary_reward == self.bigReward, imaginary_reward == self.smallReward]
+            info["i-target-size"] = list(map(int, [imaginary_reward == self.bigReward, imaginary_reward == self.smallReward]))
 
 
             if False and self.params['num_puppets'] == 0 and [1, 0] in info["i-b-loc"]:

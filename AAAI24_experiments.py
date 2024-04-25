@@ -96,7 +96,7 @@ def load_dataframes(combined_path_list, value_names, key_param):
                 chunk = chunk.assign(**{key_param: value_name})
                 df_list.append(chunk)
     combined_df = pd.concat(df_list, ignore_index=True)
-    combined_df['informedness'] = combined_df['informedness'].fillna('none')
+    combined_df['i-informedness'] = combined_df['i-informedness'].fillna('none')
     return combined_df
 
 
@@ -107,7 +107,7 @@ def experiments(todo, repetitions, epochs, skip_train=False, skip_calc=False, ba
               'second_swap_to_first_loc', 'delay_2nd_bait', 'first_bait_size',
               'uninformed_bait', 'uninformed_swap', 'first_swap']
     prior_metrics = ['shouldAvoidSmall', 'correct-loc', 'incorrect-loc',
-                     'shouldGetBig', 'informedness', 'p-b-0', 'p-b-1', 'p-s-0', 'p-b-1', 'delay']
+                     'shouldGetBig', 'i-informedness', 'p-b-0', 'p-b-1', 'p-s-0', 'p-b-1', 'delay']
 
     sub_regime_keys = [
         "",

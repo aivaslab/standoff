@@ -622,7 +622,7 @@ def save_key_param_heatmap(save_dir, key_param_stats, key_param):
     this_save_dir = os.path.join(save_dir, 'key_param')
     os.makedirs(this_save_dir, exist_ok=True)
     print('kp', key_param)
-    key_param = "informedness"
+    key_param = "i-informedness"
     print('saving key param heatmap')
     n_groups = len(list(key_param_stats.keys()))
     chars1 = ['T', 'F', 'N']
@@ -640,7 +640,7 @@ def save_key_param_heatmap(save_dir, key_param_stats, key_param):
     if False:
         df_list = []
         for key, metrics_dict in key_param_stats.items():
-            for metric, value in metrics_dict["informedness"].items():
+            for metric, value in metrics_dict[key_param].items():
                 df_list.append({"key": key, "metric": metric, "value": value})
         df = pd.DataFrame(df_list)
 
@@ -658,8 +658,8 @@ def save_key_param_heatmap(save_dir, key_param_stats, key_param):
                     key_val = char_x + char_y.lower()
                     if key_val in key_param_stats:
                         print(key_val, param)
-                        print('ddd', param, key_val, key_param_stats[key_val]["informedness"]['mean'][param])
-                        heatmap_data[i, j] = key_param_stats[key_val]["informedness"]['mean'][param]
+                        print('ddd', param, key_val, key_param_stats[key_val][key_param]['mean'][param])
+                        heatmap_data[i, j] = key_param_stats[key_val][key_param]['mean'][param]
             fig, ax = plt.subplots()
             cax = ax.imshow(heatmap_data, cmap='viridis', interpolation='nearest')
 

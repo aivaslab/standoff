@@ -143,7 +143,7 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
             labels.append(labels_raw[..., -1]) # use only the last timestep
         else:
             labels.append(labels_raw)
-        print('first', np.sum(labels_raw, axis=0))
+        #print('first', np.sum(labels_raw, axis=0), labels_raw[15, -1])
         params.append(np.load(os.path.join(dir, 'params.npz'), mmap_mode='r')['arr_0'])
         for metric in set(prior_metrics):
             metric_data = np.load(os.path.join(dir, 'label-' + metric + '.npz'), mmap_mode='r')['arr_0']
@@ -197,10 +197,14 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
 
             for i, (inputs, labels, params, oracles, metrics, act_labels_dict) in enumerate(_val_loader):
                 inputs, labels, oracles = inputs.to(device), labels.to(device), oracles.to(device)
+                max_labels = torch.argmax(labels, dim=1)
+                if torch.isnan(max_labels).any():
+                    print("labels has nan")
+
 
                 if not oracle_is_target:
                     outputs = model(inputs, oracles)
-                    losses = special_criterion(outputs, torch.argmax(labels, dim=1))
+                    losses = special_criterion(outputs, max_labels)
                     _, predicted = torch.max(outputs, 1)
                     oracle_accuracy = torch.zeros(labels.size(0), device=device)
                     oracle_outputs = torch.zeros((labels.size(0), 10), device=device)
@@ -216,6 +220,9 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
                     oracle_accuracy = ((binary_oracle_outputs == oracles).float().sum(dim=1) / 10).float()
 
                 corrects = (predicted == torch.argmax(labels, dim=1))
+
+                if torch.isnan(corrects).any():
+                    print("corrects has nan")
                 pred = predicted.cpu()
                 small_food_selected = (pred == torch.argmax(metrics['loc'][:, -1, :, 0], dim=1))
                 big_food_selected = (pred == torch.argmax(metrics['loc'][:, -1, :, 1], dim=1))
@@ -716,7 +723,7 @@ def delta_pi_stats(unique_vals, key_param, last_epoch_df, delta_operator_summary
             for col in required_columns:  # a model might not predict all 5 values
                 if col not in conv.columns:
                     conv[col] = 0
-            subset = conv[required_columns + ['informedness', 'correct-loc', 'opponents', 'accuracy'] + perm_keys]
+            subset = conv[required_columns + ['i-informedness', 'correct-loc', 'opponents', 'accuracy'] + perm_keys]
 
             # OPERATOR PART
             for op in operators:
@@ -762,12 +769,12 @@ def delta_pi_stats(unique_vals, key_param, last_epoch_df, delta_operator_summary
                         continue
 
                     inf = subset[
-                        (subset['informedness'] == key_informedness) & (subset['opponents'] == key_opponents)].groupby(
-                        perm_keys + ['informedness', 'opponents', 'correct-loc'],
+                        (subset['i-informedness'] == key_informedness) & (subset['opponents'] == key_opponents)].groupby(
+                        perm_keys + ['i-informedness', 'opponents', 'correct-loc'],
                         observed=True).mean().reset_index()
-                    noinf = subset[(subset['informedness'].isin(descendant_informedness)) &
+                    noinf = subset[(subset['i-informedness'].isin(descendant_informedness)) &
                                    (subset['opponents'].isin(descendant_opponents))].groupby(
-                        perm_keys + ['informedness', 'opponents', 'correct-loc'],
+                        perm_keys + ['i-informedness', 'opponents', 'correct-loc'],
                         observed=True).mean().reset_index()
                     # print('lens1', len(inf), len(noinf), len(subset))
 
@@ -927,9 +934,9 @@ def delta_pi_stats(unique_vals, key_param, last_epoch_df, delta_operator_summary
         # for col in perm_keys + ['informedness', 'correct-loc']:
         #    print(f"{col} has {subset[col].nunique()} unique values:", subset[col].unique())
 
-        inf = subset[subset['informedness'] == 'Tt'].groupby(perm_keys + ['informedness', 'correct-loc'],
+        inf = subset[subset['i-informedness'] == 'Tt'].groupby(perm_keys + ['i-informedness', 'correct-loc'],
                                                              observed=True).mean().reset_index()
-        noinf = subset[subset['informedness'] != 'Tt'].groupby(perm_keys + ['informedness', 'correct-loc'],
+        noinf = subset[subset['i-informedness'] != 'Tt'].groupby(perm_keys + ['i-informedness', 'correct-loc'],
                                                                observed=True).mean().reset_index()
 
         merged_df = pd.merge(
@@ -950,10 +957,10 @@ def delta_pi_stats(unique_vals, key_param, last_epoch_df, delta_operator_summary
         delta_preds = {}
         delta_preds_correct = {}
 
-        for key in merged_df['informedness'].unique():
-            delta_preds[key] = merged_df.loc[merged_df['informedness'] == key, 'total_pred_diff'].tolist()
+        for key in merged_df['i-informedness'].unique():
+            delta_preds[key] = merged_df.loc[merged_df['i-informedness'] == key, 'total_pred_diff'].tolist()
             delta_preds_correct[key] = merged_df.loc[
-                merged_df['informedness'] == key, 'total_pred_diff_correct'].tolist()
+                merged_df['i-informedness'] == key, 'total_pred_diff_correct'].tolist()
 
         delta_mean = {key: np.mean(val) for key, val in delta_preds.items()}
         delta_std = {key: np.std(val) for key, val in delta_preds.items()}
@@ -1156,8 +1163,8 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
                 last_epoch_df[key_param] = key_param_value
                 # print('join replace took', time.time()-cur_time)
                 # print('last_df cols', last_epoch_df.columns, last_epoch_df.t)
-                combined_df['informedness'] = combined_df['informedness'].fillna('none')
-                last_epoch_df['informedness'] = last_epoch_df['informedness'].fillna('none')
+                combined_df['i-informedness'] = combined_df['i-informedness'].fillna('none')
+                last_epoch_df['i-informedness'] = last_epoch_df['i-informedness'].fillna('none')
 
                 avg_loss, variances, ranges_1, ranges_2, range_dict, range_dict3, stats, _, _, _, _ = calculate_statistics(
                     combined_df, last_epoch_df, params + prior_metrics, skip_3x=True)

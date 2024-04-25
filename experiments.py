@@ -116,14 +116,14 @@ def load_dataframes(combined_path_list, value_names, key_param):
             for chunk in chunks:
                 chunk.replace(replace_dict, inplace=True)
                 chunk['test_regime'] = chunk.apply(
-                    lambda row: informedness_to_str(string_to_list(row['informedness'])) + str(row['opponents']),
+                    lambda row: informedness_to_str(string_to_list(row['i-informedness'])) + str(row['opponents']),
                     axis=1
                 )
                 chunk = chunk.assign(**{key_param: value_name, 'repetition': repetition})
                 df_list.append(chunk)
         tq.update(1)
     combined_df = pd.concat(df_list, ignore_index=True)
-    combined_df['informedness'] = combined_df['informedness'].fillna('none')
+    combined_df['i-informedness'] = combined_df['i-informedness'].fillna('none')
     #print('combined df cols', combined_df.columns)
     return combined_df
 
@@ -261,7 +261,7 @@ def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, sk
 
     if 's' in todo:
         print('making combined heatmap')
-        names = ['exp_53', 'exp_51', 'exp_54', 'exp_59']#['exp_53']#, 'exp_51', 'exp_54',]
+        names = ['exp_153', 'exp_151', 'exp_154', 'exp_159']#['exp_53']#, 'exp_51', 'exp_54',]
         session_params['skip_train'] = True
         session_params['skip_eval'] = True
         session_params['skip_calc'] = True
@@ -272,7 +272,7 @@ def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, sk
         key_param_list = []
         for dataset in names:
             print(dataset)
-            cur_regimes = {'exp_54': mixed_regimes, 'exp_51': single_regimes, 'exp_53': regimes, 'exp_59': hregime}[dataset]
+            cur_regimes = {'exp_154': mixed_regimes, 'exp_151': single_regimes, 'exp_153': regimes, 'exp_159': hregime}[dataset]
 
             for regime in list(cur_regimes.keys()):
                 tset = cur_regimes[regime]
@@ -290,7 +290,7 @@ def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, sk
                 key_param_list.append(regime)
 
         print(key_param_list)
-        path = os.path.join('supervised', 'special')
+        path = os.path.join('supervised', 'special2')
         if not os.path.exists(path):
             os.mkdir(path)
         special_heatmap(df_path_list2, df_path_list, 'regime', key_param_list, names, path, params)
@@ -423,6 +423,32 @@ def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, sk
 
         do_comparison(combined_path_list, last_path_list, key_param_list, key_param, exp_name, params, prior_metrics)
 
+    if 153 in todo:
+        print('Running experiment 153: multi models do generalize')
+
+        combined_path_list = []
+        last_path_list = []
+        key_param = 'regime'
+        key_param_list = []
+
+        for regime in list(regimes.keys()):
+            print('regime:', regime, 'train_sets:', regimes[regime])
+            combined_paths, last_epoch_paths = run_supervised_session(
+                save_path=os.path.join('supervised', exp_name, regime),
+                train_sets=regimes[regime],
+                eval_sets=regimes['everything'],
+                oracle_labels=[None],
+                key_param=key_param,
+                key_param_value=regime,
+                label='correct-box',
+                **session_params
+            )
+            last_path_list.append(last_epoch_paths)
+            combined_path_list.append(combined_paths)
+            key_param_list.append(regime)
+
+        do_comparison(combined_path_list, last_path_list, key_param_list, key_param, exp_name, params, prior_metrics)
+
     if 54 in todo:
         print('Running experiment 54: mixed models maybe generalize')
 
@@ -440,6 +466,32 @@ def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, sk
                 oracle_labels=[None],
                 key_param=key_param,
                 key_param_value=regime,
+                **session_params
+            )
+            last_path_list.append(last_epoch_paths)
+            combined_path_list.append(combined_paths)
+            key_param_list.append(regime)
+
+        do_comparison(combined_path_list, last_path_list, key_param_list, key_param, exp_name, params, prior_metrics)
+
+    if 154 in todo:
+        print('Running experiment 154: mixed models maybe generalize')
+
+        combined_path_list = []
+        last_path_list = []
+        key_param = 'regime'
+        key_param_list = []
+
+        for regime in list(mixed_regimes.keys()):
+            print('regime:', regime, 'train_sets:', mixed_regimes[regime])
+            combined_paths, last_epoch_paths = run_supervised_session(
+                save_path=os.path.join('supervised', exp_name, regime),
+                train_sets=mixed_regimes[regime],
+                eval_sets=regimes['everything'],
+                oracle_labels=[None],
+                key_param=key_param,
+                key_param_value=regime,
+                label='correct-box',
                 **session_params
             )
             last_path_list.append(last_epoch_paths)
@@ -644,6 +696,33 @@ def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, sk
         do_comparison(combined_path_list, last_path_list, key_param_list, key_param, exp_name, params, prior_metrics)
 
     if 159 in todo:
+        print('Running experiment 159: homogeneous')
+
+        combined_path_list = []
+        last_path_list = []
+        key_param = 'regime'
+        key_param_list = []
+        session_params['oracle_is_target'] = False
+
+        for regime in list(hregime.keys()):
+            print('regime:', regime, 'train_sets:', hregime[regime])
+            combined_paths, last_epoch_paths = run_supervised_session(
+                save_path=os.path.join('supervised', exp_name, regime),
+                train_sets=hregime[regime],
+                eval_sets=regimes['everything'],
+                oracle_labels=[None],
+                key_param=key_param,
+                key_param_value=regime,
+                label='correct-box',
+                **session_params
+            )
+            last_path_list.append(last_epoch_paths)
+            combined_path_list.append(combined_paths)
+            key_param_list.append(regime)
+
+        do_comparison(combined_path_list, last_path_list, key_param_list, key_param, exp_name, params, prior_metrics)
+
+    if 159 in todo:
         print('Running experiment 159: homogeneous but box location')
 
         combined_path_list = []
@@ -811,5 +890,5 @@ def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, sk
         do_comparison(combined_path_list, last_path_list, key_param_list, key_param, exp_name, params, prior_metrics)
 
 if __name__ == '__main__':
-    experiments([159], repetitions=1, batches=10000, skip_train=True, skip_eval=True, skip_calc=True, skip_activations=True,
+    experiments([0], repetitions=1, batches=10000, skip_train=False, skip_eval=False, skip_calc=False, skip_activations=True,
                 batch_size=256, desired_evals=1, use_ff=False)
