@@ -224,7 +224,7 @@ def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, sk
               "target-box", "i-target-box",
               "box-locations", "b-box-locations", "i-b-box-locations",
               "correct-box", 'b-correct-box', 'i-b-correct-box',
-              "b-correct-loc", "i-b-correct-loc" #'last-vision-span', 
+              "b-correct-loc", "i-b-correct-loc" #'last-vision-span',
               ]
     for name in ["loc", "b-loc", "i-b-loc"]:
         labels += ["scalar-" + name, "big-" + name, "small-" + name, "any-" + name,]
@@ -890,5 +890,5 @@ def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, sk
         do_comparison(combined_path_list, last_path_list, key_param_list, key_param, exp_name, params, prior_metrics)
 
 if __name__ == '__main__':
-    experiments([59], repetitions=1, batches=10000, skip_train=True, skip_eval=False, skip_calc=True, skip_activations=False,
+    experiments([59], repetitions=1, batches=10000, skip_train=True, skip_eval=True, skip_calc=True, skip_activations=False,
                 batch_size=256, desired_evals=1, use_ff=False)

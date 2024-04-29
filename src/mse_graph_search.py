@@ -120,6 +120,7 @@ def load_data(path, epoch_numbers, repetitions, timesteps=5, skip_imaginary=Fals
                         for f_type in ['abstract', 'treat', 'box', 'image']:
                             data[size][f_type] = {}
                     for feature in loaded_activation_data.keys():
+                        print(feature, len(loaded_activation_data[feature]))
                         concatenated_array = np.concatenate(loaded_activation_data[feature], axis=0)
                         feature_shape = concatenated_array.shape[1]
                         if feature_shape == 0:
