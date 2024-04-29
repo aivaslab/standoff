@@ -8,8 +8,9 @@ import pandas as pd
 import torch
 from matplotlib import pyplot as plt
 from sklearn.preprocessing import StandardScaler
-from torch import nn
+from torch import nn, optim
 from torch.utils.data import TensorDataset, DataLoader, random_split
+from tqdm import tqdm
 
 from src.utils.activation_models import MLP2
 
@@ -30,8 +31,8 @@ class ComplexModel(nn.Module):
             outputs.append(x)
         return outputs
 
-def train_mlp_tree(inputs, target_outputs, epochs=10):
 
+def train_mlp_tree(inputs, target_outputs, epochs=10):
     output_sizes = [x.shape[-1] for x in target_outputs]
     model = ComplexModel(inputs.shape[-1], output_sizes)
     learning_rate = 1e-3
@@ -80,7 +81,7 @@ def train_mlp_tree(inputs, target_outputs, epochs=10):
                 inputs, *targets = batch
                 outputs = model(inputs)
                 losses = [criterion(output, target) for output, target in zip(outputs, targets)]
-                #val_losses.append(sum(losses).item())
+                # val_losses.append(sum(losses).item())
                 for i, loss in enumerate(losses):
                     epoch_val_losses[i].append(loss.item())
 
@@ -114,7 +115,7 @@ def load_data(path, epoch_numbers, repetitions, timesteps=5, skip_imaginary=Fals
 
                 if not created_data:
                     data = {}
-                    for size in ['all']:#"['multi', 'all', 'single', 'last']:
+                    for size in ['all']:  # "['multi', 'all', 'single', 'last']:
                         data[size] = {}
                         for f_type in ['abstract', 'treat', 'box', 'image']:
                             data[size][f_type] = {}
@@ -185,18 +186,198 @@ def print_feature_tree(tree, root, level=0, visited=None):
         for pred in predictor:
             if (pred,) not in visited:
                 print_feature_tree(tree, (pred,), level + 1, visited)
-        if k > 5 or mse >= 0.5: #mse > 0.15 and k < len(tree[root[0]])-1 or
-            print(f"{indent}  ... ({len(tree[root[0]])-k-1} more children)")
+        if k > 5 or mse >= 0.5:  # mse > 0.15 and k < len(tree[root[0]])-1 or
+            print(f"{indent}  ... ({len(tree[root[0]]) - k - 1} more children)")
             break
 
 
 def f2f_best_first(path, epoch_numbers, repetitions, timesteps=5, train_mlp=None):
     # data is structured as follows: size (partial/full), type (abstract, box, image), feature (...)
 
-
+    split_inf = True
+    run_f2f = False
+    joint = True
 
     print('loading data')
     data = load_data(path, epoch_numbers, repetitions, timesteps=5)
+    regime = data['all']['abstract']['i-informedness']
+    unique_regimes = np.unique(regime[:, -2:], axis=0)
+
+    if run_f2f:
+        results = []
+        min_val_loss_per_combo = {}
+        for regime_values in unique_regimes:
+            regime_indices = np.where((regime[:, -2] == regime_values[0]) & (regime[:, -1] == regime_values[1]))[0]
+            print(len(regime), len(regime_indices))
+            #regime_indices = np.where(np.all(regime_data == regime, axis=1))[0]
+
+            ### Start F2F REDO
+            real_data = data['all']
+            flat_data = {}
+            for key1 in real_data.keys():
+                for key2 in real_data[key1].keys():
+                    flat_data[key2] = real_data[key1][key2][regime_indices]
+
+            print(flat_data.keys())
+
+            combos = [(x, y) for x in flat_data.keys() for y in flat_data.keys() if x != y]
+            for combo in tqdm(combos):
+                best_val_loss, _, _, _, model = train_mlp(flat_data[combo[0]], flat_data[combo[1]], regime_data=None, regime=None, opponents_data=None, num_epochs=5, model_type='mlp2', )
+                combo_key = (combo[0], combo[1])
+                if combo_key not in min_val_loss_per_combo or best_val_loss < min_val_loss_per_combo[combo_key]:
+                    min_val_loss_per_combo[combo_key] = best_val_loss
+                if best_val_loss < 0.1:
+                    torch.save(model.state_dict(), os.path.join(path, f"f2f-{combo[0]}-{combo[1]}-{split_inf}.model"))
+                #results.append({'Regime': f"{regime_values[0]}-{regime_values[1]}", 'Combo': f'{combo[0]}-{combo[1]}', 'Validation Loss': best_val_loss})
+        results = [{'Combo': f'{key[0]}-{key[1]}', 'Min Validation Loss': val} for key, val in min_val_loss_per_combo.items()]
+        results_df = pd.DataFrame(results)
+        results_df.to_csv(os.path.join(path, f'f2f-val-special-{split_inf}.csv'), index=False)
+        print('done')
+
+
+    regime_values = unique_regimes[0]
+    regime_indices = np.where((regime[:, -2] == regime_values[0]) & (regime[:, -1] == regime_values[1]))[0]
+    real_data = data['all']
+    flat_data = {}
+    indexed_flat_data = {}
+    for key1 in real_data.keys():
+        for key2 in real_data[key1].keys():
+            flat_data[key2] = real_data[key1][key2]
+            indexed_flat_data[key2] = real_data[key1][key2][regime_indices]
+
+    keys = list(flat_data.keys())
+    df = pd.read_csv(os.path.join(path, f'f2f-val-special-{split_inf}.csv'))
+
+
+    def extract_keys(combo):
+        for key1 in keys:
+            for key2 in keys:
+                if combo == f"{key1}-{key2}":
+                    return key1, key2
+        return None, None
+
+    df[['First Key', 'Second Key']] = pd.DataFrame(df['Combo'].apply(lambda x: extract_keys(x)).tolist(), index=df.index)
+    filtered_df = df[df['Min Validation Loss'] < 0.1]
+    #sorted_df = filtered_df.sort_values(by=['Second Key', 'Validation Loss'])
+
+    trios = []
+    for _, row1 in filtered_df.iterrows():
+        matches = filtered_df[filtered_df['First Key'] == row1['Second Key']]
+        for _, row2 in matches.iterrows():
+            trio = (row1['First Key'], row1['Second Key'], row2['Second Key'])
+            loss1 = row1['Min Validation Loss']
+            loss2 = row2['Min Validation Loss']
+            if row1['Second Key'] == 'inputs' or row2['Second Key'] == 'inputs' or row1['First Key'] == 'labels' or row2['First Key'] == 'labels':
+                continue
+            if row1['First Key'] == row2['Second Key']:
+                continue
+            if loss1 + loss2 < 0.2:
+                trios.append((trio, loss1, loss2))
+    print(len(trios))
+
+    model_cache = {}
+    results_df = pd.DataFrame(columns=['f1', 'f2', 'f3', 'XY_Error', 'YZ_Error', 'XZ_Error', 'Chained_Error'])
+    for trio in tqdm(trios):
+        first_model_name = trio[0][0]+'-'+trio[0][1]
+        second_model_name = trio[0][1]+'-'+trio[0][2]
+        chained_model_name = trio[0][0]+'-'+trio[0][2]
+        input_data_eval, input_train = flat_data[trio[0][0]], indexed_flat_data[trio[0][0]]
+        middle_data_eval, middle_train = flat_data[trio[0][1]], indexed_flat_data[trio[0][1]]
+        output_data_eval, output_train = flat_data[trio[0][2]], indexed_flat_data[trio[0][2]]
+
+        if chained_model_name not in df['Combo'].values:
+            continue
+
+        xy_error = df.loc[df['Combo'] == first_model_name, 'Min Validation Loss'].values[0]
+        yz_error = df.loc[df['Combo'] == second_model_name, 'Min Validation Loss'].values[0]
+        xz_error = df.loc[df['Combo'] == chained_model_name, 'Min Validation Loss'].values[0]
+
+        size1 = input_train.shape[1]
+        size2 = middle_train.shape[1]
+        size3 = output_train.shape[1]
+
+        if (size1, size2) not in model_cache:
+            model1 = MLP2(size1, 32, size2)
+            model_cache[(size1, size2)] = model1
+        else:
+            model1 = model_cache[(size1, size2)]
+        if (size2, size3) not in model_cache:
+            model2 = MLP2(size2, 32, size3)
+            model_cache[(size2, size3)] = model2
+        else:
+            model2 = model_cache[(size2, size3)]
+
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        input_tensor_train = torch.tensor(input_train, dtype=torch.float32, device=device)
+        input_tensor_eval = torch.tensor(input_data_eval, dtype=torch.float32, device=device)
+        output_tensor_train = torch.tensor(output_train, dtype=torch.float32, device=device)
+        output_tensor_eval = torch.tensor(output_data_eval, dtype=torch.float32, device=device)
+
+        if not joint:
+            model1.load_state_dict(torch.load(os.path.join(path, f'f2f-{first_model_name}-{split_inf}.model'), map_location=device))
+            model1.eval()
+            model1.to(device)
+            model2.load_state_dict(torch.load(os.path.join(path, f'f2f-{second_model_name}-{split_inf}.model'), map_location=device))
+            model2.eval()
+            model2.to(device)
+        else:
+            model1.to(device)
+            model2.to(device)
+            optimizer = optim.Adam(list(model1.parameters()) + list(model2.parameters()), lr=1e-3)
+
+            intermediate_tensor_train = torch.tensor(middle_train, dtype=torch.float32, device=device)
+
+            criterion = nn.MSELoss()
+
+            dataset_train = TensorDataset(input_tensor_train, intermediate_tensor_train, output_tensor_train)
+            loader = DataLoader(dataset_train, batch_size=128, shuffle=True)
+            for epoch in range(25):
+                total_loss2 = 0
+                for inputs, intermediate_targets, targets in loader:
+                    inputs, intermediate_targets, targets = inputs.to(device), intermediate_targets.to(device), targets.to(device)
+                    optimizer.zero_grad()
+                    first_model_outputs = model1(inputs)
+                    loss1 = criterion(first_model_outputs, intermediate_targets)
+                    second_model_outputs = model2(first_model_outputs)
+                    loss2 = criterion(second_model_outputs, targets)
+                    total_loss = loss1 + loss2
+                    total_loss2 += total_loss.cpu().detach().numpy()
+                    total_loss.backward()
+                    optimizer.step()
+                #print(total_loss2/len(loader))
+        with torch.no_grad():
+            first_model_output = model1(input_tensor_eval)
+            second_model_output = model2(first_model_output)
+            mse = torch.mean((second_model_output - output_tensor_eval) ** 2).cpu().numpy()
+            train_loss = total_loss2/len(loader)
+        egg = {
+            'f1': trio[0][0],
+            'f2': trio[0][1],
+            'f3': trio[0][2],
+            'XY_Error': xy_error,
+            'YZ_Error': yz_error,
+            'XZ_Error': xz_error,
+            'Chained_Error': mse,
+            'Difference': mse-xz_error,
+            'train': train_loss,
+        }
+        print(egg)
+        results_df = results_df.append(egg, ignore_index=True)
+    results_df.to_csv(os.path.join(path, f'chain_results_{split_inf}{"" if not joint else "-j"}.csv'), index=False)
+
+
+
+
+
+
+
+
+
+    top_10_losses = sorted_df.groupby('Second Key').head(10)
+    #print(top_10_losses)
+    model_files = [f for f in os.listdir(path) if f.endswith('.model')]
+    #print(model_files)
+
 
     ### START SPECIAL TRAIN
     if False:
@@ -210,19 +391,19 @@ def f2f_best_first(path, epoch_numbers, repetitions, timesteps=5, train_mlp=None
         ]
         train_losses, val_losses = train_mlp_tree(inputs, outputs, epochs=3)
 
-        #train_losses_by_output = list(zip(*train_losses))
-        #val_losses_by_output = list(zip(*val_losses))
+        # train_losses_by_output = list(zip(*train_losses))
+        # val_losses_by_output = list(zip(*val_losses))
 
-        #train_losses_by_output = [[loss.item() for loss in losses] for losses in train_losses_by_output]
-        #val_losses_by_output = [[loss.item() for loss in losses] for losses in val_losses_by_output]
+        # train_losses_by_output = [[loss.item() for loss in losses] for losses in train_losses_by_output]
+        # val_losses_by_output = [[loss.item() for loss in losses] for losses in val_losses_by_output]
         labels = ['loc', 'b-loc', 'labels']
 
         plt.figure(figsize=(10, 6))
         for i, (t, v) in enumerate(zip(train_losses, val_losses)):
             plt.plot(t, label=labels[i] + ' train')
             plt.plot(v, label=labels[i] + ' val')
-        #total_losses = [sum(losses) for losses in zip(*train_losses_by_output)]
-        #plt.plot(total_losses, label='Total Loss', color='black', linewidth=2, linestyle='--')
+        # total_losses = [sum(losses) for losses in zip(*train_losses_by_output)]
+        # plt.plot(total_losses, label='Total Loss', color='black', linewidth=2, linestyle='--')
         plt.ylim([0, 3.2])
 
         plt.xlabel('Epoch')
@@ -244,12 +425,12 @@ def f2f_best_first(path, epoch_numbers, repetitions, timesteps=5, train_mlp=None
     visited = set()
 
     feature_tree = {}
-    done_dict = {} # stores mse for both input and output
+    done_dict = {}  # stores mse for both input and output
 
-    #val_loss_matrix_f2f = pd.read_csv(os.path.join(path, f"f2f_loss_matrix_mlp2.csv"), index_col=0, header=0)
-    #print(val_loss_matrix_f2f)
+    # val_loss_matrix_f2f = pd.read_csv(os.path.join(path, f"f2f_loss_matrix_mlp2.csv"), index_col=0, header=0)
+    # print(val_loss_matrix_f2f)
 
-    heuristics = {} # stores MSE(inputs, key)
+    heuristics = {}  # stores MSE(inputs, key)
 
     while heap:
         current_mse, current_node, path = heapq.heappop(heap)
@@ -295,27 +476,26 @@ def f2f_best_first(path, epoch_numbers, repetitions, timesteps=5, train_mlp=None
                         best_val_loss = done_dict[key]
                     elif False:
                         best_val_loss = 100
-                        if current_feature_indy in val_loss_matrix_f2f.columns: # rows are inputs, and current_feature_indy is our output
+                        if current_feature_indy in val_loss_matrix_f2f.columns:  # rows are inputs, and current_feature_indy is our output
                             if feature[0] in val_loss_matrix_f2f.index:
                                 best_val_loss = val_loss_matrix_f2f.at[feature[0], current_feature_indy]
                                 done_dict[key] = best_val_loss
                     else:
-                        best_val_loss, _, _, _ = train_mlp(feature_data, output_data, regime_data=None, regime=None, opponents_data=None, num_epochs=5, model_type=model_type, )
+                        best_val_loss, _, _, _, _ = train_mlp(feature_data, output_data, regime_data=None, regime=None, opponents_data=None, num_epochs=5, model_type=model_type, )
                         print('predicting', current_feature_indy, feature, best_val_loss)
                         done_dict[key] = best_val_loss
                     # print(next_feature_typed, current_node, best_val_loss)
 
-
                     predictors = feature_tree.get(current_feature_indy, [])
-                    predictors.append((feature, best_val_loss, best_val_loss + current_mse + 0.01*(len(feature) > 1)))
+                    predictors.append((feature, best_val_loss, best_val_loss + current_mse + 0.01 * (len(feature) > 1)))
                     feature_tree[current_feature_indy] = sorted(predictors, key=lambda x: x[2])
                     # print(f'Updated feature_tree for {current_feature_indy}:', feature_tree[current_feature_indy])
                     # print(feature_tree[current_feature_indy])
 
                     if best_val_loss < 0.95 or True:
                         next_feature_typed_indy = (current_size, data_type, feature)
-                        heapq.heappush(heap, (best_val_loss + current_mse + 0.01*(len(feature) > 1), next_feature_typed_indy, path + [feature]))
-                        #print(heap)
+                        heapq.heappush(heap, (best_val_loss + current_mse + 0.01 * (len(feature) > 1), next_feature_typed_indy, path + [feature]))
+                        # print(heap)
         print(f'{model_type} tree from {first_item}:')
         print_feature_tree(feature_tree, ('labels',))
     print('finished')

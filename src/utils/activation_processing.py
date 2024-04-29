@@ -39,6 +39,8 @@ class NMSELoss(nn.Module):
     def forward(self, y_pred, y_true):
         return torch.mean((y_pred - y_true)**2) / (torch.var(y_true) + 1e-8)
 
+
+
 def get_model_type(model_type,  input_size, input_size2, output_size, hidden_size, device, num_epochs):
 
     l2_reg = False
@@ -216,7 +218,7 @@ def train_mlp(inputs, other_data, regime_data, regime, opponents_data, patience=
                 break
         if avg_val_loss <= 0.005:
             break
-    return best_val_loss, train_losses, val_losses, last_epoch_val_losses
+    return best_val_loss, train_losses, val_losses, last_epoch_val_losses, model
 
 
 def compute_vector_correlation(activation_scalars, other_data_vectors):
@@ -466,7 +468,7 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=5):
                             one_hot = np.eye(2)[data_array.reshape(-1)].reshape(data_array.shape[0], -1)
                             arrays.append(one_hot[:, -2:])
                             hist_arrays.append(one_hot[:, :])
-                        elif key == "act_label_informedness":
+                        elif key == "act_label_i-informedness":
                             one_hot = np.eye(3)[data_array.reshape(-1)].reshape(data_array.shape[0],data_array.shape[1] * 3)
                             arrays.append(one_hot[:, -6:])
                             hist_arrays.append(one_hot[:, :])
@@ -509,7 +511,7 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=5):
             random_indices = np.random.choice(len(pred_d), size=3, replace=False)
             #print("pred datapoints:", pred_d[random_indices])
             #print("pred datapoints:", pred_d2[random_indices])
-            print(correlation_data_lstm_inputs.keys())
+            #print(correlation_data_lstm_inputs.keys())
             activation_keys = ['activations_out']  # , 'activations_hidden_short', 'activations_hidden_long']
 
             # MLP F2F DATA
@@ -580,7 +582,7 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=5):
                                     realkeys = keys1
                                 else:
                                     input_data = used_cor_inputs[key1]
-                                    regime_data = correlation_data2["informedness"]
+                                    regime_data = correlation_data2["i-informedness"]
                                     opponents_data = correlation_data2["opponents"]
                                     realkeys = output_keys  # we want this to be cor2 keys but only if not comparative
 
@@ -614,9 +616,10 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=5):
                                         #print("using key2", key2)
                                     for regime in unique_regimes:
                                         assert input_data.shape[0] == output_data.shape[0]
-                                        val_loss, train_losses, val_losses, val_losses_indy = \
+                                        val_loss, train_losses, val_losses, val_losses_indy, model = \
                                             train_mlp(input_data, output_data, regime_data=regime_data, regime=regime, opponents_data=opponents_data,
                                                       num_epochs=num_epochs, model_type=model_type, input_data2=input_data2 if not cat else None,)
+
                                         loss_matrices[str(regime)].at[key1, key2] = val_loss
                                         print(key1, key2, input_data.shape, output_data.shape, val_loss)
                                         pbar.update(1)
