@@ -218,13 +218,13 @@ def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, sk
     labels = ['loc', 'vision', 'b-loc', 'b-exist', 'exist', 'box-updated',
               'saw-last-update', 'target-loc', 'target-size', 'opponents',
               'informedness', 'swap-treat', 'swap-loc',
-              'bait-loc', 'last-vision-span', 'i-informedness', 'i-b-loc',
+              'bait-loc', 'i-informedness', 'i-b-loc',
               'i-b-exist', 'i-target-loc', 'i-target-size',
               "treat-box", "b-treat-box", "i-b-treat-box",
               "target-box", "i-target-box",
               "box-locations", "b-box-locations", "i-b-box-locations",
               "correct-box", 'b-correct-box', 'i-b-correct-box',
-              "b-correct-loc", "i-b-correct-loc"
+              "b-correct-loc", "i-b-correct-loc" #'last-vision-span', 
               ]
     for name in ["loc", "b-loc", "i-b-loc"]:
         labels += ["scalar-" + name, "big-" + name, "small-" + name, "any-" + name,]
