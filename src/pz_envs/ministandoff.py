@@ -548,10 +548,10 @@ class MiniStandoffEnv(para_MultiGridEnv):
                 self.objs_to_hide.append(obj1)
                 self.objs_to_hide.append(obj2)
         elif name == "rel":
+            self.infos['p_0']['last-vision-span'] = [int(x >= self.vision_span_start) for x in range(5)]
             if self.record_info:
                 self.infos['p_0']['eventVisibility'] = ''.join(
                     ['1' if x else '0' for x in self.visible_event_list])
-                self.infos['p_0']['last-vision-span'] = [int(x >= self.vision_span_start) for x in range(5)]
                 #print(self.infos['p_0']['eventVisibility'], self.infos['p_0']['last-vision-span'])
             for x, _y in self.released_tiles[arg]:
                 self.del_obj(x, _y)
