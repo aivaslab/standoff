@@ -224,8 +224,8 @@ def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, sk
               "target-box", "i-target-box",
               "box-locations", "b-box-locations", "i-b-box-locations",
               "correct-box", 'b-correct-box', 'i-b-correct-box',
-              "b-correct-loc", "i-b-correct-loc" #'last-vision-span',
-              ]
+              "b-correct-loc", "i-b-correct-loc"
+              ] #'last-vision-span',
     for name in ["loc", "b-loc", "i-b-loc"]:
         labels += ["scalar-" + name, "big-" + name, "small-" + name, "any-" + name,]
 
