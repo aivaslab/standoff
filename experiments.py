@@ -890,5 +890,5 @@ def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, sk
         do_comparison(combined_path_list, last_path_list, key_param_list, key_param, exp_name, params, prior_metrics)
 
 if __name__ == '__main__':
-    experiments([0], repetitions=1, batches=10000, skip_train=True, skip_eval=False, skip_calc=True, skip_activations=False,
+    experiments([59], repetitions=1, batches=10000, skip_train=True, skip_eval=False, skip_calc=True, skip_activations=False,
                 batch_size=256, desired_evals=1, use_ff=False)
