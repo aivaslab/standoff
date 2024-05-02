@@ -149,7 +149,8 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
         elif len(labels_raw.shape) > 2:
             labels.append(labels_raw[..., -1]) # use only the last timestep
         else:
-            labels.append(labels_raw.reshape(-1, 25))
+            #labels.append(labels_raw.reshape(-1, 25))
+            labels.append(labels_raw)
         #print('first', np.sum(labels_raw, axis=0), labels_raw[15, -1])
         params.append(np.load(os.path.join(dir, 'params.npz'), mmap_mode='r')['arr_0'])
         for metric in set(prior_metrics):
@@ -331,7 +332,8 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
             labels.append(labels_raw[..., -1]) # use only the last timestep
         else:
             print(labels_raw.shape, labels_raw[0])
-            labels.append(labels_raw.reshape(-1, 25))
+            #labels.append(labels_raw.reshape(-1, 25))
+            labels.append(labels_raw)
         params.append(np.load(os.path.join(dir, 'params.npz'), mmap_mode='r')['arr_0'])
         if oracle_labels:
             oracle_data = []
