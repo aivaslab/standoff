@@ -139,7 +139,14 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
         data.append(np.load(os.path.join(dir, 'obs.npz'), mmap_mode='r')['arr_0'])
         labels_raw = np.load(os.path.join(dir, 'label-' + target_label + '.npz'), mmap_mode='r')['arr_0'] #todo: try labelcheck
         print('loaded eval labels', val_set_name, labels_raw.shape)
-        if len(labels_raw.shape) > 2:
+        if target_label == 'shouldGetBig':
+            # it's 5 bools, so we take the last and turn it into 1-hot
+            x = np.eye(2)[labels_raw[:, -1].astype(int)] # single timestep
+            #x = np.eye(2)[labels_raw.astype(int)].reshape(-1, 10) # 5 timesteps
+            #print(x.shape, x[0])
+            labels.append(x)
+
+        elif len(labels_raw.shape) > 2:
             labels.append(labels_raw[..., -1]) # use only the last timestep
         else:
             labels.append(labels_raw)
@@ -315,10 +322,16 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
         dir = os.path.join(load_path, data_name)
         data.append(np.load(os.path.join(dir, 'obs.npz'), mmap_mode='r')['arr_0'])
         labels_raw = np.load(os.path.join(dir, 'label-' + target_label + '.npz'), mmap_mode='r')['arr_0']
-        if len(labels_raw.shape) > 2:
+        if target_label == 'shouldGetBig':
+            # it's 5 bools, so we take the last and turn it into 1-hot
+            x = np.eye(2)[labels_raw[:, -1].astype(int)] # single timestep
+            #x = np.eye(2)[labels_raw.astype(int)].reshape(-1, 10) # 5 timesteps
+            labels.append(x)
+        elif len(labels_raw.shape) > 2 and False:
             labels.append(labels_raw[..., -1]) # use only the last timestep
         else:
-            labels.append(labels_raw)
+            print(labels_raw.shape, labels_raw[0])
+            labels.append(labels_raw.reshape(-1, 25))
         params.append(np.load(os.path.join(dir, 'params.npz'), mmap_mode='r')['arr_0'])
         if oracle_labels:
             oracle_data = []

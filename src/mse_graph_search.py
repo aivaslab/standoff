@@ -192,25 +192,73 @@ def print_feature_tree(tree, root, level=0, visited=None):
             print(f"{indent}  ... ({len(tree[root[0]]) - k - 1} more children)")
             break
 
+def make_gen_error(path, keys):
+    ## MAKE gen-error
+    df_inf = pd.read_csv(os.path.join(path, f'f2f-val-special-{True}.csv'))
+    df_all = pd.read_csv(os.path.join(path, f'f2f-val-special-{False}.csv'))
+
+    for df in [df_inf, df_all]:
+        df[['First Key', 'Second Key']] = pd.DataFrame(df['Combo'].apply(lambda x: extract_keys(x, keys)).tolist(), index=df.index)
+
+    df_merged = pd.merge(df_inf, df_all, on=['First Key', 'Second Key'], suffixes=('_inf', '_all'))
+    df_merged['gen_error'] = df_merged['Validation Loss_all'] - df_merged['Validation Loss_inf']
+    output_path = os.path.join(path, 'gen_error_results.csv')
+    df_merged.to_csv(output_path, index=False)
+
+    x_group = df_merged.groupby("Second Key")['Validation Loss_inf'].agg(['mean', 'std'])
+    y_group = df_merged.groupby("Second Key")['Validation Loss_all'].agg(['mean', 'std'])
+
+    plt.figure(figsize=(10, 10))
+    # Scatter plot points
+    for key in x_group.index:
+        x_mean = x_group.loc[key, 'mean']
+        y_mean = y_group.loc[key, 'mean'] if key in y_group.index else np.nan
+        std_sum = 55*x_group.loc[key, 'std'] + 55*y_group.loc[key, 'std'] if key in y_group.index else np.nan
+
+        plt.scatter(x_mean, y_mean, s=10 * std_sum, marker='o')
+        plt.annotate(key, (x_mean, y_mean), textcoords="offset points", xytext=(0, 0), ha='center', rotation=35)
+
+    plt.xlabel('All - Contrast error difference when input (higher = contrast helps)')
+    plt.ylabel('All - Contrast error difference when output')
+    plt.title('Each F2F feature difference')
+    plt.ylim((0,1))
+    plt.xlim((0,1))
+    plt.show()
+    ##
+
+def extract_keys(combo, keys):
+    for key1 in keys:
+        for key2 in keys:
+            if combo == f"{key1}-{key2}":
+                return key1, key2
+    return None, None
 
 def f2f_best_first(path, epoch_numbers, repetitions, timesteps=5, train_mlp=None):
     # data is structured as follows: size (partial/full), type (abstract, box, image), feature (...)
 
     split_inf = True
     run_f2f = False
-    joint = True
+    joint = False
+    get_diff = True
 
     print('loading data')
     data = load_data(path, epoch_numbers, repetitions, timesteps=5)
-    regime = data['all']['abstract']['i-informedness']
-    unique_regimes = np.unique(regime[:, -2:], axis=0)
+    regime_data = data['all']['abstract']['i-informedness']
+    opponents = data['all']['abstract']['opponents']
+    unique_regimes = np.unique(regime_data[:, -2:], axis=0) if split_inf else [None]
 
     if run_f2f:
         results = []
         min_val_loss_per_combo = {}
         for regime_values in unique_regimes:
-            regime_indices = np.where((regime[:, -2] == regime_values[0]) & (regime[:, -1] == regime_values[1]))[0]
-            print(len(regime), len(regime_indices))
+            if regime_values is None:
+                regime_data_r = None
+                opponents_r = None
+            else:
+                regime_data_r = regime_data
+                opponents_r = opponents
+
+            #print(len(regime), len(regime_indices))
             #regime_indices = np.where(np.all(regime_data == regime, axis=1))[0]
 
             ### Start F2F REDO
@@ -218,48 +266,43 @@ def f2f_best_first(path, epoch_numbers, repetitions, timesteps=5, train_mlp=None
             flat_data = {}
             for key1 in real_data.keys():
                 for key2 in real_data[key1].keys():
-                    flat_data[key2] = real_data[key1][key2][regime_indices]
+                    flat_data[key2] = real_data[key1][key2]#[regime_indices]
 
             print(flat_data.keys())
 
-            combos = [(x, y) for x in flat_data.keys() for y in flat_data.keys() if x != y]
+            combos = [(x, y) for x in flat_data.keys() for y in flat_data.keys() if x != y and x != 'labels' and y != 'inputs']
             for combo in tqdm(combos):
-                best_val_loss, _, _, _, model = train_mlp(flat_data[combo[0]], flat_data[combo[1]], regime_data=None, regime=None, opponents_data=None, num_epochs=5, model_type='mlp2', )
+                best_val_loss, _, _, _, model = train_mlp(flat_data[combo[0]], flat_data[combo[1]], regime_data=regime_data_r, regime=regime_values, opponents_data=opponents_r, num_epochs=25, model_type='mlp2', )
                 combo_key = (combo[0], combo[1])
                 if combo_key not in min_val_loss_per_combo or best_val_loss < min_val_loss_per_combo[combo_key]:
                     min_val_loss_per_combo[combo_key] = best_val_loss
-                if best_val_loss < 0.1:
                     torch.save(model.state_dict(), os.path.join(path, f"f2f-{combo[0]}-{combo[1]}-{split_inf}.model"))
                 #results.append({'Regime': f"{regime_values[0]}-{regime_values[1]}", 'Combo': f'{combo[0]}-{combo[1]}', 'Validation Loss': best_val_loss})
-        results = [{'Combo': f'{key[0]}-{key[1]}', 'Min Validation Loss': val} for key, val in min_val_loss_per_combo.items()]
+        results = [{'Combo': f'{key[0]}-{key[1]}', 'Validation Loss': val} for key, val in min_val_loss_per_combo.items()]
         results_df = pd.DataFrame(results)
         results_df.to_csv(os.path.join(path, f'f2f-val-special-{split_inf}.csv'), index=False)
         print('done')
 
 
     regime_values = unique_regimes[0]
-    regime_indices = np.where((regime[:, -2] == regime_values[0]) & (regime[:, -1] == regime_values[1]))[0]
+    if split_inf:
+        regime_indices = np.where((regime_data[:, -2] == regime_values[0]) & (regime_data[:, -1] == regime_values[1]))[0]
     real_data = data['all']
     flat_data = {}
     indexed_flat_data = {}
     for key1 in real_data.keys():
         for key2 in real_data[key1].keys():
             flat_data[key2] = real_data[key1][key2]
-            indexed_flat_data[key2] = real_data[key1][key2][regime_indices]
+            if split_inf:
+                indexed_flat_data[key2] = real_data[key1][key2][regime_indices]
 
     keys = list(flat_data.keys())
     df = pd.read_csv(os.path.join(path, f'f2f-val-special-{split_inf}.csv'))
+    if get_diff:
+        make_gen_error(path, keys)
 
-
-    def extract_keys(combo):
-        for key1 in keys:
-            for key2 in keys:
-                if combo == f"{key1}-{key2}":
-                    return key1, key2
-        return None, None
-
-    df[['First Key', 'Second Key']] = pd.DataFrame(df['Combo'].apply(lambda x: extract_keys(x)).tolist(), index=df.index)
-    filtered_df = df[df['Min Validation Loss'] < 0.1]
+    df[['First Key', 'Second Key']] = pd.DataFrame(df['Combo'].apply(lambda x: extract_keys(x, keys)).tolist(), index=df.index)
+    filtered_df = df[df['Validation Loss'] < 0.1]
     #sorted_df = filtered_df.sort_values(by=['Second Key', 'Validation Loss'])
 
     trios = []
@@ -267,8 +310,8 @@ def f2f_best_first(path, epoch_numbers, repetitions, timesteps=5, train_mlp=None
         matches = filtered_df[filtered_df['First Key'] == row1['Second Key']]
         for _, row2 in matches.iterrows():
             trio = (row1['First Key'], row1['Second Key'], row2['Second Key'])
-            loss1 = row1['Min Validation Loss']
-            loss2 = row2['Min Validation Loss']
+            loss1 = row1['Validation Loss']
+            loss2 = row2['Validation Loss']
             if row1['Second Key'] == 'inputs' or row2['Second Key'] == 'inputs' or row1['First Key'] == 'labels' or row2['First Key'] == 'labels':
                 continue
             if row1['First Key'] == row2['Second Key']:
@@ -278,7 +321,7 @@ def f2f_best_first(path, epoch_numbers, repetitions, timesteps=5, train_mlp=None
     print(len(trios))
 
     model_cache = {}
-    results_df = pd.DataFrame(columns=['f1', 'f2', 'f3', 'XY_Error', 'YZ_Error', 'XZ_Error', 'Chained_Error'])
+    results_df = pd.DataFrame(columns=['f1', 'f2', 'f3', 'XY_Error', 'YZ_Error', 'XZ_Error', 'Chained_Error', 'XZDifference', 'XYDifference', 'YZDifference', 'train'])
     for trio in tqdm(trios):
         first_model_name = trio[0][0]+'-'+trio[0][1]
         second_model_name = trio[0][1]+'-'+trio[0][2]
@@ -290,9 +333,9 @@ def f2f_best_first(path, epoch_numbers, repetitions, timesteps=5, train_mlp=None
         if chained_model_name not in df['Combo'].values:
             continue
 
-        xy_error = df.loc[df['Combo'] == first_model_name, 'Min Validation Loss'].values[0]
-        yz_error = df.loc[df['Combo'] == second_model_name, 'Min Validation Loss'].values[0]
-        xz_error = df.loc[df['Combo'] == chained_model_name, 'Min Validation Loss'].values[0]
+        xy_error = df.loc[df['Combo'] == first_model_name, 'Validation Loss'].values[0]
+        yz_error = df.loc[df['Combo'] == second_model_name, 'Validation Loss'].values[0]
+        xz_error = df.loc[df['Combo'] == chained_model_name, 'Validation Loss'].values[0]
 
         size1 = input_train.shape[1]
         size2 = middle_train.shape[1]
@@ -314,6 +357,8 @@ def f2f_best_first(path, epoch_numbers, repetitions, timesteps=5, train_mlp=None
         input_tensor_eval = torch.tensor(input_data_eval, dtype=torch.float32, device=device)
         output_tensor_train = torch.tensor(output_train, dtype=torch.float32, device=device)
         output_tensor_eval = torch.tensor(output_data_eval, dtype=torch.float32, device=device)
+        intermediate_tensor_train = torch.tensor(middle_train, dtype=torch.float32, device=device)
+        intermediate_tensor_eval = torch.tensor(middle_data_eval, dtype=torch.float32, device=device)
 
         if not joint:
             model1.load_state_dict(torch.load(os.path.join(path, f'f2f-{first_model_name}-{split_inf}.model'), map_location=device))
@@ -327,7 +372,6 @@ def f2f_best_first(path, epoch_numbers, repetitions, timesteps=5, train_mlp=None
             model2.to(device)
             optimizer = optim.Adam(list(model1.parameters()) + list(model2.parameters()), lr=1e-3)
 
-            intermediate_tensor_train = torch.tensor(middle_train, dtype=torch.float32, device=device)
 
             criterion = nn.MSELoss()
 
@@ -351,6 +395,7 @@ def f2f_best_first(path, epoch_numbers, repetitions, timesteps=5, train_mlp=None
             first_model_output = model1(input_tensor_eval)
             second_model_output = model2(first_model_output)
             mse = torch.mean((second_model_output - output_tensor_eval) ** 2).cpu().numpy()
+            mse2 = torch.mean((first_model_output - intermediate_tensor_eval) ** 2).cpu().numpy()
             train_loss = total_loss2/len(loader)
         egg = {
             'f1': trio[0][0],
@@ -360,19 +405,14 @@ def f2f_best_first(path, epoch_numbers, repetitions, timesteps=5, train_mlp=None
             'YZ_Error': yz_error,
             'XZ_Error': xz_error,
             'Chained_Error': mse,
-            'Difference': mse-xz_error,
+            'XZDifference': mse-xz_error,
+            'XYDifference': mse2-xy_error,
+            'YZDifference': mse-yz_error,
             'train': train_loss,
         }
         print(egg)
         results_df = results_df.append(egg, ignore_index=True)
     results_df.to_csv(os.path.join(path, f'chain_results_{split_inf}{"" if not joint else "-j"}.csv'), index=False)
-
-
-
-
-
-
-
 
 
     top_10_losses = sorted_df.groupby('Second Key').head(10)

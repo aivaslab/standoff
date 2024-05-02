@@ -115,13 +115,17 @@ def train_mlp(inputs, other_data, regime_data, regime, opponents_data, patience=
     learning_rate = 1e-3
     batch_size = 128
 
+
     all_indices = np.arange(len(inputs))
     train_indices, val_indices = train_test_split(all_indices, test_size=0.10, random_state=42)
 
     if regime is not None:
-        zero_opponents_indices = np.where(np.all(opponents_data == 0, axis=1))[0]
-        regime_indices = np.where(np.all(regime_data == regime, axis=1))[0]
+        #print(opponents_data.shape, np.mean(opponents_data, axis=0), opponents_data[0], opponents_data[-1], opponents_data[5000], np.unique(opponents_data))
+        zero_opponents_indices = np.where(np.all(opponents_data[:, -1:] == -1, axis=1))[0]
+        #print(regime_data.shape, regime.shape)
+        regime_indices = np.where(np.all(regime_data[:, -2:] == regime, axis=1))[0]
         combined_indices = np.union1d(regime_indices, zero_opponents_indices)
+        #print('regime split effect', len(regime_data), len(regime_indices), len(combined_indices))
         regime_train_indices = np.intersect1d(train_indices, combined_indices)
         act_train = inputs[regime_train_indices]
         other_train = other_data[regime_train_indices]
@@ -154,8 +158,14 @@ def train_mlp(inputs, other_data, regime_data, regime, opponents_data, patience=
         val_dataset = TensorDataset(torch.tensor(act_val, dtype=torch.float32).to(device),
                                     torch.tensor(other_val, dtype=torch.float32).to(device))
 
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+    is_windows = os.name == 'nt'
+
+    if is_windows:
+        train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+        val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+    else:
+        train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=8)
+        val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=8)
 
     model, l2_reg, num_epochs = get_model_type(model_type, input_size, input_size2, output_size, hidden_size, device, num_epochs)
 

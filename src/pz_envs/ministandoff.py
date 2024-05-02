@@ -639,56 +639,62 @@ class MiniStandoffEnv(para_MultiGridEnv):
             #print(self.step_count, self.infos['p_0']["exist"], self.infos['p_0']["b-exist"], self.infos['p_0']["target"], self.infos['p_0']["vision"], self.infos['p_0']["loc"], self.infos['p_0']["b-loc"])
         if self.record_info:
             # if agent's goal of player_1 matches big treat location, then shouldAvoidBig is True
+            info = self.infos['p_0']
             if len(self.puppets):
-                self.infos['p_0']['puppet_goal'] = self.agent_goal[self.puppets[-1]]
-                if len(self.big_food_locations) > 0 and self.agent_goal[self.puppets[-1]] == \
-                        self.big_food_locations[-1]:
-                    self.infos['p_0']['shouldAvoidBig'] = not self.subject_is_dominant
-                    self.infos['p_0']['shouldGetBig'] = False
-                    self.infos['p_0']['shouldGetSmall'] = True
-                    self.infos['p_0']['shouldAvoidSmall'] = False
+                info['puppet_goal'] = self.agent_goal[self.puppets[-1]]
+                if len(self.big_food_locations) > 0 and self.agent_goal[self.puppets[-1]] == self.big_food_locations[-1]:
+                    info['shouldAvoidBig'] = not self.subject_is_dominant
+                    info['shouldGetBig'] = False
+                    info['shouldGetSmall'] = True
+                    info['shouldAvoidSmall'] = False
                 elif len(self.small_food_locations) > 0 and self.agent_goal[self.puppets[-1]] == \
                         self.small_food_locations[-1]:
-                    self.infos['p_0']['shouldAvoidSmall'] = not self.subject_is_dominant
-                    self.infos['p_0']['shouldAvoidBig'] = False
-                    self.infos['p_0']['shouldGetBig'] = True
-                    self.infos['p_0']['shouldGetSmall'] = False
+                    info['shouldAvoidSmall'] = not self.subject_is_dominant
+                    info['shouldAvoidBig'] = False
+                    info['shouldGetBig'] = True
+                    info['shouldGetSmall'] = False
                 else:
-                    self.infos['p_0']['shouldAvoidBig'] = False
-                    self.infos['p_0']['shouldAvoidSmall'] = False
-                    self.infos['p_0']['shouldGetBig'] = True
-                    self.infos['p_0']['shouldGetSmall'] = False
+                    info['shouldAvoidBig'] = False
+                    info['shouldAvoidSmall'] = False
+                    info['shouldGetBig'] = True
+                    info['shouldGetSmall'] = False
 
             if len(self.big_food_locations) > 0 and len(self.small_food_locations) > 0:
                 if 'shouldAvoidBig' in self.infos['p_0'].keys() and self.infos['p_0']['shouldAvoidBig']:
-                    self.infos['p_0']['correct-loc'] = self.small_food_locations[-1]
-                    self.infos['p_0']['incorrect-loc'] = self.big_food_locations[-1]
-                    self.infos['p_0']['shouldGetSmall'] = True
-                    self.infos['p_0']['shouldGetBig'] = False
+                    info['correct-loc'] = self.small_food_locations[-1]
+                    info['incorrect-loc'] = self.big_food_locations[-1]
+                    info['shouldGetSmall'] = True
+                    info['shouldGetBig'] = False
                 else:
-                    self.infos['p_0']['correct-loc'] = self.big_food_locations[-1]
-                    self.infos['p_0']['incorrect-loc'] = self.small_food_locations[-1]
-                    self.infos['p_0']['shouldGetBig'] = True
-                    self.infos['p_0']['shouldGetSmall'] = False
+                    info['correct-loc'] = self.big_food_locations[-1]
+                    info['incorrect-loc'] = self.small_food_locations[-1]
+                    info['shouldGetBig'] = True
+                    info['shouldGetSmall'] = False
             elif len(self.small_food_locations) > 0:
                 if not self.infos['p_0']['shouldAvoidSmall']:
-                    self.infos['p_0']['correct-loc'] = self.small_food_locations[-1]
-                    self.infos['p_0']['shouldGetSmall'] = True
-                    self.infos['p_0']['shouldGetBig'] = False
-                    self.infos['p_0']['incorrect-loc'] = -1
+                    info['correct-loc'] = self.small_food_locations[-1]
+                    info['shouldGetSmall'] = True
+                    info['shouldGetBig'] = False
+                    info['incorrect-loc'] = -1
                 else:
-                    self.infos['p_0']['correct-loc'] = -1
-                    self.infos['p_0']['shouldGetBig'] = True
-                    self.infos['p_0']['shouldGetSmall'] = False
-                    self.infos['p_0']['incorrect-loc'] = self.small_food_locations[-1]
+                    assert self.step_count < 4 # this shouldn't happen ever
+                    info['correct-loc'] = -1
+                    info['shouldGetBig'] = True
+                    info['shouldGetSmall'] = False
+                    info['incorrect-loc'] = self.small_food_locations[-1]
             elif len(self.big_food_locations) > 0:
                 if not self.infos['p_0']['shouldAvoidBig']:
-                    self.infos['p_0']['correct-loc'] = self.big_food_locations[-1]
-                    self.infos['p_0']['shouldGetBig'] = True
-                    self.infos['p_0']['shouldGetSmall'] = False
-                    self.infos['p_0']['incorrect-loc'] = -1
+                    info['correct-loc'] = self.big_food_locations[-1]
+                    info['shouldGetBig'] = True
+                    info['shouldGetSmall'] = False
+                    info['incorrect-loc'] = -1
                 else:
-                    self.infos['p_0']['correct-loc'] = -1
-                    self.infos['p_0']['shouldGetSmall'] = True
-                    self.infos['p_0']['shouldGetBig'] = False
-                    self.infos['p_0']['incorrect-loc'] = self.big_food_locations[-1]
+                    assert self.step_count < 4 # this shouldn't happen ever
+                    info['correct-loc'] = -1
+                    info['shouldGetSmall'] = True
+                    info['shouldGetBig'] = False
+                    info['incorrect-loc'] = self.big_food_locations[-1]
+
+            if len(self.puppets) == 0:
+                if info['shouldGetBig'] == False and self.step_count == 4:
+                    print('found issue', info)
