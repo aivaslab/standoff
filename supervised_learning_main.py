@@ -146,7 +146,7 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
             #print(x.shape, x[0])
             labels.append(x)
 
-        elif len(labels_raw.shape) > 2 and False:
+        elif len(labels_raw.shape) > 2:
             labels.append(labels_raw[..., -1]) # use only the last timestep
         else:
             labels.append(labels_raw.reshape(-1, 25))
@@ -327,7 +327,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
             x = np.eye(2)[labels_raw[:, -1].astype(int)] # single timestep
             #x = np.eye(2)[labels_raw.astype(int)].reshape(-1, 10) # 5 timesteps
             labels.append(x)
-        elif len(labels_raw.shape) > 2 and False:
+        elif len(labels_raw.shape) > 2:
             labels.append(labels_raw[..., -1]) # use only the last timestep
         else:
             print(labels_raw.shape, labels_raw[0])
