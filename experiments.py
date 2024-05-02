@@ -528,6 +528,32 @@ def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, sk
 
         do_comparison(combined_path_list, last_path_list, key_param_list, key_param, exp_name, params, prior_metrics)
 
+    if 154 in todo:
+        print('Running experiment 154: mixed models maybe generalize')
+
+        combined_path_list = []
+        last_path_list = []
+        key_param = 'regime'
+        key_param_list = []
+
+        for regime in list(mixed_regimes.keys()):
+            print('regime:', regime, 'train_sets:', mixed_regimes[regime])
+            combined_paths, last_epoch_paths = run_supervised_session(
+                save_path=os.path.join('supervised', exp_name, regime),
+                train_sets=mixed_regimes[regime],
+                eval_sets=regimes['everything'],
+                oracle_labels=[None],
+                key_param=key_param,
+                key_param_value=regime,
+                label='correct-box',
+                **session_params
+            )
+            last_path_list.append(last_epoch_paths)
+            combined_path_list.append(combined_paths)
+            key_param_list.append(regime)
+
+        do_comparison(combined_path_list, last_path_list, key_param_list, key_param, exp_name, params, prior_metrics)
+
     if 254 in todo:
         print('Running experiment 254: mixed models maybe generalize')
 
@@ -944,5 +970,5 @@ def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, sk
         do_comparison(combined_path_list, last_path_list, key_param_list, key_param, exp_name, params, prior_metrics)
 
 if __name__ == '__main__':
-    experiments([0, 59], repetitions=1, batches=10000, skip_train=True, skip_eval=False, skip_calc=True, skip_activations=False,
+    experiments([59], repetitions=1, batches=10000, skip_train=True, skip_eval=False, skip_calc=True, skip_activations=False,
                 batch_size=256, desired_evals=1, use_ff=False)

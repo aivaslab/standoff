@@ -146,10 +146,10 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
             #print(x.shape, x[0])
             labels.append(x)
 
-        elif len(labels_raw.shape) > 2:
+        elif len(labels_raw.shape) > 2 and False:
             labels.append(labels_raw[..., -1]) # use only the last timestep
         else:
-            labels.append(labels_raw)
+            labels.append(labels_raw.reshape(-1, 25))
         #print('first', np.sum(labels_raw, axis=0), labels_raw[15, -1])
         params.append(np.load(os.path.join(dir, 'params.npz'), mmap_mode='r')['arr_0'])
         for metric in set(prior_metrics):

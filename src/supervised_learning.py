@@ -202,6 +202,7 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
 
 
                     temp_labels = {label: [] for label in check_labels}
+                    one_labels = {label: [] for label in onehot_labels}
 
                     while pos <= frames:
                         this_ob[pos, :, :, :] = obs['p_0']
@@ -209,16 +210,18 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
 
                         for label in check_labels:
                             temp_labels[label].append(info['p_0'][label])
+                        for label in onehot_labels:
+                            data = one_hot(5, info['p_0'][label])
+                            one_labels[label].append(data)
 
 
                         if pos == frames or env.has_released:
                             data_obs.append(serialize_data(this_ob.astype(np.uint8)))
                             data_params.append(eName)
-                            for label in onehot_labels:
-                                data = one_hot(5, info['p_0'][label])
-                                data_labels[label].append(data)
                             for label in check_labels:
                                 data_labels[label].append(np.stack(temp_labels[label]))
+                            for label in onehot_labels:
+                                data_labels[label].append(np.stack(one_labels[label]))
 
                             #data_labels['informedness'].append(informedness)
                             #if informedness != info['p_0']['informedness'] and params["num_puppets"] > 0:
