@@ -112,7 +112,7 @@ class SaveActivations:
 
 def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_path='', oracle_labels=[], repetition=0,
                    epoch_number=0, prior_metrics=[], num_activation_batches=-1, use_ff=False, oracle_is_target=False, act_label_names=[], save_labels=True,
-                   oracle_early=False):
+                   oracle_early=False, last_timestep=True):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     special_criterion = nn.CrossEntropyLoss(reduction='none')
     oracle_criterion = nn.MSELoss(reduction='none')
@@ -141,16 +141,21 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
         print('loaded eval labels', val_set_name, labels_raw.shape)
         if target_label == 'shouldGetBig':
             # it's 5 bools, so we take the last and turn it into 1-hot
-            x = np.eye(2)[labels_raw[:, -1].astype(int)] # single timestep
-            #x = np.eye(2)[labels_raw.astype(int)].reshape(-1, 10) # 5 timesteps
+            if last_timestep:
+                x = np.eye(2)[labels_raw[:, -1].astype(int)] # single timestep
+            else:
+                x = np.eye(2)[labels_raw.astype(int)].reshape(-1, 10) # 5 timesteps
             #print(x.shape, x[0])
             labels.append(x)
 
         elif len(labels_raw.shape) > 2:
-            labels.append(labels_raw[..., -1]) # use only the last timestep
+            if last_timestep:
+                labels.append(labels_raw[..., -1]) # use only the last timestep
+            else:
+                labels.append(labels_raw.reshape(-1, 25))
         else:
-            #labels.append(labels_raw.reshape(-1, 25))
-            labels.append(labels_raw)
+            labels.append(labels_raw.reshape(-1, 25))
+            #labels.append(labels_raw)
         #print('first', np.sum(labels_raw, axis=0), labels_raw[15, -1])
         params.append(np.load(os.path.join(dir, 'params.npz'), mmap_mode='r')['arr_0'])
         for metric in set(prior_metrics):
@@ -310,7 +315,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
                 model_kwargs=None,
                 oracle_labels=[], repetition=0, use_ff=False,
                 save_models=True, save_every=5, record_loss=False,
-                oracle_is_target=False, batches=5000):
+                oracle_is_target=False, batches=5000, last_timestep=True):
     use_cuda = torch.cuda.is_available()
     if len(oracle_labels) == 0 or oracle_labels[0] == None:
         oracle_labels = []
@@ -325,15 +330,20 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
         labels_raw = np.load(os.path.join(dir, 'label-' + target_label + '.npz'), mmap_mode='r')['arr_0']
         if target_label == 'shouldGetBig':
             # it's 5 bools, so we take the last and turn it into 1-hot
-            x = np.eye(2)[labels_raw[:, -1].astype(int)] # single timestep
-            #x = np.eye(2)[labels_raw.astype(int)].reshape(-1, 10) # 5 timesteps
+            if last_timestep:
+                x = np.eye(2)[labels_raw[:, -1].astype(int)] # single timestep
+            else:
+                x = np.eye(2)[labels_raw.astype(int)].reshape(-1, 10)  # 5 timesteps
             labels.append(x)
         elif len(labels_raw.shape) > 2:
-            labels.append(labels_raw[..., -1]) # use only the last timestep
+            if last_timestep:
+                labels.append(labels_raw[..., -1]) # use only the last timestep
+            else:
+                labels.append(labels_raw.reshape(-1, 25))
         else:
             print(labels_raw.shape, labels_raw[0])
-            #labels.append(labels_raw.reshape(-1, 25))
-            labels.append(labels_raw)
+            labels.append(labels_raw.reshape(-1, 25))
+            #labels.append(labels_raw)
         params.append(np.load(os.path.join(dir, 'params.npz'), mmap_mode='r')['arr_0'])
         if oracle_labels:
             oracle_data = []
@@ -1111,7 +1121,7 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
                            load_path='supervised', oracle_labels=[], skip_train=True, batch_size=64,
                            prior_metrics=[], key_param=None, key_param_value=None, save_every=1, skip_calc=True,
                            use_ff=False, oracle_early=False, skip_eval=False, oracle_is_target=True, skip_figures=True,
-                           act_label_names=[], skip_activations=True, batches=5000, label='correct-loc'):
+                           act_label_names=[], skip_activations=True, batches=5000, label='correct-loc', last_timestep=True):
 
     '''
     Runs a session of supervised learning. Different steps, such as whether we train+save models, evaluate models, or run statistics on evaluations, are optional.
@@ -1139,7 +1149,7 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
                     train_model(train_sets, label, load_path=load_path,
                                 save_path=save_path, epochs=epochs, batches=batches, model_kwargs=model_kwargs,
                                 oracle_labels=oracle_labels, repetition=repetition, save_every=save_every,
-                                use_ff=use_ff, oracle_is_target=oracle_is_target)
+                                use_ff=use_ff, oracle_is_target=oracle_is_target, last_timestep=last_timestep)
                 if not skip_eval:
                     for epoch in range(epochs):
                         if epoch % save_every == save_every - 1 or epoch == epochs - 1:
@@ -1152,7 +1162,8 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
                                                       use_ff=use_ff,
                                                       oracle_is_target=oracle_is_target,
                                                       act_label_names=act_label_names,
-                                                      oracle_early=oracle_early)
+                                                      oracle_early=oracle_early,
+                                                      last_timestep=last_timestep)
                             dfs_paths.extend(df_paths)
                             if epoch == epochs - 1:
                                 last_epoch_df_paths.extend(df_paths)

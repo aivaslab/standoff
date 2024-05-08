@@ -107,6 +107,8 @@ def load_dataframes(combined_path_list, value_names, key_param):
         print('value name', value_name)
         for df_path in df_paths:
             repetition = int(df_path.split('_')[-1][:1])
+            if repetition > 0:
+                continue
             #note that this only supports single digits
             try:
                 chunks = pd.read_csv(df_path, chunksize=10000, compression='gzip')
@@ -163,7 +165,7 @@ def do_comparison(combined_path_list, last_path_list, key_param_list, key_param,
 
 
 def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, skip_calc=False, batch_size=64, desired_evals=5,
-                use_ff=False, skip_eval=False, skip_activations=False):
+                use_ff=False, skip_eval=False, skip_activations=False, last_timestep=True):
     """What is the overall performance of naive, off-the-shelf models on this task? Which parameters of competitive
     feeding settings are the most sensitive to overall model performance? To what extent are different models
     sensitive to different parameters? """
@@ -232,6 +234,9 @@ def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, sk
     oracles = labels + [None]
     conf = ScenarioConfigs()
     exp_name = f'exp_{todo[0]}' if not use_ff else f'exp_{todo[0]}-f'
+    if last_timestep:
+        exp_name += "-L"
+
     session_params = {
         'repetitions': repetitions,
         'epochs': epochs,
@@ -246,6 +251,7 @@ def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, sk
         'act_label_names': labels,
         'skip_activations': skip_activations,
         'oracle_is_target': False,
+        'last_timestep': last_timestep,
     }
     if 0 in todo:
         print('Generating datasets with labels', labels)
@@ -261,39 +267,52 @@ def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, sk
 
     if 's' in todo:
         print('making combined heatmap')
-        names = ['exp_253', 'exp_251', 'exp_254', 'exp_259']#['exp_53']#, 'exp_51', 'exp_54',]
         session_params['skip_train'] = True
         session_params['skip_eval'] = True
         session_params['skip_calc'] = True
+
         key_param = 'regime'
-        df_path_list = []
-        df_path_list2 = []
-        #used_regimes = []
-        key_param_list = []
-        for dataset in names:
-            print(dataset)
-            cur_regimes = {'exp_254': mixed_regimes, 'exp_251': single_regimes, 'exp_253': regimes, 'exp_259': hregime}[dataset]
+        regime_map = {'exp_54': mixed_regimes, 'exp_51': single_regimes, 'exp_53': regimes, 'exp_59': hregime,
+                      'exp_154': mixed_regimes, 'exp_151': single_regimes, 'exp_153': regimes, 'exp_159': hregime,
+                      'exp_254': mixed_regimes, 'exp_251': single_regimes, 'exp_253': regimes, 'exp_259': hregime}
 
-            for regime in list(cur_regimes.keys()):
-                tset = cur_regimes[regime]
-                all_dfs, last_epoch_paths = run_supervised_session(
-                    save_path=os.path.join('supervised', dataset, regime),
-                    train_sets=tset,
-                    eval_sets=regimes['everything'],
-                    oracle_labels=[None],
-                    key_param=key_param,
-                    key_param_value=regime,
-                    **session_params
-                )
-                df_path_list2.append(all_dfs)
-                df_path_list.append(last_epoch_paths)
-                key_param_list.append(regime)
 
-        print(key_param_list)
-        path = os.path.join('supervised', 'special2')
-        if not os.path.exists(path):
-            os.mkdir(path)
-        special_heatmap(df_path_list2, df_path_list, 'regime', key_param_list, names, path, params)
+        for x in [0, 1, 2]:
+            if x in todo:
+                if x > 0:
+                    names = [f'exp_{x}53', f'exp_{x}51', f'exp_{x}54', f'exp_{x}59']
+                else:
+                    names = ['exp_53', 'exp_51', 'exp_54', 'exp_59']
+                df_path_list = []
+                df_path_list2 = []
+                key_param_list = []
+                for dataset in names:
+                    if last_timestep:
+                        real_name = dataset + "-L"
+                    else:
+                        real_name = dataset
+                    print(real_name)
+                    cur_regimes = regime_map[dataset]
+                    for regime in list(cur_regimes.keys()):
+                        tset = cur_regimes[regime]
+                        all_dfs, last_epoch_paths = run_supervised_session(
+                            save_path=os.path.join('supervised', real_name, regime),
+                            train_sets=tset,
+                            eval_sets=regimes['everything'],
+                            oracle_labels=[None],
+                            key_param=key_param,
+                            key_param_value=regime,
+                            **session_params
+                        )
+                        df_path_list2.append(all_dfs)
+                        df_path_list.append(last_epoch_paths)
+                        key_param_list.append(regime)
+
+                #print(key_param_list)
+                path = os.path.join('supervised', f'special-{x}')
+                if not os.path.exists(path):
+                    os.mkdir(path)
+                special_heatmap(df_path_list2, df_path_list, 'regime', key_param_list, names, path, params)
 
     if 1 in todo:
         print('Running experiment 1: varied models training directly on the test set')
@@ -970,5 +989,5 @@ def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, sk
         do_comparison(combined_path_list, last_path_list, key_param_list, key_param, exp_name, params, prior_metrics)
 
 if __name__ == '__main__':
-    experiments([59], repetitions=1, batches=10000, skip_train=True, skip_eval=False, skip_calc=True, skip_activations=False,
-                batch_size=256, desired_evals=1, use_ff=False)
+    experiments([251, 253, 254, 259], repetitions=1, batches=10000, skip_train=False, skip_eval=False, skip_calc=True, skip_activations=True,
+                batch_size=256, desired_evals=1, use_ff=False, last_timestep=True)
