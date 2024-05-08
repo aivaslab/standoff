@@ -43,7 +43,7 @@ def train_mlp_tree(inputs, target_outputs, epochs=10):
     epoch_losses = []
 
     dataset_size = inputs.shape[0]
-    batch_size = 128
+    batch_size = 256
     validation_split = 0.2
     val_size = int(dataset_size * validation_split)
     train_size = dataset_size - val_size
@@ -405,7 +405,7 @@ def f2f_best_first(path, epoch_numbers, repetitions, timesteps=5, train_mlp=None
             criterion = nn.MSELoss()
 
             dataset_train = TensorDataset(input_tensor_train, intermediate_tensor_train, output_tensor_train)
-            loader = DataLoader(dataset_train, batch_size=128, shuffle=True)
+            loader = DataLoader(dataset_train, batch_size=256, shuffle=True)
             for epoch in range(25):
                 total_loss2 = 0
                 for inputs, intermediate_targets, targets in loader:

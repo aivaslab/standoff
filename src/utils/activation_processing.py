@@ -113,7 +113,7 @@ def train_mlp(inputs, other_data, regime_data, regime, opponents_data, patience=
     output_size = other_data.shape[1]
     hidden_size = 32
     learning_rate = 1e-3
-    batch_size = 128
+    batch_size = 256
 
 
     all_indices = np.arange(len(inputs))
