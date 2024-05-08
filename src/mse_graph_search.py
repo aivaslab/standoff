@@ -3,6 +3,7 @@ import pickle
 import os
 import numpy as np
 from itertools import combinations
+import gzip
 
 import pandas as pd
 import torch
@@ -208,23 +209,39 @@ def make_gen_error(path, keys):
     x_group = df_merged.groupby("Second Key")['Validation Loss_inf'].agg(['mean', 'std'])
     y_group = df_merged.groupby("Second Key")['Validation Loss_all'].agg(['mean', 'std'])
 
-    plt.figure(figsize=(10, 10))
-    # Scatter plot points
-    for key in x_group.index:
-        x_mean = x_group.loc[key, 'mean']
-        y_mean = y_group.loc[key, 'mean'] if key in y_group.index else np.nan
-        std_sum = 55*x_group.loc[key, 'std'] + 55*y_group.loc[key, 'std'] if key in y_group.index else np.nan
+    for inout, firstsecond in [('Input', 'First'), ('Output', 'Second')]:
+        unique_keys = df_merged[f'{firstsecond} Key'].unique()
+        colors = plt.cm.jet(np.linspace(0, 1, len(unique_keys)))
+        color_dict = dict(zip(unique_keys, colors))
 
-        plt.scatter(x_mean, y_mean, s=10 * std_sum, marker='o')
-        plt.annotate(key, (x_mean, y_mean), textcoords="offset points", xytext=(0, 0), ha='center', rotation=35)
+        for size in [0, 1]:
+            plt.figure(figsize=(10, 10))
+            mean_coords = {}
+            for key in unique_keys:
+                subset = df_merged[df_merged[f'{firstsecond} Key'] == key]
+                mean_x = subset['Validation Loss_inf'].mean()
+                mean_y = subset['Validation Loss_all'].mean()
+                mean_coords[key] = (mean_x, mean_y)
+                plt.scatter(subset['Validation Loss_inf'], subset['Validation Loss_all'], color=color_dict[key], label=key, alpha=0.5)
+                if size == 1:
+                    for _, row in subset.iterrows():
+                        plt.text(row['Validation Loss_inf'], row['Validation Loss_all'], f'{row["First Key"]}, {row["Second Key"]}', fontsize=7, color='black', rotation=45)
 
-    plt.xlabel('All - Contrast error difference when input (higher = contrast helps)')
-    plt.ylabel('All - Contrast error difference when output')
-    plt.title('Each F2F feature difference')
-    plt.ylim((0,1))
-    plt.xlim((0,1))
-    plt.show()
-    ##
+
+            if size == 0:
+                for key, (mean_x, mean_y) in mean_coords.items():
+                    plt.text(mean_x, mean_y, key, fontsize=11, ha='center', va='center', bbox=dict(facecolor=color_dict[key], alpha=0.2, edgecolor='none'))
+
+
+            plt.xlabel('Contrastive trained loss')
+            plt.ylabel('Direct trained loss')
+            plt.title(f'Each F2F {inout} feature generalization')
+            plt.ylim((0.85*size, 1))
+            plt.xlim((0, 1-0.85*size))
+            plt.savefig(os.path.join(path, f'{inout}_generalization_{size}.png'))
+            plt.close()
+
+
 
 def extract_keys(combo, keys):
     for key1 in keys:
@@ -236,8 +253,8 @@ def extract_keys(combo, keys):
 def f2f_best_first(path, epoch_numbers, repetitions, timesteps=5, train_mlp=None):
     # data is structured as follows: size (partial/full), type (abstract, box, image), feature (...)
 
-    split_inf = True
-    run_f2f = False
+    split_inf = False
+    run_f2f = True
     joint = False
     get_diff = True
 
@@ -248,6 +265,7 @@ def f2f_best_first(path, epoch_numbers, repetitions, timesteps=5, train_mlp=None
     unique_regimes = np.unique(regime_data[:, -2:], axis=0) if split_inf else [None]
 
     if run_f2f:
+        print('running f2f', 'split_inf', split_inf)
         results = []
         min_val_loss_per_combo = {}
         for regime_values in unique_regimes:
@@ -268,7 +286,7 @@ def f2f_best_first(path, epoch_numbers, repetitions, timesteps=5, train_mlp=None
                 for key2 in real_data[key1].keys():
                     flat_data[key2] = real_data[key1][key2]#[regime_indices]
 
-            print(flat_data.keys())
+            print('keys:', flat_data.keys())
 
             combos = [(x, y) for x in flat_data.keys() for y in flat_data.keys() if x != y and x != 'labels' and y != 'inputs']
             for combo in tqdm(combos):
@@ -276,7 +294,11 @@ def f2f_best_first(path, epoch_numbers, repetitions, timesteps=5, train_mlp=None
                 combo_key = (combo[0], combo[1])
                 if combo_key not in min_val_loss_per_combo or best_val_loss < min_val_loss_per_combo[combo_key]:
                     min_val_loss_per_combo[combo_key] = best_val_loss
-                    torch.save(model.state_dict(), os.path.join(path, f"f2f-{combo[0]}-{combo[1]}-{split_inf}.model"))
+                    path2 = os.path.join(path, f"f2f-{combo[0]}-{combo[1]}-{split_inf}.pkl.gz")
+                    with gzip.open(path2, 'wb') as f:
+                        pickle.dump(model.state_dict(), f)
+
+                    #torch.save(model.state_dict(), path )
                 #results.append({'Regime': f"{regime_values[0]}-{regime_values[1]}", 'Combo': f'{combo[0]}-{combo[1]}', 'Validation Loss': best_val_loss})
         results = [{'Combo': f'{key[0]}-{key[1]}', 'Validation Loss': val} for key, val in min_val_loss_per_combo.items()]
         results_df = pd.DataFrame(results)
@@ -361,17 +383,24 @@ def f2f_best_first(path, epoch_numbers, repetitions, timesteps=5, train_mlp=None
         intermediate_tensor_eval = torch.tensor(middle_data_eval, dtype=torch.float32, device=device)
 
         if not joint:
-            model1.load_state_dict(torch.load(os.path.join(path, f'f2f-{first_model_name}-{split_inf}.model'), map_location=device))
-            model1.eval()
-            model1.to(device)
-            model2.load_state_dict(torch.load(os.path.join(path, f'f2f-{second_model_name}-{split_inf}.model'), map_location=device))
-            model2.eval()
-            model2.to(device)
+            path1 = os.path.join(path, f'f2f-{first_model_name}-{split_inf}.pkl.gz')
+            path2 = os.path.join(path, f'f2f-{second_model_name}-{split_inf}.pkl.gz')
+            with gzip.open(path1, 'rb') as f:
+                state_dict = pickle.load(f)
+                state_dict = {k: v.to(device) for k, v in state_dict.items()}
+                model1.load_state_dict(state_dict)
+                model1.eval()
+                model1.to(device)
+            with gzip.open(path2, 'rb') as f:
+                state_dict = pickle.load(f)
+                state_dict = {k: v.to(device) for k, v in state_dict.items()}
+                model2.load_state_dict(state_dict)
+                model2.eval()
+                model2.to(device)
         else:
             model1.to(device)
             model2.to(device)
             optimizer = optim.Adam(list(model1.parameters()) + list(model2.parameters()), lr=1e-3)
-
 
             criterion = nn.MSELoss()
 
