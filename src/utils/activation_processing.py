@@ -158,7 +158,7 @@ def train_mlp(inputs, other_data, regime_data, regime, opponents_data, patience=
         val_dataset = TensorDataset(torch.tensor(act_val, dtype=torch.float32).to(device),
                                     torch.tensor(other_val, dtype=torch.float32).to(device))
 
-    is_windows = os.name == 'nt'
+    is_windows = True#os.name == 'nt'
 
     if is_windows:
         train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
