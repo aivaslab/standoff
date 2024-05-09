@@ -340,7 +340,7 @@ def f2f_best_first(path, epoch_numbers, repetitions, timesteps=5, train_mlp=None
                 continue
             if row1['First Key'] == row2['Second Key']:
                 continue
-            if loss1 + loss2 < 0.2:
+            if loss1 + loss2 < 1.0:
                 trios.append((trio, loss1, loss2))
     print(len(trios), flat_data.keys())
 
