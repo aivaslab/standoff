@@ -256,7 +256,7 @@ def f2f_best_first(path, epoch_numbers, repetitions, timesteps=5, train_mlp=None
     split_inf = False
     run_f2f = False
     joint = True
-    get_diff = fALSE
+    get_diff = False
 
     print('loading data')
     data = load_data(path, epoch_numbers, repetitions, timesteps=5)
