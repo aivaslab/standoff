@@ -317,6 +317,8 @@ def f2f_best_first(path, epoch_numbers, repetitions, timesteps=5, train_mlp=None
             flat_data[key2] = real_data[key1][key2]
             if split_inf:
                 indexed_flat_data[key2] = real_data[key1][key2][regime_indices]
+            else:
+                indexed_flat_data[key2] = real_data[key1][key2]
 
     keys = list(flat_data.keys())
     df = pd.read_csv(os.path.join(path, f'f2f-val-special-{split_inf}.csv'))
