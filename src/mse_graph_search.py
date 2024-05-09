@@ -326,7 +326,7 @@ def f2f_best_first(path, epoch_numbers, repetitions, timesteps=5, train_mlp=None
         make_gen_error(path, keys)
 
     df[['First Key', 'Second Key']] = pd.DataFrame(df['Combo'].apply(lambda x: extract_keys(x, keys)).tolist(), index=df.index)
-    filtered_df = df[df['Validation Loss'] < 0.1]
+    filtered_df = df[df['Validation Loss'] < 0.9]
     #sorted_df = filtered_df.sort_values(by=['Second Key', 'Validation Loss'])
 
     trios = []
