@@ -340,7 +340,7 @@ def f2f_best_first(path, epoch_numbers, repetitions, timesteps=5, train_mlp=None
                 continue
             if loss1 + loss2 < 0.2:
                 trios.append((trio, loss1, loss2))
-    print(len(trios))
+    print(len(trios), flat_data.keys())
 
     model_cache = {}
     results_df = pd.DataFrame(columns=['f1', 'f2', 'f3', 'XY_Error', 'YZ_Error', 'XZ_Error', 'Chained_Error', 'XZDifference', 'XYDifference', 'YZDifference', 'train'])
