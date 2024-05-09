@@ -253,10 +253,10 @@ def extract_keys(combo, keys):
 def f2f_best_first(path, epoch_numbers, repetitions, timesteps=5, train_mlp=None):
     # data is structured as follows: size (partial/full), type (abstract, box, image), feature (...)
 
-    split_inf = True
-    run_f2f = True
-    joint = False
-    get_diff = True
+    split_inf = False
+    run_f2f = False
+    joint = True
+    get_diff = fALSE
 
     print('loading data')
     data = load_data(path, epoch_numbers, repetitions, timesteps=5)
