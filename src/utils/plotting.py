@@ -801,9 +801,9 @@ def save_key_param_figures(save_dir, key_param_stats, oracle_stats, key_param, k
 
                         original_row_order = pivot_df.index.tolist()
 
-                        use_special_rows = True
+                        use_special_rows = False
 
-                        use_many_rows = True
+                        use_many_rows = False
                         if use_special_rows:
                             if use_many_rows:
                                 single_rows = ['Tt0', 'Tf0', 'Tn0', 'Ft0', 'Ff0', 'Fn0', 'Nt0', 'Nf0', 'Nn0', 'Tt1', 'Tf1', 'Tn1', 'Ft1', 'Ff1', 'Fn1', 'Nt1', 'Nf1', 'Nn1']
@@ -1015,6 +1015,20 @@ def save_single_param_figures(save_dir, params, avg_loss, last_epoch_df):
         plt.savefig(file_path)
         plt.close()
 
+
+def plot_learning_curves(save_dir, lp_list):
+    print('plotting learning curves')
+    plt.figure(figsize=(10, 6))
+    for l in lp_list:
+        print('plotting', l)
+        if os.path.exists(l[0]):
+            df = pd.read_csv(l[0])
+            plt.plot(df['Batch'], df['Loss'], label=l)
+    plt.xlabel('Batch')
+    plt.ylabel('Loss')
+    plt.title('Validation Loss')
+    plt.savefig(os.path.join(save_dir, 'loss.png'))
+    plt.close()
 
 def save_fixed_double_param_figures(save_dir, top_n_ranges, df, avg_loss, last_epoch_df):
     this_save_dir = os.path.join(save_dir, 'fixeddoubleparams')

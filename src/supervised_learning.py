@@ -1,4 +1,4 @@
-
+import hashlib
 import pickle
 from functools import lru_cache
 
@@ -448,13 +448,16 @@ class CustomDataset(Dataset):
 
         metrics = self.metrics[index] if len(self.metrics) else None
         return data, labels, self.params[index], oracles, metrics
+
+
 class BaseDatasetBig(Dataset):
-    def __init__(self, data_list, labels_list, params_list, oracles_list, metrics=None):
+    def __init__(self, data_list, labels_list, params_list, oracles_list, included_indices, metrics=None):
         self.data_list = data_list
         self.labels_list = labels_list
         self.params_list = params_list
         self.oracles_list = oracles_list
         self.metrics = metrics
+        self.included_indices = included_indices
 
         self.cumulative_sizes = self._cumulative_sizes()
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -473,7 +476,8 @@ class BaseDatasetBig(Dataset):
         return list_index, local_index
 
     def __len__(self):
-        return self.cumulative_sizes[-1]
+        return len(self.included_indices)
+        #return self.cumulative_sizes[-1]
 
 
 def custom_collate(batch):
@@ -484,14 +488,20 @@ def custom_collate(batch):
     labels = default_collate(labels)
     oracles = default_collate(oracles)
     params = default_collate(params)
-    metric_keys = metrics[0].keys()
-    metrics_collated = {key: default_collate([d[key] for d in metrics]) for key in metric_keys}
+    if metrics and isinstance(metrics[0], dict):
+        metric_keys = metrics[0].keys()
+        metrics_collated = {key: default_collate([d[key] for d in metrics if key in d]) for key in metric_keys}
+    else:
+        metrics_collated = {}
+    #metrics_collated = {key: default_collate([d[key] for d in metrics]) for key in metric_keys}
     act_labels_keys = act_labels_batch[0].keys()
     act_labels_batch = {key: default_collate([d[key] for d in act_labels_batch]) for key in act_labels_keys}
 
     return data, labels, params, oracles, metrics_collated, act_labels_batch
+
 class TrainDatasetBig(BaseDatasetBig):
-    def __getitem__(self, index):
+    def __getitem__(self, idx):
+        index = self.included_indices[idx]
         list_index, local_index = self._find_list_index(index)
         data = torch.from_numpy(pickle.loads(self.data_list[list_index][local_index])).float()
         labels = torch.from_numpy(self.labels_list[list_index][local_index].astype(np.int8))
@@ -510,12 +520,15 @@ class TrainDatasetBig(BaseDatasetBig):
         return data, labels, params, oracles, metrics
 
 
-class EvalDatasetBig(BaseDatasetBig):
-    def __init__(self, data_list, labels_list, params_list, oracles_list, metrics=None, act_list=None):
-        super().__init__(data_list, labels_list, params_list, oracles_list, metrics)
-        self.act_list = act_list
 
-    def __getitem__(self, index):
+class EvalDatasetBig(BaseDatasetBig):
+    def __init__(self, data_list, labels_list, params_list, oracles_list, included_indices, metrics=None, act_list=None, ):
+        super().__init__(data_list, labels_list, params_list, oracles_list, included_indices, metrics)
+        self.act_list = act_list
+        self.included_indices = included_indices
+
+    def __getitem__(self, idx):
+        index = self.included_indices[idx]
         list_index, local_index = self._find_list_index(index)
         data = torch.from_numpy(pickle.loads(self.data_list[list_index][local_index])).float()
         labels = torch.from_numpy(self.labels_list[list_index][local_index].astype(np.int8))
@@ -542,10 +555,172 @@ class EvalDatasetBig(BaseDatasetBig):
 
         return data, labels,params, oracles, metrics, act_labels_batch
 
-class RNNModel(nn.Module):
+class cLstmModel(nn.Module):
     def __init__(self, hidden_size, num_layers, output_len, channels, kernels=8, kernels2=8, kernel_size1=3,
                  kernel_size2=3, stride1=1, pool_kernel_size=2, pool_stride=2, padding1=0, padding2=0, use_pool=True,
                  use_conv2=False, oracle_len=0, is_fc=False, lr=0.0, batch_size=0.0,
+                 oracle_is_target=False, oracle_early=False):
+        super(cLstmModel, self).__init__()
+        self.kwargs = {'hidden_size': hidden_size, 'num_layers': num_layers,
+                       'output_len': output_len, 'pool_kernel_size': pool_kernel_size,
+                       'pool_stride': pool_stride, 'channels': channels, 'kernels': kernels,
+                       'padding1': padding1, 'padding2': padding2, 'use_pool': use_pool, 'stride1': stride1,
+                       'use_conv2': use_conv2, 'kernel_size1': kernel_size1,
+                       'kernels2': kernels2, 'kernel_size2': kernel_size2, 'is_fc': is_fc, 'lr':lr, 'batch_size':batch_size,}
+
+        input_size = 7
+        self.input_frames = 5
+
+        self.is_fc = is_fc
+        self.use_pool = use_pool
+        self.use_conv2 = use_conv2
+        conv1_output_size = (input_size - kernel_size1 + 2 * padding1) // stride1 + 1
+        self.conv1 = nn.Conv2d(channels, kernels, kernel_size=kernel_size1, padding=padding1, stride=stride1)
+
+        if use_pool:
+            self.pool = nn.MaxPool2d(kernel_size=pool_kernel_size, stride=pool_stride,
+                                     padding=0 if pool_kernel_size < conv1_output_size else 1)
+
+        pool1_output_size = (conv1_output_size - pool_kernel_size + 2 * 0 if pool_kernel_size < conv1_output_size else 1) // pool_stride + 1 if use_pool else conv1_output_size
+
+        if use_conv2:
+            conv2_output_size = (pool1_output_size - min(kernel_size2, pool1_output_size) + 2 * padding2) // stride1 + 1
+            self.conv2 = nn.Conv2d(kernels, kernels2, kernel_size=min(pool1_output_size, kernel_size2), padding=padding2)
+            pks = min(pool_kernel_size, conv2_output_size)
+            if use_pool:
+                self.pool2 = nn.MaxPool2d(kernel_size=pks, stride=pool_stride,
+                                          padding=0 if pool_kernel_size < conv2_output_size else 1)
+            pool2_output_size = (conv2_output_size - pks + 2 * 0 if pks < conv2_output_size else 1) // pool_stride + 1 if use_pool else conv2_output_size
+        else:
+            conv2_output_size = conv1_output_size
+            pool2_output_size = pool1_output_size
+
+        input_size = kernels2 * pool2_output_size * pool2_output_size
+
+        self.rnn = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
+        self.fc_main_output = nn.Linear(hidden_size, int(output_len))
+
+    def forward(self, x, oracle_inputs=None):
+        conv_outputs = []
+        for t in range(self.input_frames):
+            x_t = x[:, t, :, :, :]
+            x_t = self.pool(F.relu(self.conv1(x_t))) if self.use_pool else F.relu(self.conv1(x_t))
+            if self.use_conv2:
+                x_t = self.pool(F.relu(self.conv2(x_t))) if self.use_pool else F.relu(self.conv2(x_t))
+            flattened = x_t.view(x.size(0), -1)
+            conv_outputs.append(flattened)
+        x = torch.stack(conv_outputs, dim=1)
+        out, _ = self.rnn(x)
+        outputs = self.fc_main_output(out[:, -1, :])
+        return outputs
+
+
+class cRNNModel(nn.Module):
+    def __init__(self, hidden_size, num_layers, output_len, channels, kernels=8, kernels2=8, kernel_size1=3,
+                 kernel_size2=3, stride1=1, pool_kernel_size=2, pool_stride=2, padding1=0, padding2=0, use_pool=True,
+                 use_conv2=False, oracle_len=0, is_fc=False, lr=0.0, batch_size=0.0,
+                 oracle_is_target=False, oracle_early=False):
+        super(cRNNModel, self).__init__()
+        self.kwargs = {'hidden_size': hidden_size, 'num_layers': num_layers,
+                       'output_len': output_len, 'pool_kernel_size': pool_kernel_size,
+                       'pool_stride': pool_stride, 'channels': channels, 'kernels': kernels,
+                       'padding1': padding1, 'padding2': padding2, 'use_pool': use_pool, 'stride1': stride1,
+                       'use_conv2': use_conv2, 'kernel_size1': kernel_size1,
+                       'kernels2': kernels2, 'kernel_size2': kernel_size2, 'is_fc': is_fc, 'lr':lr, 'batch_size':batch_size,}
+
+        self.input_frames = 5
+        self.use_pool = use_pool
+        self.use_conv2 = use_conv2
+
+        self.conv1 = nn.Conv2d(channels, kernels, kernel_size=kernel_size1, padding=padding1, stride=stride1)
+        conv1_output_size = (7 - kernel_size1 + 2 * padding1) // stride1 + 1
+
+        if use_pool:
+            self.pool = nn.MaxPool2d(kernel_size=pool_kernel_size, stride=pool_stride,
+                                     padding=0 if pool_kernel_size < conv1_output_size else 1)
+            pool1_output_size = (conv1_output_size - pool_kernel_size + 2 * 0 if pool_kernel_size < conv1_output_size else 1) // pool_stride + 1
+        else:
+            pool1_output_size = conv1_output_size
+
+        if use_conv2:
+            self.conv2 = nn.Conv2d(kernels, kernels2, kernel_size=min(pool1_output_size, kernel_size2), padding=padding2)
+            conv2_output_size = (pool1_output_size - kernel_size2 + 2 * padding2) // stride1 + 1
+            pool2_output_size = (conv2_output_size - pool_kernel_size + 2 * 0 if pool_kernel_size < conv2_output_size else 1) // pool_stride + 1 if use_pool else conv2_output_size
+        else:
+            pool2_output_size = pool1_output_size
+
+        final_output_size = kernels2 * pool2_output_size * pool2_output_size if use_conv2 else kernels * pool1_output_size * pool1_output_size
+
+        self.rnn = nn.RNN(final_output_size, hidden_size, num_layers, batch_first=True)
+        self.fc_main_output = nn.Linear(hidden_size, int(output_len))
+
+    def forward(self, x, oracle_inputs=None):
+        conv_outputs = []
+        for t in range(self.input_frames):
+            x_t = x[:, t, :, :, :]
+            x_t = self.pool(F.relu(self.conv1(x_t))) if self.use_pool else F.relu(self.conv1(x_t))
+            if self.use_conv2:
+                x_t = self.pool(F.relu(self.conv2(x_t))) if self.use_pool else F.relu(self.conv2(x_t))
+            flattened = x_t.view(x.size(0), -1)
+            conv_outputs.append(flattened)
+
+        x = torch.stack(conv_outputs, dim=1)
+        out, _ = self.rnn(x)
+        outputs = self.fc_main_output(out[:, -1, :])  # Use last RNN output for the fully connected layer
+        return outputs
+
+class CNNModel(nn.Module):
+    def __init__(self, hidden_size, num_layers, output_len, channels, kernels=8, kernels2=8, kernel_size1=3,
+                 kernel_size2=3, stride1=1, pool_kernel_size=2, pool_stride=2, padding1=0, padding2=0, use_pool=True,
+                 use_conv2=False, oracle_len=0, is_fc=False, lr=0.0, batch_size=256,
+                 oracle_is_target=False, oracle_early=False):
+        super(CNNModel, self).__init__()
+        self.kwargs = {'hidden_size': hidden_size, 'num_layers': num_layers,
+                       'output_len': output_len, 'pool_kernel_size': pool_kernel_size,
+                       'pool_stride': pool_stride, 'channels': channels, 'kernels': kernels,
+                       'padding1': padding1, 'padding2': padding2, 'use_pool': use_pool, 'stride1': stride1,
+                       'use_conv2': use_conv2, 'kernel_size1': kernel_size1,
+                       'kernels2': kernels2, 'kernel_size2': kernel_size2, 'is_fc': is_fc, 'lr':lr, 'batch_size':batch_size,}
+
+        self.input_frames = 5  # Assuming a fixed number of input frames as in the original model
+        self.use_pool = use_pool
+        self.use_conv2 = use_conv2
+
+        self.conv1 = nn.Conv2d(channels, kernels, kernel_size=kernel_size1, padding=padding1, stride=stride1)
+        conv1_output_size = (7 - kernel_size1 + 2 * padding1) // stride1 + 1
+
+        if use_pool:
+            self.pool = nn.MaxPool2d(kernel_size=pool_kernel_size, stride=pool_stride)
+            pool1_output_size = ((conv1_output_size - pool_kernel_size) // pool_stride + 1)
+        else:
+            pool1_output_size = conv1_output_size
+
+        if use_conv2:
+            self.conv2 = nn.Conv2d(kernels, kernels2, kernel_size=kernel_size2, padding=padding2)
+            conv2_output_size = ((pool1_output_size - kernel_size2 + 2 * padding2) // stride1 + 1)
+            final_output_size = kernels2 * conv2_output_size * conv2_output_size * 5
+        else:
+            final_output_size = kernels * pool1_output_size * pool1_output_size * 5
+        self.fc = nn.Linear(final_output_size, output_len)
+
+    def forward(self, x, unused):
+        conv_outputs = []
+        for t in range(self.input_frames):
+            x_t = x[:, t, :, :, :]
+            x_t = self.pool(F.relu(self.conv1(x_t))) if self.use_pool else F.relu(self.conv1(x_t))
+            if self.use_conv2:
+                x_t = self.pool(F.relu(self.conv2(x_t))) if self.use_pool else F.relu(self.conv2(x_t))
+            flattened = x_t.view(x.size(0), -1)
+            conv_outputs.append(flattened)
+
+        final_conv_output = torch.cat(conv_outputs, dim=1)
+        outputs = self.fc(final_conv_output)
+        return outputs
+
+class RNNModel(nn.Module):
+    def __init__(self, hidden_size, num_layers, output_len, channels, kernels=8, kernels2=8, kernel_size1=3,
+                 kernel_size2=3, stride1=1, pool_kernel_size=2, pool_stride=2, padding1=0, padding2=0, use_pool=True,
+                 use_conv2=False, oracle_len=0, is_fc=False, lr=0.0, batch_size=256,
                  oracle_is_target=False, oracle_early=False):
         super(RNNModel, self).__init__()
         self.kwargs = {'hidden_size': hidden_size, 'num_layers': num_layers,
@@ -558,8 +733,6 @@ class RNNModel(nn.Module):
 
         input_size = 7
         self.input_frames = 5
-
-
 
         self.oracle_early = oracle_early
         self.oracle_is_target = oracle_is_target
@@ -619,9 +792,6 @@ class RNNModel(nn.Module):
         x = torch.stack(conv_outputs, dim=1)
 
         out, _ = self.rnn(x)
-
-        #if not self.oracle_is_target and self.oracle_layer != 1:
-        #    out = torch.cat((out, oracle_inputs), dim=-1)
         if self.oracle_is_target:
             oracle_outputs = self.fc_oracle_output(out)
             oracle_outputs = oracle_outputs.view(oracle_outputs.size(0), -1)
@@ -632,7 +802,6 @@ class RNNModel(nn.Module):
             outputs = self.fc_main_output(torch.cat((newout, oracle_inputs), dim=1))
         else:
             outputs = self.fc_main_output(out[:, -1, :])
-
         return outputs
 
 
@@ -711,4 +880,137 @@ class FeedForwardModel(nn.Module):
             x = F.relu(self.fc(torch.cat((x, oracle_inputs), dim=-1)))
             x = self.output_layer(x)
 
+        return x
+
+class fCNN(nn.Module):
+    # this module folds timesteps into channels, as opposed to running conv kernels on each individually
+    def __init__(self, hidden_size, num_layers, output_len, channels, kernels=8, kernels2=8, kernel_size1=3,
+                 kernel_size2=3, stride1=1, pool_kernel_size=2, pool_stride=2, padding1=0, padding2=0, use_pool=True,
+                 use_conv2=False, oracle_len=0, is_fc=False, lr=0.0, batch_size=256,
+                 oracle_is_target=False, oracle_early=False):
+        super(fCNN, self).__init__()
+        self.kwargs = {
+            'hidden_size': hidden_size, 'num_layers': num_layers, 'output_len': output_len,
+            'channels': channels, 'kernels': kernels, 'kernels2': kernels2, 'kernel_size1': kernel_size1,
+            'kernel_size2': kernel_size2, 'stride1': stride1, 'pool_kernel_size': pool_kernel_size,
+            'pool_stride': pool_stride, 'padding1': padding1, 'padding2': padding2, 'use_pool': use_pool,
+            'use_conv2': use_conv2, 'oracle_len': oracle_len, 'is_fc': is_fc, 'lr': lr, 'batch_size': batch_size,
+            'oracle_is_target': oracle_is_target, 'oracle_early': oracle_early
+        }
+
+        self.conv1 = nn.Conv2d(channels * 5, kernels, kernel_size=kernel_size1, padding=padding1, stride=stride1)
+        if use_pool:
+            self.pool = nn.MaxPool2d(kernel_size=pool_kernel_size, stride=pool_stride)
+        self.fc = nn.Linear(kernels * 7 * 7, output_len)  # Adjust the sizing based on input dimensions post-pooling
+
+    def forward(self, x, unused):
+        batch_size, timesteps, channels, height, width = x.size()
+        x = x.view(batch_size, timesteps * channels, height, width)
+        x = self.conv1(x)
+        if hasattr(self, 'pool'):
+            x = self.pool(x)
+        x = F.relu(x)
+        x = x.view(x.size(0), -1)
+        x = self.fc(x)
+        return x
+
+class tCNN(nn.Module):
+    # this module folds timesteps into channels, as opposed to running conv kernels on each individually
+    def __init__(self, hidden_size, num_layers, output_len, channels, kernels=8, kernels2=8, kernel_size1=3,
+                 kernel_size2=3, stride1=1, pool_kernel_size=2, pool_stride=2, padding1=0, padding2=0, use_pool=True,
+                 use_conv2=False, oracle_len=0, is_fc=False, lr=0.0, batch_size=256,
+                 oracle_is_target=False, oracle_early=False):
+        super(tCNN, self).__init__()
+        self.kwargs = {
+            'hidden_size': hidden_size, 'num_layers': num_layers, 'output_len': output_len,
+            'channels': channels, 'kernels': kernels, 'kernels2': kernels2, 'kernel_size1': kernel_size1,
+            'kernel_size2': kernel_size2, 'stride1': stride1, 'pool_kernel_size': pool_kernel_size,
+            'pool_stride': pool_stride, 'padding1': padding1, 'padding2': padding2, 'use_pool': use_pool,
+            'use_conv2': use_conv2, 'oracle_len': oracle_len, 'is_fc': is_fc, 'lr': lr, 'batch_size': batch_size,
+            'oracle_is_target': oracle_is_target, 'oracle_early': oracle_early
+        }
+
+        self.conv1 = nn.Conv2d(channels, kernels, kernel_size=kernel_size1, padding=padding1, stride=stride1)
+        if use_pool:
+            self.pool = nn.MaxPool2d(kernel_size=pool_kernel_size, stride=pool_stride)
+        self.fc = nn.Linear(kernels * 7 * 7 * 5, output_len)  # Adjust the sizing based on input dimensions post-pooling
+
+    def forward(self, x, unused):
+        outputs = []
+        batch_size, timesteps, channels, height, width = x.size()
+        for t in range(timesteps):
+            x_t = x[:, t, :, :, :]
+            x_t = self.conv1(x_t)
+            x_t = F.relu(x_t)
+            x_t = x_t.view(x_t.size(0), -1)
+            outputs.append(x_t)
+
+        outputs = torch.cat(outputs, dim=1)
+        x = self.fc(outputs)
+        return x
+
+class sRNN(nn.Module):
+    def __init__(self, hidden_size, num_layers, output_len, channels, kernels=8, kernels2=8, kernel_size1=3,
+                 kernel_size2=3, stride1=1, pool_kernel_size=2, pool_stride=2, padding1=0, padding2=0, use_pool=True,
+                 use_conv2=False, oracle_len=0, is_fc=False, lr=0.0, batch_size=0.0,
+                 oracle_is_target=False, oracle_early=False):
+        super(sRNN, self).__init__()
+        self.kwargs = {
+            'hidden_size': hidden_size, 'num_layers': num_layers, 'output_len': output_len,
+            'channels': channels, 'kernels': kernels, 'kernels2': kernels2, 'kernel_size1': kernel_size1,
+            'kernel_size2': kernel_size2, 'stride1': stride1, 'pool_kernel_size': pool_kernel_size,
+            'pool_stride': pool_stride, 'padding1': padding1, 'padding2': padding2, 'use_pool': use_pool,
+            'use_conv2': use_conv2, 'oracle_len': oracle_len, 'is_fc': is_fc, 'lr': lr, 'batch_size': batch_size,
+            'oracle_is_target': oracle_is_target, 'oracle_early': oracle_early
+        }
+
+        self.conv1 = nn.Conv2d(channels, kernels, kernel_size1, stride=stride1, padding=padding1)
+        if use_pool:
+            self.pool = nn.MaxPool2d(pool_kernel_size, stride=pool_stride)
+        conv_output_size = (7 + 2 * padding1 - kernel_size1) // stride1 + 1
+        if use_pool:
+            conv_output_size = (conv_output_size - pool_kernel_size) // pool_stride + 1
+        conv_output_size = (kernels, conv_output_size, conv_output_size)
+        rnn_input_size = conv_output_size[0] * conv_output_size[1] * conv_output_size[2]
+
+        self.rnn = nn.RNN(input_size=rnn_input_size, hidden_size=hidden_size, num_layers=num_layers, batch_first=True)
+        self.fc = nn.Linear(hidden_size, output_len)
+
+    def forward(self, x, unused):
+        batch_size, timesteps, channels, height, width = x.shape
+        c_out = x.view(batch_size * timesteps, channels, height, width)
+        c_out = F.relu(self.conv1(c_out))
+        if hasattr(self, 'pool'):
+            c_out = self.pool(c_out)
+        c_out = c_out.view(batch_size, timesteps, -1)
+        out, _ = self.rnn(c_out)
+        out = self.fc(out[:, -1, :])
+        return out
+
+
+class sMLP(nn.Module):
+    def __init__(self, hidden_size, num_layers, output_len, channels, kernels=8, kernels2=8, kernel_size1=3,
+                 kernel_size2=3, stride1=1, pool_kernel_size=2, pool_stride=2, padding1=0, padding2=0, use_pool=True,
+                 use_conv2=False, oracle_len=0, is_fc=False, lr=0.0, batch_size=0.0,
+                 oracle_is_target=False, oracle_early=False):
+        super(sMLP, self).__init__()
+        self.kwargs = {
+            'hidden_size': hidden_size, 'num_layers': num_layers, 'output_len': output_len,
+            'channels': channels, 'kernels': kernels, 'kernels2': kernels2, 'kernel_size1': kernel_size1,
+            'kernel_size2': kernel_size2, 'stride1': stride1, 'pool_kernel_size': pool_kernel_size,
+            'pool_stride': pool_stride, 'padding1': padding1, 'padding2': padding2, 'use_pool': use_pool,
+            'use_conv2': use_conv2, 'oracle_len': oracle_len, 'is_fc': is_fc, 'lr': lr, 'batch_size': batch_size,
+            'oracle_is_target': oracle_is_target, 'oracle_early': oracle_early
+        }
+
+        input_size = 7 * 7 * channels * 5 # Correctly set input size based on image dimensions and channels
+        self.fc1 = nn.Linear(input_size, hidden_size)
+        self.fc2 = nn.Linear(hidden_size, hidden_size)  # Additional depth layer
+        self.fc3 = nn.Linear(hidden_size, output_len)  # Output layer
+
+    def forward(self, x, unused):
+        x = x.view(x.size(0), -1)  # Flatten the input
+        x = F.relu(self.fc1(x))
+        x = F.relu(self.fc2(x))
+        x = self.fc3(x)
         return x
