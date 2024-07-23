@@ -2,6 +2,8 @@ import math
 import pickle
 
 import numpy as np
+import torch
+import umap
 from matplotlib import pyplot as plt, gridspec
 from stable_baselines3.common.results_plotter import load_results, ts2xy
 import os
@@ -43,6 +45,7 @@ def plot_results(log_folder, title='Learning Curve'):
     plt.show()
     plt.close()
 
+
 def plot_regime_lengths(regime_lengths, grouped, savepath):
     regime_names = list(grouped.index)
     accuracies = list(grouped.values)
@@ -60,6 +63,8 @@ def plot_regime_lengths(regime_lengths, grouped, savepath):
     plt.title('Scatterplot of Regime Length vs. Accuracy')
     plt.savefig(savepath)
     plt.close()
+
+
 def plot_split(indexer, df, mypath, title, window, values=None, use_std=True):
     if values is None:
         values = ["accuracy"]
@@ -95,7 +100,7 @@ def plot_progression(path, save_path):
     print(loaded_accuracies)
     n = len(loaded_accuracies) // 2
     print('n', n)
-    fig, axes = plt.subplots(1, n + 1, figsize=(2.1*(n+1), 2.5))
+    fig, axes = plt.subplots(1, n + 1, figsize=(2.1 * (n + 1), 2.5))
     fig.subplots_adjust(wspace=0.06)
 
     mean_accuracies = {'0': [], '1': []}
@@ -122,7 +127,7 @@ def plot_progression(path, save_path):
 
         label = 'No Oracle' if oracle == '0' else 'Oracle' if legend_handles[oracle] is None else None
 
-        for cur, ax in enumerate([axes[k // 2]]): #, axes[-1]
+        for cur, ax in enumerate([axes[k // 2]]):  # , axes[-1]
             ax.set_xticks(range(10))
             ax.set_ylim(0.4, 1.0)
             if k // 2 == 0 and cur == 0:
@@ -136,7 +141,6 @@ def plot_progression(path, save_path):
                 if label:
                     legend_handles[oracle] = line
 
-
         axes[-1].set_xticks(range(10))
         axes[-1].set_ylim(0.4, 1.0)
         axes[-1].set_yticks([])
@@ -147,7 +151,7 @@ def plot_progression(path, save_path):
 
     plt.legend(handles=valid_handles, labels=valid_labels, loc='lower right')
 
-    #plt.title('Progression Trial Accuracies')
+    # plt.title('Progression Trial Accuracies')
     plt.tight_layout(rect=[0, 0.1, 1, 1.0])
     fig.text(0.5, 0.05, 'Number of Opponent Regimes', ha='center', va='center', fontsize=12)
     plt.savefig(save_path)
@@ -454,7 +458,6 @@ def save_delta_figures(dir, df_summary, df_x):
         plt.savefig(plot_save_path)
         plt.close()'''
 
-
     # subfigs of accuracy across operators
     all_cols = ['t', 'f', 'tt', 'tf', 'ft', 'ff']
     p_cols = ['p' + col for col in all_cols]
@@ -462,7 +465,7 @@ def save_delta_figures(dir, df_summary, df_x):
     new_cols = p_cols + m_cols
 
     # generate ideal row
-    #df_x2 = df_x.copy()
+    # df_x2 = df_x.copy()
     row_df = list(df_x.items())[0][1]
     print('row df', row_df)
     temp = {}
@@ -503,7 +506,7 @@ def save_delta_figures(dir, df_summary, df_x):
         fig.text(0.5, 0.03, 'informedness operator', ha='center', va='center', fontsize=12)
 
         for idx, (key_val, df) in enumerate(df_x2):
-            for col_idx, (_, row) in enumerate(df.iterrows()): # row is each operator
+            for col_idx, (_, row) in enumerate(df.iterrows()):  # row is each operator
                 if nrows > 1:
                     ax = axes[idx, col_idx]
                 else:
@@ -618,6 +621,7 @@ def save_double_param_figures(save_dir, top_pairs, avg_loss, last_epoch_df):
         plt.savefig(os.path.join(os.getcwd(), os.path.join(this_save_dir, f'hist_{param1}{param2}.png')))
         plt.close()
 
+
 def save_key_param_heatmap(save_dir, key_param_stats, key_param):
     this_save_dir = os.path.join(save_dir, 'key_param')
     os.makedirs(this_save_dir, exist_ok=True)
@@ -683,6 +687,7 @@ def save_key_param_heatmap(save_dir, key_param_stats, key_param):
             plt.savefig(file_path)
             plt.close()
 
+
 def df_list_from_stat_dict(stat_dict, param):
     df_list = []
     for key_val in stat_dict.keys():
@@ -691,6 +696,7 @@ def df_list_from_stat_dict(stat_dict, param):
             ci = stat_dict[key_val][param]['std'][param_val]
             df_list.append([key_val, param_val, f"{mean}", f"{ci}"])
     return df_list
+
 
 def save_key_param_figures(save_dir, key_param_stats, oracle_stats, key_param, key_param_stats_special=[]):
     save_key_param_heatmap(save_dir, key_param_stats, key_param)
@@ -703,7 +709,7 @@ def save_key_param_figures(save_dir, key_param_stats, oracle_stats, key_param, k
 
     for param in list(next(iter(key_param_stats.values())).keys()):
 
-        #print('trying param', param)
+        # print('trying param', param)
         labels = list(key_param_stats.keys())
         param_vals = list(key_param_stats[next(iter(key_param_stats))][param]['mean'].keys())
         bar_width = 0.8 / len(param_vals)
@@ -769,98 +775,105 @@ def save_key_param_figures(save_dir, key_param_stats, oracle_stats, key_param, k
 
             # produce typical heatmaps for accuracy
             big_mode = True
-
-
+            split_by_type = True
 
             if param == 'test_regime':
-                for use_zero_op in [True, False]:
-                    if use_zero_op:
-                        desired_order = ['Tt0', 'Tf0', 'Tn0', 'Ft0', 'Ff0', 'Fn0', 'Nt0', 'Nf0', 'Nn0', 'Tt1', 'Tf1',
-                                         'Tn1', 'Ft1', 'Ff1', 'Fn1', 'Nt1', 'Nf1', 'Nn1']
-                    else:
-                        desired_order = ['Tt1', 'Tf1', 'Tn1', 'Ft1', 'Ff1', 'Fn1', 'Nt1', 'Nf1', 'Nn1']
-                    for use_std in [True, False]:
-                        df["accuracy mean"] = pd.to_numeric(df["accuracy mean"], errors='coerce')
-                        df["accuracy std"] = pd.to_numeric(df["accuracy std"], errors='coerce')
-                        df["Accuracy mean (Accuracy std)"] = df["accuracy mean"].map("{:.2f}".format) + " (" + df["accuracy std"].map("{:.2f}".format) + ")"
-                        df_filtered = df[df[param].astype(str).str.endswith('1')] if not use_zero_op else df
-                        if use_std:
-                            all_stds.extend(df["accuracy std"].values.tolist())
-                            pivot_df = df_filtered.pivot(index=key_param, columns=param, values="Accuracy mean (Accuracy std)")
-                            mean_values_df = pivot_df.applymap(lambda x: float(x.split(' ')[0]))
+                for type in ['loc', 'box', 'size'] if split_by_type else ['']:
+                    for use_zero_op in [True, False]:
+                        if use_zero_op:
+                            desired_order = ['Tt0', 'Tf0', 'Tn0', 'Ft0', 'Ff0', 'Fn0', 'Nt0', 'Nf0', 'Nn0', 'Tt1', 'Tf1',
+                                             'Tn1', 'Ft1', 'Ff1', 'Fn1', 'Nt1', 'Nf1', 'Nn1']
                         else:
-                            pivot_df = df_filtered.pivot(index=key_param, columns=param, values="accuracy mean")
-                            mean_values_df = pivot_df
-                            pivot_df = pivot_df.applymap(lambda x: f"{x:.2f}")
-
-                        # print(mean_values_df) this is empty dataframe?
-
-                        fig = plt.figure(figsize=(6, 12))
-                        heatmap_ax = fig.add_axes([0.0, 0.11, 1.0, 0.9])
-                        cbar_ax = fig.add_axes([0.0, 0.03, 1.0, 0.02])
-
-                        original_row_order = pivot_df.index.tolist()
-
-                        use_special_rows = False
-
-                        use_many_rows = False
-                        if use_special_rows:
-                            if use_many_rows:
-                                single_rows = ['Tt0', 'Tf0', 'Tn0', 'Ft0', 'Ff0', 'Fn0', 'Nt0', 'Nf0', 'Nn0', 'Tt1', 'Tf1', 'Tn1', 'Ft1', 'Ff1', 'Fn1', 'Nt1', 'Nf1', 'Nn1']
-                                contrast_rows = ['Tt', 'Tf', 'Tn', 'Ft', 'Ff', 'Fn', 'Nt', 'Nf', 'Nn']
-                                desired_row_order = ['noOpponent', 'direct', 'everything']
-                                desired_row_order.extend(single_rows)
-                                row_name_dict = {x: 'contrast-' + x for x in contrast_rows}
-                                desired_row_order.extend(contrast_rows)
-                                row_name_dict.update({x: 'single-' + x.replace('0', '-a').replace('1', '-p') for x in single_rows})
-                                desired_row_order.extend(['homogeneous'])
-                                row_name_dict.update({'noOpponent': 'full-absent', 'direct': 'full-present', 'everything': 'full-both', 'homogeneous': 'homogeneous'})
+                            desired_order = ['Tt1', 'Tf1', 'Tn1', 'Ft1', 'Ff1', 'Fn1', 'Nt1', 'Nf1', 'Nn1']
+                        # todo: don't even make these if there's only 1 repetition
+                        for use_std in [True, False]:
+                            df["accuracy mean"] = pd.to_numeric(df["accuracy mean"], errors='coerce')
+                            df["accuracy std"] = pd.to_numeric(df["accuracy std"], errors='coerce')
+                            df["Accuracy mean (Accuracy std)"] = df["accuracy mean"].map("{:.2f}".format) + " (" + df["accuracy std"].map("{:.2f}".format) + ")"
+                            df_filtered = df[df[param].astype(str).str.endswith('1')] if not use_zero_op else df
+                            if use_std:
+                                all_stds.extend(df["accuracy std"].values.tolist())
+                                pivot_df = df_filtered.pivot(index=key_param, columns=param, values="Accuracy mean (Accuracy std)")
+                                mean_values_df = pivot_df.applymap(lambda x: float(x.split(' ')[0]))
                             else:
-                                if 'Tt' in original_row_order:
-                                    desired_row_order = ['Tt', 'Tf', 'Tn', 'Ft', 'Ff', 'Fn', 'Nt', 'Nf', 'Nn']
-                                    row_name_dict = {x: 'contrast-' + x for x in desired_row_order}
+                                pivot_df = df_filtered.pivot(index=key_param, columns=param, values="accuracy mean")
+                                mean_values_df = pivot_df
+                                pivot_df = pivot_df.applymap(lambda x: f"{x:.2f}")
 
-                                elif 'Tt0' in original_row_order:
-                                    desired_row_order = desired_order
-                                    row_name_dict = {x: 'single-' + x for x in desired_row_order}
-                                else:
+                            fig = plt.figure(figsize=(6, 12 - 6 * split_by_type))
+                            heatmap_ax = fig.add_axes([0.0, 0.11, 1.0, 0.9])
+                            cbar_ax = fig.add_axes([0.0, 0.03, 1.0, 0.02])
+
+                            original_row_order = pivot_df.index.tolist()
+
+                            use_special_rows = False
+
+                            use_many_rows = False
+                            if split_by_type:
+                                filtered_row_order = [row for row in original_row_order if type in row]
+                                pivot_df = pivot_df.loc[filtered_row_order]
+                                mean_values_df = mean_values_df.loc[filtered_row_order]
+
+                            if use_special_rows:
+                                if use_many_rows:
+                                    single_rows = ['Tt0', 'Tf0', 'Tn0', 'Ft0', 'Ff0', 'Fn0', 'Nt0', 'Nf0', 'Nn0', 'Tt1', 'Tf1', 'Tn1', 'Ft1', 'Ff1', 'Fn1', 'Nt1', 'Nf1', 'Nn1']
+                                    contrast_rows = ['Tt', 'Tf', 'Tn', 'Ft', 'Ff', 'Fn', 'Nt', 'Nf', 'Nn']
                                     desired_row_order = ['noOpponent', 'direct', 'everything']
-                                    row_name_dict = {'noOpponent': 'full-noop', 'direct': 'full-op', 'everything': 'full-both'}
+                                    desired_row_order.extend(single_rows)
+                                    row_name_dict = {x: 'contrast-' + x for x in contrast_rows}
+                                    desired_row_order.extend(contrast_rows)
+                                    row_name_dict.update({x: 'single-' + x.replace('0', '-a').replace('1', '-p') for x in single_rows})
+                                    desired_row_order.extend(['homogeneous'])
+                                    row_name_dict.update({'noOpponent': 'full-absent', 'direct': 'full-present', 'everything': 'full-both', 'homogeneous': 'homogeneous'})
+                                else:
+                                    if 'Tt' in original_row_order:
+                                        desired_row_order = ['Tt', 'Tf', 'Tn', 'Ft', 'Ff', 'Fn', 'Nt', 'Nf', 'Nn']
+                                        row_name_dict = {x: 'contrast-' + x for x in desired_row_order}
 
-                            pivot_df = pivot_df.reindex(columns=desired_order, index=desired_row_order)
-                            mean_values_df = mean_values_df.reindex(columns=desired_order, index=desired_row_order)
+                                    elif 'Tt0' in original_row_order:
+                                        desired_row_order = desired_order
+                                        row_name_dict = {x: 'single-' + x for x in desired_row_order}
+                                    else:
+                                        desired_row_order = ['noOpponent', 'direct', 'everything']
+                                        row_name_dict = {'noOpponent': 'full-noop', 'direct': 'full-op', 'everything': 'full-both'}
 
-                            new_column_names = {x: x.replace('1', '-p').replace('0', '-a') for x in pivot_df.columns}
+                                pivot_df = pivot_df.reindex(columns=desired_order, index=desired_row_order)
+                                mean_values_df = mean_values_df.reindex(columns=desired_order, index=desired_row_order)
 
-                            pivot_df = pivot_df.rename(columns=new_column_names)
-                            mean_values_df = mean_values_df.rename(columns=new_column_names)
+                                new_column_names = {x: x.replace('1', '-p').replace('0', '-a') for x in pivot_df.columns}
 
-                            pivot_df = pivot_df.rename(index=row_name_dict)
-                            mean_values_df = mean_values_df.rename(index=row_name_dict)
+                                pivot_df = pivot_df.rename(columns=new_column_names)
+                                mean_values_df = mean_values_df.rename(columns=new_column_names)
 
-                        #row_minima = mean_values_df.min(axis=1)
-                        #mean_values_df['min'] = row_minima
-                        #pivot_df['min'] = row_minima.map("{:.2f}".format)
-                        print(mean_values_df)
+                                pivot_df = pivot_df.rename(index=row_name_dict)
+                                mean_values_df = mean_values_df.rename(index=row_name_dict)
 
-                        quadmesh = sns.heatmap(mean_values_df, annot=pivot_df, fmt='', cmap='RdBu', linewidths=0.5, linecolor='white', vmin=0, vmax=1, cbar=False, ax=heatmap_ax)
-                        quadmesh.set_yticklabels(quadmesh.get_yticklabels(), rotation=0)
-                        quadmesh.set_xlabel("Test regime", fontsize=10)
-                        quadmesh.set_ylabel("Training dataset", fontsize=10)
+                            # row_minima = mean_values_df.min(axis=1)
+                            # mean_values_df['min'] = row_minima
+                            # pivot_df['min'] = row_minima.map("{:.2f}".format)
+                            print(mean_values_df)
 
-                        quadmesh.hlines(3, *quadmesh.get_xlim(), color='white', linewidth=4)
-                        quadmesh.hlines(3+9, *quadmesh.get_xlim(), color='white', linewidth=4)
-                        quadmesh.hlines(3+18, *quadmesh.get_xlim(), color='white', linewidth=4)
-                        quadmesh.vlines(9, *quadmesh.get_ylim(), color='white', linewidth=4)
+                            quadmesh = sns.heatmap(mean_values_df, annot=pivot_df, fmt='', cmap='RdBu', linewidths=0.5, linecolor='white', vmin=0, vmax=1, cbar=False, ax=heatmap_ax)
+                            quadmesh.set_yticklabels(quadmesh.get_yticklabels(), rotation=0)
+                            quadmesh.set_xlabel("Test regime", fontsize=10)
+                            quadmesh.set_ylabel("Training dataset", fontsize=10)
 
-                        plt.colorbar(quadmesh.collections[0], cax=cbar_ax, orientation='horizontal', cmap='RdBu')
-                        plt.tight_layout()
+                            if use_special_rows:
+                                # thicker white lines manually added
+                                quadmesh.hlines(3, *quadmesh.get_xlim(), color='white', linewidth=4)
+                                quadmesh.hlines(3 + 9, *quadmesh.get_xlim(), color='white', linewidth=4)
+                                quadmesh.hlines(3 + 18, *quadmesh.get_xlim(), color='white', linewidth=4)
+                                quadmesh.vlines(9, *quadmesh.get_ylim(), color='white', linewidth=4)
 
-                        plot_save_path = os.path.join(save_dir, f'{label}_{param}_{use_std}_{use_zero_op}_heatmap.png')
-                        print('saving fig to', plot_save_path)
-                        plt.savefig(plot_save_path, bbox_inches='tight')
-                        plt.close()
+                            # if not split_by_type:
+                            # attempt to not draw a colorbar resulted in a bad one
+                            plt.colorbar(quadmesh.collections[0], cax=cbar_ax, orientation='horizontal', cmap='RdBu')
+                            plt.tight_layout()
 
+                            plot_save_path = os.path.join(save_dir, f'{label}_{param}_{use_std}_{use_zero_op}_{type}heatmap.png')
+                            print('saving fig to', plot_save_path)
+                            plt.savefig(plot_save_path, bbox_inches='tight')
+                            plt.close()
 
             if param == 'test_regime':
                 regimes = df[key_param].unique()
@@ -877,7 +890,7 @@ def save_key_param_figures(save_dir, key_param_stats, oracle_stats, key_param, k
                             if regime_A != regime_B:
                                 accuracy_A_B = df[(df[key_param] == regime_A) & (df['test_regime'] == regime_B)]['accuracy mean'].values[0]
                                 accuracy_B_A = df[(df[key_param] == regime_B) & (df['test_regime'] == regime_A)]['accuracy mean'].values[0]
-                                asymmetry = accuracy_A_B - accuracy_B_A # train a test b minus train b test a, so if positive, it's better to train a test b.
+                                asymmetry = accuracy_A_B - accuracy_B_A  # train a test b minus train b test a, so if positive, it's better to train a test b.
                                 asymmetry_dict[(regime_A, regime_B)] = asymmetry
                     print(asymmetry_dict)
                     sorted_asymmetries = sorted(asymmetry_dict.keys(), key=lambda x: (regimes.index(x[0]), regimes.index(x[1])))
@@ -899,7 +912,7 @@ def save_key_param_figures(save_dir, key_param_stats, oracle_stats, key_param, k
                     if big_mode:
                         gs = gridspec.GridSpec(nrows, ncols, wspace=0.2, hspace=0.3, top=1.0 - (0.25 / nrows), bottom=0.12, left=0.03, right=1.0)
                     else:
-                        gs = gridspec.GridSpec(nrows, ncols, wspace=0.2, hspace=0.4, top=0.75, left=0.1, right=0.9) # might mess up if ncols > 1
+                        gs = gridspec.GridSpec(nrows, ncols, wspace=0.2, hspace=0.4, top=0.75, left=0.1, right=0.9)  # might mess up if ncols > 1
                     for k, key_param_val in enumerate(regimes):
                         if nrows == 1 and ncols > 1:
                             ax_main = plt.subplot(gs[k])
@@ -964,7 +977,6 @@ def save_key_param_figures(save_dir, key_param_stats, oracle_stats, key_param, k
         print('len', len(all_stds), len(filtered_stds), 'mean std', np.mean(filtered_stds), 'std_of_std', np.std(filtered_stds))
 
 
-
 def save_single_param_figures(save_dir, params, avg_loss, last_epoch_df):
     this_save_dir = os.path.join(save_dir, 'singleparams')
     os.makedirs(this_save_dir, exist_ok=True)
@@ -1016,19 +1028,152 @@ def save_single_param_figures(save_dir, params, avg_loss, last_epoch_df):
         plt.close()
 
 
+def load_checkpoints(directory, prefix):
+    checkpoints = {}
+    for filename in os.listdir(directory):
+        if filename.startswith(prefix) and filename.endswith('.pt'):
+            epoch = int(filename.split('-')[-1].split('.')[0])
+            checkpoint_path = os.path.join(directory, filename)
+            checkpoints[(prefix, epoch)] = torch.load(checkpoint_path)
+    return checkpoints
+
+
+def extract_weights(checkpoints):
+    weights = []
+    labels = []
+    sources = []
+    for (prefix, epoch), checkpoint in checkpoints.items():
+        # Checkpoint structure: [model.kwargs, model.state_dict()]
+        state_dict = checkpoint[1] if isinstance(checkpoint, list) and len(checkpoint) > 1 else None
+
+        if state_dict is None:
+            raise ValueError(f"Unexpected checkpoint structure: {type(checkpoint)}")
+
+        flat_weights = np.concatenate([param.cpu().numpy().flatten() for param in state_dict.values()])
+
+        weights.append(flat_weights)
+        labels.append(f"{prefix}-{epoch}")
+        sources.append(prefix)
+    return np.array(weights), labels, sources
+
+
 def plot_learning_curves(save_dir, lp_list):
-    print('plotting learning curves')
-    plt.figure(figsize=(10, 6))
+    print('doing tsne stuff')
+    print('XXXXXXXXXXXXXXX')
+
     for l in lp_list:
-        print('plotting', l)
         if os.path.exists(l[0]):
-            df = pd.read_csv(l[0])
-            plt.plot(df['Batch'], df['Loss'], label=l)
-    plt.xlabel('Batch')
-    plt.ylabel('Loss')
-    plt.title('Validation Loss')
-    plt.savefig(os.path.join(save_dir, 'loss.png'))
-    plt.close()
+            head, tail = os.path.split(l[0])
+            # head is sup\exp\model
+
+            print(head, tail)
+            checkpoints1 = load_checkpoints(head, "0-checkpoint")
+            checkpoints2 = load_checkpoints(head, "momentum09-rt-model")
+            checkpoints3 = load_checkpoints(f'supervised\\exp_101-L\\{os.path.basename(head)}', "0-checkpoint")
+            checkpoints4 = load_checkpoints(f'supervised\\exp_101-L\\{os.path.basename(head)}', "momentum09-rt-model")
+            checkpoints = {**checkpoints1, **checkpoints2}
+            checkpointsb = {**checkpoints3, **checkpoints4}
+            print(len(checkpoints))
+
+            weights, labels, sources = extract_weights(checkpoints)
+            weights2, labels2, sources2 = extract_weights(checkpointsb)  # the direct training ones for comparison
+
+            all_weights = np.concatenate([weights, weights2])
+            all_labels = labels + labels2
+            all_sources = sources + sources2
+
+            umap_model = umap.UMAP(n_neighbors=5, min_dist=0.5, metric='euclidean')
+            embedding2 = umap_model.fit_transform(weights2)
+            embedding = umap_model.transform(weights)
+
+            order1 = np.argsort([int(label.split('-')[-1]) for label in labels])
+            sorted_embedding = embedding[order1]
+            order2 = np.argsort([int(label.split('-')[-1]) for label in labels2])
+            sorted_embedding2 = embedding2[order2]
+
+            plt.figure(figsize=(12, 8))
+            colors = {'0-checkpoint': 'blue', 'momentum09-rt-model': 'red'}
+            names = {'0-checkpoint': 'pretraining', 'momentum09-rt-model': "transfer"}
+
+            seen_labels = set()
+
+            def add_to_legend(source, name):
+                if name not in seen_labels:
+                    seen_labels.add(name)
+                    return name
+                return "_nolegend_"
+
+            for i, (label, source) in enumerate(zip(labels, sources)):
+                plt.scatter(embedding[i, 0], embedding[i, 1], color=colors[source], s=50, label=add_to_legend(source, names[source]))
+                plt.text(embedding[i, 0], embedding[i, 1], label.split('-')[-1], fontsize=8)
+                #if i < len(labels) - 1:
+                #    plt.plot([embedding[i, 0], embedding[i + 1, 0]], [embedding[i, 1], embedding[i + 1, 1]], color=colors[source], linestyle='-', linewidth=0.5)
+
+            for i, (label, source) in enumerate(zip(labels2, sources2)):
+                plt.scatter(embedding2[i, 0], embedding2[i, 1], color=colors[source], s=50, marker='x', label=add_to_legend(source, names[source]))
+                plt.text(embedding2[i, 0], embedding2[i, 1], label.split('-')[-1], fontsize=8)
+
+                #if i < len(labels2) - 1:
+                #    plt.plot([embedding2[i, 0], embedding2[i + 1, 0]], [embedding2[i, 1], embedding2[i + 1, 1]], color=colors[source], linestyle='-', linewidth=0.5)
+
+            #for i in range(len(labels) - 1):
+            #    plt.plot([sorted_embedding[i, 0], sorted_embedding[i + 1, 0]], [sorted_embedding[i, 1], sorted_embedding[i + 1, 1]], color='black', linestyle='-', linewidth=0.5)
+
+            #for i in range(len(labels2) - 1):
+            #    plt.plot([sorted_embedding2[i, 0], sorted_embedding2[i + 1, 0]], [sorted_embedding2[i, 1], sorted_embedding2[i + 1, 1]], color='black', linestyle='-', linewidth=0.5)
+
+            plt.title(f'UMAP of Model Weights ({os.path.basename(head)})')
+            plt.xlabel('UMAP1')
+            plt.ylabel('UMAP2')
+            plt.legend()
+            plt.savefig(os.path.join(save_dir, f'{tail}-umap.png'))
+
+    print('plotting learning curves')
+    for type in ['loc', 'box', 'size']:
+        plt.figure(figsize=(10, 6))
+        for l in lp_list:
+            if os.path.exists(l[0]):
+                head, tail = os.path.split(l[0])
+                name = os.path.basename(head)
+                if type in name:
+                    df = pd.read_csv(l[0])
+                    plt.plot(df['Batch'], df['Loss'], label=name)
+        plt.xlabel('Batch')
+        plt.ylabel('Loss')
+        plt.ylim([0, 2.0])
+        plt.title('Validation Loss')
+        plt.legend()
+        plt.savefig(os.path.join(save_dir, f'loss-{type}.png'))
+        plt.close()
+
+    print('plotting rt learning curves')
+    grouped_paths = {}
+    for l in lp_list:
+        for l2 in l[1:]:
+            head, tail = os.path.split(l2)
+            if head not in grouped_paths:
+                grouped_paths[head] = []
+            grouped_paths[head].append(l2)
+
+    for head, paths in grouped_paths.items():
+        plt.figure(figsize=(10, 6))
+        print('paths', paths)
+        for path in paths:
+            if os.path.exists(path):
+                name = os.path.basename(path)
+                if 'rt' in name:
+                    print('found a path', name)
+                    df = pd.read_csv(path)
+                    plt.plot(df['Batch'], df['Loss'], label=name[:-len('-rt-losses.csv')])
+        plt.xlabel('Batch')
+        plt.ylabel('Loss')
+        plt.ylim([0, 0.6])
+        plt.title(f'Validation Loss for {os.path.basename(head)}')
+        plt.legend()
+        plt.savefig(os.path.join(head, f'loss-{os.path.basename(head)}.png'))
+        plt.close()
+    exit()
+
 
 def save_fixed_double_param_figures(save_dir, top_n_ranges, df, avg_loss, last_epoch_df):
     this_save_dir = os.path.join(save_dir, 'fixeddoubleparams')
@@ -1109,7 +1254,7 @@ def save_fixed_triple_param_figures(save_dir, top_n_ranges, df, avg_loss, last_e
         labels = []
         for value3 in unique_values:
             value_df = last_epoch_df[(last_epoch_df[param2] == value2) & (last_epoch_df[param1] == value1) & (
-                        last_epoch_df[param3] == value3)]
+                    last_epoch_df[param3] == value3)]
             mean_acc = value_df.groupby('param')['accuracy'].mean()
             mean_acc.index = mean_acc.index.astype('category')
             hist_data.append(mean_acc)

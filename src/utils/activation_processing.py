@@ -2,15 +2,19 @@ import os
 import pickle
 import numpy as np
 import pandas as pd
-import scipy.stats
+#import scipy.stats
 import tqdm
+import umap
 
-from scipy.stats import pearsonr, entropy
+#from scipy.stats import pearsonr, entropy
 import seaborn as sns
 import matplotlib.pyplot as plt
+from sklearn.cross_decomposition import CCA
+from scipy.spatial.distance import pdist, squareform
 
-from sklearn.manifold import TSNE
-from sklearn.metrics import mutual_info_score
+#from sklearn.manifold import TSNE
+#from sklearn.metrics import mutual_info_score
+#from sklearn.preprocessing import LabelEncoder
 from torch.utils.data import Dataset, DataLoader, TensorDataset
 import torch.nn as nn
 import torch
@@ -32,17 +36,16 @@ class VectorDataset(Dataset):
     def __getitem__(self, idx):
         return self.act_vectors[idx], self.other_vectors[idx]
 
+
 class NMSELoss(nn.Module):
     def __init__(self):
         super(NMSELoss, self).__init__()
 
     def forward(self, y_pred, y_true):
-        return torch.mean((y_pred - y_true)**2) / (torch.var(y_true) + 1e-8)
+        return torch.mean((y_pred - y_true) ** 2) / (torch.var(y_true) + 1e-8)
 
 
-
-def get_model_type(model_type,  input_size, input_size2, output_size, hidden_size, device, num_epochs):
-
+def get_model_type(model_type, input_size, input_size2, output_size, hidden_size, device, num_epochs):
     l2_reg = False
     if "l2reg" in model_type:
         model_type = model_type.replace("l2reg", "")
@@ -103,6 +106,7 @@ def get_model_type(model_type,  input_size, input_size2, output_size, hidden_siz
         model = RNNClassifier(input_size, hidden_size, output_size, 1, 0.5).to(device)
     return model, l2_reg, num_epochs
 
+
 def train_mlp(inputs, other_data, regime_data, regime, opponents_data, patience=2, num_prints=5, num_epochs=25,
               model_type="linear", input_data2=None):
     # Parameters
@@ -115,17 +119,16 @@ def train_mlp(inputs, other_data, regime_data, regime, opponents_data, patience=
     learning_rate = 1e-3
     batch_size = 256
 
-
     all_indices = np.arange(len(inputs))
     train_indices, val_indices = train_test_split(all_indices, test_size=0.10, random_state=42)
 
     if regime is not None:
-        #print(opponents_data.shape, np.mean(opponents_data, axis=0), opponents_data[0], opponents_data[-1], opponents_data[5000], np.unique(opponents_data))
+        # print(opponents_data.shape, np.mean(opponents_data, axis=0), opponents_data[0], opponents_data[-1], opponents_data[5000], np.unique(opponents_data))
         zero_opponents_indices = np.where(np.all(opponents_data[:, -1:] == -1, axis=1))[0]
-        #print(regime_data.shape, regime.shape)
+        # print(regime_data.shape, regime.shape)
         regime_indices = np.where(np.all(regime_data[:, -2:] == regime, axis=1))[0]
         combined_indices = np.union1d(regime_indices, zero_opponents_indices)
-        #print('regime split effect', len(regime_data), len(regime_indices), len(combined_indices))
+        # print('regime split effect', len(regime_data), len(regime_indices), len(combined_indices))
         regime_train_indices = np.intersect1d(train_indices, combined_indices)
         act_train = inputs[regime_train_indices]
         other_train = other_data[regime_train_indices]
@@ -158,7 +161,7 @@ def train_mlp(inputs, other_data, regime_data, regime, opponents_data, patience=
         val_dataset = TensorDataset(torch.tensor(act_val, dtype=torch.float32).to(device),
                                     torch.tensor(other_val, dtype=torch.float32).to(device))
 
-    is_windows = True#os.name == 'nt'
+    is_windows = True  # os.name == 'nt'
 
     if is_windows:
         train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
@@ -171,7 +174,7 @@ def train_mlp(inputs, other_data, regime_data, regime, opponents_data, patience=
 
     criterion = nn.MSELoss()
     slowcriterion = nn.MSELoss(reduction='none')
-    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay= 1e-5 if l2_reg else 0)
+    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-5 if l2_reg else 0)
 
     best_val_loss = float('inf')
     epochs_no_improve = 0
@@ -363,7 +366,7 @@ def run_mlp_test(correlation_data2, act_key, activations, path):
     plot_info_matrices(confusion_matrix, confusion_matrix_n, models, percentile, path, ig_matrix)
 
 
-def get_keys(model_type, used_cor_inputs, correlation_data2, correlation_data_conv, correlation_data_lstm,  correlation_data_lstm_inputs, correlation_data_lstm_outputs, compose,
+def get_keys(model_type, used_cor_inputs, correlation_data2, correlation_data_conv, correlation_data_lstm, correlation_data_lstm_inputs, correlation_data_lstm_outputs, compose,
              use_conv_inputs=False, image_output=False):
     output_keys = sorted(used_cor_inputs.keys())
     input_keys = sorted(used_cor_inputs.keys())
@@ -389,11 +392,177 @@ def get_keys(model_type, used_cor_inputs, correlation_data2, correlation_data_co
     return input_keys, output_keys, output_size, input_size, second_input_keys
 
 
+def correlation_thing(activation_keys, correlation_data2, path, umapping=True, cca=False, rsa=False, pearson_figs=False, max_samples=-1, mlp_test=False):
+    # final heatmap is feature vs layer, mean neuron abs correlation
+    major_cor_results = {}
+    cca_results = {}
+    rsa_results = {}
+    mlp_results = {}
 
-def process_activations(path, epoch_numbers, repetitions, timesteps=5):
+    for act_key in activation_keys:
+        if act_key == 'labels':
+            continue
+        # each of our activations
+        activations = correlation_data2[act_key][:max_samples, :]
+        correlation_results = {}
 
-    f2f_best_first(path, epoch_numbers, repetitions, timesteps=5, train_mlp=train_mlp)
-    print('done')
+        if umapping:
+            tsne_model = umap.UMAP(n_neighbors=50, min_dist=0.5, metric='euclidean', n_epochs=100)
+            tsne_values = tsne_model.fit_transform(activations)
+            print('finished umap')
+
+        # this is for model activations
+        #run_mlp_test(correlation_data2, act_key, activations, path)
+        #continue
+
+        for other_key, other_data in tqdm.tqdm(correlation_data2.items()):
+            other_data = other_data[:max_samples, :]
+            if other_key == '' or 'oracle' in other_key or 'pred' in other_key:
+                continue
+            if umapping:
+                unique_vectors, integer_labels = np.unique(other_data, axis=0, return_inverse=True)
+            other_key = other_key.replace('act_label_', '')
+
+            if umapping:
+                plt.figure(figsize=(10, 6))
+                plt.scatter(tsne_values[:, 0], tsne_values[:, 1], c=integer_labels, edgecolors='black', cmap='tab10')
+                plt.title(f'umap of {act_key} colored by {other_key}')
+                plt.xlabel('Dimension 1')
+                plt.ylabel('Dimension 2')
+                plt.tight_layout()
+                os.makedirs(os.path.join(path, 'umaps'), exist_ok=True)
+                plt.savefig(os.path.join(path, 'umaps', f"{act_key}-umap-colored-by-{other_key}.png"))
+                plt.close()
+
+            if mlp_test and other_key != act_key:
+                assert activations.shape[0] == other_data.shape[0]
+                val_loss, train_losses, val_losses, val_losses_indy, _ = train_mlp(activations, other_data, None, None, None, model_type='mlp2')
+                mlp_results[(act_key, other_key)] = val_loss
+                #all_individual_val_losses[other_key] = val_losses_indy
+                #all_val_losses[other_key] = val_losses
+
+            #print('data', other_key, other_data[0], len(get_unique_arrays(other_data)))
+
+            # pearson correlation
+            temp_results = compute_vector_correlation(activations, other_data)
+            non_nan_columns = ~np.isnan(temp_results).any(axis=0)
+            correlation_results[other_key] = temp_results[:, non_nan_columns]
+
+            # cca
+            if cca:
+                cca = CCA(n_components=1)
+                X_c, Y_c = cca.fit_transform(activations, other_data)
+                cca_correlation = np.corrcoef(X_c.T, Y_c.T)[0, 1]
+                cca_results[(act_key, other_key)] = cca_correlation
+
+            # Compute RSA
+            if rsa:
+                activation_sim = 1 - squareform(pdist(activations, metric='correlation'))
+                feature_sim = 1 - squareform(pdist(other_data, metric='correlation'))
+                rsa_correlation = np.corrcoef(activation_sim.flatten(), feature_sim.flatten())[0, 1]
+                rsa_results[(act_key, other_key)] = rsa_correlation
+
+            # Plotting the heatmap for each matrix
+            if pearson_figs:
+                plt.figure(figsize=(10, 10))
+                ax = sns.heatmap(correlation_results[other_key], cmap='coolwarm', center=0, vmin=-1, vmax=1)
+                plt.xlabel(f"{other_key} components")
+                plt.ylabel(f"{act_key} Neuron")
+                plt.title(f"{act_key} vs {other_key}")
+                plt.tight_layout()
+                os.makedirs(os.path.join(path, 'neuron-component'), exist_ok=True)
+                plt.savefig(os.path.join(path, 'neuron-component', f"{other_key}-{act_key}.png"))
+                plt.close()
+
+        sum_results = []
+        for result_key, matrix in correlation_results.items():
+            sums = np.sum(np.abs(matrix), axis=1) / matrix.shape[1]
+            sum_results.append(sums)
+        sum_matrix = np.column_stack(sum_results)
+
+        plt.figure(figsize=(15, 10))
+        ax = sns.heatmap(sum_matrix, cmap='viridis')
+        plt.xlabel("Result Key")
+        plt.ylabel("Neuron")
+        plt.title("Mean of Absolute Neuron Activation Correlations over Unique Feature Values")
+        plt.xticks(ticks=np.arange(0.5, len(correlation_results), 1), labels=correlation_results.keys(), rotation=90)
+        plt.tight_layout()
+        plt.savefig(os.path.join(path, f"{act_key}-entropy_heatmap.png"))
+        plt.close()
+
+        mean_neurons = np.mean(sum_matrix, axis=0)
+        major_cor_results[act_key] = mean_neurons
+
+    if train_mlp:
+        cca_matrix = np.zeros((len(activation_keys), len(correlation_results)))
+        for i, act_key in enumerate(activation_keys):
+            for j, other_key in enumerate(correlation_results.keys()):
+                if (act_key, other_key) in mlp_results:
+                    cca_matrix[i, j] = mlp_results[(act_key, other_key)]
+        plt.figure(figsize=(10, 10))
+        ax = sns.heatmap(cca_matrix, cmap='viridis')
+        plt.xlabel("Feature")
+        plt.ylabel("Layer")
+        plt.title("MLP Validation Loss")
+        plt.xticks(ticks=np.arange(0.5, len(correlation_results), 1), labels=correlation_results.keys(), rotation=90)
+        plt.yticks(ticks=np.arange(0.5, len(activation_keys), 1), labels=activation_keys, rotation=0)
+        plt.tight_layout()
+        plt.savefig(os.path.join(path, f"layer_mlp_heatmap.png"))
+        plt.close()
+
+    # Plotting CCA results
+    if cca:
+        cca_matrix = np.zeros((len(activation_keys), len(correlation_results)))
+        for i, act_key in enumerate(activation_keys):
+            for j, other_key in enumerate(correlation_results.keys()):
+                if (act_key, other_key) in cca_results:
+                    cca_matrix[i, j] = cca_results[(act_key, other_key)]
+        plt.figure(figsize=(10, 10))
+        ax = sns.heatmap(cca_matrix, cmap='viridis')
+        plt.xlabel("Feature")
+        plt.ylabel("Layer")
+        plt.title("Canonical Correlation Analysis")
+        plt.xticks(ticks=np.arange(0.5, len(correlation_results), 1), labels=correlation_results.keys(), rotation=90)
+        plt.yticks(ticks=np.arange(0.5, len(activation_keys), 1), labels=activation_keys, rotation=0)
+        plt.tight_layout()
+        plt.savefig(os.path.join(path, f"layer_cca_heatmap.png"))
+        plt.close()
+
+    # Plotting RSA results
+    if rsa:
+        rsa_matrix = np.zeros((len(activation_keys), len(correlation_results)))
+        for i, act_key in enumerate(activation_keys):
+            for j, other_key in enumerate(correlation_results.keys()):
+                if (act_key, other_key) in rsa_results:
+                    rsa_matrix[i, j] = rsa_results[(act_key, other_key)]
+        plt.figure(figsize=(10, 10))
+        ax = sns.heatmap(rsa_matrix, cmap='viridis')
+        plt.xlabel("Feature")
+        plt.ylabel("Layer")
+        plt.title("Representational Similarity Analysis")
+        plt.xticks(ticks=np.arange(0.5, len(correlation_results), 1), labels=correlation_results.keys(), rotation=90)
+        plt.yticks(ticks=np.arange(0.5, len(activation_keys), 1), labels=activation_keys, rotation=0)
+        plt.tight_layout()
+        plt.savefig(os.path.join(path, f"layer_rsa_heatmap.png"))
+        plt.close()
+
+    plt.figure(figsize=(10, 10))
+    ax = sns.heatmap(np.array(list(major_cor_results.values())).T, cmap='viridis')
+    plt.xlabel("Layer")
+    plt.ylabel("Feature")
+    plt.title("Mean of Layers' Mean Neuron Correlations")
+    plt.xticks(ticks=np.arange(0.5, len(activation_keys), 1), labels=activation_keys, rotation=90)
+    plt.yticks(ticks=np.arange(0.5, len(correlation_results.keys()), 1), labels=list(correlation_results.keys()), rotation=0)
+    plt.tight_layout()
+    plt.savefig(os.path.join(path, f"layer_heatmap.png"))
+    plt.close()
+
+
+def process_activations(path, epoch_numbers, repetitions, timesteps=5, do_best_first=False):
+    if do_best_first:
+        print('doing best first search')
+        f2f_best_first(path, epoch_numbers, repetitions, timesteps=5, train_mlp=train_mlp)
+        print('done')
 
     use_i = False
     use_non_h = False
@@ -411,12 +580,12 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=5):
             correlation_data_conv = {}
             correlation_data_conv_flat = {}
 
-            keys_to_process = ['activations_out', 'activations_hidden_short', 'activations_hidden_long']
+            keys_to_process = list(loaded_activation_data.keys())#['activations_out', 'activations_hidden_short', 'activations_hidden_long']
 
             skip_model_dependent = True
 
             for key in keys_to_process:
-                if key in loaded_activation_data:
+                if key in loaded_activation_data and len(loaded_activation_data[key]):
                     concatenated_array = np.concatenate(loaded_activation_data[key], axis=0)
                     correlation_data[key] = concatenated_array
                     if not skip_model_dependent:
@@ -438,7 +607,7 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=5):
                         correlation_data2[key] = np.concatenate(arrays, axis=0)
 
                     elif key == "inputs":
-                        #print(np.concatenate(loaded_activation_data[key], axis=0).shape)
+                        # print(np.concatenate(loaded_activation_data[key], axis=0).shape)
                         real_arrays = np.concatenate(loaded_activation_data[key], axis=0).reshape((-1, 5, 5, 7, 7))
 
                         correlation_data_conv[key + '_stacked'] = real_arrays.reshape((-1, 25, 7, 7))
@@ -448,17 +617,17 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=5):
                             correlation_data_conv[f'{key}_t{t}'] = real_arrays[:, t, :, :, :].reshape((-1, 5, 7, 7))
                             correlation_data_conv_flat[f'{key}_t{t}'] = real_arrays[:, t, :, :, :].reshape((-1, 5 * 7 * 7))
                         for c in range(real_arrays.shape[1]):
-                            correlation_data_conv[f'{key}_c{c}_last'] = real_arrays[:, -1, c, :, :].reshape( (-1, 1, 7, 7))
-                            correlation_data_conv_flat[f'{key}_c{c}_last'] = real_arrays[:, -1, c, :, :].reshape( (-1, 1 * 7 * 7))
+                            correlation_data_conv[f'{key}_c{c}_last'] = real_arrays[:, -1, c, :, :].reshape((-1, 1, 7, 7))
+                            correlation_data_conv_flat[f'{key}_c{c}_last'] = real_arrays[:, -1, c, :, :].reshape((-1, 1 * 7 * 7))
                             correlation_data_conv[f'{key}_c{c}_h'] = real_arrays[:, :, c, :, :].reshape((-1, 5, 7, 7))
                             correlation_data_conv_flat[f'{key}_c{c}_h'] = real_arrays[:, :, c, :, :].reshape((-1, 5 * 7 * 7))
                         for k in correlation_data_conv.keys():
                             pass
-                            #print("conv shape", k, correlation_data_conv[k].shape)
+                            # print("conv shape", k, correlation_data_conv[k].shape)
                     else:
                         concatenated_array = np.concatenate(loaded_activation_data[key], axis=0)
                         correlation_data2[key] = concatenated_array
-                    #print(f'{key} shape:', concatenated_array.shape)
+                    # print(f'{key} shape:', concatenated_array.shape)
 
             for key in loaded_activation_data:
                 if not use_i and "i-" in key:
@@ -479,7 +648,7 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=5):
                             arrays.append(one_hot[:, -2:])
                             hist_arrays.append(one_hot[:, :])
                         elif key == "act_label_i-informedness":
-                            one_hot = np.eye(3)[data_array.reshape(-1)].reshape(data_array.shape[0],data_array.shape[1] * 3)
+                            one_hot = np.eye(3)[data_array.reshape(-1)].reshape(data_array.shape[0], data_array.shape[1] * 3)
                             arrays.append(one_hot[:, -6:])
                             hist_arrays.append(one_hot[:, :])
                         else:
@@ -487,9 +656,9 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=5):
                             hist_arrays.append(data_array[:, :])
                     if key != "act_label_vision" and key != "act_label_box-updated" and key != "act_label_exist":
                         # these variables are always the same at the end of the task, but differ during
-                        if use_non_h or new_key == "i-informedness" or new_key == "opponents": #this one gets used otherwise
+                        if use_non_h or new_key == "i-informedness" or new_key == "opponents":  # this one gets used otherwise
                             correlation_data2[new_key] = np.concatenate(arrays, axis=0)
-                        #print('cor2shape', new_key, correlation_data2[new_key].shape)
+                        # print('cor2shape', new_key, correlation_data2[new_key].shape)
                     if key != "act_label_opponents" and key != "act_label_informedness":
                         correlation_data2[new_key + "_h"] = np.concatenate(hist_arrays, axis=0)
                         value = correlation_data2[new_key + "_h"]
@@ -497,7 +666,7 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=5):
                         feature_dim = feature_dim_times_timesteps // timesteps
                         new_value = value.reshape((num_sequences, timesteps, feature_dim))
                         correlation_data_lstm[new_key + "_h"] = new_value
-                        #print('corlstmshape', new_key, correlation_data_lstm[new_key + "_h"].shape)
+                        # print('corlstmshape', new_key, correlation_data_lstm[new_key + "_h"].shape)
 
                         modified_sequences = np.zeros((num_sequences * timesteps, timesteps, feature_dim))
                         modified_final = np.zeros((num_sequences * timesteps, feature_dim))
@@ -510,27 +679,34 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=5):
 
                         correlation_data_lstm_inputs[new_key] = modified_sequences
                         correlation_data_lstm_outputs[new_key] = modified_final
-                        #print('corstepsshape', new_key, correlation_data_lstm_inputs[new_key].shape)
-                        #print('corlastshape', new_key, correlation_data_lstm_outputs[new_key].shape)
+                        # print('corstepsshape', new_key, correlation_data_lstm_inputs[new_key].shape)
+                        # print('corlastshape', new_key, correlation_data_lstm_outputs[new_key].shape)
 
-            correlation_data2["rand_vec5"] = np.random.randint(2, size=(length, 5))
-            correlation_data_conv["rand_vec5"] = np.random.randint(2, size=(length, 1, 7, 7))
-            correlation_data_conv_flat["rand_vec5"] = np.random.randint(2, size=(length, 1 * 7 * 7))
+            correlation_data2["rand_vec5"] = np.random.randint(2, size=(32, 5))
+            # correlation_data_conv["rand_vec5"] = np.random.randint(2, size=(8, 1, 7, 7))
+            # correlation_data_conv_flat["rand_vec5"] = np.random.randint(2, size=(length, 1 * 7 * 7))
             pred_d = correlation_data_lstm_inputs["vision"]
             pred_d2 = correlation_data_lstm_outputs["vision"]
             random_indices = np.random.choice(len(pred_d), size=3, replace=False)
-            #print("pred datapoints:", pred_d[random_indices])
-            #print("pred datapoints:", pred_d2[random_indices])
-            #print(correlation_data_lstm_inputs.keys())
-            activation_keys = ['activations_out']  # , 'activations_hidden_short', 'activations_hidden_long']
+            # print("pred datapoints:", pred_d[random_indices])
+            # print("pred datapoints:", pred_d2[random_indices])
+            # print(correlation_data_lstm_inputs.keys())
+
+
+
+            ### Correlation thing
+            if True:
+                print('correlation thing!')
+                activation_keys = [x for x in correlation_data.keys() if 'act_label' not in x and x not in ['inputs', 'pred', 'oracles', '', ]]
+                correlation_thing(activation_keys, correlation_data, path)
 
             # MLP F2F DATA
             remove_labels = []
-            run = True
+            run = False
             models = ['mlp2']
-            #models = ['mlp2', 'mlp2bn', 'mlp2d', 'mlp2d2', 'mlp2d3', 'mlp2ln', 'mlp2s', 'mlp3', 'mlp1', 'mlp2l2reg', 'linear', 'mlp2c5', 'mlp2c10', 'mlp2c16', 'linearl2reg', 'mlp2dl2reg', 'mlp3l2reg', 'mlp1l2reg', 'mlp2e50', 'mlp2l2rege50', 'mlp3l2rege50', 'mlp1l2rege50']
-            #models = ['mlp2l2reg', 'mlp2ln', 'mlp2d']
-            #models = ['rnn', 'rnnd1', 'rnnd5', 'lstm', 'lstmd1', 'lstmd5']
+            # models = ['mlp2', 'mlp2bn', 'mlp2d', 'mlp2d2', 'mlp2d3', 'mlp2ln', 'mlp2s', 'mlp3', 'mlp1', 'mlp2l2reg', 'linear', 'mlp2c5', 'mlp2c10', 'mlp2c16', 'linearl2reg', 'mlp2dl2reg', 'mlp3l2reg', 'mlp1l2reg', 'mlp2e50', 'mlp2l2rege50', 'mlp3l2rege50', 'mlp1l2rege50']
+            # models = ['mlp2l2reg', 'mlp2ln', 'mlp2d']
+            # models = ['rnn', 'rnnd1', 'rnnd5', 'lstm', 'lstmd1', 'lstmd5']
 
             compose = False
             split_by_regime = False
@@ -567,14 +743,13 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=5):
             else:
                 unique_regimes = [None]
 
+
             if run:
-                print('running', "ff2" + str(compose_targets) if compose else "f2f", str(models), 'regime-split:',
-                      split_by_regime, 'epochs:', num_epochs)
+                print('running', "ff2" + str(compose_targets) if compose else "f2f", str(models), 'regime-split:', split_by_regime, 'epochs:', num_epochs)
                 for model_type in models:
                     keys1, output_keys, size1, size, second_input_keys = get_keys(model_type, used_cor_inputs, correlation_data2,
-                                                               correlation_data_conv, correlation_data_lstm, correlation_data_lstm_inputs, correlation_data_lstm_outputs, compose,
-                                                               use_conv_inputs=image_inputs, image_output=image_outputs)
-
+                                                                                  correlation_data_conv, correlation_data_lstm, correlation_data_lstm_inputs, correlation_data_lstm_outputs, compose,
+                                                                                  use_conv_inputs=image_inputs, image_output=image_outputs)
 
                     loss_matrices = {str(regime): pd.DataFrame(index=keys1, columns=output_keys) for regime in
                                      unique_regimes}
@@ -587,8 +762,8 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=5):
                             for i, key1 in enumerate(keys1):
                                 if "lstm" in model_type or "rnn" in model_type:
                                     input_data = correlation_data_lstm_inputs[key1]
-                                    regime_data = None#correlation_data_lstm_outputs["informedness"]
-                                    opponents_data = None#correlation_data_lstm_outputs["opponents"]
+                                    regime_data = None  # correlation_data_lstm_outputs["informedness"]
+                                    opponents_data = None  # correlation_data_lstm_outputs["opponents"]
                                     realkeys = keys1
                                 else:
                                     input_data = used_cor_inputs[key1]
@@ -622,13 +797,13 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=5):
                                         output_data = correlation_data_lstm_outputs[key2]
                                     else:
                                         output_data = correlation_data2[key2]
-                                    #if not cat:
-                                        #print("using key2", key2)
+                                    # if not cat:
+                                    # print("using key2", key2)
                                     for regime in unique_regimes:
                                         assert input_data.shape[0] == output_data.shape[0]
                                         val_loss, train_losses, val_losses, val_losses_indy, model = \
                                             train_mlp(input_data, output_data, regime_data=regime_data, regime=regime, opponents_data=opponents_data,
-                                                      num_epochs=num_epochs, model_type=model_type, input_data2=input_data2 if not cat else None,)
+                                                      num_epochs=num_epochs, model_type=model_type, input_data2=input_data2 if not cat else None, )
 
                                         loss_matrices[str(regime)].at[key1, key2] = val_loss
                                         print(key1, key2, input_data.shape, output_data.shape, val_loss)
@@ -654,8 +829,8 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=5):
             models_used = []
             for model_type in models:
                 keys1, keys, size1, size, input2keys = get_keys(model_type, used_cor_inputs, correlation_data2,
-                                                    correlation_data_conv, correlation_data_lstm, correlation_data_lstm_inputs, correlation_data_lstm_outputs, compose,
-                                                    use_conv_inputs=image_inputs, image_output=image_outputs)
+                                                                correlation_data_conv, correlation_data_lstm, correlation_data_lstm_inputs, correlation_data_lstm_outputs, compose,
+                                                                use_conv_inputs=image_inputs, image_output=image_outputs)
 
                 min_matrix_f2f = pd.DataFrame(np.inf, index=keys1, columns=keys)
                 min_matrix_ff2l = {}
@@ -691,17 +866,17 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=5):
                                 if str(regime) == str(unique_regimes[0]):
                                     pass
                                     mat = min_matrix_f2f.to_numpy().flatten()
-                                    #mat = np.nan_to_num(mat, nan=np.nan, posinf=np.nan, neginf=np.nan)[np.isfinite(mat)]
-                                    #models_used.append(model_type)
-                                    #print(model_type, mat.mean(), mat.std(), (mat < 0.1).sum(), (mat < 0.05).sum(), (mat < 0.02).sum(), (mat < 0.01).sum())
-                                    #histogram.append(mat)
+                                    # mat = np.nan_to_num(mat, nan=np.nan, posinf=np.nan, neginf=np.nan)[np.isfinite(mat)]
+                                    # models_used.append(model_type)
+                                    # print(model_type, mat.mean(), mat.std(), (mat < 0.1).sum(), (mat < 0.05).sum(), (mat < 0.02).sum(), (mat < 0.01).sum())
+                                    # histogram.append(mat)
                         else:
                             print("couldn't find file", matrix_path)
                     if compose:
                         for target in compose_targets:
                             matrix_path = os.path.join(path, f"{name}ff2l_{target}_loss_matrix_{model_type}.csv")
                             if os.path.exists(matrix_path):
-                                val_loss_matrix_ff2l = pd.read_csv( matrix_path, index_col=0,header=0)
+                                val_loss_matrix_ff2l = pd.read_csv(matrix_path, index_col=0, header=0)
                                 min_matrix_ff2l[target] = min_matrix_ff2l[target].combine(val_loss_matrix_ff2l, np.minimum)
 
                                 if model_type == "lstm":
@@ -799,138 +974,40 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=5):
 
             print('finished')
 
-            name = "c" * bool(image_inputs) + "v" * (bool(image_inputs) and not image_outputs)
-            matrices = {model: pd.read_csv(os.path.join(path, f"{name}f2f_loss_matrix_{model}.csv")) for model in models}
-            for i, model1 in enumerate(models):
-                for j, model2 in enumerate(models):
-                    if j <= i:  # This ensures we only consider each pair once, avoiding redundancy
-                        continue
+            if run:
 
-                    keys = sorted(correlation_data2.keys())
-                    if model1 == "lstm" or model2 == "lstm":
-                        keys1 = sorted(correlation_data_lstm.keys())
-                    else:
-                        keys1 = keys
+                name = "c" * bool(image_inputs) + "v" * (bool(image_inputs) and not image_outputs)
+                matrices = {model: pd.read_csv(os.path.join(path, f"{name}f2f_loss_matrix_{model}.csv")) for model in models}
+                for i, model1 in enumerate(models):
+                    for j, model2 in enumerate(models):
+                        if j <= i:  # This ensures we only consider each pair once, avoiding redundancy
+                            continue
 
-                    # val_loss_matrix_full = np.full((len(keys), len(keys)), np.nan)
-                    val_loss_matrix_full = pd.DataFrame(index=keys, columns=keys, data=np.nan)
-                    shared_keys_indices = [keys.index(key) for key in keys1]
-                    all_indices = [keys.index(key) for key in keys]
-                    lstm_keys_indices = [keys1.index(key) for key in keys1]
+                        keys = sorted(correlation_data2.keys())
+                        if model1 == "lstm" or model2 == "lstm":
+                            keys1 = sorted(correlation_data_lstm.keys())
+                        else:
+                            keys1 = keys
 
-                    for idx1, ldx1 in zip(shared_keys_indices, lstm_keys_indices):
-                        for idx2 in all_indices:
-                            if keys[idx1] in keys1:
-                                model1_index = ldx1 if model1 == "lstm" else idx1
-                                model2_index = ldx1 if model2 == "lstm" else idx1
-                                val_loss_matrix_full[idx1, idx2] = matrices[model2][model2_index, idx2] - \
-                                                                   matrices[model1][model1_index, idx2]
-                    plt.figure(figsize=(12, 8))
-                    sns.heatmap(val_loss_matrix_full, annot=True, fmt=".2f", cmap="coolwarm", vmin=-0.06, vmax=0.06)
-                    plt.title(f'F2F Validation MSE ({model2} - {model1})')
-                    plt.xlabel('Target')
-                    plt.ylabel('Input')
-                    plt.tight_layout()
-                    plt.savefig(os.path.join(path, f"f2f-difference-{model1}-{model2}.png"))
+                        # val_loss_matrix_full = np.full((len(keys), len(keys)), np.nan)
+                        val_loss_matrix_full = pd.DataFrame(index=keys, columns=keys, data=np.nan)
+                        shared_keys_indices = [keys.index(key) for key in keys1]
+                        all_indices = [keys.index(key) for key in keys]
+                        lstm_keys_indices = [keys1.index(key) for key in keys1]
+
+                        for idx1, ldx1 in zip(shared_keys_indices, lstm_keys_indices):
+                            for idx2 in all_indices:
+                                if keys[idx1] in keys1:
+                                    model1_index = ldx1 if model1 == "lstm" else idx1
+                                    model2_index = ldx1 if model2 == "lstm" else idx1
+                                    val_loss_matrix_full[idx1, idx2] = matrices[model2][model2_index, idx2] - \
+                                                                       matrices[model1][model1_index, idx2]
+                        plt.figure(figsize=(12, 8))
+                        sns.heatmap(val_loss_matrix_full, annot=True, fmt=".2f", cmap="coolwarm", vmin=-0.06, vmax=0.06)
+                        plt.title(f'F2F Validation MSE ({model2} - {model1})')
+                        plt.xlabel('Target')
+                        plt.ylabel('Input')
+                        plt.tight_layout()
+                        plt.savefig(os.path.join(path, f"f2f-difference-{model1}-{model2}.png"))
 
             # END
-
-            for act_key in activation_keys:
-                activations = correlation_data[act_key]
-                correlation_results = {}
-
-                # tsne_model = TSNE(n_components=2, perplexity=30, n_iter=300)
-                # tsne_values = tsne_model.fit_transform(activations)
-                egg = 1
-
-                # this is for model activations
-                run_mlp_test(correlation_data2, act_key, activations, path)
-                continue
-
-                if egg == 0:
-
-                    if egg == 0:
-                        unique_vectors = get_unique_arrays(other_data)
-                        integer_labels = get_integer_labels_for_data(other_data, unique_vectors)
-
-                        plt.figure(figsize=(10, 6))
-                        labels = correlation_data2[other_key]
-                        plt.scatter(tsne_values[:, 0], tsne_values[:, 1], c=integer_labels, edgecolors='black',
-                                    cmap='tab10')
-                        plt.title(f't-SNE of {act_key} colored by {other_key}')
-                        plt.xlabel('Dimension 1')
-                        plt.ylabel('Dimension 2')
-                        plt.tight_layout()
-                        plt.savefig(os.path.join(path, f"{act_key}-tsne-colored-by-{other_key}.png"))
-                        plt.close()
-
-                        result_key = f"{other_key}"
-
-                        # print('data', other_data[0], len(get_unique_arrays(other_data)))
-
-                        temp_results = compute_vector_correlation(activations, other_data)
-                        non_nan_columns = ~np.isnan(temp_results).any(axis=0)
-                        correlation_results[result_key] = temp_results[:, non_nan_columns]
-
-                        # Plotting the heatmap for each matrix
-                        plt.figure(figsize=(10, 10))
-                        ax = sns.heatmap(correlation_results[result_key], cmap='coolwarm', center=0, vmin=-1, vmax=1)
-                        plt.xlabel(f"{other_key} Environment Features")
-                        plt.ylabel(f"{act_key} Neuron")
-                        plt.title(f"{act_key} vs {result_key}")
-                        if act_key == 'activations_out':
-                            y_ticks = np.arange(0, 128, 4)
-                            y_ticklabels = [(str(i % 32)) for i in y_ticks]
-                            ax.set_yticks(y_ticks)
-                            ax.set_yticklabels(y_ticklabels)
-
-                            max_width = max([t.get_window_extent().width for t in ax.get_yticklabels()])
-                            offset = max_width / ax.figure.dpi * 1.5
-
-                            plot_width = ax.get_window_extent().width / ax.figure.dpi
-                            text_offset = -plot_width * 0.05
-
-                            for ts in range(0, 4):
-                                plt.axhline(32 * ts, color='white', linestyle='--')
-                                ax.text(text_offset, 32 * ts + 16, f"Timestep {ts + 1}", va='center',
-                                        ha='left', color='black', backgroundcolor='white', rotation=90)
-                        plt.tight_layout()
-                        y_label_pos = ax.yaxis.get_label().get_position()
-                        ax.yaxis.get_label().set_position((y_label_pos[0] + offset, y_label_pos[1]))
-                        plt.savefig(os.path.join(path, f"{other_key}-{act_key}.png"))
-                        plt.close()
-
-                sum_results = []
-                for result_key, matrix in correlation_results.items():
-                    sums = np.sum(np.abs(matrix), axis=1) / matrix.shape[1]
-                    sum_results.append(sums)
-                sum_matrix = np.column_stack(sum_results)
-
-                plt.figure(figsize=(15, 10))
-                ax = sns.heatmap(sum_matrix, cmap='viridis')
-                plt.xlabel("Result Key")
-                plt.ylabel("Neuron")
-                plt.title("Mean of Absolute Neuron Activation Correlations")
-                plt.xticks(ticks=np.arange(0.5, len(correlation_results), 1), labels=correlation_results.keys(),
-                           rotation=90)
-
-                if act_key == 'activations_out':
-                    y_ticks = np.arange(0, 128, 4)
-                    y_ticklabels = [(str(i % 32)) for i in y_ticks]
-                    ax.set_yticks(y_ticks)
-                    ax.set_yticklabels(y_ticklabels)
-
-                    max_width = max([t.get_window_extent().width for t in ax.get_yticklabels()])
-                    offset = max_width / ax.figure.dpi * 1.5
-                    plot_width = ax.get_window_extent().width / ax.figure.dpi
-                    text_offset = -plot_width * 0.05
-
-                    for ts in range(0, 4):
-                        plt.axhline(32 * ts, color='white', linestyle='--')
-                        ax.text(text_offset, 32 * ts + 16, f"Timestep {ts + 1}", va='center',
-                                ha='left', color='black', backgroundcolor='white', rotation=90)
-                plt.tight_layout()
-                y_label_pos = ax.yaxis.get_label().get_position()
-                ax.yaxis.get_label().set_position((y_label_pos[0] + offset, y_label_pos[1]))
-                plt.savefig(os.path.join(path, f"{act_key}-entropy_heatmap.png"))
-                plt.close()

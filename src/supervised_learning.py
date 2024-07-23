@@ -1003,13 +1003,13 @@ class sMLP(nn.Module):
             'oracle_is_target': oracle_is_target, 'oracle_early': oracle_early
         }
 
-        input_size = 7 * 7 * channels * 5 # Correctly set input size based on image dimensions and channels
+        input_size = 7 * 7 * channels * 5
         self.fc1 = nn.Linear(input_size, hidden_size)
-        self.fc2 = nn.Linear(hidden_size, hidden_size)  # Additional depth layer
-        self.fc3 = nn.Linear(hidden_size, output_len)  # Output layer
+        self.fc2 = nn.Linear(hidden_size, hidden_size)
+        self.fc3 = nn.Linear(hidden_size, output_len)
 
     def forward(self, x, unused):
-        x = x.view(x.size(0), -1)  # Flatten the input
+        x = x.view(x.size(0), -1)
         x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
         x = self.fc3(x)

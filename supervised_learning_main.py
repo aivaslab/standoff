@@ -14,6 +14,7 @@ from functools import lru_cache
 import pandas as pd
 import heapq
 from scipy.stats import sem, t
+from torch.optim.lr_scheduler import ExponentialLR
 
 from src.utils.activation_processing import process_activations
 from src.utils.plotting import save_double_param_figures, save_single_param_figures, save_fixed_double_param_figures, \
@@ -22,11 +23,11 @@ from src.utils.plotting import save_double_param_figures, save_single_param_figu
 sys.path.append(os.getcwd())
 
 # from src.objects import *
-from torch.utils.data import DataLoader, random_split, Subset
+from torch.utils.data import DataLoader, random_split
 import tqdm
 import torch.nn as nn
 import torch
-from src.supervised_learning import RNNModel, TrainDatasetBig, EvalDatasetBig, FeedForwardModel, custom_collate, cLstmModel, CNNModel, cRNNModel, fCNN, tCNN, sRNN, sMLP
+from src.supervised_learning import TrainDatasetBig, EvalDatasetBig, custom_collate, cLstmModel, CNNModel, cRNNModel, fCNN, tCNN, sRNN, sMLP
 import traceback
 import torch.multiprocessing as mp
 
@@ -104,13 +105,24 @@ def decode_event_name(name):
 
 class SaveActivations:
     def __init__(self):
-        self.activations_out = None
-        self.activations_hidden = None
+        self.activations = {}
 
-    def __call__(self, module, module_in, module_out):
-        self.activations_out = module_out[0]
-        self.activations_hidden = module_out[1]
+    def save_activation(self, name):
+        def hook(module, input, output):
+            if isinstance(output, tuple):
+                for idx, item in enumerate(output):
+                    if isinstance(item, torch.Tensor):
+                        self.activations[f"{name}_{idx}"] = item.detach()
+            elif isinstance(output, torch.Tensor):
+                self.activations[name] = output.detach()
+            else:
+                raise TypeError(f"Unsupported output type: {type(output)}")
 
+        return hook
+
+def register_hooks(model, hook):
+    for name, layer in model.named_modules():
+        layer.register_forward_hook(hook.save_activation(name))
 
 def load_model(model_type, model_kwargs, device):
 
@@ -133,7 +145,7 @@ def load_model(model_type, model_kwargs, device):
 
 def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_path='', oracle_labels=[], repetition=0,
                    epoch_number=0, prior_metrics=[], num_activation_batches=-1, oracle_is_target=False, act_label_names=[], save_labels=True,
-                   oracle_early=False, last_timestep=True,  model_type=None, seed=0, test_percent=0.2):
+                   oracle_early=False, last_timestep=True,  model_type=None, seed=0, test_percent=0.2, retrain_model=True):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     special_criterion = nn.CrossEntropyLoss(reduction='none')
     oracle_criterion = nn.MSELoss(reduction='none')
@@ -142,7 +154,6 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
     batch_size = model_kwargs['batch_size']
     model = load_model(model_type, model_kwargs, device)
     model.load_state_dict(state_dict)
-    model.eval()
 
     if len(oracle_labels) and oracle_labels[0] is None:
         oracle_labels = []
@@ -156,7 +167,7 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
         dir = os.path.join(load_path, val_set_name)
         data.append(np.load(os.path.join(dir, 'obs.npz'), mmap_mode='r')['arr_0'])
         labels_raw = np.load(os.path.join(dir, 'label-' + target_label + '.npz'), mmap_mode='r')['arr_0'] #todo: try labelcheck
-        print('loaded eval labels', val_set_name, labels_raw.shape)
+        #print('loaded eval labels', val_set_name, labels_raw.shape)
         if target_label == 'shouldGetBig':
             # it's 5 bools, so we take the last and turn it into 1-hot
             if last_timestep:
@@ -176,7 +187,7 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
             #labels.append(labels_raw)
         #print('first', np.sum(labels_raw, axis=0), labels_raw[15, -1])
         params.append(np.load(os.path.join(dir, 'params.npz'), mmap_mode='r')['arr_0'])
-        for metric in set(prior_metrics, lp_list):
+        for metric in set(prior_metrics):
             metric_data = np.load(os.path.join(dir, 'label-' + metric + '.npz'), mmap_mode='r')['arr_0']
             if metric in prior_metrics_data.keys():
                 prior_metrics_data[metric].append(metric_data)
@@ -203,21 +214,32 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
     for metric, arrays in prior_metrics_data.items():
         prior_metrics_data[metric] = np.concatenate(arrays, axis=0)
 
-    included_indices = filter_indices(data, labels, params, oracles, is_train=False, test_percent=0.2)
-    val_dataset = EvalDatasetBig(data, labels, params, oracles, included_indices, metrics=prior_metrics_data, act_list=act_labels)
+    test_indices = filter_indices(data, labels, params, oracles, is_train=False, test_percent=test_percent)
+    train_indices = filter_indices(data, labels, params, oracles, is_train=True, test_percent=test_percent)
+
+    if retrain_model:
+        print("retraining model on all")
+        train_dataset = TrainDatasetBig(data, labels, params, oracles, train_indices, metrics=prior_metrics_data)
+        val_dataset = TrainDatasetBig(data, labels, params, oracles, test_indices, metrics=prior_metrics_data)
+        train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=0)
+        val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=0)
+        for optimizer in ['adam']:#['sgd', 'adam', 'momentum09', 'nesterov09', 'rmsprop']:
+            train_model_retrain(model, train_loader, val_loader, model_save_path, model_kwargs, opt=optimizer, max_tries=5, repetition=repetition)
+        del train_dataset, val_dataset, train_loader, val_loader
+
+    val_dataset = EvalDatasetBig(data, labels, params, oracles, test_indices, metrics=prior_metrics_data, act_list=act_labels)
     print(len(val_dataset))
     test_loaders.append(DataLoader(val_dataset, batch_size=batch_size, shuffle=True, collate_fn=custom_collate))
 
     hook = SaveActivations()
     activation_data = {
-        'activations_out': [],
-        'activations_hidden_short': [],
-        'activations_hidden_long': [],
         'inputs': [],
+        'pred': [],
         'labels': [],
         'oracles': [],
-        'pred': [],
     }
+    register_hooks(model, hook)
+    model.eval()
 
     for idx, _val_loader in enumerate(test_loaders):
         with torch.no_grad():
@@ -261,27 +283,22 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
 
                 if i < num_activation_batches or num_activation_batches < 0:
                     real_batch_size = len(labels)
-                    # commented these out because they take a while.
-                    #activation_data['activations_out'].append(hook.activations_out.cpu().reshape(real_batch_size, -1))
-                    #activation_data['activations_hidden_short'].append(hook.activations_hidden[0].cpu().reshape(real_batch_size, -1))
-                    #activation_data['activations_hidden_long'].append(hook.activations_hidden[1].cpu().reshape(real_batch_size, -1))
-                    #print(inputs.cpu().numpy().shape)
-                    if False:
+                    for layer_name, activation in hook.activations.items():
+                        if layer_name not in activation_data:
+                            activation_data[layer_name] = []
+                        activation_data[layer_name].append(activation.cpu().reshape(real_batch_size, -1).to(torch.float16))
+
+                    if True:
                         activation_data['inputs'].append(inputs.cpu().numpy().reshape(real_batch_size, -1))
                         activation_data['pred'].append(pred.numpy().reshape(real_batch_size, -1))
                         activation_data['labels'].append(labels.cpu().numpy().reshape(real_batch_size, -1))
                         activation_data['oracles'].append(oracles.cpu().numpy().reshape(real_batch_size, -1))
 
-                        # Handle each act_label separately
                         for name, act_label in act_labels_dict.items():
                             key = f"act_label_{name}"
                             if key not in activation_data:
                                 activation_data[key] = []
                             activation_data[key].append(act_label.cpu().numpy().reshape(real_batch_size, -1))
-                            #print('shape', key, act_label.shape)
-
-                #if i == num_activation_batches - 1:
-                #    handle.remove()# temporary! don't leave
 
                 batch_param_losses = []
                 for k, elements in enumerate(zip(params, losses, corrects, small_food_selected, big_food_selected, neither_food_selected, pred, oracle_outputs, oracle_accuracy, oracle_losses if oracle_is_target else [0] * len(pred))):
@@ -299,11 +316,10 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
                         'neither_food_selected': neither.item(),
                         'o_acc': o_acc.item()
                     }
-                    # Only add oracle_loss if it's part of the current configuration
+
                     if oracle_is_target:
                         data_dict['oracle_loss'] = oracle_loss.item()
 
-                    # Extend with metrics, try to avoid .numpy() call inside the loop if possible
                     for x, v in metrics.items():
                         data_dict[x] = v[k].numpy() if hasattr(v[k], 'numpy') else v[k]
 
@@ -331,7 +347,7 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
 
     float_columns = ['o_acc']
     for col in float_columns:
-        df[col] = df[col].astype('float32')
+        df[col] = df[col].astype('float16')
 
     print(df.info(memory_usage='deep'))
 
@@ -380,6 +396,108 @@ def filter_indices(data_list, labels_list, params_list, oracles_list, is_train=T
             global_index += 1
 
     return included_indices
+
+def weight_distance(original_weights, new_weights):
+    return sum(torch.norm(ow - nw).item() for ow, nw in zip(original_weights, new_weights))
+
+
+def train_model_retrain(model, train_loader, test_loader, save_path,
+                model_kwargs=None,
+                oracle_labels=[], repetition=0,
+                save_models=True, record_loss=True,
+                oracle_is_target=False, max_batches=10000,
+                tolerance=5e-4, max_tries=3,
+                opt='sgd'):
+
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    lr = model_kwargs['lr']
+    print('lr:', lr)
+    old_weights = [param.data.clone() for param in model.parameters()]
+
+    criterion = nn.CrossEntropyLoss()
+    if opt == 'adam':
+        optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+    elif opt == 'sgd':
+        optimizer = torch.optim.SGD(model.parameters(), lr=lr)
+    elif opt == 'momentum09':
+        optimizer = torch.optim.SGD(model.parameters(), lr=0.1, momentum=0.9)
+    elif opt == 'nesterov09':
+        optimizer = torch.optim.SGD(model.parameters(), lr=lr, momentum=0.9, nesterov=True)
+    elif opt == 'rmsprop':
+        optimizer = torch.optim.RMSprop(model.parameters(), lr=lr)
+    t = tqdm.trange(max_batches)
+    iter_loader = iter(train_loader)
+    epoch_length = len(train_loader)
+    epoch_losses_df = pd.DataFrame(columns=['Batch', 'Loss'])
+    retrain_stats = pd.DataFrame(columns=['Batch', 'Validation Loss', 'Weight Distance'])
+    scheduler = ExponentialLR(optimizer, gamma=0.95)
+    tries = 0
+    total_loss = 0.0
+    start_loss = 1000000
+    breaking = False
+    model.to(device)
+    model.train()
+    for batch in range(max_batches):
+        try:
+            inputs, target_labels, _, _, _ = next(iter_loader)
+        except StopIteration:
+            iter_loader = iter(train_loader)
+            inputs, target_labels, _, _, _ = next(iter_loader)
+        inputs, target_labels = inputs.to(device), target_labels.to(device)
+
+        outputs = model(inputs, None)
+        loss = criterion(outputs, torch.argmax(target_labels, dim=1))
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+        t.update(1)
+
+
+        if record_loss and ((batch % epoch_length == 0) or (batch == max_batches-1)):
+            total_loss += loss.item()
+
+            scheduler.step()
+
+            model.eval()
+            with torch.no_grad():
+                test_loss = 0.0
+                for inputs, target_labels, _, oracle_inputs, _ in test_loader:
+                    inputs, target_labels, oracle_inputs = inputs.to(device), target_labels.to(device), oracle_inputs.to(device)
+                    outputs = model(inputs, oracle_inputs)
+                    loss = criterion(outputs, torch.argmax(target_labels, dim=1))
+                    test_loss += loss.item()
+                epoch_losses_df = epoch_losses_df.append({'Batch': batch, 'Loss': test_loss / len(test_loader)}, ignore_index=True)
+
+            if batch % epoch_length == 0:
+                avg_loss = test_loss / len(test_loader)
+
+                if avg_loss >= start_loss - tolerance:
+                    tries += 1
+                    #start_loss = avg_loss - tolerance
+                    print(f"Tries incremented: {tries}, Start Loss updated: {start_loss}, avg_loss was: {avg_loss}")
+                    if tries >= max_tries:
+                        breaking = True
+                        print("break")
+                else:
+                    start_loss = avg_loss - tolerance
+                    print('reset tries', start_loss)
+                    tries = 0
+
+                if save_models:
+                    os.makedirs(save_path, exist_ok=True)
+                    torch.save([model.kwargs, model.state_dict()], os.path.join(save_path, f'{opt}-rt-model-{repetition}-{batch // epoch_length}.pt'))
+
+            model.train()
+
+        if breaking:
+            new_weights = [param.data.clone() for param in model.parameters()]
+            weight_dist = weight_distance(old_weights, new_weights)
+            retrain_stats = retrain_stats.append({'Batch': (batch // epoch_length) - tries, 'Validation Loss': avg_loss, 'Weight Distance': weight_dist}, ignore_index=True)
+            retrain_stats.to_csv(os.path.join(save_path, f'{opt}-rt-stats-{repetition}.csv'), index=False)
+            break
+
+    if record_loss:
+        epoch_losses_df.to_csv(os.path.join(save_path, f'{opt}-rt-losses-{repetition}.csv'), index=False)
 
 def train_model(train_sets, target_label, load_path='supervised/', save_path='', epochs=100,
                 model_kwargs=None, model_type=None,
@@ -448,7 +566,9 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
     model = load_model(model_type, model_kwargs, device)
     criterion = nn.CrossEntropyLoss()
     oracle_criterion = nn.MSELoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+    #optimizer = torch.optim.SGD(model.parameters(), lr=lr, momentum=0.99)
+    scheduler = ExponentialLR(optimizer, gamma=0.90)
 
     if False: # if loading previous model, only for progressions
         last_digit = int(save_path[-1])
@@ -463,11 +583,8 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
     epoch_length = batches // 20
 
     t = tqdm.trange(batches)
-
     iter_loader = iter(train_loader)
-
     epoch_losses_df = pd.DataFrame(columns=['Batch', 'Loss'])
-
     for batch in range(batches):
         total_loss = 0.0
         try:
@@ -494,6 +611,9 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
         optimizer.step()
         t.update(1)
 
+        if batch % epoch_length == 0:
+            scheduler.step()
+
         if record_loss and ((batch % epoch_length == 0) or (batch == batches-1)):
             total_loss += loss.item()
             with torch.no_grad():
@@ -505,12 +625,16 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
                     test_loss += loss.item()
                 epoch_losses_df = epoch_losses_df.append({'Batch': batch, 'Loss': test_loss / len(test_loader)}, ignore_index=True)
 
+            if save_models:
+                os.makedirs(save_path, exist_ok=True)
+                torch.save([model.kwargs, model.state_dict()], os.path.join(save_path, f'{repetition}-checkpoint-{batch // epoch_length}.pt'))
+
         if save_models and (batch % (len(train_loader)) == len(train_loader) - 1):
             os.makedirs(save_path, exist_ok=True)
             torch.save([model.kwargs, model.state_dict()], os.path.join(save_path, f'{repetition}-model_epoch{epochs-1}.pt'))
 
     if record_loss:
-        epoch_losses_df.to_csv(os.path.join(save_path, f'losses.csv'), index=False)
+        epoch_losses_df.to_csv(os.path.join(save_path, f'losses-{repetition}.csv'), index=False)
 
 
 @lru_cache(maxsize=None)
@@ -1166,7 +1290,8 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
                            load_path='supervised', oracle_labels=[], skip_train=True, batch_size=64,
                            prior_metrics=[], key_param=None, key_param_value=None, save_every=1, skip_calc=True,
                            oracle_early=False, skip_eval=False, oracle_is_target=True, skip_figures=True,
-                           act_label_names=[], skip_activations=True, batches=5000, label='correct-loc', last_timestep=True, model_type=None):
+                           act_label_names=[], skip_activations=True, batches=5000, label='correct-loc',
+                           last_timestep=True, model_type=None, retrain_model=True):
 
     '''
     Runs a session of supervised learning. Different steps, such as whether we train+save models, evaluate models, or run statistics on evaluations, are optional.
@@ -1183,7 +1308,7 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
     test = 0
     while test < num_random_tests:
         try:
-            model_kwargs = {"oracle_early": oracle_early, "hidden_size": 32, "num_layers": 3, "kernels": 16, "kernel_size1": 3, "kernel_size2": 5, "stride1": 1, "pool_kernel_size": 3, "pool_stride": 1, "padding1": 1, "padding2": 1, "use_pool": False, "use_conv2": False, "kernels2": 16, "batch_size": 256, "lr": 0.001, "oracle_len": 0, "output_len": 5, "channels": 5}
+            model_kwargs = {"oracle_early": oracle_early, "hidden_size": 32, "num_layers": 3, "kernels": 16, "kernel_size1": 3, "kernel_size2": 5, "stride1": 1, "pool_kernel_size": 3, "pool_stride": 1, "padding1": 1, "padding2": 1, "use_pool": False, "use_conv2": False, "kernels2": 16, "batch_size": 256, "lr": 0.0003, "oracle_len": 0, "output_len": 5, "channels": 5}
 
             model_name = "".join([str(x) + "," for x in model_kwargs.values()])
 
@@ -1210,18 +1335,22 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
                                                       oracle_is_target=oracle_is_target,
                                                       act_label_names=act_label_names,
                                                       oracle_early=oracle_early,
-                                                      last_timestep=last_timestep)
+                                                      last_timestep=last_timestep,
+                                                      retrain_model=retrain_model)
                             dfs_paths.extend(df_paths)
                             if epoch == epochs - 1:
                                 last_epoch_df_paths.extend(df_paths)
+
+                loss_paths.append(os.path.join(save_path, f'losses-{repetition}.csv'))
+                for file in glob.glob(os.path.join(save_path, '*-rt-losses.csv')):
+                    loss_paths.append(file)
+
             if skip_train:
                 dfs_paths = find_df_paths(save_path, 'param_losses_*_*.csv') #use  .csv.gz? I'm not sure why it sometimes wants this but sometimes not.
                 print('sup sess dfs paths', dfs_paths, save_path)
                 if len(dfs_paths):
                     max_epoch = max(int(path.split('_')[-2]) for path in dfs_paths)
                     last_epoch_df_paths = [path for path in dfs_paths if int(path.split('_')[-2]) == max_epoch]
-
-            loss_paths.append(os.path.join(save_path, 'losses.csv')) # note that this only works for 1 repetition at the moment!
 
             if not skip_calc and len(last_epoch_df_paths):
                 print('loading dfs (with gzip)...', dfs_paths)
