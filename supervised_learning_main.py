@@ -1,3 +1,4 @@
+import ast
 import glob
 import hashlib
 import itertools
@@ -30,7 +31,6 @@ import torch
 from src.supervised_learning import TrainDatasetBig, EvalDatasetBig, custom_collate, cLstmModel, CNNModel, cRNNModel, fCNN, tCNN, sRNN, sMLP
 import traceback
 import torch.multiprocessing as mp
-
 
 mp.set_start_method('spawn', force=True)
 
@@ -107,25 +107,48 @@ class SaveActivations:
     def __init__(self):
         self.activations = {}
 
-    def save_activation(self, name):
+    def save_activation(self, name, save_inputs):
         def hook(module, input, output):
-            if isinstance(output, tuple):
-                for idx, item in enumerate(output):
-                    if isinstance(item, torch.Tensor):
-                        self.activations[f"{name}_{idx}"] = item.detach()
-            elif isinstance(output, torch.Tensor):
-                self.activations[name] = output.detach()
+            if save_inputs:
+                if isinstance(input, tuple):
+                    for idx, item in enumerate(input):
+                        if isinstance(item, torch.Tensor):
+                            self.activations[f"{name}_input_{idx}"] = item.detach()
+                elif isinstance(input, torch.Tensor):
+                    self.activations[f"{name}_input"] = input.detach()
+
+            if isinstance(module, nn.LSTM):
+                output_seq, (h_n, c_n) = output
+                num_layers = h_n.size(0)
+                #print(output_seq.shape)
+                seq_len = output_seq.size(1)
+
+                for t in range(seq_len):
+                    for layer in range(num_layers):
+                        self.activations[f"{name}_hidden_state_l{layer}_t{t}"] = h_n[layer, :, :].detach()
+                        self.activations[f"{name}_cell_state_l{layer}_t{t}"] = c_n[layer, :, :].detach()
+
             else:
-                raise TypeError(f"Unsupported output type: {type(output)}")
+                if isinstance(output, tuple):
+                    for idx, item in enumerate(output):
+                        if isinstance(item, torch.Tensor):
+                            self.activations[f"{name}_output_{idx}"] = item.detach()
+                elif isinstance(output, torch.Tensor):
+                    self.activations[f"{name}_output"] = output.detach()
+
+            #print(self.activations.keys(), [(x, len(self.activations[x])) for x in self.activations.keys()])
 
         return hook
 
+
 def register_hooks(model, hook):
+    save_inputs = True
     for name, layer in model.named_modules():
-        layer.register_forward_hook(hook.save_activation(name))
+        layer.register_forward_hook(hook.save_activation(name, save_inputs=save_inputs))
+        save_inputs = False
+
 
 def load_model(model_type, model_kwargs, device):
-
     if model_type == 'cnn':
         model = CNNModel(**model_kwargs).to(device)
     elif model_type == 'fcnn':
@@ -143,14 +166,45 @@ def load_model(model_type, model_kwargs, device):
 
     return model
 
-def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_path='', oracle_labels=[], repetition=0,
-                   epoch_number=0, prior_metrics=[], num_activation_batches=-1, oracle_is_target=False, act_label_names=[], save_labels=True,
-                   oracle_early=False, last_timestep=True,  model_type=None, seed=0, test_percent=0.2, retrain_model=True):
+
+def load_model_eval(model_save_path, repetition, use_prior=False):
+    if use_prior:
+        file_name = f'{repetition}-checkpoint-prior.pt'
+    else:
+        files = [f for f in os.listdir(model_save_path) if f.startswith(f'{repetition}-checkpoint-') and f.endswith('.pt')]
+
+        if not files:
+            raise FileNotFoundError(f"No checkpoint files found for repetition {repetition} in {model_save_path}")
+
+        numbers = []
+        for f in files:
+            parts = f.split('-')
+            if len(parts) > 2:
+                try:
+                    # Extract the number part
+                    number = int(parts[-1].replace('.pt', ''))
+                    numbers.append(number)
+                except ValueError:
+                    # Skip if the conversion fails
+                    continue
+
+        print(numbers)
+        highest_number = max(numbers)
+        file_name = f'{repetition}-checkpoint-{highest_number}.pt'
+
+    # Load the model
+    print('loading model for eval:', model_save_path, file_name)
+    model_kwargs, state_dict = torch.load(os.path.join(model_save_path, file_name))
+    return model_kwargs, state_dict
+
+def load_model_data_eval_retrain(test_sets, load_path, target_label, last_timestep, prior_metrics, model_save_path,
+                                 repetition, model_type, oracle_labels, save_labels, act_label_names, test_percent,
+                                 use_prior=False):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     special_criterion = nn.CrossEntropyLoss(reduction='none')
     oracle_criterion = nn.MSELoss(reduction='none')
 
-    model_kwargs, state_dict = torch.load(os.path.join(model_save_path, f'{repetition}-model_epoch{epoch_number}.pt'))
+    model_kwargs, state_dict = load_model_eval(model_save_path, repetition, use_prior)#f'{repetition}-model_epoch{epoch_number}.pt'))
     batch_size = model_kwargs['batch_size']
     model = load_model(model_type, model_kwargs, device)
     model.load_state_dict(state_dict)
@@ -158,7 +212,6 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
     if len(oracle_labels) and oracle_labels[0] is None:
         oracle_labels = []
 
-    param_losses_list = []
     prior_metrics_data = {}
 
     test_loaders = []
@@ -166,26 +219,26 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
     for val_set_name in test_sets:
         dir = os.path.join(load_path, val_set_name)
         data.append(np.load(os.path.join(dir, 'obs.npz'), mmap_mode='r')['arr_0'])
-        labels_raw = np.load(os.path.join(dir, 'label-' + target_label + '.npz'), mmap_mode='r')['arr_0'] #todo: try labelcheck
-        #print('loaded eval labels', val_set_name, labels_raw.shape)
+        labels_raw = np.load(os.path.join(dir, 'label-' + target_label + '.npz'), mmap_mode='r')['arr_0']  # todo: try labelcheck
+        # print('loaded eval labels', val_set_name, labels_raw.shape)
         if target_label == 'shouldGetBig':
             # it's 5 bools, so we take the last and turn it into 1-hot
             if last_timestep:
-                x = np.eye(2)[labels_raw[:, -1].astype(int)] # single timestep
+                x = np.eye(2)[labels_raw[:, -1].astype(int)]  # single timestep
             else:
-                x = np.eye(2)[labels_raw.astype(int)].reshape(-1, 10) # 5 timesteps
-            #print(x.shape, x[0])
+                x = np.eye(2)[labels_raw.astype(int)].reshape(-1, 10)  # 5 timesteps
+            # print(x.shape, x[0])
             labels.append(x)
 
         elif len(labels_raw.shape) > 2:
             if last_timestep:
-                labels.append(labels_raw[..., -1]) # use only the last timestep
+                labels.append(labels_raw[..., -1, :])  # use only the last timestep (was last dimension but I changed it)...
             else:
                 labels.append(labels_raw.reshape(-1, 25))
         else:
             labels.append(labels_raw.reshape(-1, 25))
-            #labels.append(labels_raw)
-        #print('first', np.sum(labels_raw, axis=0), labels_raw[15, -1])
+            # labels.append(labels_raw)
+        # print('first', np.sum(labels_raw, axis=0), labels_raw[15, -1])
         params.append(np.load(os.path.join(dir, 'params.npz'), mmap_mode='r')['arr_0'])
         for metric in set(prior_metrics):
             metric_data = np.load(os.path.join(dir, 'label-' + metric + '.npz'), mmap_mode='r')['arr_0']
@@ -203,7 +256,7 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
             combined_oracle_data = np.concatenate(oracle_data, axis=-1)
             oracles.append(combined_oracle_data)
 
-        if save_labels: # save labels for comparison with activations
+        if save_labels:  # save labels for comparison with activations
             act_label_data_dict = {}
             for act_label_name in act_label_names:
                 this_label = np.load(os.path.join(dir, 'label-' + act_label_name + '.npz'))['arr_0']
@@ -215,21 +268,49 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
         prior_metrics_data[metric] = np.concatenate(arrays, axis=0)
 
     test_indices = filter_indices(data, labels, params, oracles, is_train=False, test_percent=test_percent)
-    train_indices = filter_indices(data, labels, params, oracles, is_train=True, test_percent=test_percent)
-
-    if retrain_model:
-        print("retraining model on all")
-        train_dataset = TrainDatasetBig(data, labels, params, oracles, train_indices, metrics=prior_metrics_data)
-        val_dataset = TrainDatasetBig(data, labels, params, oracles, test_indices, metrics=prior_metrics_data)
-        train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=0)
-        val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=0)
-        for optimizer in ['adam']:#['sgd', 'adam', 'momentum09', 'nesterov09', 'rmsprop']:
-            train_model_retrain(model, train_loader, val_loader, model_save_path, model_kwargs, opt=optimizer, max_tries=5, repetition=repetition)
-        del train_dataset, val_dataset, train_loader, val_loader
 
     val_dataset = EvalDatasetBig(data, labels, params, oracles, test_indices, metrics=prior_metrics_data, act_list=act_labels)
-    print(len(val_dataset))
     test_loaders.append(DataLoader(val_dataset, batch_size=batch_size, shuffle=True, collate_fn=custom_collate))
+
+    return test_loaders, special_criterion, oracle_criterion, model, device, data, labels, params, oracles, act_labels, batch_size, prior_metrics_data, model_kwargs
+
+
+def retrain_model(test_sets, target_label, load_path='supervised/', model_load_path='', oracle_labels=[], repetition=0, save_labels=True,
+                  epoch_number=0, prior_metrics=[], last_timestep=True, act_label_names=None, model_type=None, model_kwargs=None,
+                  seed=0, test_percent=0.2, retrain_batches=5000, retrain_path=''):
+    test_loaders, special_criterion, oracle_criterion, model, device, \
+    data, labels, params, oracles, act_labels, batch_size, prior_metrics_data, \
+    model_kwargs = load_model_data_eval_retrain(test_sets, load_path,
+                                                target_label, last_timestep,
+                                                prior_metrics, model_load_path,
+                                                repetition,
+                                                model_type, oracle_labels,
+                                                save_labels, act_label_names,
+                                                test_percent)
+    print("retraining model on all")
+    train_indices = filter_indices(data, labels, params, oracles, is_train=True, test_percent=test_percent)
+    test_indices = filter_indices(data, labels, params, oracles, is_train=False, test_percent=test_percent)
+    train_dataset = TrainDatasetBig(data, labels, params, oracles, train_indices, metrics=prior_metrics_data)
+    val_dataset = TrainDatasetBig(data, labels, params, oracles, test_indices, metrics=prior_metrics_data)
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=0)
+    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=0)
+    for optimizer in ['adam']:  # ['sgd', 'adam', 'momentum09', 'nesterov09', 'rmsprop']:
+        train_model_retrain(model, train_loader, val_loader, retrain_path, model_kwargs=model_kwargs, opt=optimizer, max_tries=5, repetition=repetition, max_batches=retrain_batches)
+
+
+def evaluate_model(test_sets, target_label, load_path='supervised/', model_load_path='', oracle_labels=[], repetition=0,
+                   epoch_number=0, prior_metrics=[], num_activation_batches=-1, oracle_is_target=False, act_label_names=[], save_labels=True,
+                   oracle_early=False, last_timestep=True, model_type=None, seed=0, test_percent=0.2, use_prior=False):
+    test_loaders, special_criterion, oracle_criterion, model, device, \
+    data, labels, params, oracles, act_labels, batch_size, prior_metrics_data, \
+    model_kwargs = load_model_data_eval_retrain(test_sets, load_path,
+                                                target_label, last_timestep,
+                                                prior_metrics, model_load_path,
+                                                repetition,
+                                                model_type, oracle_labels,
+                                                save_labels, act_label_names,
+                                                test_percent, use_prior=use_prior)
+    param_losses_list = []
 
     hook = SaveActivations()
     activation_data = {
@@ -241,6 +322,8 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
     register_hooks(model, hook)
     model.eval()
 
+    print('num_activation_batches', num_activation_batches)
+
     for idx, _val_loader in enumerate(test_loaders):
         with torch.no_grad():
 
@@ -249,9 +332,8 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
             for i, (inputs, labels, params, oracles, metrics, act_labels_dict) in enumerate(_val_loader):
                 inputs, labels, oracles = inputs.to(device), labels.to(device), oracles.to(device)
                 max_labels = torch.argmax(labels, dim=1)
-                if torch.isnan(max_labels).any():
-                    print("labels has nan")
-
+                #if torch.isnan(max_labels).any():
+                #    print("labels has nan")
 
                 if not oracle_is_target:
                     outputs = model(inputs, oracles)
@@ -270,10 +352,10 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
                     binary_oracle_outputs = (oracle_outputs > 0.5).float()
                     oracle_accuracy = ((binary_oracle_outputs == oracles).float().sum(dim=1) / 10).float()
 
-                corrects = (predicted == torch.argmax(labels, dim=1))
+                corrects = (predicted == max_labels)
 
-                if torch.isnan(corrects).any():
-                    print("corrects has nan")
+                #if torch.isnan(corrects).any():
+                #    print("corrects has nan")
                 pred = predicted.cpu()
                 small_food_selected = (pred == torch.argmax(metrics['loc'][:, -1, :, 0], dim=1))
                 big_food_selected = (pred == torch.argmax(metrics['loc'][:, -1, :, 1], dim=1))
@@ -288,17 +370,16 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
                             activation_data[layer_name] = []
                         activation_data[layer_name].append(activation.cpu().reshape(real_batch_size, -1).to(torch.float16))
 
-                    if True:
-                        activation_data['inputs'].append(inputs.cpu().numpy().reshape(real_batch_size, -1))
-                        activation_data['pred'].append(pred.numpy().reshape(real_batch_size, -1))
-                        activation_data['labels'].append(labels.cpu().numpy().reshape(real_batch_size, -1))
-                        activation_data['oracles'].append(oracles.cpu().numpy().reshape(real_batch_size, -1))
+                    activation_data['inputs'].append(inputs.cpu().numpy().reshape(real_batch_size, -1))
+                    activation_data['pred'].append(pred.numpy().reshape(real_batch_size, -1))
+                    activation_data['labels'].append(labels.cpu().numpy().reshape(real_batch_size, -1))
+                    activation_data['oracles'].append(oracles.cpu().numpy().reshape(real_batch_size, -1))
 
-                        for name, act_label in act_labels_dict.items():
-                            key = f"act_label_{name}"
-                            if key not in activation_data:
-                                activation_data[key] = []
-                            activation_data[key].append(act_label.cpu().numpy().reshape(real_batch_size, -1))
+                    for name, act_label in act_labels_dict.items():
+                        key = f"act_label_{name}"
+                        if key not in activation_data:
+                            activation_data[key] = []
+                        activation_data[key].append(act_label.cpu().numpy().reshape(real_batch_size, -1))
 
                 batch_param_losses = []
                 for k, elements in enumerate(zip(params, losses, corrects, small_food_selected, big_food_selected, neither_food_selected, pred, oracle_outputs, oracle_accuracy, oracle_losses if oracle_is_target else [0] * len(pred))):
@@ -328,7 +409,7 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
 
     # save dfs periodically to free up ram:
     df_paths = []
-    os.makedirs(model_save_path, exist_ok=True)
+    os.makedirs(model_load_path, exist_ok=True)
 
     df = pd.DataFrame(param_losses_list)
     print('converting')
@@ -352,14 +433,16 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_save_
     print(df.info(memory_usage='deep'))
 
     print('saving csv...')
-    #print('cols', df.columns)
+    # print('cols', df.columns)
     curtime = time.time()
-    df.to_csv(os.path.join(model_save_path, f'param_losses_{epoch_number}_{repetition}.csv'), index=False, compression='gzip')
-    print('compressed write time (gzip):', time.time()-curtime)
+    if use_prior:
+        epoch_number = 'prior'
+    df.to_csv(os.path.join(model_load_path, f'param_losses_{epoch_number}_{repetition}.csv'), index=False, compression='gzip')
+    print('compressed write time (gzip):', time.time() - curtime)
 
-    df_paths.append(os.path.join(model_save_path, f'param_losses_{epoch_number}_{repetition}.csv'))
+    df_paths.append(os.path.join(model_load_path, f'param_losses_{epoch_number}_{repetition}.csv'))
     print('saving activations...')
-    with open(os.path.join(model_save_path, f'activations_{epoch_number}_{repetition}.pkl'), 'wb') as f:
+    with open(os.path.join(model_load_path, f'activations_{epoch_number}_{repetition}.pkl'), 'wb') as f:
         pickle.dump(activation_data, f)
     return df_paths
 
@@ -397,18 +480,22 @@ def filter_indices(data_list, labels_list, params_list, oracles_list, is_train=T
 
     return included_indices
 
+
 def weight_distance(original_weights, new_weights):
     return sum(torch.norm(ow - nw).item() for ow, nw in zip(original_weights, new_weights))
 
 
 def train_model_retrain(model, train_loader, test_loader, save_path,
-                model_kwargs=None,
-                oracle_labels=[], repetition=0,
-                save_models=True, record_loss=True,
-                oracle_is_target=False, max_batches=10000,
-                tolerance=5e-4, max_tries=3,
-                opt='sgd'):
-
+                        model_kwargs=None,
+                        oracle_labels=[],
+                        repetition=0,
+                        save_models=True,
+                        record_loss=True,
+                        oracle_is_target=False,
+                        max_batches=10000,
+                        tolerance=5e-4,
+                        max_tries=3,
+                        opt='sgd'):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     lr = model_kwargs['lr']
     print('lr:', lr)
@@ -452,8 +539,7 @@ def train_model_retrain(model, train_loader, test_loader, save_path,
         optimizer.step()
         t.update(1)
 
-
-        if record_loss and ((batch % epoch_length == 0) or (batch == max_batches-1)):
+        if record_loss and ((batch % epoch_length == 0) or (batch == max_batches - 1)):
             total_loss += loss.item()
 
             scheduler.step()
@@ -473,7 +559,7 @@ def train_model_retrain(model, train_loader, test_loader, save_path,
 
                 if avg_loss >= start_loss - tolerance:
                     tries += 1
-                    #start_loss = avg_loss - tolerance
+                    # start_loss = avg_loss - tolerance
                     print(f"Tries incremented: {tries}, Start Loss updated: {start_loss}, avg_loss was: {avg_loss}")
                     if tries >= max_tries:
                         breaking = True
@@ -485,7 +571,7 @@ def train_model_retrain(model, train_loader, test_loader, save_path,
 
                 if save_models:
                     os.makedirs(save_path, exist_ok=True)
-                    torch.save([model.kwargs, model.state_dict()], os.path.join(save_path, f'{opt}-rt-model-{repetition}-{batch // epoch_length}.pt'))
+                    torch.save([model.kwargs, model.state_dict()], os.path.join(save_path, f'{repetition}-checkpoint-{batch // epoch_length}.pt'))
 
             model.train()
 
@@ -493,11 +579,12 @@ def train_model_retrain(model, train_loader, test_loader, save_path,
             new_weights = [param.data.clone() for param in model.parameters()]
             weight_dist = weight_distance(old_weights, new_weights)
             retrain_stats = retrain_stats.append({'Batch': (batch // epoch_length) - tries, 'Validation Loss': avg_loss, 'Weight Distance': weight_dist}, ignore_index=True)
-            retrain_stats.to_csv(os.path.join(save_path, f'{opt}-rt-stats-{repetition}.csv'), index=False)
             break
 
+    retrain_stats.to_csv(os.path.join(save_path, f'{opt}-stats-{repetition}.csv'), index=False)
     if record_loss:
-        epoch_losses_df.to_csv(os.path.join(save_path, f'{opt}-rt-losses-{repetition}.csv'), index=False)
+        epoch_losses_df.to_csv(os.path.join(save_path, f'{opt}-losses-{repetition}.csv'), index=False)
+
 
 def train_model(train_sets, target_label, load_path='supervised/', save_path='', epochs=100,
                 model_kwargs=None, model_type=None,
@@ -519,19 +606,19 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
         if target_label == 'shouldGetBig':
             # it's 5 bools, so we take the last and turn it into 1-hot
             if last_timestep:
-                x = np.eye(2)[labels_raw[:, -1].astype(int)] # single timestep
+                x = np.eye(2)[labels_raw[:, -1].astype(int)]  # single timestep
             else:
                 x = np.eye(2)[labels_raw.astype(int)].reshape(-1, 10)  # 5 timesteps
             labels.append(x)
         elif len(labels_raw.shape) > 2:
             if last_timestep:
-                labels.append(labels_raw[..., -1]) # use only the last timestep
+                labels.append(labels_raw[..., -1, :])  # use only the last timestep
             else:
                 labels.append(labels_raw.reshape(-1, 25))
         else:
             print(labels_raw.shape, labels_raw[0])
             labels.append(labels_raw.reshape(-1, 25))
-            #labels.append(labels_raw)
+            # labels.append(labels_raw)
         params.append(np.load(os.path.join(dir, 'params.npz'), mmap_mode='r')['arr_0'])
         if oracle_labels:
             oracle_data = []
@@ -567,10 +654,10 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
     criterion = nn.CrossEntropyLoss()
     oracle_criterion = nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
-    #optimizer = torch.optim.SGD(model.parameters(), lr=lr, momentum=0.99)
-    scheduler = ExponentialLR(optimizer, gamma=0.90)
+    # optimizer = torch.optim.SGD(model.parameters(), lr=lr, momentum=0.99)
+    scheduler = ExponentialLR(optimizer, gamma=0.95)
 
-    if False: # if loading previous model, only for progressions
+    if False:  # if loading previous model, only for progressions
         last_digit = int(save_path[-1])
         print(last_digit)
         if last_digit > 0:
@@ -585,6 +672,11 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
     t = tqdm.trange(batches)
     iter_loader = iter(train_loader)
     epoch_losses_df = pd.DataFrame(columns=['Batch', 'Loss'])
+
+    if save_models:
+        os.makedirs(save_path, exist_ok=True)
+        torch.save([model.kwargs, model.state_dict()], os.path.join(save_path, f'{repetition}-checkpoint-prior.pt'))
+
     for batch in range(batches):
         total_loss = 0.0
         try:
@@ -597,7 +689,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
             drop_mask = torch.bernoulli(0.5 * torch.ones_like(oracles)).to(device)
             oracles = oracles * drop_mask
             outputs = model(inputs, oracles)
-            #print(outputs.shape, target_labels.shape, torch.argmax(target_labels, dim=1))
+            # print(outputs.shape, target_labels.shape, torch.argmax(target_labels, dim=1))
             loss = criterion(outputs, torch.argmax(target_labels, dim=1))
         else:
             outputs = model(inputs, None)
@@ -614,7 +706,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
         if batch % epoch_length == 0:
             scheduler.step()
 
-        if record_loss and ((batch % epoch_length == 0) or (batch == batches-1)):
+        if record_loss and ((batch % epoch_length == 0) or (batch == batches - 1)):
             total_loss += loss.item()
             with torch.no_grad():
                 test_loss = 0.0
@@ -629,9 +721,6 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
                 os.makedirs(save_path, exist_ok=True)
                 torch.save([model.kwargs, model.state_dict()], os.path.join(save_path, f'{repetition}-checkpoint-{batch // epoch_length}.pt'))
 
-        if save_models and (batch % (len(train_loader)) == len(train_loader) - 1):
-            os.makedirs(save_path, exist_ok=True)
-            torch.save([model.kwargs, model.state_dict()], os.path.join(save_path, f'{repetition}-model_epoch{epochs-1}.pt'))
 
     if record_loss:
         epoch_losses_df.to_csv(os.path.join(save_path, f'losses-{repetition}.csv'), index=False)
@@ -652,7 +741,10 @@ def calculate_ci(group):
     # return {'lower': m - h, 'upper': m + h, 'mean': m}
     return pd.DataFrame({'lower': [m - h], 'upper': [m + h], 'mean': [m]}, columns=['lower', 'upper', 'mean'])
 
+
 lenny = len("tensor(")
+
+
 def convert_to_numeric(x):
     if isinstance(x, str):
         return int(x[lenny:-1])
@@ -690,28 +782,39 @@ def get_descendants(category, op, categories):
     descendants = []
     # below technique gets all categories with the change, not just one otherwise identical (usually 6)
 
-    #for potential_descendant in categories:
+    # for potential_descendant in categories:
     #    if tgt in potential_descendant and src not in potential_descendant:
     #        descendants.append(potential_descendant)
     direct_descendant = category.replace(src, tgt)
     return [direct_descendant]
-    #return descendants
-
-def extract_last_value_from_list_str(val):
-    if not isinstance(val, str):
-        return val
-
-    pattern = r'\[(.*)\]'
-    match = re.match(pattern, val)
-    if match:
-        values = match.group(1).split()
-        if True: # len(values) == 4:
-            return values[-1]
-    return val
+    # return descendants
 
 
+def extract_last_value_from_list_str(value):
+    if not isinstance(value, str):
+        return value
 
-def calculate_statistics(df, last_epoch_df, params, skip_3x=True, skip_2x1=False, key_param=None, skip_1x=True, record_delta_pi=False, used_regimes=None, savepath=None):
+    if isinstance(value, str):
+        last_row = value.split('\n')[-1].strip()
+
+        numbers = re.findall(r'\d+\.\s*', last_row)
+
+        if numbers:
+            return [float(num.strip()) for num in numbers]
+    return value
+
+def get_last_timestep(value):
+    if isinstance(value, str):
+        try:
+            parsed = ast.literal_eval(value)
+            if isinstance(parsed, list):
+                return parsed[-1]
+        except (ValueError, SyntaxError):
+            return value
+    return value
+
+
+def calculate_statistics(df, last_epoch_df, params, skip_3x=True, skip_2x1=False, key_param=None, skip_1x=True, record_delta_pi=False, used_regimes=None, savepath=None, last_timestep=True):
     '''
     Calculates various statistics from datasets of model outputs detailing model performance.
     '''
@@ -732,12 +835,11 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=True, skip_2x1=False
     print('making categorical')
     for param in params:
         if last_epoch_df[param].dtype == 'object':
-            #df[param] = df[param].astype('category')
+            # df[param] = df[param].astype('category')
             last_epoch_df[param] = last_epoch_df[param].astype('category')
     params = [param for param in params if param not in ['delay', 'perm']]
 
-    #print('params:', params)
-
+    # print('params:', params)
 
     param_pairs = itertools.combinations(params, 2)
     param_triples = itertools.combinations(params, 3)
@@ -768,9 +870,18 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=True, skip_2x1=False
         if False:
             plot_regime_lengths(regime_lengths, grouped, savepath + 'scatter.png')
 
-
     unique_vals = {param: last_epoch_df[param].unique() for param in params}
-    #print('found unique vals', unique_vals)
+    print('found unique vals', unique_vals)
+    for par, val in unique_vals.items():
+        print(par, type(val[0]))
+    if last_timestep:
+        print('reducing timesteps')
+        for param in unique_vals:
+
+            last_epoch_df[param] = last_epoch_df[param].apply(get_last_timestep)
+            #This is redundant with above extract part and also doesn't work properly.
+    unique_vals = {param: last_epoch_df[param].unique() for param in params}
+    print('new unique vals', unique_vals)
 
     if not skip_1x:
         print('calculating single params')
@@ -810,26 +921,30 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=True, skip_2x1=False
     df_summary = {}
     delta_operator_summary = {}
     print('key param stats')
+
     key_param_stats = {}
     oracle_key_param_stats = {}
     if key_param is not None:
         for param in params:
+            print(param)
             if param != key_param:
                 # Initializing a nested dictionary for each unique key_param value
                 for acc_type, save_dict in zip(['accuracy', 'o_acc'], [key_param_stats, oracle_key_param_stats]):
-                    #print(unique_vals)
+                    #print('SSSSSSSSSS', unique_vals) #unique vals of regime has only 6 of them
                     for key_val in unique_vals[key_param]:
                         subset = last_epoch_df[last_epoch_df[key_param] == key_val]
                         grouped = subset.groupby(['repetition', param])[acc_type]
                         repetition_means = grouped.mean()
                         overall_means = repetition_means.groupby(level=param).mean()
                         means_std = repetition_means.groupby(level=param).std()
+
                         Q1 = grouped.quantile(0.25).groupby(level=param).mean()
                         Q3 = grouped.quantile(0.75).groupby(level=param).mean()
                         counts = grouped.size()
 
                         z_value = 1.96  # For a 95% CI
-                        standard_errors = (z_value * np.sqrt(repetition_means  * (1 - repetition_means ) / counts)).groupby(level=param).mean()
+                        standard_errors = (z_value * np.sqrt(repetition_means * (1 - repetition_means) / counts)).groupby(level=param).mean()
+
 
                         if key_val not in save_dict:
                             save_dict[key_val] = {}
@@ -845,8 +960,8 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=True, skip_2x1=False
         if record_delta_pi:
             delta_pi_stats(unique_vals, key_param, last_epoch_df, delta_operator_summary, df_summary)
 
-
     return avg_loss, variances, ranges_1, ranges_2, range_dict, range_dict3, stats, key_param_stats, oracle_key_param_stats, df_summary, delta_operator_summary
+
 
 def delta_pi_stats(unique_vals, key_param, last_epoch_df, delta_operator_summary, df_summary):
     # todo: if delay_2nd_bait or first_swap are na, just make them 0? shouldn't affect anything
@@ -981,7 +1096,7 @@ def delta_pi_stats(unique_vals, key_param, last_epoch_df, delta_operator_summary
                     )
 
                     merged_df['changed_target'] = (
-                                merged_df['correct-loc_m'] != merged_df['correct-loc']).astype(int)
+                            merged_df['correct-loc_m'] != merged_df['correct-loc']).astype(int)
 
                     for i in range(5):
                         merged_df[f'pred_diff_{i}'] = abs(merged_df[f'pred_{i}_m'] - merged_df[f'pred_{i}'])
@@ -1002,22 +1117,22 @@ def delta_pi_stats(unique_vals, key_param, last_epoch_df, delta_operator_summary
                     merged_df['dpred_m_f'] = (merged_df['changed_target'] == 0) * (1 - merged_df['total_pred_diff'])
 
                     merged_df['total_pred_diff_p_T_T'] = (merged_df['changed_target']) * (merged_df['accuracy_m']) * (
-                    merged_df['accuracy'])
+                        merged_df['accuracy'])
                     merged_df['total_pred_diff_p_T_F'] = (merged_df['changed_target']) * (merged_df['accuracy_m']) * (
-                                1 - merged_df['accuracy'])
+                            1 - merged_df['accuracy'])
                     merged_df['total_pred_diff_p_F_T'] = (merged_df['changed_target']) * (
-                                1 - merged_df['accuracy_m']) * (merged_df['accuracy'])
+                            1 - merged_df['accuracy_m']) * (merged_df['accuracy'])
                     merged_df['total_pred_diff_p_F_F'] = (merged_df['changed_target']) * (
-                                1 - merged_df['accuracy_m']) * (1 - merged_df['accuracy'])
+                            1 - merged_df['accuracy_m']) * (1 - merged_df['accuracy'])
 
                     merged_df['total_pred_diff_m_T_T'] = (1 - merged_df['changed_target']) * (
-                    merged_df['accuracy_m']) * (merged_df['accuracy'])
+                        merged_df['accuracy_m']) * (merged_df['accuracy'])
                     merged_df['total_pred_diff_m_T_F'] = (1 - merged_df['changed_target']) * (
-                    merged_df['accuracy_m']) * (1 - merged_df['accuracy'])
+                        merged_df['accuracy_m']) * (1 - merged_df['accuracy'])
                     merged_df['total_pred_diff_m_F_T'] = (1 - merged_df['changed_target']) * (
-                                1 - merged_df['accuracy_m']) * (merged_df['accuracy'])
+                            1 - merged_df['accuracy_m']) * (merged_df['accuracy'])
                     merged_df['total_pred_diff_m_F_F'] = (1 - merged_df['changed_target']) * (
-                                1 - merged_df['accuracy_m']) * (1 - merged_df['accuracy'])
+                            1 - merged_df['accuracy_m']) * (1 - merged_df['accuracy'])
 
                     # print(op, key, descendants, np.mean(merged_df['changed_target']))
                     dpred_p_t.extend(merged_df['dpred_p_t'].tolist())
@@ -1121,7 +1236,7 @@ def delta_pi_stats(unique_vals, key_param, last_epoch_df, delta_operator_summary
             'mf': [delta_mean_m_f_rep[key] for key in delta_mean_m_f_rep.keys()],
         })
 
-        #print('do', key_val, delta_operator_summary[key_val])
+        # print('do', key_val, delta_operator_summary[key_val])
 
         # CATEGORY ONE
 
@@ -1129,9 +1244,9 @@ def delta_pi_stats(unique_vals, key_param, last_epoch_df, delta_operator_summary
         #    print(f"{col} has {subset[col].nunique()} unique values:", subset[col].unique())
 
         inf = subset[subset['i-informedness'] == 'Tt'].groupby(perm_keys + ['i-informedness', 'correct-loc'],
-                                                             observed=True).mean().reset_index()
-        noinf = subset[subset['i-informedness'] != 'Tt'].groupby(perm_keys + ['i-informedness', 'correct-loc'],
                                                                observed=True).mean().reset_index()
+        noinf = subset[subset['i-informedness'] != 'Tt'].groupby(perm_keys + ['i-informedness', 'correct-loc'],
+                                                                 observed=True).mean().reset_index()
 
         merged_df = pd.merge(
             inf,
@@ -1172,10 +1287,11 @@ def delta_pi_stats(unique_vals, key_param, last_epoch_df, delta_operator_summary
                               delta_mean_correct.keys()]
         })
 
-        #print(df_summary[key_val])
+        # print(df_summary[key_val])
+
 
 def save_figures(path, df, avg_loss, ranges, range_dict, range_dict3, params, last_epoch_df, num=10,
-                 key_param_stats=None,  oracle_stats=None, key_param=None, delta_sum=None, delta_x=None,
+                 key_param_stats=None, oracle_stats=None, key_param=None, delta_sum=None, delta_x=None,
                  key_param_stats_special=[]):
     top_pairs = sorted(ranges.items(), key=lambda x: x[1], reverse=True)[:num]
     top_n_ranges = heapq.nlargest(num, range_dict, key=range_dict.get)
@@ -1192,16 +1308,20 @@ def save_figures(path, df, avg_loss, ranges, range_dict, range_dict3, params, la
     save_fixed_double_param_figures(path, top_n_ranges, df, avg_loss, last_epoch_df)
     save_fixed_triple_param_figures(path, top_n_ranges3, df, avg_loss, last_epoch_df)
 
+
 def string_to_tensor(s):
     # Use regex to extract the list of integers from the string
     numbers = list(map(int, re.findall(r'(\d+)', s)))
     # Convert the list of integers to a tensor
     return torch.tensor(numbers, dtype=torch.int32)
+
+
 def decode_param(tensor):
     byte_list = tensor.tolist()
     byte_list = [b for b in byte_list if b != 0]
     char_list = [chr(c) for c in byte_list]
     return ''.join(char_list)
+
 
 def write_metrics_to_file(filepath, df, ranges, params, stats, key_param=None, d_s=None, d_x=None):
     '''
@@ -1263,8 +1383,8 @@ def write_metrics_to_file(filepath, df, ranges, params, stats, key_param=None, d
             f.write(f"Correlation between {param} and acc: {stats['accuracy_correlations'][param]}\n")
 
         f.write("\nCorrelations between parameters:\n")
-        #print(len(params), len(stats['param_correlations']))
-        #print(params, stats['param_correlations'].columns)
+        # print(len(params), len(stats['param_correlations']))
+        # print(params, stats['param_correlations'].columns)
         for i in range(len(stats['param_correlations'])):
             for j in range(i + 1, len(stats['param_correlations'])):
                 f.write(f"Correlation between {stats['param_correlations'].columns[i]} and {stats['param_correlations'].columns[j]}: {stats['param_correlations'].iloc[i, j]}\n")
@@ -1291,8 +1411,7 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
                            prior_metrics=[], key_param=None, key_param_value=None, save_every=1, skip_calc=True,
                            oracle_early=False, skip_eval=False, oracle_is_target=True, skip_figures=True,
                            act_label_names=[], skip_activations=True, batches=5000, label='correct-loc',
-                           last_timestep=True, model_type=None, retrain_model=True):
-
+                           last_timestep=True, model_type=None, do_retrain_model=True):
     '''
     Runs a session of supervised learning. Different steps, such as whether we train+save models, evaluate models, or run statistics on evaluations, are optional.
 
@@ -1315,19 +1434,37 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
             dfs_paths = []
             last_epoch_df_paths = []
             loss_paths = []
+
+            retrain_path = save_path + '-retrain'
+            os.makedirs(retrain_path, exist_ok=True)
             for repetition in range(repetitions):
                 if not skip_train:
                     train_model(train_sets, label, load_path=load_path, model_type=model_type,
                                 save_path=save_path, epochs=epochs, batches=batches, model_kwargs=model_kwargs,
                                 oracle_labels=oracle_labels, repetition=repetition, save_every=save_every,
                                 oracle_is_target=oracle_is_target, last_timestep=last_timestep)
+                if do_retrain_model:
+                    epoch = epochs - 1
+                    print('retraining', epoch)
+                    retrain_model(eval_sets, label, load_path=load_path,
+                                  model_type=model_type,
+                                  model_load_path=save_path,
+                                  retrain_path=retrain_path,
+                                  oracle_labels=oracle_labels,
+                                  repetition=repetition,
+                                  epoch_number=epoch,
+                                  prior_metrics=prior_metrics,
+                                  act_label_names=act_label_names,
+                                  last_timestep=last_timestep,
+                                  retrain_batches=batches)
                 if not skip_eval:
-                    for epoch in range(epochs):
-                        if epoch % save_every == save_every - 1 or epoch == epochs - 1:
-                            print('evaluating', epoch)
-                            df_paths = evaluate_model(eval_sets, label, load_path=load_path,
+                    for epoch in [9, epochs - 1]:
+                        print('evaluating', epoch)
+                        for this_path in [save_path, retrain_path]:
+                            for eval_prior in [False, True] if this_path == save_path else [False]:
+                                df_paths = evaluate_model(eval_sets, label, load_path=load_path,
                                                       model_type=model_type,
-                                                      model_save_path=save_path,
+                                                      model_load_path=this_path,
                                                       oracle_labels=oracle_labels,
                                                       repetition=repetition,
                                                       epoch_number=epoch,
@@ -1336,50 +1473,63 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
                                                       act_label_names=act_label_names,
                                                       oracle_early=oracle_early,
                                                       last_timestep=last_timestep,
-                                                      retrain_model=retrain_model)
-                            dfs_paths.extend(df_paths)
-                            if epoch == epochs - 1:
-                                last_epoch_df_paths.extend(df_paths)
+                                                      use_prior=eval_prior)
+                                dfs_paths.extend(df_paths)
+                                if epoch == epochs - 1 or eval_prior:
+                                    last_epoch_df_paths.extend(df_paths)
 
                 loss_paths.append(os.path.join(save_path, f'losses-{repetition}.csv'))
-                for file in glob.glob(os.path.join(save_path, '*-rt-losses.csv')):
+                loss_paths.append(os.path.join(retrain_path, f'losses-{repetition}.csv'))
+                for file in glob.glob(os.path.join(retrain_path, '*-rt-losses.csv')):
                     loss_paths.append(file)
 
-            if skip_train:
-                dfs_paths = find_df_paths(save_path, 'param_losses_*_*.csv') #use  .csv.gz? I'm not sure why it sometimes wants this but sometimes not.
-                print('sup sess dfs paths', dfs_paths, save_path)
+            dfs_paths = []
+            for this_path in [save_path, retrain_path]:
+                if skip_train:
+                    dfs_paths.extend(find_df_paths(this_path, 'param_losses_*_*.csv'))
+                    print('sup sess dfs paths', dfs_paths, save_path)
                 if len(dfs_paths):
-                    max_epoch = max(int(path.split('_')[-2]) for path in dfs_paths)
-                    last_epoch_df_paths = [path for path in dfs_paths if int(path.split('_')[-2]) == max_epoch]
+                    matches = []
+                    prior_matches = []
+                    for path in dfs_paths:
+                        match = re.search(r'(\d+)', path.split('_')[-2])
+                        if 'prior' in path.split('_')[-2]:
+                            prior_matches.append(path)
+                        if match:
+                            matches.append((path, int(match.group())))
+                    max_epoch = max(epoch for path, epoch in matches)
+                    last_epoch_df_paths = [path for path, epoch in matches if epoch == max_epoch]
+                    if prior_matches:
+                        last_epoch_df_paths.extend(prior_matches)
 
-            if not skip_calc and len(last_epoch_df_paths):
-                print('loading dfs (with gzip)...', dfs_paths)
+                if not skip_calc and len(last_epoch_df_paths):
+                    print('loading dfs (with gzip)...', dfs_paths)
 
-                df_list = [pd.read_csv(df_path, compression='gzip') for df_path in dfs_paths]
-                combined_df = pd.concat(df_list, ignore_index=True)
+                    df_list = [pd.read_csv(df_path, compression='gzip') for df_path in dfs_paths]
+                    combined_df = pd.concat(df_list, ignore_index=True)
 
-                last_df_list = [pd.read_csv(df_path, compression='gzip') for df_path in last_epoch_df_paths]
-                last_epoch_df = pd.concat(last_df_list, ignore_index=True)
-                replace_dict = {'1': 1, '0': 0}
-                combined_df.replace(replace_dict, inplace=True)
-                last_epoch_df.replace(replace_dict, inplace=True)
-                combined_df[key_param] = key_param_value
-                last_epoch_df[key_param] = key_param_value
-                # print('join replace took', time.time()-cur_time)
-                # print('last_df cols', last_epoch_df.columns, last_epoch_df.t)
-                combined_df['i-informedness'] = combined_df['i-informedness'].fillna('none')
-                last_epoch_df['i-informedness'] = last_epoch_df['i-informedness'].fillna('none')
+                    last_df_list = [pd.read_csv(df_path, compression='gzip') for df_path in last_epoch_df_paths]
+                    last_epoch_df = pd.concat(last_df_list, ignore_index=True)
+                    replace_dict = {'1': 1, '0': 0}
+                    combined_df.replace(replace_dict, inplace=True)
+                    last_epoch_df.replace(replace_dict, inplace=True)
+                    combined_df[key_param] = key_param_value
+                    last_epoch_df[key_param] = key_param_value
+                    # print('join replace took', time.time()-cur_time)
+                    # print('last_df cols', last_epoch_df.columns, last_epoch_df.t)
+                    combined_df['i-informedness'] = combined_df['i-informedness'].fillna('none')
+                    last_epoch_df['i-informedness'] = last_epoch_df['i-informedness'].fillna('none')
 
-                avg_loss, variances, ranges_1, ranges_2, range_dict, range_dict3, stats, _, _, _, _ = calculate_statistics(
-                    combined_df, last_epoch_df, params + prior_metrics, skip_3x=True)
+                    avg_loss, variances, ranges_1, ranges_2, range_dict, range_dict3, stats, _, _, _, _ = calculate_statistics(
+                        combined_df, last_epoch_df, params + prior_metrics, skip_3x=True)
 
-                write_metrics_to_file(os.path.join(save_path, 'metrics.txt'), last_epoch_df, ranges_1, params, stats, key_param=key_param)
+                    write_metrics_to_file(os.path.join(this_path, 'metrics.txt'), last_epoch_df, ranges_1, params, stats, key_param=key_param)
 
-                if not skip_figures:
-                    save_figures(os.path.join(save_path, 'figs'), combined_df, avg_loss, ranges_2, range_dict, range_dict3,
-                             params + prior_metrics, last_epoch_df, num=12)
+                    if not skip_figures:
+                        save_figures(os.path.join(this_path, 'figs'), combined_df, avg_loss, ranges_2, range_dict, range_dict3,
+                                     params + prior_metrics, last_epoch_df, num=12)
 
-                test_names.append(model_name)
+                    test_names.append(model_name)
             test += 1
         except BaseException as e:
             print(e)
@@ -1387,7 +1537,9 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
 
     if not skip_activations:
         print('corring activations...')
-        process_activations(save_path, [epochs-1], [0])
+        process_activations(save_path, [0, 9, epochs - 1], [x for x in range(repetitions)])
+        process_activations(save_path + '-retrain', [0, 9, epochs - 1], [x for x in range(repetitions)])
+
     return dfs_paths, last_epoch_df_paths, loss_paths
 
 

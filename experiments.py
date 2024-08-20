@@ -1,16 +1,18 @@
+import argparse
 import ast
-import copy
 import json
 import os
-import pickle
 import traceback
+import seaborn as sns
 
 import pandas as pd
 import tqdm
+from matplotlib import pyplot as plt
+from scipy.stats import pearsonr
 
 from src.pz_envs import ScenarioConfigs
 from src.supervised_learning import gen_data
-from src.utils.plotting import create_combined_histogram, plot_progression, save_key_param_figures, plot_learning_curves
+from src.utils.plotting import create_combined_histogram, plot_progression, save_key_param_figures, plot_learning_curves, make_splom, make_ifrscores, make_scatter
 from supervised_learning_main import run_supervised_session, calculate_statistics, write_metrics_to_file, save_figures, \
     train_model
 import numpy as np
@@ -105,10 +107,12 @@ def load_dataframes(combined_path_list, value_names, key_param):
     print(combined_path_list)
     for df_paths, value_name in zip(combined_path_list, value_names):
         print('value name', value_name)
+
         for df_path in df_paths:
+            #print(df_path, ('prior' in df_path) )
             repetition = int(df_path.split('_')[-1][:1])
-            if repetition > 0:
-                continue
+            retrain = ('retrain' in df_path)
+            prior = ('prior' in df_path)
             #note that this only supports single digits
             try:
                 chunks = pd.read_csv(df_path, chunksize=10000, compression='gzip')
@@ -121,7 +125,7 @@ def load_dataframes(combined_path_list, value_names, key_param):
                     lambda row: informedness_to_str(string_to_list(row['i-informedness'])) + str(row['opponents']),
                     axis=1
                 )
-                chunk = chunk.assign(**{key_param: value_name, 'repetition': repetition})
+                chunk = chunk.assign(**{key_param: value_name, 'repetition': repetition, 'retrain': retrain, 'prior': prior})
                 df_list.append(chunk)
         tq.update(1)
     if len(df_list):
@@ -144,24 +148,172 @@ def special_heatmap(df_path_list2, df_path_list, key_param='regime', key_param_l
     save_key_param_figures(save_dir, key_param_stats, None, key_param)
     print('done special')
 
-
-
 def do_comparison(combined_path_list, last_path_list, key_param_list, key_param, exp_name, params, prior_metrics, lp_list, used_regimes=None):
-    print('loading dataframes for final comparison')
+    #print('loading dataframes for final comparison')
+
+    #print('kp list', key_param_list) # has all 9 values
 
     combined_path = os.path.join('supervised', exp_name, 'c')
     os.makedirs(combined_path, exist_ok=True)
-    plot_learning_curves(combined_path, lp_list)
 
-    combined_df = load_dataframes(combined_path_list, key_param_list, key_param)
+    print('loading IFRs')
+    folder_paths = set()
+    for sublist in lp_list:
+        for file_path in sublist:
+            folder_path = os.path.dirname(file_path)
+            folder_paths.add(folder_path)
+
+    dataframes = []
+    for folder in folder_paths:
+        csv_path = os.path.join(folder, 'ifr_df.csv')
+        if os.path.exists(csv_path):
+            try:
+                df = pd.read_csv(csv_path)
+                base_name = os.path.basename(folder)
+                base_name = base_name.replace('-retrain', '')
+                df = df.dropna(subset=['epoch'])
+                print('uniques', df['epoch'].unique())
+                df['prior'] = df['epoch'] == 0
+                df['model'] = base_name
+                df['retrain'] = 'retrain' in folder
+                dataframes.append(df)
+            except Exception as e:
+                print(f"Error reading {csv_path}: {e}")
+
+    if len(dataframes) > 0:
+        combined_df = pd.concat(dataframes, ignore_index=True)
+        combined_df.to_csv(os.path.join(combined_path, 'combined_ifr_df.csv'), index=False)
+    #combined_df = combined_df.dropna(subset=['epoch'])
+    combined_df['label'] = np.where(combined_df['retrain'], combined_df['epoch'] + 20, 0)
+    columns_to_ignore = ['loss']
+    columns_to_consider = [col for col in combined_df.columns if col not in columns_to_ignore]
+    current_length = len(combined_df)
+    combined_df = combined_df.drop_duplicates(subset=columns_to_consider)
+    print('duplicates removed', current_length, len(combined_df))
+
+    #plot_learning_curves(combined_path, lp_list)
+
+    print('getting accuracy results')
+
+    all_epochs_df = load_dataframes(combined_path_list, key_param_list, key_param)
+    print(all_epochs_df.columns, all_epochs_df['epoch'].unique())
+
+    ## This is sus.
+    all_epochs_df['epoch'] = all_epochs_df['epoch'].replace(24, 0)
+
+    all_epochs_df['epoch'] = all_epochs_df['epoch'].fillna(0)
+    print('unique epochs in all', all_epochs_df['epoch'].unique())
+    grouped_df = all_epochs_df.groupby(['repetition', 'regime', 'epoch', 'retrain', 'prior'])['accuracy'].agg(['mean', 'std']).reset_index()
+    print('unique epochs after group', grouped_df['epoch'].unique())
+    grouped_df = grouped_df.dropna(subset=['mean'])
+    grouped_df = grouped_df.rename(columns={'regime': 'model', 'repetition': 'rep'})
+    print('unique epochs in grouped_df', grouped_df['epoch'].unique(), grouped_df.columns, len(grouped_df))
+
+
+    # filter out priors
+    grouped_df = grouped_df[~grouped_df['model'].str.contains('prior', na=False)]
+
+    # add "retrain" to model field of combined_df
+    # instead we will keep retrain for our splom
+    '''
+    combined_df['model'] = combined_df.apply(
+        lambda row: f"{row['model']}-retrain" if row['retrain'] else row['model'],
+        axis=1
+    )
+    combined_df = combined_df.drop(columns=['retrain'])
+    '''
+
+
+
+    for retrain in [True, False]:
+        for prior in [True, False]:
+            for act in ['all_activations', 'last_timestep_activations', 'final_layer_activations', 'scalar']:
+                make_ifrscores(combined_df[(combined_df['act'] == act) & (combined_df['retrain'] == retrain) & (combined_df['prior'] == prior)], combined_path, act, retrain, prior)
+
+    print('length', len(grouped_df))
+
+    print('merging dfs')
+    merged_df = pd.merge(combined_df, grouped_df, on=['rep', 'model', 'epoch', 'retrain', 'prior'])
+    #duplicates = merged_df[merged_df.duplicated(['feature', 'rep', 'model', 'epoch'], keep=False)]
+    #print(duplicates.sort_values(['feature', 'rep', 'model', 'epoch']))
+    print(merged_df.head())
+
+
+    # SPLOM
+    for retrain in [True, False]:
+        for act in ['all_activations', 'last_timestep_activations', 'final_layer_activations', 'scalar']:
+            try:
+                make_splom(merged_df[(merged_df['act'] == act) & (merged_df['retrain'] == retrain)], combined_path, act, retrain, True)
+                make_scatter(merged_df[merged_df['act'] == act], combined_path, act)
+            except BaseException as e:
+                print('failed a splom', e)
+
+
+    correlations = []
+
+    # no epoch, because this currently aggs over epochs!
+    for (model, feature, act, retrain, prior), group in merged_df.groupby(['model', 'feature', 'act', 'retrain', 'prior']):
+        print(model, feature, len(group), group.columns)
+        #correlation = group[['mean', 'loss']].corr().iloc[0, 1]
+        if len(group) > 1:
+            corr, p_value = pearsonr(group['mean'], group['loss'])
+            correlations.append({
+                'train_set': model,
+                'feature': feature,
+                'act': act,
+                'prior': prior,
+                'retrain': retrain,
+                'correlation': corr,
+                'p_value': p_value
+            })
+
+    correlation_df = pd.DataFrame(correlations)
+    #print(correlation_df)
+
+    for retrain in [True, False]:
+        for prior in [True, False]:
+            for act in ['all_activations', 'last_timestep_activations', 'final_layer_activations', 'scalar']:
+                try:
+                    cdf = correlation_df[(correlation_df['act'] == act) & (correlation_df['retrain'] == retrain) & (correlation_df['prior'] == prior)]
+
+                    cdf['correlation'] = pd.to_numeric(cdf['correlation'], errors='coerce')
+                    cdf['p_value'] = pd.to_numeric(cdf['p_value'], errors='coerce')
+                    print(cdf)
+                    pivot_corr = cdf.pivot(index='feature', columns='train_set', values='correlation')
+                    pivot_pval = cdf.pivot(index='feature', columns='train_set', values='p_value')
+
+                    #combined = pivot_corr.applymap('{:.2f}'.format) + '\n(' + pivot_pval.applymap('{:.3f}'.format) + ')'
+
+                    combined = pivot_corr.applymap(lambda x: f'{x:.2f}' if pd.notnull(x) else 'NaN') + '\n(' + \
+                               pivot_pval.applymap(lambda x: f'{x:.3f}' if pd.notnull(x) else 'NaN') + ')'
+
+                    plt.figure(figsize=(12, 8))
+                    sns.heatmap(pivot_corr, annot=combined, cmap='coolwarm', vmin=-1, vmax=1, center=0, fmt="")
+                    plt.xlabel('Train Set')
+                    plt.ylabel('Feature')
+                    plt.title(f'IFR-Accuracy Correlations (p-values) over Retrain {retrain} Prior{prior} models using {act}')
+                    plt.tight_layout()
+                    plt.savefig(os.path.join(combined_path, f'{act}-{retrain}-{prior}-ifr_acc.png'))
+                    plt.close()
+                except BaseException as e:
+                    print('failed', e)
+
+    mean_correlation_df = correlation_df.groupby('feature')['correlation'].mean().reset_index()
+    print(mean_correlation_df)
+    exit()
+
+
     last_epoch_df = load_dataframes(last_path_list, key_param_list, key_param)
 
-    if combined_df is not None and last_epoch_df is not None:
-        create_combined_histogram(last_epoch_df, combined_df, key_param, os.path.join('supervised', exp_name))
+    print('last epoch df columns', last_epoch_df.columns)
+
+    if all_epochs_df is not None and last_epoch_df is not None:
+        create_combined_histogram(last_epoch_df, all_epochs_df, key_param, os.path.join('supervised', exp_name))
 
         avg_loss, variances, ranges_1, ranges_2, range_dict, range_dict3, stats, key_param_stats, oracle_stats, delta_sum, delta_x = calculate_statistics(
-            combined_df, last_epoch_df, list(set(params + prior_metrics + [key_param])),
-            skip_3x=True, skip_1x=True, key_param=key_param, used_regimes=used_regimes, savepath=os.path.join('supervised', exp_name))
+            all_epochs_df, last_epoch_df, list(set(params + prior_metrics + [key_param])),
+            skip_3x=True, skip_1x=True, key_param=key_param, used_regimes=used_regimes, savepath=os.path.join('supervised', exp_name), last_timestep=True)
+
 
 
     write_metrics_to_file(os.path.join(combined_path, 'metrics.txt'), last_epoch_df, ranges_1, params, stats,
@@ -172,7 +324,7 @@ def do_comparison(combined_path_list, last_path_list, key_param_list, key_param,
 
 
 def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, skip_calc=False, batch_size=64, desired_evals=5,
-                skip_eval=False, skip_activations=False, last_timestep=True):
+                skip_eval=False, skip_activations=False, last_timestep=True, retrain=False):
     """What is the overall performance of naive, off-the-shelf models on this task? Which parameters of competitive
     feeding settings are the most sensitive to overall model performance? To what extent are different models
     sensitive to different parameters? """
@@ -206,6 +358,7 @@ def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, sk
     sregime['special'] = ['sl-Tt0', 'sl-Tt1', 'sl-Nt0', 'sl-Nt1', 'sl-Nf0', 'sl-Nf1', 'sl-Nn0', 'sl-Nn1']
 
     fregimes = {}
+    fregimes['s1'] = regimes['noOpponent']
     fregimes['everything'] = regimes['everything']
     fregimes['Tt'] = mixed_regimes['Tt']
     fregimes['homogeneous'] = hregime['homogeneous']
@@ -236,8 +389,10 @@ def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, sk
               "correct-box", 'b-correct-box', 'i-b-correct-box',
               "b-correct-loc", "i-b-correct-loc", 'shouldGetBig'
               ] #'last-vision-span',
+
+    ### Removed these to speed it up
     for name in ["loc", "b-loc", "i-b-loc"]:
-        labels += ["scalar-" + name, "big-" + name]#, "small-" + name, "any-" + name,]
+        labels += ["big-" + name, "small-" + name]#, , "any-" + name,] "scalar-" + name,
 
     oracles = labels + [None]
     conf = ScenarioConfigs()
@@ -282,9 +437,9 @@ def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, sk
         key_param_list = []
         session_params['oracle_is_target'] = False
 
-        for label, label_name in [('correct-loc', 'loc')]:#[('correct-loc', 'loc'), ('correct-box', 'box'), ('shouldGetBig', 'size')]:
-            for model_type in ['clstm', ]:#['smlp', 'cnn', 'clstm', ]
-                for regime in fregimes.keys():
+        for label, label_name in [('correct-loc', 'loc')]: #[('correct-loc', 'loc'), ('correct-box', 'box'), ('shouldGetBig', 'size')]:
+            for model_type in ['clstm', ]: #['smlp', 'cnn', 'clstm', ]
+                for regime in list(fregimes.keys()):
                     kpname = f'{model_type}-{label_name}-{regime}'
                     print(model_type + '-' + label_name, 'regime:', regime, 'train_sets:', fregimes[regime])
                     combined_paths, last_epoch_paths, lp = run_supervised_session(
@@ -296,49 +451,44 @@ def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, sk
                         key_param_value=kpname,
                         label=label,
                         model_type=model_type,
+                        do_retrain_model=retrain,
                         **session_params
                     )
-                    last_path_list.append(last_epoch_paths)
-                    combined_path_list.append(combined_paths)
-                    key_param_list.append(kpname)
-                    lp_list.append(lp)
+                    conditions = [
+                        (lambda x: 'prior' not in x and 'retrain' not in x, ''),
+                        (lambda x: 'prior' in x and 'retrain' not in x, '-prior'),
+                        (lambda x: 'prior' not in x and 'retrain' in x, '-retrain')
+                    ]
 
-        do_comparison(combined_path_list, last_path_list, key_param_list, key_param, exp_name, params, prior_metrics, lp_list)
+                    print('paths found', combined_paths, last_epoch_paths)
 
-    if 101 in todo:
-        print('Running experiment 101: base, different models and answers')
-
-        combined_path_list = []
-        last_path_list = []
-        lp_list = []
-        key_param = 'regime'
-        key_param_list = []
-        session_params['oracle_is_target'] = False
-
-        for label, label_name in [('correct-loc', 'loc')]:
-            for model_type in ['smlp', 'cnn', 'clstm', ]:
-                for regime in ['everything']:
-                    kpname = model_type + '-' + label_name
-                    print(model_type + '-' + label_name, 'regime:', regime, 'train_sets:', regimes['everything'])
-                    combined_paths, last_epoch_paths, lp = run_supervised_session(
-                        save_path=os.path.join('supervised', exp_name, kpname),
-                        train_sets=regimes['everything'],
-                        eval_sets=regimes['everything'],
-                        oracle_labels=[None],
-                        key_param=key_param,
-                        key_param_value=kpname,
-                        label=label,
-                        model_type=model_type,
-                        **session_params
-                    )
-                    last_path_list.append(last_epoch_paths)
-                    combined_path_list.append(combined_paths)
-                    key_param_list.append(kpname)
-                    lp_list.append(lp)
+                    for condition, suffix in conditions:
+                        last_path_list.append([x for x in last_epoch_paths if condition(x)])
+                        combined_path_list.append([x for x in combined_paths if condition(x)])
+                        key_param_list.append(kpname + suffix)
+                    lp_list.append(lp) # has x, x-retrain currently
 
         do_comparison(combined_path_list, last_path_list, key_param_list, key_param, exp_name, params, prior_metrics, lp_list)
 
 
 if __name__ == '__main__':
-    experiments([999], repetitions=3, batches=10000, skip_train=True, skip_eval=False, skip_calc=True, skip_activations=True,
-                batch_size=256, desired_evals=1, last_timestep=True)
+    parser = argparse.ArgumentParser(description="Run experiments with various options.")
+
+    parser.add_argument('-t', action='store_true', help='training')
+    parser.add_argument('-e', action='store_true', help='evaluation')
+    parser.add_argument('-c', action='store_true', help='calculation')
+    parser.add_argument('-a', action='store_true', help='activations')
+    parser.add_argument('-r', action='store_true', help='Retrain the model')
+
+    args = parser.parse_args()
+    experiments([999],
+                repetitions=3,
+                batches=10000,
+                skip_train=not args.t,
+                skip_eval=not args.e,
+                skip_calc=not args.c,
+                skip_activations=not args.a,
+                retrain=args.r,
+                batch_size=256,
+                desired_evals=1,
+                last_timestep=True)

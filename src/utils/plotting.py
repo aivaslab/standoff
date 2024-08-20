@@ -1,5 +1,6 @@
 import math
 import pickle
+import re
 
 import numpy as np
 import torch
@@ -693,9 +694,65 @@ def df_list_from_stat_dict(stat_dict, param):
     for key_val in stat_dict.keys():
         for param_val in stat_dict[key_val][param]['mean'].keys():
             mean = stat_dict[key_val][param]['mean'][param_val]
-            ci = stat_dict[key_val][param]['std'][param_val]
+            ci = stat_dict[key_val][param]['ci'][param_val]
             df_list.append([key_val, param_val, f"{mean}", f"{ci}"])
     return df_list
+
+def make_ifrscores(combined_df, combined_path, act, retrain, prior):
+    print('prior thing', prior, combined_df['epoch'].unique())
+    mean_df = combined_df.groupby(['feature', 'model'])['loss'].mean().reset_index()
+    std_df = combined_df.groupby(['feature', 'model'])['loss'].std().reset_index()
+
+    merged_df = mean_df.merge(std_df, on=['feature', 'model'], suffixes=('_mean', '_std'))
+
+    formatted_values = {
+        (row['feature'], row['model']): f"{row['loss_mean']:.2f} ({row['loss_std']:.2f})"
+        for _, row in merged_df.iterrows()
+    }
+
+    heatmap_colors = mean_df.pivot_table(index='feature', columns='model', values='loss', fill_value=0)
+
+    heatmap_data = pd.DataFrame(
+        {model: [formatted_values.get((feature, model), '0.00 (0.00)') for feature in heatmap_colors.index]
+         for model in heatmap_colors.columns},
+        index=heatmap_colors.index
+    )
+
+    plt.figure(figsize=(12, 8))
+    sns.heatmap(heatmap_colors, annot=heatmap_data, cmap='coolwarm', vmin=0, vmax=0.25, center=0.1, fmt="")
+    plt.xlabel('Model')
+    plt.ylabel('Feature')
+    plt.title(f'IFR Scores for {act}, retrain:{retrain}, prior:{prior}')
+    plt.tight_layout()
+    plt.savefig(os.path.join(combined_path, f'{act}-{retrain}-{prior}-ifr_scores.png'))
+    plt.close()
+
+def make_splom(merged_df, combined_path, act, retrain, prior):
+    print('splom thing', prior, merged_df['epoch'].unique())
+    g = sns.FacetGrid(merged_df, col='feature', row='model', margin_titles=True, sharex=True, sharey=True, )
+    g.map_dataframe(sns.scatterplot, x='loss', y='mean', hue='epoch', palette='viridis')
+
+    g.set_axis_labels('IFR Loss', 'Accuracy')
+    g.set_titles(col_template="{col_name}", row_template="{row_name}")
+    g.fig.suptitle(f'IFR vs Acc, {act}, retrain:{retrain}, prior:{prior}, Models and Features', y=1.02)
+
+    plt.tight_layout()
+    plt.savefig(os.path.join(combined_path, f'{act}-{retrain}-{prior}-splom.png'))
+    plt.close()
+
+def make_scatter(merged_df, combined_path, act):
+    print('scatter thing', merged_df['epoch'].unique())
+
+    for feature in merged_df['feature'].unique():
+        plt.figure(figsize=(12, 8))
+
+        this_df = merged_df[merged_df['feature'] == feature]
+
+        plt.scatter(this_df['loss'], this_df['mean'])
+
+        plt.tight_layout()
+        plt.savefig(os.path.join(combined_path, f'{act}-{feature}-scatter.png'))
+        plt.close()
 
 
 def save_key_param_figures(save_dir, key_param_stats, oracle_stats, key_param, key_param_stats_special=[]):
@@ -708,6 +765,7 @@ def save_key_param_figures(save_dir, key_param_stats, oracle_stats, key_param, k
     print('key param keys', key_param_stats.keys())
 
     for param in list(next(iter(key_param_stats.values())).keys()):
+
 
         # print('trying param', param)
         labels = list(key_param_stats.keys())
@@ -762,13 +820,14 @@ def save_key_param_figures(save_dir, key_param_stats, oracle_stats, key_param, k
 
         all_stds = []
 
-        for stat_dict, label in zip([key_param_stats, oracle_stats], ['accuracy', 'o_acc']):
+        for stat_dict, label in zip([key_param_stats, oracle_stats], ['accuracy']):#['accuracy', 'o_acc']):
 
             if stat_dict is None:
                 continue
             df_list = df_list_from_stat_dict(stat_dict, param)
 
             df = pd.DataFrame(df_list, columns=[key_param, param, "accuracy mean", "accuracy std"])
+            # if the param shape has 2+ dimensions, use only the last timestep ones and aggregate
 
             table_save_path = os.path.join(this_save_dir, f'{param}_{label}_table.csv')
             df.to_csv(table_save_path, index=False)
@@ -788,19 +847,22 @@ def save_key_param_figures(save_dir, key_param_stats, oracle_stats, key_param, k
                         # todo: don't even make these if there's only 1 repetition
                         for use_std in [True, False]:
                             df["accuracy mean"] = pd.to_numeric(df["accuracy mean"], errors='coerce')
-                            df["accuracy std"] = pd.to_numeric(df["accuracy std"], errors='coerce')
-                            df["Accuracy mean (Accuracy std)"] = df["accuracy mean"].map("{:.2f}".format) + " (" + df["accuracy std"].map("{:.2f}".format) + ")"
+                            if use_std:
+                                df["accuracy std"] = pd.to_numeric(df["accuracy std"], errors='coerce')
+                                print('df!', df['accuracy std'], df['accuracy mean'])
+                                df["Accuracy mean (Accuracy std)"] = df["accuracy mean"].map("{:.2f}".format) + " (" + df["accuracy std"].map("{:.2f}".format) + ")"
                             df_filtered = df[df[param].astype(str).str.endswith('1')] if not use_zero_op else df
                             if use_std:
                                 all_stds.extend(df["accuracy std"].values.tolist())
                                 pivot_df = df_filtered.pivot(index=key_param, columns=param, values="Accuracy mean (Accuracy std)")
                                 mean_values_df = pivot_df.applymap(lambda x: float(x.split(' ')[0]))
+
                             else:
                                 pivot_df = df_filtered.pivot(index=key_param, columns=param, values="accuracy mean")
                                 mean_values_df = pivot_df
                                 pivot_df = pivot_df.applymap(lambda x: f"{x:.2f}")
 
-                            fig = plt.figure(figsize=(6, 12 - 6 * split_by_type))
+                            fig = plt.figure(figsize=(8, 13 - 6 * split_by_type))
                             heatmap_ax = fig.add_axes([0.0, 0.11, 1.0, 0.9])
                             cbar_ax = fig.add_axes([0.0, 0.03, 1.0, 0.02])
 
@@ -851,7 +913,7 @@ def save_key_param_figures(save_dir, key_param_stats, oracle_stats, key_param, k
                             # row_minima = mean_values_df.min(axis=1)
                             # mean_values_df['min'] = row_minima
                             # pivot_df['min'] = row_minima.map("{:.2f}".format)
-                            print(mean_values_df)
+                            print('mean values df', mean_values_df)
 
                             quadmesh = sns.heatmap(mean_values_df, annot=pivot_df, fmt='', cmap='RdBu', linewidths=0.5, linecolor='white', vmin=0, vmax=1, cbar=False, ax=heatmap_ax)
                             quadmesh.set_yticklabels(quadmesh.get_yticklabels(), rotation=0)
@@ -933,7 +995,7 @@ def save_key_param_figures(save_dir, key_param_stats, oracle_stats, key_param, k
                             subset_df['param_char2'] = subset_df[param].str[1]
                             subset_pivot = subset_df.pivot(index='param_char1', columns='param_char2', values='accuracy mean')
 
-                            subset_pivot = subset_pivot / 5
+                            #subset_pivot = subset_pivot / 5
                             subset_pivot = subset_pivot.reindex(custom_row_order)
                             subset_pivot = subset_pivot.reindex(columns=custom_col_order)
 
@@ -1057,39 +1119,107 @@ def extract_weights(checkpoints):
     return np.array(weights), labels, sources
 
 
+def parse_filename(filename):
+    parts = filename.split('\\')
+    experiment = parts[-2].split('-')[-1]
+    if experiment == 'retrain':
+        experiment = parts[-2].split('-')[-2]
+    repetition = int(re.search(r'losses-(\d+)', parts[-1]).group(1))
+    is_retrain = 'retrain' in filename
+    return experiment, repetition, is_retrain
+
+def read_and_combine_data(original_file, retrain_file=None):
+    df = pd.read_csv(original_file)
+    if retrain_file:
+        df_retrain = pd.read_csv(retrain_file)
+        df_retrain['Batch'] += 10000  # Adjust batch numbers for retrain data
+        df = pd.concat([df, df_retrain], ignore_index=True)
+    return df
+
 def plot_learning_curves(save_dir, lp_list):
     print('doing tsne stuff')
     print('XXXXXXXXXXXXXXX')
 
+    print(lp_list)
+
+    experiments = {}
+
+    for group in lp_list:
+        for filename in group:
+            experiment, repetition, is_retrain = parse_filename(filename)
+            if experiment not in experiments:
+                experiments[experiment] = {}
+            if repetition not in experiments[experiment]:
+                experiments[experiment][repetition] = {'original': None, 'retrain': None}
+
+            if is_retrain:
+                retrain_dir = os.path.dirname(filename)
+                retrain_file = os.path.join(retrain_dir, f'adam-losses-{repetition}.csv')
+                experiments[experiment][repetition]['retrain'] = retrain_file
+            else:
+                experiments[experiment][repetition]['original'] = filename
+
+    plt.figure(figsize=(14, 6))
+    colors = plt.cm.rainbow(np.linspace(0.1, 0.8, len(experiments)))
+
+
+    for (experiment, repetitions), color in zip(experiments.items(), colors):
+        original_data = []
+        retrain_data = []
+        for rep, rep_data in repetitions.items():
+            if rep_data['original']:
+                df_original = pd.read_csv(rep_data['original'])
+                original_data.append(df_original)
+            if rep_data['retrain']:
+                df_retrain = pd.read_csv(rep_data['retrain'])
+                retrain_data.append(df_retrain)
+
+        if original_data:
+            for k, df in enumerate(original_data):
+                plt.plot(df['Batch'], df['Loss'], color=color, alpha=0.33*(k+1), label=f'{experiment}' if k == 2 else None)
+
+        if retrain_data:
+            for k, df in enumerate(retrain_data):
+                plt.plot(df['Batch'] + 10000, df['Loss'], color=color, alpha=0.33*(k+1))
+
+    plt.xlabel('Batch')
+    plt.ylabel('Loss')
+    plt.title('Learning Curves')
+    plt.legend(bbox_to_anchor=(1, 1), loc='upper right')
+    plt.savefig(os.path.join(save_dir, 'learncurves.png'))
+    plt.close()
+
+
+    '''
     for l in lp_list:
         if os.path.exists(l[0]):
             head, tail = os.path.split(l[0])
             # head is sup\exp\model
 
             print(head, tail)
-            checkpoints1 = load_checkpoints(head, "0-checkpoint")
-            checkpoints2 = load_checkpoints(head, "momentum09-rt-model")
-            checkpoints3 = load_checkpoints(f'supervised\\exp_101-L\\{os.path.basename(head)}', "0-checkpoint")
-            checkpoints4 = load_checkpoints(f'supervised\\exp_101-L\\{os.path.basename(head)}', "momentum09-rt-model")
+            checkpoints1 = load_checkpoints(head, "checkpoint")
+            checkpoints2 = load_checkpoints(head + '-retrain', "checkpoint")
+            #checkpoints3 = load_checkpoints(f'supervised\\exp_101-L\\{os.path.basename(head)}', "0-checkpoint")
+            #checkpoints4 = load_checkpoints(f'supervised\\exp_101-L\\{os.path.basename(head)}', "momentum09-rt-model")
             checkpoints = {**checkpoints1, **checkpoints2}
-            checkpointsb = {**checkpoints3, **checkpoints4}
+            #checkpointsb = {**checkpoints3, **checkpoints4}
             print(len(checkpoints))
 
             weights, labels, sources = extract_weights(checkpoints)
-            weights2, labels2, sources2 = extract_weights(checkpointsb)  # the direct training ones for comparison
+            #weights2, labels2, sources2 = extract_weights(checkpointsb)  # the direct training ones for comparison
 
-            all_weights = np.concatenate([weights, weights2])
-            all_labels = labels + labels2
-            all_sources = sources + sources2
+            #all_weights = np.concatenate([weights, weights2])
+            #all_labels = labels + labels2
+            #all_sources = sources + sources2
 
             umap_model = umap.UMAP(n_neighbors=5, min_dist=0.5, metric='euclidean')
-            embedding2 = umap_model.fit_transform(weights2)
+            #embedding2 = umap_model.fit_transform(weights2)
             embedding = umap_model.transform(weights)
 
             order1 = np.argsort([int(label.split('-')[-1]) for label in labels])
             sorted_embedding = embedding[order1]
-            order2 = np.argsort([int(label.split('-')[-1]) for label in labels2])
-            sorted_embedding2 = embedding2[order2]
+            #order2 = np.argsort([int(label.split('-')[-1]) for label in labels2])
+            #sorted_embedding2 = embedding2[order2]
 
             plt.figure(figsize=(12, 8))
             colors = {'0-checkpoint': 'blue', 'momentum09-rt-model': 'red'}
@@ -1109,9 +1239,9 @@ def plot_learning_curves(save_dir, lp_list):
                 #if i < len(labels) - 1:
                 #    plt.plot([embedding[i, 0], embedding[i + 1, 0]], [embedding[i, 1], embedding[i + 1, 1]], color=colors[source], linestyle='-', linewidth=0.5)
 
-            for i, (label, source) in enumerate(zip(labels2, sources2)):
-                plt.scatter(embedding2[i, 0], embedding2[i, 1], color=colors[source], s=50, marker='x', label=add_to_legend(source, names[source]))
-                plt.text(embedding2[i, 0], embedding2[i, 1], label.split('-')[-1], fontsize=8)
+            #for i, (label, source) in enumerate(zip(labels2, sources2)):
+            #    plt.scatter(embedding2[i, 0], embedding2[i, 1], color=colors[source], s=50, marker='x', label=add_to_legend(source, names[source]))
+            #    plt.text(embedding2[i, 0], embedding2[i, 1], label.split('-')[-1], fontsize=8)
 
                 #if i < len(labels2) - 1:
                 #    plt.plot([embedding2[i, 0], embedding2[i + 1, 0]], [embedding2[i, 1], embedding2[i + 1, 1]], color=colors[source], linestyle='-', linewidth=0.5)
@@ -1126,7 +1256,7 @@ def plot_learning_curves(save_dir, lp_list):
             plt.xlabel('UMAP1')
             plt.ylabel('UMAP2')
             plt.legend()
-            plt.savefig(os.path.join(save_dir, f'{tail}-umap.png'))
+            plt.savefig(os.path.join(save_dir, f'{tail}-umap.png'))'''
 
     print('plotting learning curves')
     for type in ['loc', 'box', 'size']:
@@ -1172,7 +1302,6 @@ def plot_learning_curves(save_dir, lp_list):
         plt.legend()
         plt.savefig(os.path.join(head, f'loss-{os.path.basename(head)}.png'))
         plt.close()
-    exit()
 
 
 def save_fixed_double_param_figures(save_dir, top_n_ranges, df, avg_loss, last_epoch_df):

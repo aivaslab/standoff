@@ -107,7 +107,12 @@ def get_model_type(model_type, input_size, input_size2, output_size, hidden_size
     return model, l2_reg, num_epochs
 
 
-def train_mlp(inputs, other_data, regime_data, regime, opponents_data, patience=2, num_prints=5, num_epochs=25,
+def calculate_accuracy(outputs, labels, threshold=0.5):
+    binarized_preds = (outputs > threshold).float()
+    correct = (binarized_preds == labels).sum().item()
+    return correct / labels.numel()
+
+def train_mlp(inputs, other_data, regime_data, regime, opponents_data, patience=5, num_prints=5, num_epochs=25,
               model_type="linear", input_data2=None):
     # Parameters
     input_size = inputs.shape[-1] if "conv" not in model_type else inputs.shape[1]
@@ -181,6 +186,7 @@ def train_mlp(inputs, other_data, regime_data, regime, opponents_data, patience=
     train_losses = []
     val_losses = []
     last_epoch_val_losses = []
+    val_accuracies = []
 
     for epoch in range(num_epochs):
         model.train()
@@ -207,6 +213,9 @@ def train_mlp(inputs, other_data, regime_data, regime, opponents_data, patience=
                     val_loss_indy = slowcriterion(outputs, other_vector).mean(dim=1)
                     epoch_val_losses.append(val_loss.item())
                     last_epoch_val_losses.extend(val_loss_indy.tolist())
+
+                    val_acc = calculate_accuracy(outputs, other_vector)
+                    val_accuracies.append(val_acc)
             else:
                 for data in val_loader:
                     act_vector, *optional_data = data[:-1]
@@ -215,10 +224,14 @@ def train_mlp(inputs, other_data, regime_data, regime, opponents_data, patience=
                     val_loss = criterion(outputs, other_vector)
                     epoch_val_losses.append(val_loss.item())
 
+                    val_acc = calculate_accuracy(outputs, other_vector)
+                    val_accuracies.append(val_acc)
+
         avg_train_loss = sum(epoch_train_losses) / len(epoch_train_losses)
         train_losses.append(avg_train_loss)
         avg_val_loss = sum(epoch_val_losses) / len(epoch_val_losses)
         val_losses.append(avg_val_loss)
+        avg_val_acc = sum(val_accuracies) / len(val_accuracies)
         # if (epoch + 1) % (num_epochs // num_prints) == 0:
         #    print(f'Epoch [{epoch}/{num_epochs}], Training Loss: {loss.item():.4f}, Validation Loss: {avg_val_loss:.4f}' )
 
@@ -231,7 +244,7 @@ def train_mlp(inputs, other_data, regime_data, regime, opponents_data, patience=
                 break
         if avg_val_loss <= 0.005:
             break
-    return best_val_loss, train_losses, val_losses, last_epoch_val_losses, model
+    return best_val_loss, train_losses, val_losses, last_epoch_val_losses, avg_val_acc, model
 
 
 def compute_vector_correlation(activation_scalars, other_data_vectors):
@@ -323,7 +336,7 @@ def run_mlp_test(correlation_data2, act_key, activations, path):
             print(other_key, len(activations), len(other_data))
 
             assert activations.shape[0] == other_data.shape[0]
-            val_loss, train_losses, val_losses, val_losses_indy = train_mlp(activations, other_data)
+            val_loss, train_losses, val_losses, val_losses_indy, val_acc, model = train_mlp(activations, other_data)
             '''plt.figure(figsize=(10, 6))
             #plt.plot(train_losses, label='Training Loss')
             plt.plot(val_losses, label='Validation Loss')
@@ -392,18 +405,55 @@ def get_keys(model_type, used_cor_inputs, correlation_data2, correlation_data_co
     return input_keys, output_keys, output_size, input_size, second_input_keys
 
 
-def correlation_thing(activation_keys, correlation_data2, path, umapping=True, cca=False, rsa=False, pearson_figs=False, max_samples=-1, mlp_test=False):
+def correlation_thing(activation_keys, correlation_data2, path, umapping=False, cca=False, rsa=False, pearson_figs=False, max_samples=-1, mlp_test=True, repetition=-1, epoch=-1):
     # final heatmap is feature vs layer, mean neuron abs correlation
     major_cor_results = {}
     cca_results = {}
     rsa_results = {}
     mlp_results = {}
 
-    for act_key in activation_keys:
+    #print('all keys', correlation_data2.keys())
+
+    activation_keys = [x for x in correlation_data2.keys() if "_output" in x or "_state" in x]
+    activation_keys.append('scalar')
+    num_samples = len(correlation_data2[activation_keys[0]])
+    print('keys', activation_keys, num_samples)
+
+    #print(np.mean(correlation_data2['act_label_exist']))
+
+    correlation_data2['all_activations'] = [
+        np.concatenate([correlation_data2[key][i] for key in activation_keys])
+        for i in range(num_samples)
+    ]
+    correlation_data2['last_timestep_activations'] = [
+        np.concatenate([correlation_data2[key][i] for key in activation_keys if "t5" in key or "fc" in key])
+        for i in range(num_samples)
+    ]
+    correlation_data2['final_layer_activations'] = [
+        np.concatenate([correlation_data2[key][i] for key in activation_keys if "fc" in key])
+        for i in range(num_samples)
+    ]
+    test_keys = ['act_label_opponents', 'labels', 'pred', 'act_label_loc', 'act_label_b-loc', 'act_label_i-b-loc',
+                 'act_label_big-loc', 'act_label_small-loc',
+                 'act_label_big-b-loc', 'act_label_small-b-loc',
+                 'act_label_big-i-b-loc', 'act_label_small-i-b-loc']#
+
+    real_act_keys = ['last_timestep_activations', 'final_layer_activations']#['all_activations'] #activation_keys + ['all_activations', 'inputs']
+    if repetition == 0 and epoch == 0:
+        real_act_keys.append('scalar')
+
+    csv_path = os.path.join(path, 'ifr_df.csv')
+    if os.path.exists(csv_path):
+        ifr_df = pd.read_csv(csv_path)
+    else:
+        ifr_df = pd.DataFrame()
+
+    for act_key in real_act_keys:#activation_keys:
         if act_key == 'labels':
             continue
         # each of our activations
-        activations = correlation_data2[act_key][:max_samples, :]
+        data = correlation_data2[act_key]
+        activations = np.asarray(data[:max_samples])
         correlation_results = {}
 
         if umapping:
@@ -415,9 +465,9 @@ def correlation_thing(activation_keys, correlation_data2, path, umapping=True, c
         #run_mlp_test(correlation_data2, act_key, activations, path)
         #continue
 
-        for other_key, other_data in tqdm.tqdm(correlation_data2.items()):
-            other_data = other_data[:max_samples, :]
-            if other_key == '' or 'oracle' in other_key or 'pred' in other_key:
+        for other_key in tqdm.tqdm(test_keys):
+            other_data = np.asarray(correlation_data2[other_key])[:max_samples]
+            if other_key == '' or 'oracle' in other_key:
                 continue
             if umapping:
                 unique_vectors, integer_labels = np.unique(other_data, axis=0, return_inverse=True)
@@ -436,10 +486,12 @@ def correlation_thing(activation_keys, correlation_data2, path, umapping=True, c
 
             if mlp_test and other_key != act_key:
                 assert activations.shape[0] == other_data.shape[0]
-                val_loss, train_losses, val_losses, val_losses_indy, _ = train_mlp(activations, other_data, None, None, None, model_type='mlp2')
+                val_loss, train_losses, val_losses, val_losses_indy, val_acc, _ = train_mlp(activations, other_data, None, None, None, model_type='mlp2')
                 mlp_results[(act_key, other_key)] = val_loss
                 #all_individual_val_losses[other_key] = val_losses_indy
                 #all_val_losses[other_key] = val_losses
+                ifr_df = ifr_df.append({'epoch': epoch, 'act': act_key, 'feature': other_key, 'rep': repetition, 'type': 'mlp', 'loss': val_loss, 'val_acc': val_acc}, ignore_index=True)
+                print(mlp_results)
 
             #print('data', other_key, other_data[0], len(get_unique_arrays(other_data)))
 
@@ -493,19 +545,22 @@ def correlation_thing(activation_keys, correlation_data2, path, umapping=True, c
         mean_neurons = np.mean(sum_matrix, axis=0)
         major_cor_results[act_key] = mean_neurons
 
+    print('saving csv', csv_path)
+    ifr_df.to_csv(csv_path, index=False)
+
     if train_mlp:
-        cca_matrix = np.zeros((len(activation_keys), len(correlation_results)))
-        for i, act_key in enumerate(activation_keys):
+        cca_matrix = np.zeros((len(real_act_keys), len(correlation_results)))
+        for i, act_key in enumerate(real_act_keys):
             for j, other_key in enumerate(correlation_results.keys()):
                 if (act_key, other_key) in mlp_results:
                     cca_matrix[i, j] = mlp_results[(act_key, other_key)]
         plt.figure(figsize=(10, 10))
-        ax = sns.heatmap(cca_matrix, cmap='viridis')
+        ax = sns.heatmap(cca_matrix, cmap='viridis', annot=True, fmt=".3f", vmin=0, vmax=0.25)
         plt.xlabel("Feature")
         plt.ylabel("Layer")
         plt.title("MLP Validation Loss")
         plt.xticks(ticks=np.arange(0.5, len(correlation_results), 1), labels=correlation_results.keys(), rotation=90)
-        plt.yticks(ticks=np.arange(0.5, len(activation_keys), 1), labels=activation_keys, rotation=0)
+        plt.yticks(ticks=np.arange(0.5, len(real_act_keys), 1), labels=real_act_keys, rotation=0)
         plt.tight_layout()
         plt.savefig(os.path.join(path, f"layer_mlp_heatmap.png"))
         plt.close()
@@ -567,10 +622,21 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=5, do_best_f
     use_i = False
     use_non_h = False
 
+    print('repetitions', repetitions)
+
     for epoch_number in epoch_numbers:
         for repetition in repetitions:
-            with open(os.path.join(path, f'activations_{epoch_number}_{repetition}.pkl'), 'rb') as f:
-                loaded_activation_data = pickle.load(f)
+            print(path, f'activations_{epoch_number}_{repetition}.pkl')
+            try:
+                if epoch_number == 0:
+                    with open(os.path.join(path, f'activations_prior_{repetition}.pkl'), 'rb') as f:
+                        loaded_activation_data = pickle.load(f)
+                else:
+                    with open(os.path.join(path, f'activations_{epoch_number}_{repetition}.pkl'), 'rb') as f:
+                        loaded_activation_data = pickle.load(f)
+            except Exception as e:
+                print('failed', e)
+                continue
 
             correlation_data = {}
             correlation_data2 = {}
@@ -590,7 +656,7 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=5, do_best_f
                     correlation_data[key] = concatenated_array
                     if not skip_model_dependent:
                         correlation_data2[key] = concatenated_array
-                    print(f'{key} shape:', concatenated_array.shape)
+                    #print(f'{key} shape:', concatenated_array.shape)
                     length = concatenated_array.shape[0]
 
             keys_to_process2 = ['inputs', 'labels', 'pred']
@@ -682,7 +748,9 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=5, do_best_f
                         # print('corstepsshape', new_key, correlation_data_lstm_inputs[new_key].shape)
                         # print('corlastshape', new_key, correlation_data_lstm_outputs[new_key].shape)
 
-            correlation_data2["rand_vec5"] = np.random.randint(2, size=(32, 5))
+            correlation_data2["scalar"] = np.random.randint(2, size=(1,))
+            print(correlation_data["inputs"].shape)
+            correlation_data["scalar"] = np.random.randint(2, size=(8844, 1,))
             # correlation_data_conv["rand_vec5"] = np.random.randint(2, size=(8, 1, 7, 7))
             # correlation_data_conv_flat["rand_vec5"] = np.random.randint(2, size=(length, 1 * 7 * 7))
             pred_d = correlation_data_lstm_inputs["vision"]
@@ -696,9 +764,9 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=5, do_best_f
 
             ### Correlation thing
             if True:
-                print('correlation thing!')
-                activation_keys = [x for x in correlation_data.keys() if 'act_label' not in x and x not in ['inputs', 'pred', 'oracles', '', ]]
-                correlation_thing(activation_keys, correlation_data, path)
+                print('correlation thing!', path)
+                activation_keys = [x for x in correlation_data.keys() if 'act_label' not in x and x not in ['inputs', 'oracles', '', ]]
+                correlation_thing(activation_keys, correlation_data, path, repetition=repetition, epoch=epoch_number)
 
             # MLP F2F DATA
             remove_labels = []
@@ -801,12 +869,12 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=5, do_best_f
                                     # print("using key2", key2)
                                     for regime in unique_regimes:
                                         assert input_data.shape[0] == output_data.shape[0]
-                                        val_loss, train_losses, val_losses, val_losses_indy, model = \
+                                        val_loss, train_losses, val_losses, val_losses_indy, val_acc, model = \
                                             train_mlp(input_data, output_data, regime_data=regime_data, regime=regime, opponents_data=opponents_data,
                                                       num_epochs=num_epochs, model_type=model_type, input_data2=input_data2 if not cat else None, )
 
                                         loss_matrices[str(regime)].at[key1, key2] = val_loss
-                                        print(key1, key2, input_data.shape, output_data.shape, val_loss)
+                                        print(key1, key2, input_data.shape, output_data.shape, val_loss, val_acc)
                                         pbar.update(1)
 
                             for regime in unique_regimes:

@@ -762,3 +762,37 @@ if 64 in todo:
                     if not os.path.exists(path):
                         os.mkdir(path)
                     special_heatmap(df_path_list2, df_path_list, 'regime', key_param_list, names, path, params)
+
+
+    if 101 in todo:
+        print('Running experiment 101: base, different models and answers')
+
+        combined_path_list = []
+        last_path_list = []
+        lp_list = []
+        key_param = 'regime'
+        key_param_list = []
+        session_params['oracle_is_target'] = False
+
+        for label, label_name in [('correct-loc', 'loc')]:
+            for model_type in ['smlp', 'cnn', 'clstm', ]:
+                for regime in ['everything']:
+                    kpname = model_type + '-' + label_name
+                    print(model_type + '-' + label_name, 'regime:', regime, 'train_sets:', regimes['everything'])
+                    combined_paths, last_epoch_paths, lp = run_supervised_session(
+                        save_path=os.path.join('supervised', exp_name, kpname),
+                        train_sets=regimes['everything'],
+                        eval_sets=regimes['everything'],
+                        oracle_labels=[None],
+                        key_param=key_param,
+                        key_param_value=kpname,
+                        label=label,
+                        model_type=model_type,
+                        **session_params
+                    )
+                    last_path_list.append(last_epoch_paths)
+                    combined_path_list.append(combined_paths)
+                    key_param_list.append(kpname)
+                    lp_list.append(lp)
+
+        do_comparison(combined_path_list, last_path_list, key_param_list, key_param, exp_name, params, prior_metrics, lp_list)
