@@ -5,6 +5,7 @@ import itertools
 import pickle
 import re
 
+
 import sys
 import os
 import time
@@ -166,31 +167,42 @@ def load_model(model_type, model_kwargs, device):
 
     return model
 
+def load_last_model(model_save_path, repetition):
+    files = [f for f in os.listdir(model_save_path) if f.startswith(f'{repetition}-checkpoint-') and f.endswith('.pt')]
 
-def load_model_eval(model_save_path, repetition, use_prior=False):
+    if not files:
+        raise FileNotFoundError(f"No checkpoint files found for repetition {repetition} in {model_save_path}")
+
+    numbers = []
+    for f in files:
+        parts = f.split('-')
+        if len(parts) > 2:
+            try:
+                # Extract the number part
+                number = int(parts[-1].replace('.pt', ''))
+                numbers.append(number)
+            except ValueError:
+                # Skip if the conversion fails
+                continue
+
+    print('numbers found', numbers)
+    highest_number = max(numbers)
+    file_name = f'{repetition}-checkpoint-{highest_number}.pt'
+    return file_name
+
+def load_model_eval(model_save_path, repetition, use_prior=False, desired_epoch=None):
     if use_prior:
         file_name = f'{repetition}-checkpoint-prior.pt'
+    elif desired_epoch is not None:
+        file_name = f'{repetition}-checkpoint-{desired_epoch}.pt'
+        if desired_epoch == 49: # we name things badly
+            file_name = f'{repetition}-checkpoint-{19}.pt'
+            files = [f for f in os.listdir(model_save_path) if f == file_name]
+            if not files:
+                file_name = load_last_model(model_save_path, repetition)
     else:
-        files = [f for f in os.listdir(model_save_path) if f.startswith(f'{repetition}-checkpoint-') and f.endswith('.pt')]
+        file_name = load_last_model(model_save_path, repetition)
 
-        if not files:
-            raise FileNotFoundError(f"No checkpoint files found for repetition {repetition} in {model_save_path}")
-
-        numbers = []
-        for f in files:
-            parts = f.split('-')
-            if len(parts) > 2:
-                try:
-                    # Extract the number part
-                    number = int(parts[-1].replace('.pt', ''))
-                    numbers.append(number)
-                except ValueError:
-                    # Skip if the conversion fails
-                    continue
-
-        print(numbers)
-        highest_number = max(numbers)
-        file_name = f'{repetition}-checkpoint-{highest_number}.pt'
 
     # Load the model
     print('loading model for eval:', model_save_path, file_name)
@@ -199,12 +211,12 @@ def load_model_eval(model_save_path, repetition, use_prior=False):
 
 def load_model_data_eval_retrain(test_sets, load_path, target_label, last_timestep, prior_metrics, model_save_path,
                                  repetition, model_type, oracle_labels, save_labels, act_label_names, test_percent,
-                                 use_prior=False):
+                                 use_prior=False, desired_epoch=None):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     special_criterion = nn.CrossEntropyLoss(reduction='none')
     oracle_criterion = nn.MSELoss(reduction='none')
 
-    model_kwargs, state_dict = load_model_eval(model_save_path, repetition, use_prior)#f'{repetition}-model_epoch{epoch_number}.pt'))
+    model_kwargs, state_dict = load_model_eval(model_save_path, repetition, use_prior, desired_epoch=desired_epoch)#f'{repetition}-model_epoch{epoch_number}.pt'))
     batch_size = model_kwargs['batch_size']
     model = load_model(model_type, model_kwargs, device)
     model.load_state_dict(state_dict)
@@ -309,7 +321,8 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_load_
                                                 repetition,
                                                 model_type, oracle_labels,
                                                 save_labels, act_label_names,
-                                                test_percent, use_prior=use_prior)
+                                                test_percent, use_prior=use_prior,
+                                                desired_epoch=epoch_number)
     param_losses_list = []
 
     hook = SaveActivations()
@@ -317,49 +330,51 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_load_
         'inputs': [],
         'pred': [],
         'labels': [],
-        'oracles': [],
+        #'oracles': [],
     }
     register_hooks(model, hook)
     model.eval()
 
     print('num_activation_batches', num_activation_batches)
 
+    # i have commented out oracle related things
+    # this includes oracle_is_target check
     for idx, _val_loader in enumerate(test_loaders):
         with torch.no_grad():
 
             tq = tqdm.trange(len(_val_loader))
 
-            for i, (inputs, labels, params, oracles, metrics, act_labels_dict) in enumerate(_val_loader):
-                inputs, labels, oracles = inputs.to(device), labels.to(device), oracles.to(device)
+            for i, (inputs, labels, params, _, metrics, act_labels_dict) in enumerate(_val_loader):
+                inputs, labels = inputs.to(device), labels.to(device)
+                #inputs, labels, oracles = inputs.to(device), labels.to(device), oracles.to(device)
                 max_labels = torch.argmax(labels, dim=1)
                 #if torch.isnan(max_labels).any():
                 #    print("labels has nan")
 
-                if not oracle_is_target:
-                    outputs = model(inputs, oracles)
-                    losses = special_criterion(outputs, max_labels)
-                    _, predicted = torch.max(outputs, 1)
-                    oracle_accuracy = torch.zeros(labels.size(0), device=device)
-                    oracle_outputs = torch.zeros((labels.size(0), 10), device=device)
-                else:
-                    outputs = model(inputs, None)
-                    typical_outputs = outputs[:, :5]
-                    _, predicted = torch.max(typical_outputs, 1)
-                    oracle_outputs = outputs[:, 5:]
+                outputs = model(inputs, oracles)
+                losses = special_criterion(outputs, max_labels)
+                predicted = outputs.argmax(1)
+                #oracle_accuracy = torch.zeros(labels.size(0), device=device)
+                #oracle_outputs = torch.zeros((labels.size(0), 10), device=device)
 
-                    losses = special_criterion(typical_outputs, torch.argmax(labels, dim=1))
-                    oracle_losses = oracle_criterion(oracle_outputs, oracles).sum(dim=1)
-                    binary_oracle_outputs = (oracle_outputs > 0.5).float()
-                    oracle_accuracy = ((binary_oracle_outputs == oracles).float().sum(dim=1) / 10).float()
+                # this was alternative if oracle was target
+                '''
+                outputs = model(inputs, None)
+                typical_outputs = outputs[:, :5]
+                predicted = typical_outputs.argmax(1)
+                oracle_outputs = outputs[:, 5:]
 
-                corrects = (predicted == max_labels)
+                losses = special_criterion(typical_outputs, torch.argmax(labels, dim=1))
+                oracle_losses = oracle_criterion(oracle_outputs, oracles).sum(dim=1)
+                binary_oracle_outputs = (oracle_outputs > 0.5).float()
+                oracle_accuracy = ((binary_oracle_outputs == oracles).float().sum(dim=1) / 10).float()
+                '''
 
-                #if torch.isnan(corrects).any():
-                #    print("corrects has nan")
+                corrects = predicted.eq(max_labels)
                 pred = predicted.cpu()
-                small_food_selected = (pred == torch.argmax(metrics['loc'][:, -1, :, 0], dim=1))
-                big_food_selected = (pred == torch.argmax(metrics['loc'][:, -1, :, 1], dim=1))
-                neither_food_selected = ~(small_food_selected | big_food_selected)
+                #small_food_selected = (pred == torch.argmax(metrics['small-loc'][:, -1, :, 0], dim=1))
+                #big_food_selected = (pred == torch.argmax(metrics['big-loc'][:, -1, :, 1], dim=1))
+                #neither_food_selected = ~(small_food_selected | big_food_selected)
 
                 tq.update(1)
 
@@ -373,16 +388,16 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_load_
                     activation_data['inputs'].append(inputs.cpu().numpy().reshape(real_batch_size, -1))
                     activation_data['pred'].append(pred.numpy().reshape(real_batch_size, -1))
                     activation_data['labels'].append(labels.cpu().numpy().reshape(real_batch_size, -1))
-                    activation_data['oracles'].append(oracles.cpu().numpy().reshape(real_batch_size, -1))
+                    #activation_data['oracles'].append(oracles.cpu().numpy().reshape(real_batch_size, -1))
 
                     for name, act_label in act_labels_dict.items():
-                        key = f"act_label_{name}"
-                        if key not in activation_data:
-                            activation_data[key] = []
-                        activation_data[key].append(act_label.cpu().numpy().reshape(real_batch_size, -1))
+                        activation_data.setdefault(f"act_{name}", []).append(
+                            act_label.cpu().reshape(real_batch_size, -1).numpy()
+                        )
+
 
                 batch_param_losses = []
-                for k, elements in enumerate(zip(params, losses, corrects, small_food_selected, big_food_selected, neither_food_selected, pred, oracle_outputs, oracle_accuracy, oracle_losses if oracle_is_target else [0] * len(pred))):
+                '''for k, elements in enumerate(zip(params, losses, corrects, small_food_selected, big_food_selected, neither_food_selected, pred, oracle_outputs, oracle_accuracy, oracle_losses if oracle_is_target else [0] * len(pred))):
                     param, loss, correct, small, big, neither, _pred, o_pred, o_acc, oracle_loss = elements
                     data_dict = {
                         'param': param,
@@ -404,7 +419,26 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_load_
                     for x, v in metrics.items():
                         data_dict[x] = v[k].numpy() if hasattr(v[k], 'numpy') else v[k]
 
-                    batch_param_losses.append(data_dict)
+                    batch_param_losses.append(data_dict)'''
+                epoch_number_dict = {'epoch': epoch_number}
+
+                batch_param_losses = [
+                    {
+                        'param': param,
+                        **decode_event_name(param),
+                        **epoch_number_dict,
+                        'pred': pred.item(),
+                        'loss': loss.item(),
+                        'accuracy': correct.item(),
+                        #'small_food_selected': small.item(),
+                        #'big_food_selected': big.item(),
+                        #'neither_food_selected': neither.item(),
+                        **{x: v[k].numpy() if hasattr(v[k], 'numpy') else v[k] for x, v in metrics.items()}
+                    }
+                    #for k, (param, loss, correct, small, big, neither, pred) in enumerate(zip(params, losses, corrects, small_food_selected, big_food_selected, neither_food_selected, pred))
+                    for k, (param, loss, correct, pred) in enumerate(zip(params, losses, corrects, pred))
+                ]
+
                 param_losses_list.extend(batch_param_losses)
 
     # save dfs periodically to free up ram:
@@ -417,26 +451,27 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_load_
     print('done')
     # weak attempt at shortening the data
     df['loss'] = df['loss'].round(4)
-    df[['small_food_selected', 'big_food_selected', 'neither_food_selected']] = \
-        df[['small_food_selected', 'big_food_selected', 'neither_food_selected']].astype(int)
+    #df[['small_food_selected', 'big_food_selected', 'neither_food_selected']] =  df[['small_food_selected', 'big_food_selected', 'neither_food_selected']].astype(int)
 
-    int_columns = ['visible_baits', 'swaps', 'visible_swaps', 'first_bait_size', 'small_food_selected',
-                   'big_food_selected', 'neither_food_selected', 'epoch']
+    #int_columns = ['visible_baits', 'swaps', 'visible_swaps', 'first_bait_size', 'small_food_selected', 'big_food_selected', 'neither_food_selected', 'epoch']
+    int_columns = ['visible_baits', 'swaps', 'visible_swaps', 'first_bait_size', 'epoch']
 
     for col in int_columns:
         df[col] = pd.to_numeric(df[col], downcast='integer')
 
-    float_columns = ['o_acc']
-    for col in float_columns:
-        df[col] = df[col].astype('float16')
+    #float_columns = ['o_acc']
+    #for col in float_columns:
+    #    df[col] = df[col].astype('float16')
 
+    curtime = time.time()
     print(df.info(memory_usage='deep'))
 
     print('saving csv...')
     # print('cols', df.columns)
-    curtime = time.time()
     if use_prior:
         epoch_number = 'prior'
+
+
     df.to_csv(os.path.join(model_load_path, f'param_losses_{epoch_number}_{repetition}.csv'), index=False, compression='gzip')
     print('compressed write time (gzip):', time.time() - curtime)
 
@@ -638,7 +673,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
         print('recording loss')
         train_size = int(0.8 * len(train_dataset))
         test_size = len(train_dataset) - train_size
-        train_dataset, test_dataset = random_split(train_dataset, [train_size, test_size])
+        train_dataset, test_dataset = random_split(train_dataset, [train_size, test_size], generator=torch.Generator().manual_seed(42))
         train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=0)
         test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=0)
 
@@ -835,8 +870,16 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=True, skip_2x1=False
     print('making categorical')
     for param in params:
         if last_epoch_df[param].dtype == 'object':
-            # df[param] = df[param].astype('category')
-            last_epoch_df[param] = last_epoch_df[param].astype('category')
+            try:
+                last_epoch_df[param] = last_epoch_df[param].astype('category')
+            except TypeError:
+                try:
+                    last_epoch_df[param] = last_epoch_df[param].apply(tuple)
+                    last_epoch_df[param] = last_epoch_df[param].astype('category')
+                except TypeError:
+                    print('double error on', param)
+                    pass
+                pass
     params = [param for param in params if param not in ['delay', 'perm']]
 
     # print('params:', params)
@@ -893,8 +936,7 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=True, skip_2x1=False
         print('calculating double params')
 
         for param1, param2 in tqdm.tqdm(param_pairs):
-            avg_loss[(param1, param2)] = df.groupby([param1, param2, 'epoch'])['accuracy'].apply(
-                calculate_ci).reset_index()
+            avg_loss[(param1, param2)] = df.groupby([param1, param2, 'epoch'])['accuracy'].apply(calculate_ci).reset_index()
 
             means = last_epoch_df.groupby([param1, param2]).mean()
             ranges_2[(param1, param2)] = means['accuracy'].max() - means['accuracy'].min()
@@ -929,7 +971,7 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=True, skip_2x1=False
             print(param)
             if param != key_param:
                 # Initializing a nested dictionary for each unique key_param value
-                for acc_type, save_dict in zip(['accuracy', 'o_acc'], [key_param_stats, oracle_key_param_stats]):
+                for acc_type, save_dict in zip(['accuracy'], [key_param_stats]): #zip(['accuracy', 'o_acc'], [key_param_stats, oracle_key_param_stats]):
                     #print('SSSSSSSSSS', unique_vals) #unique vals of regime has only 6 of them
                     for key_val in unique_vals[key_param]:
                         subset = last_epoch_df[last_epoch_df[key_param] == key_val]
@@ -944,7 +986,6 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=True, skip_2x1=False
 
                         z_value = 1.96  # For a 95% CI
                         standard_errors = (z_value * np.sqrt(repetition_means * (1 - repetition_means) / counts)).groupby(level=param).mean()
-
 
                         if key_val not in save_dict:
                             save_dict[key_val] = {}
@@ -1363,6 +1404,30 @@ def write_metrics_to_file(filepath, df, ranges, params, stats, key_param=None, d
                 std_accuracy = group['accuracy'].std()
                 f.write(f"Acc {key_param}: {key}: {mean_accuracy} ({std_accuracy})\n")
 
+                train_regime = key.split('-')[2] # get the train regime
+                # aggregate the mean but only where test-regime is not in the train regime set...
+                test_regimes = group['test_regime']
+                sub_regime_keys = [
+                    "Nn", "Fn", "Nf", "Tn", "Nt", "Ff", "Tf", "Ft", "Tt"
+                ]
+                train_map = {
+                    's3': [x + '0' for x in sub_regime_keys] + [x + '1' for x in sub_regime_keys],
+                    's2': [x + '0' for x in sub_regime_keys] + ['Tt1'],
+                    's1': [x + '0' for x in sub_regime_keys],
+                    'homogeneous': ['Tt0', 'Ff0', 'Nn0', 'Tt1', 'Ff1', 'Nn1']
+                }
+
+                group['is_novel_task'] = ~test_regimes.isin(train_map[train_regime])
+                mean_novel_accuracy = group.loc[group['is_novel_task'], 'accuracy'].mean()
+                std_novel_accuracy = group.loc[group['is_novel_task'], 'accuracy'].std()
+                f.write(f"Novel acc {key_param}: {key}: {mean_novel_accuracy} ({std_novel_accuracy})\n")
+
+                group['isnt_novel_task'] = test_regimes.isin(train_map[train_regime])
+                mean_xnovel_accuracy = group.loc[group['isnt_novel_task'], 'accuracy'].mean()
+                std_xnovel_accuracy = group.loc[group['isnt_novel_task'], 'accuracy'].std()
+                f.write(f"Old acc {key_param}: {key}: {mean_xnovel_accuracy} ({std_xnovel_accuracy})\n")
+
+
         param_value_stats = []
         for param in params:
             param_stats_mean = df2.groupby(param)['accuracy'].mean().reset_index().values
@@ -1458,7 +1523,7 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
                                   last_timestep=last_timestep,
                                   retrain_batches=batches)
                 if not skip_eval:
-                    for epoch in [9, epochs - 1]:
+                    for epoch in [epochs - 1]:
                         print('evaluating', epoch)
                         for this_path in [save_path, retrain_path]:
                             for eval_prior in [False, True] if this_path == save_path else [False]:
@@ -1537,8 +1602,8 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
 
     if not skip_activations:
         print('corring activations...')
-        process_activations(save_path, [0, 9, epochs - 1], [x for x in range(repetitions)])
-        process_activations(save_path + '-retrain', [0, 9, epochs - 1], [x for x in range(repetitions)])
+        process_activations(save_path, [0, epochs - 1], [x for x in range(repetitions)])
+        process_activations(save_path + '-retrain', [0, epochs - 1], [x for x in range(repetitions)])
 
     return dfs_paths, last_epoch_df_paths, loss_paths
 

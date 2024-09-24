@@ -113,6 +113,7 @@ def rotate_grid(grid, rot_k):
 
 def convert_to_scalar(loc_list):
     pattern_to_scalar = {
+        (1, 1): 3,
         (1, 0): 2,
         (0, 1): 1,
         (0, 0): 0
@@ -1250,6 +1251,25 @@ class para_MultiGridEnv(ParallelEnv):
                 for reward in all_rewards_seen_imaginary
             ]
 
+            info["fb"] = any(
+                b_loc != loc
+                for b_loc, loc in zip(info["b-loc"], info["loc"])
+            )
+            info["i-fb"] = any(
+                b_loc != loc
+                for b_loc, loc in zip(info["i-b-loc"], info["loc"])
+            )
+
+            info["b-loc-diff"] = [
+                [int(l != b) for l, b in zip(loc, b_loc)]
+                for loc, b_loc in zip(info["loc"], info["b-loc"])
+            ]
+
+            info["i-b-loc-diff"] = [
+                [int(l != i_b) for l, i_b in zip(loc, i_b_loc)]
+                for loc, i_b_loc in zip(info["loc"], info["i-b-loc"])
+            ]
+
             #info['correct-box'][int(self.box_locations[int(self.infos['p_0']['correct-loc'])])] = 1
             # correct-loc comes from ministandoff step following new target
             info["b-correct-loc"] = distribute_weights_to_second_largest(all_rewards_seen) if self.params['num_puppets'] > 0 else [1 / self.boxes] * self.boxes
@@ -1267,14 +1287,31 @@ class para_MultiGridEnv(ParallelEnv):
             #info["b-correct-box"] = [info["box-locations"][k] if x == 1 else 0 for k, x in enumerate(info["b-correct-loc"])]
             info["i-b-correct-box"] = [info["box-locations"][k] if x == 1 else 0 for k, x in enumerate(info["i-b-correct-loc"])]
 
-            for name in ["loc", "b-loc", "i-b-loc"]:
-                info["scalar-" + name] = convert_to_scalar(info[name])
+            for name in ["loc", "b-loc", "i-b-loc", "b-loc-diff", "i-b-loc-diff"]:
+
+                #info["scalar-" + name] = convert_to_scalar(info[name]) #broken for the diff ones?
                 info["big-" + name] = [x[0] for x in info[name]]
                 info["small-" + name] = [x[1] for x in info[name]]
-                info["any-" + name] = [int(x != [0, 0]) for x in info[name]]
+                #info["any-" + name] = [int(x != [0, 0]) for x in info[name]]
 
-            info["exist"] = [1 if self.bigReward in real_box_rewards else 0,
-                                          1 if self.smallReward in real_box_rewards else 0]
+            def loc_to_box(loc_vector, box_locations):
+                box_info = [0] * len(box_locations)
+                for loc, box in enumerate(box_locations):
+                    if loc_vector[loc] == 1:
+                        box_info[box] = 1
+                return box_info
+            info["big-box"] = loc_to_box(info["big-loc"], info["box-locations"])
+            info["small-box"] = loc_to_box(info["small-loc"], info["box-locations"])
+            info["big-b-box"] = loc_to_box(info["big-b-loc"], info["b-box-locations"])
+            info["small-b-box"] = loc_to_box(info["small-b-loc"], info["b-box-locations"])
+            info["b-box"] = [
+                [1, 0] if big == 1 else
+                [0, 1] if small == 1 else
+                [0, 0]
+                for big, small in zip(info["big-b-box"], info["small-b-box"])
+            ]
+
+            info["exist"] = [1 if self.bigReward in real_box_rewards else 0, 1 if self.smallReward in real_box_rewards else 0]
             info["b-exist"] = [
                 1 if any(abs(reward - self.bigReward) < tolerance for reward in all_rewards_seen) else 0,
                 1 if any(abs(reward - self.smallReward) < tolerance for reward in all_rewards_seen) else 0
@@ -1283,6 +1320,15 @@ class para_MultiGridEnv(ParallelEnv):
                 1 if any(abs(reward - self.bigReward) < tolerance for reward in all_rewards_seen_imaginary) else 0,
                 1 if any(abs(reward - self.smallReward) < tolerance for reward in all_rewards_seen_imaginary) else 0
             ]
+
+            info["b-exist-diff"] = [
+                int(l != b) for l, b in zip(info["exist"], info["b-exist"])
+            ]
+
+            info["i-b-exist-diff"] = [
+                int(l != i_b) for l, i_b in zip(info["exist"], info["i-b-exist"])
+            ]
+
             imaginary_reward = real_box_rewards[self.agent_goal['i']]
             info["i-target-size"] = list(map(int, [imaginary_reward == self.bigReward, imaginary_reward == self.smallReward]))
 

@@ -6,6 +6,7 @@ import numpy as np
 import torch
 import umap
 from matplotlib import pyplot as plt, gridspec
+from scipy.stats import pearsonr, stats
 from stable_baselines3.common.results_plotter import load_results, ts2xy
 import os
 import pandas as pd
@@ -699,60 +700,276 @@ def df_list_from_stat_dict(stat_dict, param):
     return df_list
 
 def make_ifrscores(combined_df, combined_path, act, retrain, prior):
-    print('prior thing', prior, combined_df['epoch'].unique())
-    mean_df = combined_df.groupby(['feature', 'model'])['loss'].mean().reset_index()
-    std_df = combined_df.groupby(['feature', 'model'])['loss'].std().reset_index()
+    print('prior thing', prior, combined_df['epoch'].unique(),)
+    for use_acc in ['loss', 'val_acc']:
+        mean_df = combined_df.groupby(['feature', 'model'])[use_acc].mean().reset_index()
+        std_df = combined_df.groupby(['feature', 'model'])[use_acc].std().reset_index()
 
-    merged_df = mean_df.merge(std_df, on=['feature', 'model'], suffixes=('_mean', '_std'))
+        merged_df = mean_df.merge(std_df, on=['feature', 'model'], suffixes=('_mean', '_std'))
 
-    formatted_values = {
-        (row['feature'], row['model']): f"{row['loss_mean']:.2f} ({row['loss_std']:.2f})"
-        for _, row in merged_df.iterrows()
+        formatted_values = {
+            (row['feature'], row['model']): f"{row[f'{use_acc}_mean']:.2f} ({row[f'{use_acc}_std']:.2f})"
+            for _, row in merged_df.iterrows()
+        }
+        heatmap_colors = mean_df.pivot_table(index='feature', columns='model', values=use_acc, fill_value=0)
+
+        heatmap_data = pd.DataFrame(
+            {model: [formatted_values.get((feature, model), '0.00 (0.00)') for feature in heatmap_colors.index]
+             for model in heatmap_colors.columns},
+            index=heatmap_colors.index
+        )
+
+        plt.figure(figsize=(12, 8))
+        sns.heatmap(heatmap_colors, annot=heatmap_data, cmap='coolwarm' if use_acc=='loss' else 'coolwarm_r', vmin=0, vmax=0.25 if use_acc=='loss' else 1.0, fmt="")
+        plt.xlabel('Model')
+        plt.ylabel('Feature')
+        plt.title(f'IFR {use_acc} Scores for {act}, retrain:{retrain}, prior:{prior}')
+        plt.tight_layout()
+
+        path2 = os.path.join(combined_path, 'ifr')
+        os.makedirs(path2, exist_ok=True)
+        plt.savefig(os.path.join(path2, f'{act}-{retrain}-{prior}-ifr_scores-{use_acc}.png'))
+        plt.close()
+
+def make_corr_things(merged_df, combined_path, loss_type='val_acc'):
+    def calculate_correlations(group, mean_col, std_col, loss_type='val_acc'):
+        valid_data = group[[mean_col, std_col, loss_type]].replace([np.inf, -np.inf], np.nan).dropna()
+        if len(valid_data) > 1:
+            try:
+                combined_metric = valid_data[mean_col] / valid_data[std_col]
+                corr, p_value = pearsonr(combined_metric, valid_data[loss_type])
+                return corr, p_value
+            except ValueError:
+                return np.nan, np.nan
+        return np.nan, np.nan
+
+    def process_correlations(merged_df, metric_pairs, loss_type='val_acc'):
+        correlations = []
+        for (model, feature, act, retrain, prior), group in merged_df.groupby(['model', 'feature', 'act', 'retrain', 'prior']):
+            for metric, (mean_col, std_col) in metric_pairs.items():
+                if not (group[mean_col].isna().all() or group[std_col].isna().all()):
+                    corr, p_value = calculate_correlations(group, mean_col, std_col, loss_type=loss_type)
+                    correlations.append({
+                        'train_set': model,
+                        'feature': feature,
+                        'act': act,
+                        'metric': metric,
+                        'correlation': corr,
+                        'p_value': p_value
+                    })
+
+        for (feature, act), group in merged_df.groupby(['feature', 'act']):
+            for metric, (mean_col, std_col) in metric_pairs.items():
+                if not (group[mean_col].isna().all() or group[std_col].isna().all()):
+                    corr, p_value = calculate_correlations(group, mean_col, std_col, loss_type=loss_type)
+                    correlations.append({
+                        'train_set': 'all_models',
+                        'feature': feature,
+                        'act': act,
+                        'metric': metric,
+                        'correlation': corr,
+                        'p_value': p_value
+                    })
+
+        return pd.DataFrame(correlations)
+
+    def make_correlation_heatmap(correlation_df, loss_type='val_acc'):
+        for act in ['all_activations', 'final_layer_activations', 'input_activations']:
+            try:
+                cdf = correlation_df[(correlation_df['act'] == act)]
+                cdf['correlation'] = pd.to_numeric(cdf['correlation'], errors='coerce')
+                cdf['p_value'] = pd.to_numeric(cdf['p_value'], errors='coerce')
+
+                fig, axes = plt.subplots(1, 3, figsize=(30, 8))
+                fig.suptitle(f'IFR-{loss_type} Correlations (p-values) over using {act}', fontsize=16)
+
+                for idx, metric in enumerate(metric_pairs):
+                    pivot_corr = cdf[cdf['metric'] == metric].pivot(index='feature', columns='train_set', values='correlation')
+                    pivot_pval = cdf[cdf['metric'] == metric].pivot(index='feature', columns='train_set', values='p_value')
+
+                    def format_cell(corr, pval):
+                        if pd.isnull(corr) or pd.isnull(pval):
+                            return 'NaN\n(NaN)'
+                        corr_str = f'{corr:.2f}'
+                        pval_str = f'{pval:.3f}'
+                        if pval < 0.05:
+                            return f'**{corr_str}**\n({pval_str})'
+                        return f'{corr_str}\n({pval_str})'
+
+                    combined = pivot_corr.combine(pivot_pval, format_cell)
+
+                    cbar = True if idx == len(metric_pairs) - 1 else False
+                    mask = pivot_pval >= 0.05
+                    sns.heatmap(pivot_corr, annot=combined, cmap='coolwarm' if loss_type=='loss' else 'coolwarm_r', vmin=-1, vmax=1, center=0, fmt="", mask=mask, ax=axes[idx], cbar=cbar)
+                    axes[idx].set_title(f'{metric.replace("_", " ").title()}')
+                    axes[idx].set_xlabel('Train Set')
+                    if idx == 0:
+                        axes[idx].set_ylabel('Feature')
+                    else:
+                        axes[idx].set_ylabel('')
+
+                plt.tight_layout()
+                path2 = os.path.join(combined_path, 'corrs')
+                os.makedirs(path2, exist_ok=True)
+                plt.savefig(os.path.join(path2, f'{act}-ifr_{loss_type}_combined.png'))
+                plt.close()
+
+            except BaseException as e:
+                print(f'failed for {act}: {e}')
+
+    # Define pairs of mean and std columns for each metric
+    metric_pairs = {
+        'acc': ('acc_mean', 'acc_std'),
+        'novel_acc': ('novel_acc_mean', 'novel_acc_std'),
+        'familiar_acc': ('familiar_acc_mean', 'familiar_acc_std')
     }
 
-    heatmap_colors = mean_df.pivot_table(index='feature', columns='model', values='loss', fill_value=0)
+    for loss_type in ['val_acc', 'loss']:
+        correlation_df = process_correlations(merged_df, metric_pairs, loss_type)
+        make_correlation_heatmap(correlation_df, loss_type)
 
-    heatmap_data = pd.DataFrame(
-        {model: [formatted_values.get((feature, model), '0.00 (0.00)') for feature in heatmap_colors.index]
-         for model in heatmap_colors.columns},
-        index=heatmap_colors.index
-    )
+def make_splom_aux(data, act_type, dir):
+    print('making splom')
+    other_keys = data['other_key'].unique()
+    reshaped_data = pd.DataFrame({
+        key: data[data['other_key'] == key].set_index(['id', 'regime'])['aux_task_loss']
+        for key in other_keys
+    }).reset_index()
+    print('reshaped')
+    plot_vars = [col for col in reshaped_data.columns if col not in ['id', 'regime']]
 
-    plt.figure(figsize=(12, 8))
-    sns.heatmap(heatmap_colors, annot=heatmap_data, cmap='coolwarm', vmin=0, vmax=0.25, center=0.1, fmt="")
-    plt.xlabel('Model')
-    plt.ylabel('Feature')
-    plt.title(f'IFR Scores for {act}, retrain:{retrain}, prior:{prior}')
-    plt.tight_layout()
-    plt.savefig(os.path.join(combined_path, f'{act}-{retrain}-{prior}-ifr_scores.png'))
-    plt.close()
+    if reshaped_data.empty or reshaped_data.isnull().all().all():
+        print(f"No valid data for SPLOM: {act_type}")
+        return
+
+    try:
+        g = sns.PairGrid(reshaped_data, vars=plot_vars, hue='regime', diag_sharey=False, corner=True)
+        g.map_lower(sns.scatterplot, alpha=0.5, s=0.5)
+
+        def log_hist(x, **kwargs):
+            if x.min() <= 0:
+                min_val = x[x > 0].min()  # Find the minimum positive value
+                x = x.clip(lower=min_val)  # Clip values to be at least min_val
+            bins = np.logspace(np.log10(x.min()), np.log10(x.max()), 30)
+            plt.hist(x, bins=bins, **kwargs)
+            plt.xscale('log')
+
+        g.map_diag(log_hist)
+        print('started')
+
+        def corrfunc(x, y, **kws):
+            r, _ = stats.pearsonr(x, y)
+            ax = plt.gca()
+            ax.annotate(f'r = {r:.2f}', xy=(.1, .9), xycoords=ax.transAxes)
+
+        #g.map_upper(corrfunc)
+
+        for i, j in zip(*np.tril_indices_from(g.axes, -1)):
+            g.axes[i, j].set_xscale('log')
+            g.axes[i, j].set_yscale('log')
+
+        title = f'Loss Comparison SPLOM - {act_type.capitalize()} Activations'
+        g.fig.suptitle(title)
+        g.add_legend(title='Regime', bbox_to_anchor=(1.05, 1), loc='upper right')
+
+        filename = f'splom_{act_type}'
+        plt.savefig(os.path.join(dir, f'{filename}.png'), dpi=300, bbox_inches='tight')
+        plt.close()
+        print(f"SPLOM created for {act_type}")
+    except Exception as e:
+        print(f"Error creating SPLOM for {act_type}, Error: {str(e)}")
+        print(f"Data shape: {reshaped_data.shape}, Data types: {reshaped_data.dtypes}")
+        print(f"Data head:\n{reshaped_data.head()}")
 
 def make_splom(merged_df, combined_path, act, retrain, prior):
     print('splom thing', prior, merged_df['epoch'].unique())
-    g = sns.FacetGrid(merged_df, col='feature', row='model', margin_titles=True, sharex=True, sharey=True, )
-    g.map_dataframe(sns.scatterplot, x='loss', y='mean', hue='epoch', palette='viridis')
+    for use_acc in ['loss', 'val_acc']:
+        g = sns.FacetGrid(merged_df, col='feature', row='model', margin_titles=True, sharex=True, sharey=True, )
+        g.map_dataframe(sns.scatterplot, x=use_acc, y='acc_mean', hue='epoch', palette='viridis')
 
-    g.set_axis_labels('IFR Loss', 'Accuracy')
-    g.set_titles(col_template="{col_name}", row_template="{row_name}")
-    g.fig.suptitle(f'IFR vs Acc, {act}, retrain:{retrain}, prior:{prior}, Models and Features', y=1.02)
-
-    plt.tight_layout()
-    plt.savefig(os.path.join(combined_path, f'{act}-{retrain}-{prior}-splom.png'))
-    plt.close()
-
-def make_scatter(merged_df, combined_path, act):
-    print('scatter thing', merged_df['epoch'].unique())
-
-    for feature in merged_df['feature'].unique():
-        plt.figure(figsize=(12, 8))
-
-        this_df = merged_df[merged_df['feature'] == feature]
-
-        plt.scatter(this_df['loss'], this_df['mean'])
+        g.set_axis_labels(f'IFR {use_acc}', 'Model accuracy')
+        g.set_titles(col_template="{col_name}", row_template="{row_name}")
+        g.fig.suptitle(f'IFR {use_acc} vs Acc, {act}, retrain:{retrain}, prior:{prior}, Models and Features', y=1.02)
 
         plt.tight_layout()
-        plt.savefig(os.path.join(combined_path, f'{act}-{feature}-scatter.png'))
+        path2 = os.path.join(combined_path, 'sploms')
+        os.makedirs(path2, exist_ok=True)
+        plt.savefig(os.path.join(path2, f'{act}-{retrain}-{prior}-splom-{use_acc}.png'))
         plt.close()
+
+def make_scatters2(all_indy_all, all_indy_final, other_keys, combined_path):
+    for layer, layername in [(all_indy_all, 'all'), (all_indy_final, 'final')]:
+        for i, key1 in enumerate(other_keys):
+            for j, key2 in enumerate(other_keys):
+                if j < i:
+                    plt.figure(figsize=(10, 8))
+                    data1 = layer[layer['other_key'] == key1][['id', 'aux_task_loss', 'regime']]
+                    data2 = layer[layer['other_key'] == key2][['id', 'aux_task_loss', 'regime']]
+
+                    merged_data = pd.merge(data1, data2, on=['id', 'regime'], suffixes=(f'_{key1}', f'_{key2}'))
+
+                    sns.scatterplot(data=merged_data, x=f'aux_task_loss_{key1}', y=f'aux_task_loss_{key2}', hue='regime', alpha=0.5, s=5)
+
+                    plt.xscale('log')
+                    plt.yscale('log')
+                    plt.title(f'{key2} loss versus {key1} loss ({layername})')
+                    plt.tight_layout()
+                    plt.savefig(os.path.join(combined_path, 'scatters', f'{layername}-{key1}-{key2}.png'))
+                    plt.close()
+
+def make_scatter(merged_df, save_path, act):
+    print('scatter thing', merged_df['epoch'].unique(), merged_df['model'].unique())
+
+    for use_acc in ['val_acc']:#['loss', 'val_acc']:
+        for feature in merged_df['feature'].unique():
+            fig, ax = plt.subplots(figsize=(14, 10))
+
+            this_df = merged_df[(merged_df['feature'] == feature)]
+
+            models = this_df['model'].unique()
+            colors = plt.cm.rainbow(np.linspace(0, 1, len(models)))
+            model_color_map = dict(zip(models, colors))
+
+            for rep in this_df['rep'].unique():
+                rep_df = this_df[this_df['rep'] == rep]
+                rep_df = rep_df.sort_values('epoch')
+
+                for model in models:
+                    model_df = rep_df[rep_df['model'] == model]
+
+                    ax.scatter(model_df[use_acc], model_df['acc_mean'], color=model_color_map[model], alpha=0.3, label=f"{model}" if rep == model_df['rep'].unique()[0] else "")
+
+                    ax.plot(model_df[use_acc], model_df['acc_mean'], color=model_color_map[model], alpha=0.3, linestyle='--')
+            for model in models:
+                # aggregate over reps
+                model_df = this_df[this_df['model'] == model]
+
+                mean_df = model_df.groupby('epoch').agg('mean').reset_index()
+
+                ax.errorbar(mean_df[use_acc], mean_df['acc_mean'],
+                             yerr=mean_df['acc_std'],
+                             fmt='o', capsize=5, capthick=2,
+                             color=model_color_map[model],
+                             label=f"{model}")
+                ax.plot(mean_df[use_acc], mean_df['acc_mean'], color=model_color_map[model], alpha=0.9)
+                ax.scatter(mean_df[use_acc], mean_df['familiar_acc_mean'], marker='^', color=model_color_map[model], alpha=0.9)
+                ax.scatter(mean_df[use_acc], mean_df['novel_acc_mean'], marker='s', color=model_color_map[model], alpha=0.9)
+
+            # this_df has model, our color, and rep/epoch, our line
+            plt.xlabel(use_acc)
+            handles, labels = ax.get_legend_handles_labels()
+            by_label = dict(zip(labels, handles))
+            ax.set_xlim(0, 1)
+            ax.set_ylim(0, 1)
+            ax.legend(by_label.values(), by_label.keys(),
+                      title='Models', bbox_to_anchor=(1.05, 1), loc='upper left')
+            plt.ylabel('model accuracy')
+            plt.title(f'{act} - {feature} - Scatter plot ({use_acc})')
+            plt.tight_layout()
+            path2 = os.path.join(save_path, 'scatters')
+            os.makedirs(path2, exist_ok=True)
+            plt.savefig(os.path.join(path2, f'{act}-{feature}-scatter-{use_acc}.png'))
+            plt.close()
 
 
 def save_key_param_figures(save_dir, key_param_stats, oracle_stats, key_param, key_param_stats_special=[]):

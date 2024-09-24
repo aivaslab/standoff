@@ -127,7 +127,7 @@ def load_data(path, epoch_numbers, repetitions, timesteps=5, skip_imaginary=Fals
                         feature_shape = concatenated_array.shape[1]
                         if feature_shape == 0:
                             continue
-                        new_key = feature.replace("act_label_", "")
+                        new_key = feature.replace("act_", "")
                         concatenated_array = normalize_feature_data(concatenated_array)
 
                         if new_key in ['pred', 'activations_out', 'activations_hidden_short', 'activations_hidden_long', 'oracles']:

@@ -1,5 +1,7 @@
 import os
 import pickle
+
+import h5py
 import numpy as np
 import pandas as pd
 #import scipy.stats
@@ -11,6 +13,8 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from sklearn.cross_decomposition import CCA
 from scipy.spatial.distance import pdist, squareform
+
+from torch.optim.lr_scheduler import ExponentialLR
 
 #from sklearn.manifold import TSNE
 #from sklearn.metrics import mutual_info_score
@@ -109,10 +113,11 @@ def get_model_type(model_type, input_size, input_size2, output_size, hidden_size
 
 def calculate_accuracy(outputs, labels, threshold=0.5):
     binarized_preds = (outputs > threshold).float()
-    correct = (binarized_preds == labels).sum().item()
-    return correct / labels.numel()
+    correct_elements = (binarized_preds == labels)
+    correct_datapoints = correct_elements.all(dim=1)
+    return correct_datapoints.float()
 
-def train_mlp(inputs, other_data, regime_data, regime, opponents_data, patience=5, num_prints=5, num_epochs=25,
+def train_mlp(inputs, other_data, regime_data, regime, opponents_data, datapoint_ids=None, patience=5, num_batches=10000,
               model_type="linear", input_data2=None):
     # Parameters
     input_size = inputs.shape[-1] if "conv" not in model_type else inputs.shape[1]
@@ -124,8 +129,11 @@ def train_mlp(inputs, other_data, regime_data, regime, opponents_data, patience=
     learning_rate = 1e-3
     batch_size = 256
 
+    num_epochs = num_batches // batch_size
+
     all_indices = np.arange(len(inputs))
     train_indices, val_indices = train_test_split(all_indices, test_size=0.10, random_state=42)
+
 
     if regime is not None:
         # print(opponents_data.shape, np.mean(opponents_data, axis=0), opponents_data[0], opponents_data[-1], opponents_data[5000], np.unique(opponents_data))
@@ -147,6 +155,12 @@ def train_mlp(inputs, other_data, regime_data, regime, opponents_data, patience=
 
     act_val = inputs[val_indices]
     other_val = other_data[val_indices]
+    if datapoint_ids is not None:
+        individual_losses = []
+        individual_accuracies = []
+        validation_indices = []
+        datapoint_val = datapoint_ids[val_indices]
+
     if input_data2 is not None:
         input2_val = input_data2[val_indices]
 
@@ -163,8 +177,14 @@ def train_mlp(inputs, other_data, regime_data, regime, opponents_data, patience=
     else:
         train_dataset = TensorDataset(torch.tensor(act_train, dtype=torch.float32).to(device),
                                       torch.tensor(other_train, dtype=torch.float32).to(device))
-        val_dataset = TensorDataset(torch.tensor(act_val, dtype=torch.float32).to(device),
-                                    torch.tensor(other_val, dtype=torch.float32).to(device))
+        if datapoint_ids is None:
+            val_dataset = TensorDataset(torch.tensor(act_val, dtype=torch.float32).to(device),
+                                        torch.tensor(other_val, dtype=torch.float32).to(device))
+        else:
+            val_dataset = TensorDataset(torch.tensor(act_val, dtype=torch.float32).to(device),
+                                        torch.tensor(datapoint_val, dtype=torch.float32).to(device),
+                                        torch.tensor(other_val, dtype=torch.float32).to(device))
+
 
     is_windows = True  # os.name == 'nt'
 
@@ -180,6 +200,7 @@ def train_mlp(inputs, other_data, regime_data, regime, opponents_data, patience=
     criterion = nn.MSELoss()
     slowcriterion = nn.MSELoss(reduction='none')
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-5 if l2_reg else 0)
+    scheduler = ExponentialLR(optimizer, gamma=0.95)
 
     best_val_loss = float('inf')
     epochs_no_improve = 0
@@ -188,49 +209,79 @@ def train_mlp(inputs, other_data, regime_data, regime, opponents_data, patience=
     last_epoch_val_losses = []
     val_accuracies = []
 
+
     for epoch in range(num_epochs):
         model.train()
         epoch_train_losses = []
         for data in train_loader:
-            act_vector, *optional_data = data[:-1]
-            other_vector = data[-1]
+            #act_vector, *optional_data = data[0]
+            #other_vector = data[-1]
+            act_vector, other_vector = data[0], data[1]
             outputs = model(act_vector, *optional_data) if input_data2 is not None else model(act_vector)
             loss = criterion(outputs, other_vector)
             epoch_train_losses.append(loss.item())
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
+        scheduler.step()
 
         model.eval()
         epoch_val_losses = []
         with torch.no_grad():
+            #print(epoch, num_epochs)
             if epoch == num_epochs - 1:
                 for data in val_loader:
-                    act_vector, *optional_data = data[:-1]
-                    other_vector = data[-1]
-                    outputs = model(act_vector, *optional_data) if input_data2 is not None else model(act_vector)
+                    act_vector, other_vector = data[0], data[2]
+                    index_vector = data[1]
+                    #act_vector, *optional_data = data[:-1]
+                    #other_vector = data[-1]
+                    #outputs = model(act_vector, *optional_data) if input_data2 is not None else model(act_vector)
+                    outputs = model(act_vector)
                     val_loss = criterion(outputs, other_vector)
                     val_loss_indy = slowcriterion(outputs, other_vector).mean(dim=1)
                     epoch_val_losses.append(val_loss.item())
                     last_epoch_val_losses.extend(val_loss_indy.tolist())
+                    val_acc_indy = calculate_accuracy(outputs, other_vector)
+                    '''flat_indices = index_vector.cpu().numpy().flatten()
+                    flat_losses = val_loss_indy.cpu().numpy().flatten()
+                    flat_accs = val_acc_indy.cpu().numpy().flatten()
 
-                    val_acc = calculate_accuracy(outputs, other_vector)
-                    val_accuracies.append(val_acc)
+                    for idx, loss, acc in zip(flat_indices, flat_losses, flat_accs):
+                        individual_losses[int(idx)] = float(loss)
+                        individual_accuracies[int(idx)] = float(acc)'''
+
+                    individual_losses.append(val_loss_indy)
+                    individual_accuracies.append(val_acc_indy)
+                    #print('appended')
+                    validation_indices.append(index_vector)
+
+                    val_accuracies.append(val_acc_indy.mean().item())
             else:
                 for data in val_loader:
-                    act_vector, *optional_data = data[:-1]
-                    other_vector = data[-1]
-                    outputs = model(act_vector, *optional_data) if input_data2 is not None else model(act_vector)
+                    #act_vector, *optional_data = data[:-1]
+                    #other_vector = data[-1]
+                    act_vector, other_vector = data[0], data[2]
+                    index_vector = data[1]
+                    #outputs = model(act_vector, *optional_data) if input_data2 is not None else model(act_vector)
+                    outputs = model(act_vector)
                     val_loss = criterion(outputs, other_vector)
                     epoch_val_losses.append(val_loss.item())
 
                     val_acc = calculate_accuracy(outputs, other_vector)
-                    val_accuracies.append(val_acc)
+                    val_accuracies.append(val_acc.mean().item())
+
+        if epoch == num_epochs - 1:
+            individual_losses = torch.cat(individual_losses).cpu().numpy()
+            individual_accuracies = torch.cat(individual_accuracies).cpu().numpy()
+            all_validation_indices = torch.cat(validation_indices).cpu().numpy()
+            individual_losses_dict = dict(zip(all_validation_indices.flatten(), individual_losses))
+            individual_accuracies_dict = dict(zip(all_validation_indices.flatten(), individual_accuracies))
 
         avg_train_loss = sum(epoch_train_losses) / len(epoch_train_losses)
         train_losses.append(avg_train_loss)
         avg_val_loss = sum(epoch_val_losses) / len(epoch_val_losses)
         val_losses.append(avg_val_loss)
+        val_accuracies = [acc.item() if torch.is_tensor(acc) else acc for acc in val_accuracies]
         avg_val_acc = sum(val_accuracies) / len(val_accuracies)
         # if (epoch + 1) % (num_epochs // num_prints) == 0:
         #    print(f'Epoch [{epoch}/{num_epochs}], Training Loss: {loss.item():.4f}, Validation Loss: {avg_val_loss:.4f}' )
@@ -240,11 +291,11 @@ def train_mlp(inputs, other_data, regime_data, regime, opponents_data, patience=
             epochs_no_improve = 0
         else:
             epochs_no_improve += 1
-            if epochs_no_improve == patience:
-                break
-        if avg_val_loss <= 0.005:
-            break
-    return best_val_loss, train_losses, val_losses, last_epoch_val_losses, avg_val_acc, model
+            '''if epochs_no_improve == patience:
+                break'''
+        '''if avg_val_loss <= 0.005:
+            break'''
+    return best_val_loss, train_losses, val_losses, last_epoch_val_losses, avg_val_acc, model, individual_losses_dict, individual_accuracies_dict
 
 
 def compute_vector_correlation(activation_scalars, other_data_vectors):
@@ -336,7 +387,7 @@ def run_mlp_test(correlation_data2, act_key, activations, path):
             print(other_key, len(activations), len(other_data))
 
             assert activations.shape[0] == other_data.shape[0]
-            val_loss, train_losses, val_losses, val_losses_indy, val_acc, model = train_mlp(activations, other_data)
+            val_loss, train_losses, val_losses, val_losses_indy, val_acc, model, _ = train_mlp(activations, other_data)
             '''plt.figure(figsize=(10, 6))
             #plt.plot(train_losses, label='Training Loss')
             plt.plot(val_losses, label='Validation Loss')
@@ -405,44 +456,49 @@ def get_keys(model_type, used_cor_inputs, correlation_data2, correlation_data_co
     return input_keys, output_keys, output_size, input_size, second_input_keys
 
 
-def correlation_thing(activation_keys, correlation_data2, path, umapping=False, cca=False, rsa=False, pearson_figs=False, max_samples=-1, mlp_test=True, repetition=-1, epoch=-1):
+def correlation_thing(activation_keys, correlation_data_inputs, correlation_data_outputs, test_keys, path, umapping=False, cca=False, rsa=False, pearson_figs=False, max_samples=-1, mlp_test=True, repetition=-1, epoch=-1, use_inputs=False):
     # final heatmap is feature vs layer, mean neuron abs correlation
     major_cor_results = {}
     cca_results = {}
     rsa_results = {}
     mlp_results = {}
+    all_individual_losses = {}
+    all_individual_accs = {}
+    identity_data = np.asarray(correlation_data_inputs['act_id'])[:max_samples]
 
-    #print('all keys', correlation_data2.keys())
+    print('all keys', correlation_data_inputs.keys())
 
-    activation_keys = [x for x in correlation_data2.keys() if "_output" in x or "_state" in x]
+    activation_keys = [x for x in correlation_data_inputs.keys() if "_output" in x or "_state" in x]
+    input_keys = [x for x in correlation_data_inputs.keys() if "_input" in x]
     activation_keys.append('scalar')
-    num_samples = len(correlation_data2[activation_keys[0]])
+    num_samples = len(correlation_data_inputs[activation_keys[0]])
     print('keys', activation_keys, num_samples)
 
     #print(np.mean(correlation_data2['act_label_exist']))
 
-    correlation_data2['all_activations'] = [
-        np.concatenate([correlation_data2[key][i] for key in activation_keys])
+    correlation_data_inputs['all_activations'] = [
+        np.concatenate([correlation_data_inputs[key][i] for key in activation_keys if 'input' not in key and 'scalar' not in key])
         for i in range(num_samples)
     ]
-    correlation_data2['last_timestep_activations'] = [
-        np.concatenate([correlation_data2[key][i] for key in activation_keys if "t5" in key or "fc" in key])
+    correlation_data_inputs['final_layer_activations'] = [
+        np.concatenate([correlation_data_inputs[key][i] for key in activation_keys if "fc" in key])
         for i in range(num_samples)
     ]
-    correlation_data2['final_layer_activations'] = [
-        np.concatenate([correlation_data2[key][i] for key in activation_keys if "fc" in key])
-        for i in range(num_samples)
-    ]
-    test_keys = ['act_label_opponents', 'labels', 'pred', 'act_label_loc', 'act_label_b-loc', 'act_label_i-b-loc',
-                 'act_label_big-loc', 'act_label_small-loc',
-                 'act_label_big-b-loc', 'act_label_small-b-loc',
-                 'act_label_big-i-b-loc', 'act_label_small-i-b-loc']#
 
-    real_act_keys = ['last_timestep_activations', 'final_layer_activations']#['all_activations'] #activation_keys + ['all_activations', 'inputs']
-    if repetition == 0 and epoch == 0:
-        real_act_keys.append('scalar')
+    real_act_keys = ['all_activations', 'final_layer_activations', 'input_activations']
+    if not use_inputs:
+        real_act_keys = [x for x in real_act_keys if 'input' not in x]
+    else:
+        correlation_data_inputs['input_activations'] = [
+            np.concatenate([correlation_data_inputs[key][i] for key in input_keys])
+            for i in range(num_samples)
+        ]
+
+    #if repetition == 0 and epoch == 0:
+    #    real_act_keys.append('scalar')
 
     csv_path = os.path.join(path, 'ifr_df.csv')
+    h5_path = os.path.join(path, 'indy_ifr.h5')
     if os.path.exists(csv_path):
         ifr_df = pd.read_csv(csv_path)
     else:
@@ -452,7 +508,7 @@ def correlation_thing(activation_keys, correlation_data2, path, umapping=False, 
         if act_key == 'labels':
             continue
         # each of our activations
-        data = correlation_data2[act_key]
+        data = correlation_data_inputs[act_key]
         activations = np.asarray(data[:max_samples])
         correlation_results = {}
 
@@ -466,12 +522,12 @@ def correlation_thing(activation_keys, correlation_data2, path, umapping=False, 
         #continue
 
         for other_key in tqdm.tqdm(test_keys):
-            other_data = np.asarray(correlation_data2[other_key])[:max_samples]
+            other_data = np.asarray(correlation_data_outputs[other_key])[:max_samples]
             if other_key == '' or 'oracle' in other_key:
                 continue
             if umapping:
                 unique_vectors, integer_labels = np.unique(other_data, axis=0, return_inverse=True)
-            other_key = other_key.replace('act_label_', '')
+            other_key = other_key.replace('act_', '')
 
             if umapping:
                 plt.figure(figsize=(10, 6))
@@ -486,8 +542,10 @@ def correlation_thing(activation_keys, correlation_data2, path, umapping=False, 
 
             if mlp_test and other_key != act_key:
                 assert activations.shape[0] == other_data.shape[0]
-                val_loss, train_losses, val_losses, val_losses_indy, val_acc, _ = train_mlp(activations, other_data, None, None, None, model_type='mlp2')
+                val_loss, train_losses, val_losses, val_losses_indy, val_acc, _, val_loss_indy, val_acc_indy = train_mlp(activations, other_data, None, None, None, model_type='mlp2', num_batches=10000, datapoint_ids=identity_data)
                 mlp_results[(act_key, other_key)] = val_loss
+                all_individual_losses[(act_key, other_key, epoch, repetition)] = val_loss_indy
+                all_individual_accs[(act_key, other_key, epoch, repetition)] = val_acc_indy
                 #all_individual_val_losses[other_key] = val_losses_indy
                 #all_val_losses[other_key] = val_losses
                 ifr_df = ifr_df.append({'epoch': epoch, 'act': act_key, 'feature': other_key, 'rep': repetition, 'type': 'mlp', 'loss': val_loss, 'val_acc': val_acc}, ignore_index=True)
@@ -548,6 +606,22 @@ def correlation_thing(activation_keys, correlation_data2, path, umapping=False, 
     print('saving csv', csv_path)
     ifr_df.to_csv(csv_path, index=False)
 
+    print('saving individual losses h5', h5_path)
+    with h5py.File(h5_path, 'w') as f:
+        for (act_key, other_key, epoch, repetition) in all_individual_losses.keys():
+            dataset_name = f"{act_key}_{other_key}_{epoch}_{repetition}"
+
+            losses = all_individual_losses[(act_key, other_key, epoch, repetition)]
+            accs = all_individual_accs[(act_key, other_key, epoch, repetition)]
+
+            indices = np.array(list(losses.keys()))
+            values = np.array(list(losses.values()))
+            acc_values = np.array(list(accs.values()))
+            f.create_dataset(f"{dataset_name}_indices", data=indices)
+            f.create_dataset(f"{dataset_name}_values", data=values)
+            f.create_dataset(f"{dataset_name}_acc_values", data=acc_values)
+
+
     if train_mlp:
         cca_matrix = np.zeros((len(real_act_keys), len(correlation_results)))
         for i, act_key in enumerate(real_act_keys):
@@ -562,7 +636,10 @@ def correlation_thing(activation_keys, correlation_data2, path, umapping=False, 
         plt.xticks(ticks=np.arange(0.5, len(correlation_results), 1), labels=correlation_results.keys(), rotation=90)
         plt.yticks(ticks=np.arange(0.5, len(real_act_keys), 1), labels=real_act_keys, rotation=0)
         plt.tight_layout()
-        plt.savefig(os.path.join(path, f"layer_mlp_heatmap.png"))
+
+        path2 = os.path.join(path, 'mlp_results')
+        os.makedirs(path2, exist_ok=True)
+        plt.savefig(os.path.join(path2, f"layer_mlp_heatmap.png"))
         plt.close()
 
     # Plotting CCA results
@@ -613,7 +690,7 @@ def correlation_thing(activation_keys, correlation_data2, path, umapping=False, 
     plt.close()
 
 
-def process_activations(path, epoch_numbers, repetitions, timesteps=5, do_best_first=False):
+def process_activations(path, epoch_numbers, repetitions, timesteps=5, do_best_first=False, do_sequences_and_conv=False):
     if do_best_first:
         print('doing best first search')
         f2f_best_first(path, epoch_numbers, repetitions, timesteps=5, train_mlp=train_mlp)
@@ -641,6 +718,7 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=5, do_best_f
             correlation_data = {}
             correlation_data2 = {}
             correlation_data_lstm = {}
+            correlation_data_last_ts = {}
             correlation_data_lstm_inputs = {}
             correlation_data_lstm_outputs = {}
             correlation_data_conv = {}
@@ -659,47 +737,49 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=5, do_best_f
                     #print(f'{key} shape:', concatenated_array.shape)
                     length = concatenated_array.shape[0]
 
-            keys_to_process2 = ['inputs', 'labels', 'pred']
+            keys_to_process2 = ['inputs', 'labels', 'pred', 'id']
+
             for key in keys_to_process2:
                 if key in loaded_activation_data:
                     if key == "pred":
-                        if skip_model_dependent:
-                            continue
+                        #if skip_model_dependent:
+                        #    continue
                         arrays = []
                         for index in range(len(loaded_activation_data[key])):
                             data_array = np.array(loaded_activation_data[key][index]).astype(int)
                             one_hot = np.eye(5)[data_array.reshape(-1)].reshape(data_array.shape[0], -1)
                             arrays.append(one_hot[:, -5:])
-                        correlation_data2[key] = np.concatenate(arrays, axis=0)
+                        correlation_data[key] = np.concatenate(arrays, axis=0)
 
                     elif key == "inputs":
                         # print(np.concatenate(loaded_activation_data[key], axis=0).shape)
                         real_arrays = np.concatenate(loaded_activation_data[key], axis=0).reshape((-1, 5, 5, 7, 7))
 
-                        correlation_data_conv[key + '_stacked'] = real_arrays.reshape((-1, 25, 7, 7))
-                        correlation_data_conv_flat[key + '_stacked'] = real_arrays.reshape((-1, 25 * 7 * 7))
 
-                        for t in range(5):
-                            correlation_data_conv[f'{key}_t{t}'] = real_arrays[:, t, :, :, :].reshape((-1, 5, 7, 7))
-                            correlation_data_conv_flat[f'{key}_t{t}'] = real_arrays[:, t, :, :, :].reshape((-1, 5 * 7 * 7))
-                        for c in range(real_arrays.shape[1]):
-                            correlation_data_conv[f'{key}_c{c}_last'] = real_arrays[:, -1, c, :, :].reshape((-1, 1, 7, 7))
-                            correlation_data_conv_flat[f'{key}_c{c}_last'] = real_arrays[:, -1, c, :, :].reshape((-1, 1 * 7 * 7))
-                            correlation_data_conv[f'{key}_c{c}_h'] = real_arrays[:, :, c, :, :].reshape((-1, 5, 7, 7))
-                            correlation_data_conv_flat[f'{key}_c{c}_h'] = real_arrays[:, :, c, :, :].reshape((-1, 5 * 7 * 7))
-                        for k in correlation_data_conv.keys():
-                            pass
-                            # print("conv shape", k, correlation_data_conv[k].shape)
+                        if do_sequences_and_conv:
+                            correlation_data_conv[key + '_stacked'] = real_arrays.reshape((-1, 25, 7, 7))
+                            correlation_data_conv_flat[key + '_stacked'] = real_arrays.reshape((-1, 25 * 7 * 7))
+                            for t in range(5):
+                                correlation_data_conv[f'{key}_t{t}'] = real_arrays[:, t, :, :, :].reshape((-1, 5, 7, 7))
+                                correlation_data_conv_flat[f'{key}_t{t}'] = real_arrays[:, t, :, :, :].reshape((-1, 5 * 7 * 7))
+                            for c in range(real_arrays.shape[1]):
+                                correlation_data_conv[f'{key}_c{c}_last'] = real_arrays[:, -1, c, :, :].reshape((-1, 1, 7, 7))
+                                correlation_data_conv_flat[f'{key}_c{c}_last'] = real_arrays[:, -1, c, :, :].reshape((-1, 1 * 7 * 7))
+                                correlation_data_conv[f'{key}_c{c}_h'] = real_arrays[:, :, c, :, :].reshape((-1, 5, 7, 7))
+                                correlation_data_conv_flat[f'{key}_c{c}_h'] = real_arrays[:, :, c, :, :].reshape((-1, 5 * 7 * 7))
+                            for k in correlation_data_conv.keys():
+                                pass
+                                # print("conv shape", k, correlation_data_conv[k].shape)
                     else:
                         concatenated_array = np.concatenate(loaded_activation_data[key], axis=0)
                         correlation_data2[key] = concatenated_array
-                    # print(f'{key} shape:', concatenated_array.shape)
+                        #print(f'{key} shape:', concatenated_array.shape)
 
             for key in loaded_activation_data:
                 if not use_i and "i-" in key:
                     continue
-                new_key = key.replace("act_label_", "")
-                if "act_label_" in key:
+                new_key = key.replace("act_", "")
+                if "act_" in key:
                     arrays = []
                     hist_arrays = []
                     for index in range(len(loaded_activation_data[key])):
@@ -709,64 +789,83 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=5, do_best_f
                             reshaped_array = data_array.reshape((5, 5, 7, 7))
                             arrays.append(reshaped_array)
 
-                        if key in ["act_label_opponents", "act_label_vision"]:
+                        if key in ["act_opponents", "act_label_vision"]:
                             one_hot = np.eye(2)[data_array.reshape(-1)].reshape(data_array.shape[0], -1)
                             arrays.append(one_hot[:, -2:])
                             hist_arrays.append(one_hot[:, :])
-                        elif key == "act_label_i-informedness":
+                        elif key == "act_i-informedness":
                             one_hot = np.eye(3)[data_array.reshape(-1)].reshape(data_array.shape[0], data_array.shape[1] * 3)
                             arrays.append(one_hot[:, -6:])
                             hist_arrays.append(one_hot[:, :])
                         else:
                             arrays.append(data_array[:, -(a_len // timesteps):])
                             hist_arrays.append(data_array[:, :])
-                    if key != "act_label_vision" and key != "act_label_box-updated" and key != "act_label_exist":
+                    if key != "act_vision" and key != "act_box-updated" and key != "act_exist":
                         # these variables are always the same at the end of the task, but differ during
                         if use_non_h or new_key == "i-informedness" or new_key == "opponents":  # this one gets used otherwise
                             correlation_data2[new_key] = np.concatenate(arrays, axis=0)
                         # print('cor2shape', new_key, correlation_data2[new_key].shape)
-                    if key != "act_label_opponents" and key != "act_label_informedness":
+                    if key != "act_opponents" and key != "act_informedness" and key != 'act_id' and key != 'act_vision':
                         correlation_data2[new_key + "_h"] = np.concatenate(hist_arrays, axis=0)
                         value = correlation_data2[new_key + "_h"]
                         num_sequences, feature_dim_times_timesteps = value.shape
                         feature_dim = feature_dim_times_timesteps // timesteps
+                        #print(key)
                         new_value = value.reshape((num_sequences, timesteps, feature_dim))
                         correlation_data_lstm[new_key + "_h"] = new_value
-                        # print('corlstmshape', new_key, correlation_data_lstm[new_key + "_h"].shape)
 
-                        modified_sequences = np.zeros((num_sequences * timesteps, timesteps, feature_dim))
-                        modified_final = np.zeros((num_sequences * timesteps, feature_dim))
-                        for i in range(num_sequences):
-                            for num_steps in range(1, timesteps + 1):
-                                sequence = np.zeros((timesteps, feature_dim))
-                                sequence[-num_steps:] = new_value[i, :num_steps]
-                                modified_sequences[i * timesteps + (num_steps - 1)] = sequence
-                                modified_final[i * timesteps + (num_steps - 1)] = sequence[-1]
+                        correlation_data_last_ts[new_key] = correlation_data_lstm[new_key + "_h"][:, -1, :]
+                        #print('corlstmshape', new_key, correlation_data_last_ts[new_key].shape)
 
-                        correlation_data_lstm_inputs[new_key] = modified_sequences
-                        correlation_data_lstm_outputs[new_key] = modified_final
+                        if do_sequences_and_conv:
+                            modified_sequences = np.zeros((num_sequences * timesteps, timesteps, feature_dim))
+                            modified_final = np.zeros((num_sequences * timesteps, feature_dim))
+                            for i in range(num_sequences):
+                                for num_steps in range(1, timesteps + 1):
+                                    sequence = np.zeros((timesteps, feature_dim))
+                                    sequence[-num_steps:] = new_value[i, :num_steps]
+                                    modified_sequences[i * timesteps + (num_steps - 1)] = sequence
+                                    modified_final[i * timesteps + (num_steps - 1)] = sequence[-1]
+
+                            correlation_data_lstm_inputs[new_key] = modified_sequences
+                            correlation_data_lstm_outputs[new_key] = modified_final
                         # print('corstepsshape', new_key, correlation_data_lstm_inputs[new_key].shape)
                         # print('corlastshape', new_key, correlation_data_lstm_outputs[new_key].shape)
+                    #elif key == 'act_opponents':
+                    #    correlation_data_last_ts[key] = correlation_data[key]
+
 
             correlation_data2["scalar"] = np.random.randint(2, size=(1,))
-            print(correlation_data["inputs"].shape)
             correlation_data["scalar"] = np.random.randint(2, size=(8844, 1,))
             # correlation_data_conv["rand_vec5"] = np.random.randint(2, size=(8, 1, 7, 7))
             # correlation_data_conv_flat["rand_vec5"] = np.random.randint(2, size=(length, 1 * 7 * 7))
-            pred_d = correlation_data_lstm_inputs["vision"]
-            pred_d2 = correlation_data_lstm_outputs["vision"]
+            print(correlation_data.keys())
+            pred_d = correlation_data["pred"]
+            labels_d = correlation_data["labels"]
+            #pred_d2 = correlation_data_lstm_outputs["vision"]
             random_indices = np.random.choice(len(pred_d), size=3, replace=False)
-            # print("pred datapoints:", pred_d[random_indices])
+
+            #correlation_data_last_ts["pred"] = correlation_data["pred"]
+            #print("pred datapoints:", pred_d[random_indices], labels_d[random_indices], correlation_data["act_big-loc"][random_indices], correlation_data["act_big-b-loc"][random_indices])
             # print("pred datapoints:", pred_d2[random_indices])
             # print(correlation_data_lstm_inputs.keys())
 
+            test_keys = ['act_opponents', 'labels', 'pred',
+                         'act_big-loc', 'act_small-loc',
+                         'act_big-box', 'act_small-box',
+                         'act_b-loc', 'act_b-box',
+                         'act_target-loc', 'act_target-box',
+                         "act_fb", "act_vision"]
 
-
+            for key in test_keys:
+                if key not in correlation_data_last_ts.keys():
+                    correlation_data_last_ts[key] = correlation_data[key]
+            print(correlation_data["inputs"].shape, correlation_data_last_ts['act_vision'].shape)
             ### Correlation thing
             if True:
-                print('correlation thing!', path)
-                activation_keys = [x for x in correlation_data.keys() if 'act_label' not in x and x not in ['inputs', 'oracles', '', ]]
-                correlation_thing(activation_keys, correlation_data, path, repetition=repetition, epoch=epoch_number)
+                print('running IFR calculation', path)
+                activation_keys = [x for x in correlation_data.keys() if 'act_' not in x and x not in ['inputs', 'oracles', '', ]]
+                correlation_thing(activation_keys, correlation_data, correlation_data_last_ts, test_keys, path, repetition=repetition, epoch=epoch_number)
 
             # MLP F2F DATA
             remove_labels = []
@@ -869,7 +968,7 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=5, do_best_f
                                     # print("using key2", key2)
                                     for regime in unique_regimes:
                                         assert input_data.shape[0] == output_data.shape[0]
-                                        val_loss, train_losses, val_losses, val_losses_indy, val_acc, model = \
+                                        val_loss, train_losses, val_losses, val_losses_indy, val_acc, model, _ = \
                                             train_mlp(input_data, output_data, regime_data=regime_data, regime=regime, opponents_data=opponents_data,
                                                       num_epochs=num_epochs, model_type=model_type, input_data2=input_data2 if not cat else None, )
 

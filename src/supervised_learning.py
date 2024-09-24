@@ -114,10 +114,12 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
     suffix = pref_type + role_type
 
     onehot_labels = ['correct-loc', 'incorrect-loc']
-    extra_labels = ['opponents', 'last-vision-span']
+    extra_labels = ['opponents', 'last-vision-span', 'id'] #we get these manually outside the env
 
     tq = tqdm.tqdm(range(sum(len(conf.stages[cc]['events']) for cc in conf.stages)))
     # tqdm not currently working with subject dominant and subject valence lists
+
+    unique_id = 0 # this is the id of each datapoint
 
     for configName in conf.stages:
         configs = conf.standoff
@@ -228,12 +230,11 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
                             #    print('true inf:', informedness, 'step inf:', info['p_0']['informedness'], info['p_0']['loc'], info['p_0']['b-loc'], eName, 'v',
                             #          temp_labels['vision'], 'bait', temp_labels['bait-treat'], 'swap', temp_labels['swap-treat'])
                             data_labels['opponents'].append(params["num_puppets"])
+                            data_labels['id'].append(unique_id)
+                            unique_id += 1
                             #print(informedness, params["num_puppets"], info['p_0']['shouldGetBig'], info['p_0']['shouldGetSmall'])
 
-                            loc = info['p_0']['loc']
-                            b_loc = info['p_0']['b-loc']
-
-                            identify_mismatches(info, env, informedness, params, data_name, configName, eName, loc, b_loc, counts)
+                            identify_mismatches(info, env, informedness, params, data_name, configName, eName, info['p_0']['loc'], info['p_0']['b-loc'], counts)
 
                             break
 
