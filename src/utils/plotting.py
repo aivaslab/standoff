@@ -623,6 +623,51 @@ def save_double_param_figures(save_dir, top_pairs, avg_loss, last_epoch_df):
         plt.savefig(os.path.join(os.getcwd(), os.path.join(this_save_dir, f'hist_{param1}{param2}.png')))
         plt.close()
 
+def plot_strategy_bar(df, save_dir, strategies, retrain):
+    models = df['Model'].unique()
+
+    for model in models:
+        model_df = df[df['Model'] == model]
+
+        fig, ax = plt.subplots(figsize=(15, 8))
+        fig.suptitle(f'Accuracy by Feature and Strategy for {model}', fontsize=16)
+
+        model_df_melted = pd.melt(model_df,
+                                  id_vars=['Feature', 'strategy'],
+                                  value_vars=['Familiar accuracy (All)', 'Novel accuracy (All)'],
+                                  var_name='Accuracy Type',
+                                  value_name='Accuracy')
+
+        model_df_melted['Accuracy'] = model_df_melted['Accuracy'].astype(float)
+
+        strategies_list = list(strategies.keys())
+        x = np.arange(len(strategies_list))
+        width = 0.35
+        for i, acc_type in enumerate(['Familiar accuracy (All)', 'Novel accuracy (All)']):
+            for j, strategy in enumerate(strategies_list):
+                strategy_data = model_df_melted[(model_df_melted['strategy'] == strategy) &
+                                                (model_df_melted['Accuracy Type'] == acc_type)]
+                features = strategies[strategy]
+                positions = x[j] + np.arange(len(features)) * width - width / 2 + i * width / 2
+
+                ax.bar(positions, strategy_data['Accuracy'], width / 2, label=f'{acc_type} - {strategy}' if j == 0 else "_nolegend_")
+
+        ax.set_ylabel('Accuracy')
+        ax.set_ylim(0, 1)
+        ax.set_xticks(x)
+        ax.set_xticklabels(strategies_list)
+        ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+
+        for j, strategy in enumerate(strategies_list):
+            features = strategies[strategy]
+            positions = x[j] + np.arange(len(features)) * width - width / 2
+            for pos, feature in zip(positions, features):
+                ax.text(pos, -0.05, feature, ha='center', va='top', rotation=45, transform=ax.get_xaxis_transform())
+
+        plt.tight_layout()
+        plt.savefig(os.path.join(save_dir, f'{model}-strategy-bar-retrain{retrain}.png'), bbox_inches='tight')
+        plt.close(fig)
+
 
 def save_key_param_heatmap(save_dir, key_param_stats, key_param):
     this_save_dir = os.path.join(save_dir, 'key_param')

@@ -1,5 +1,6 @@
 import os
 import pickle
+import time
 
 import h5py
 import numpy as np
@@ -456,7 +457,7 @@ def get_keys(model_type, used_cor_inputs, correlation_data2, correlation_data_co
     return input_keys, output_keys, output_size, input_size, second_input_keys
 
 
-def correlation_thing(activation_keys, correlation_data_inputs, correlation_data_outputs, test_keys, path, umapping=False, cca=False, rsa=False, pearson_figs=False, max_samples=-1, mlp_test=True, repetition=-1, epoch=-1, use_inputs=False):
+def correlation_thing(activation_keys, correlation_data_inputs, correlation_data_outputs, test_keys, path, umapping=False, cca=False, rsa=False, pearson_figs=False, max_samples=-1, mlp_test=True, repetition=-1, epoch=-1, use_inputs=True):
     # final heatmap is feature vs layer, mean neuron abs correlation
     major_cor_results = {}
     cca_results = {}
@@ -467,6 +468,8 @@ def correlation_thing(activation_keys, correlation_data_inputs, correlation_data
     identity_data = np.asarray(correlation_data_inputs['act_id'])[:max_samples]
 
     print('all keys', correlation_data_inputs.keys())
+
+    start_time = time.time()
 
     activation_keys = [x for x in correlation_data_inputs.keys() if "_output" in x or "_state" in x]
     input_keys = [x for x in correlation_data_inputs.keys() if "_input" in x]
@@ -497,8 +500,8 @@ def correlation_thing(activation_keys, correlation_data_inputs, correlation_data
     #if repetition == 0 and epoch == 0:
     #    real_act_keys.append('scalar')
 
-    csv_path = os.path.join(path, 'ifr_df.csv')
-    h5_path = os.path.join(path, 'indy_ifr.h5')
+    csv_path = os.path.join(path, f'ifr_df.csv')
+    h5_path = os.path.join(path, f'indy_ifr{repetition}.h5')
     if os.path.exists(csv_path):
         ifr_df = pd.read_csv(csv_path)
     else:
@@ -541,15 +544,16 @@ def correlation_thing(activation_keys, correlation_data_inputs, correlation_data
                 plt.close()
 
             if mlp_test and other_key != act_key:
-                assert activations.shape[0] == other_data.shape[0]
-                val_loss, train_losses, val_losses, val_losses_indy, val_acc, _, val_loss_indy, val_acc_indy = train_mlp(activations, other_data, None, None, None, model_type='mlp2', num_batches=10000, datapoint_ids=identity_data)
-                mlp_results[(act_key, other_key)] = val_loss
-                all_individual_losses[(act_key, other_key, epoch, repetition)] = val_loss_indy
-                all_individual_accs[(act_key, other_key, epoch, repetition)] = val_acc_indy
-                #all_individual_val_losses[other_key] = val_losses_indy
-                #all_val_losses[other_key] = val_losses
-                ifr_df = ifr_df.append({'epoch': epoch, 'act': act_key, 'feature': other_key, 'rep': repetition, 'type': 'mlp', 'loss': val_loss, 'val_acc': val_acc}, ignore_index=True)
-                print(mlp_results)
+                for ifr_rep in [0, 1, 2]:
+                    assert activations.shape[0] == other_data.shape[0]
+                    val_loss, train_losses, val_losses, val_losses_indy, val_acc, _, val_loss_indy, val_acc_indy = train_mlp(activations, other_data, None, None, None, model_type='mlp1', num_batches=10000, datapoint_ids=identity_data)
+                    mlp_results[(act_key, other_key, ifr_rep)] = val_loss
+                    all_individual_losses[(act_key, other_key, epoch, repetition, ifr_rep)] = val_loss_indy
+                    all_individual_accs[(act_key, other_key, epoch, repetition, ifr_rep)] = val_acc_indy
+                    #all_individual_val_losses[other_key] = val_losses_indy
+                    #all_val_losses[other_key] = val_losses
+                    ifr_df = ifr_df.append({'epoch': epoch, 'act': act_key, 'feature': other_key, 'rep': repetition, 'type': 'mlp', 'loss': val_loss, 'val_acc': val_acc, 'ifr_rep': ifr_rep}, ignore_index=True)
+                    print(mlp_results)
 
             #print('data', other_key, other_data[0], len(get_unique_arrays(other_data)))
 
@@ -608,11 +612,11 @@ def correlation_thing(activation_keys, correlation_data_inputs, correlation_data
 
     print('saving individual losses h5', h5_path)
     with h5py.File(h5_path, 'w') as f:
-        for (act_key, other_key, epoch, repetition) in all_individual_losses.keys():
-            dataset_name = f"{act_key}_{other_key}_{epoch}_{repetition}"
+        for (act_key, other_key, epoch, repetition, ifr_rep) in all_individual_losses.keys():
+            dataset_name = f"{act_key}_{other_key}_{epoch}_{repetition}_{ifr_rep}"
 
-            losses = all_individual_losses[(act_key, other_key, epoch, repetition)]
-            accs = all_individual_accs[(act_key, other_key, epoch, repetition)]
+            losses = all_individual_losses[(act_key, other_key, epoch, repetition, ifr_rep)]
+            accs = all_individual_accs[(act_key, other_key, epoch, repetition, ifr_rep)]
 
             indices = np.array(list(losses.keys()))
             values = np.array(list(losses.values()))
@@ -621,6 +625,9 @@ def correlation_thing(activation_keys, correlation_data_inputs, correlation_data
             f.create_dataset(f"{dataset_name}_values", data=values)
             f.create_dataset(f"{dataset_name}_acc_values", data=acc_values)
 
+    elapsed_time = time.time() - start_time
+    time_struct = time.gmtime(elapsed_time)
+    print(f"Finished correlation, took: {time.strftime('%H:%M:%S', time_struct)}")
 
     if train_mlp:
         cca_matrix = np.zeros((len(real_act_keys), len(correlation_results)))
@@ -690,7 +697,7 @@ def correlation_thing(activation_keys, correlation_data_inputs, correlation_data
     plt.close()
 
 
-def process_activations(path, epoch_numbers, repetitions, timesteps=5, do_best_first=False, do_sequences_and_conv=False):
+def process_activations(path, epoch_numbers, repetitions, timesteps=5, do_best_first=False, do_sequences_and_conv=False, use_inputs=False):
     if do_best_first:
         print('doing best first search')
         f2f_best_first(path, epoch_numbers, repetitions, timesteps=5, train_mlp=train_mlp)
@@ -855,17 +862,17 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=5, do_best_f
                          'act_big-box', 'act_small-box',
                          'act_b-loc', 'act_b-box',
                          'act_target-loc', 'act_target-box',
-                         "act_fb", "act_vision"]
+                         "act_fb-loc", "act_vision", "act_fb-exist"]
 
             for key in test_keys:
                 if key not in correlation_data_last_ts.keys():
                     correlation_data_last_ts[key] = correlation_data[key]
-            print(correlation_data["inputs"].shape, correlation_data_last_ts['act_vision'].shape)
+            #print(correlation_data["inputs"].shape, correlation_data_last_ts['act_vision'].shape)
             ### Correlation thing
             if True:
                 print('running IFR calculation', path)
                 activation_keys = [x for x in correlation_data.keys() if 'act_' not in x and x not in ['inputs', 'oracles', '', ]]
-                correlation_thing(activation_keys, correlation_data, correlation_data_last_ts, test_keys, path, repetition=repetition, epoch=epoch_number)
+                correlation_thing(activation_keys, correlation_data, correlation_data_last_ts, test_keys, path, repetition=repetition, epoch=epoch_number, use_inputs=epoch_number==epoch_numbers[0] and use_inputs)
 
             # MLP F2F DATA
             remove_labels = []
@@ -921,7 +928,7 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=5, do_best_f
                     loss_matrices = {str(regime): pd.DataFrame(index=keys1, columns=output_keys) for regime in
                                      unique_regimes}
                     # val_loss_matrix = np.zeros((size1, size))
-                    print(keys1, output_keys)
+                    #print(keys1, output_keys)
                     with tqdm.tqdm(total=size1 * size * len(unique_regimes) * len(compose_targets),
                                    desc='Processing key pairs') as pbar:
                         for target in compose_targets:

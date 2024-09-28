@@ -1,5 +1,6 @@
 import argparse
 import ast
+import itertools
 import json
 import os
 import traceback
@@ -11,11 +12,12 @@ import tqdm
 
 from src.pz_envs import ScenarioConfigs
 from src.supervised_learning import gen_data
-from src.utils.plotting import create_combined_histogram, plot_progression, save_key_param_figures, plot_learning_curves, make_splom, make_ifrscores, make_scatter, make_corr_things, make_splom_aux
+from src.utils.plotting import create_combined_histogram, plot_progression, save_key_param_figures, plot_learning_curves, make_splom, make_ifrscores, make_scatter, make_corr_things, make_splom_aux, plot_strategy_bar
 from supervised_learning_main import run_supervised_session, calculate_statistics, write_metrics_to_file, save_figures, \
     train_model
 import numpy as np
 import random
+from sklearn.feature_selection import mutual_info_regression
 
 import warnings
 
@@ -178,24 +180,28 @@ def load_h5_data(h5_path, regime, retrain, prior):
             if dataset_name.endswith('_indices'):
                 base_name = dataset_name[:-8]  # Remove '_indices'
 
-                new_name = base_name.replace('_act', '-act').replace('_layer', '-layer')
+                new_name = base_name.replace('_act', '-act').replace('_layer', '-layer').replace('acc_values', 'acc-values')
+
                 #act_key, other_key, epoch, repetition = base_name.split('_')
 
-                act_key, other_key = new_name.split('_')
+                act_key, other_key, epoch, repetition, ifr_rep = new_name.split('_')
                 indices = f[f"{base_name}_indices"][:]
                 values = f[f"{base_name}_values"][:]
+                acc_values = f[f"{base_name}_acc_values"][:]
 
-                for idx, value in zip(indices, values):
+                for idx, value, acc_value in zip(indices, values, acc_values):
                     all_data.append({
                         'act_key': act_key,
                         'other_key': other_key,
-                        'epoch': 0,#int(epoch),
-                        'repetition': 0, #int(repetition),
+                        'epoch': int(epoch),
+                        'repetition': int(repetition),
+                        'ifr_rep': int(ifr_rep),
                         'id': idx,
                         'aux_task_loss': value,
                         'regime': regime,
                         'retrain': retrain,
                         'prior': prior,
+                        'acc': acc_value,
                     })
     return pd.DataFrame(all_data)
 
@@ -251,39 +257,108 @@ def group_eval_df(all_epochs_df):
 
 
 def generate_accuracy_tables(combined_df, output_path):
+
     for retrain in [True, False]:
-        df = combined_df[(combined_df['retrain'] == retrain) & (combined_df['prior'] == False)]
+        for acc_name, acc_type in [('accuracy', 'acc')]:#, ('loss', 'aux_task_loss')]:
+            df = combined_df[(combined_df['retrain'] == retrain) & (combined_df['prior'] == False)]
 
-        table_data = []
+            results = []
+            for model in df['regime'].unique():
+                print('model', model)
+                for act in ['all-activations', 'final-layer-activations']:
 
-        combinations = df[['other_key', 'regime']].drop_duplicates()
+                    #print(f"Unique values in 'regime': {df['regime'].unique()}")
+                    #print(f"Unique values in 'act_key': {df['act_key'].unique()}")
 
-        for _, combo in combinations.iterrows():
-            feature, model = combo['other_key'], combo['regime']
-            row = [feature, model]
+                    act_data = df[(df['regime'] == model) & (df['act_key'] == act)]
+                    for is_novel in [False, True]:
+                        task_data = act_data[act_data['is_novel_task'] == is_novel]
+                        grouped = task_data.groupby('id')
+                        for feature in task_data['other_key'].unique():
+                            feature_acc = grouped.apply(lambda x: x[x['other_key'] == feature][acc_type].values[0]).astype(bool)
+                            pred_acc = grouped.apply(lambda x: x[x['other_key'] == 'labels'][acc_type].values[0]).astype(bool)
 
-            for act in ['all-activations', 'final-layer-activations']:
-                act_data = df[(df['other_key'] == feature) &
-                              (df['regime'] == model) &
-                              (df['act_key'] == act)]
+                            f_implies_p = np.logical_or(~feature_acc, pred_acc)
+                            notf_implies_notp = np.logical_or(feature_acc, ~pred_acc)
 
-                all_acc_mean = act_data['aux_task_loss'].mean()
-                all_acc_std = act_data['aux_task_loss'].std()
-                row.append(f"{all_acc_mean:.2f} ({all_acc_std:.2f})")
+                            new_result = {
+                                'retrain': retrain,
+                                'model': model,
+                                'activation': act,
+                                'is_novel': is_novel,
+                                'feature': feature,
+                                'f_implies_p_mean': np.mean(f_implies_p),
+                                'f_implies_p_std': np.std(f_implies_p),
+                                'notf_implies_notp_mean': np.mean(notf_implies_notp),
+                                'notf_implies_notp_std': np.std(notf_implies_notp),
+                            }
 
-                novel_data = act_data[act_data['is_novel_task'] == True]
-                novel_acc_mean = novel_data['aux_task_loss'].mean()
-                novel_acc_std = novel_data['aux_task_loss'].std()
-                row.append(f"{novel_acc_mean:.2f} ({novel_acc_std:.2f})")
+                            results.append(new_result)
+            headers = ['retrain', 'model', 'activation', 'is_novel', 'feature', 'f_implies_p_mean', 'f_implies_p_std', 'notf_implies_notp_mean', 'notf_implies_notp_std']
+            df_output = pd.DataFrame(results, columns=headers)
+            filename = f"{acc_name}_dependencies_retrain_{retrain}.csv"
+            df_output.to_csv(os.path.join(output_path, filename), index=False)
 
-            table_data.append(row)
 
-        headers = ['Feature', 'Model',
-                   'All Loss (All)', 'Novel Loss (All)',
-                   'All Loss (Final)', 'Novel Loss (Final)']
-        df_output = pd.DataFrame(table_data, columns=headers)
-        filename = f"accuracy_table_retrain_{retrain}.csv"
-        df_output.to_csv(f"{output_path}/{filename}", index=False)
+            table_data = []
+            combinations = df[['other_key', 'regime']].drop_duplicates()
+
+            for _, combo in combinations.iterrows():
+                feature, model = combo['other_key'], combo['regime']
+                row = [retrain, feature, model]
+
+                for act in ['all-activations', 'final-layer-activations']:
+                    act_data = df[(df['other_key'] == feature) &
+                                  (df['regime'] == model) &
+                                  (df['act_key'] == act)]
+
+                    for is_novel in [False, True]:
+                        task_data = act_data[act_data['is_novel_task'] == is_novel]
+                        grouped = task_data.groupby('repetition')
+
+                        base_model_means = grouped[acc_type].mean()
+
+                        overall_mean = base_model_means.mean()
+
+                        between_std = base_model_means.std()
+
+                        within_stds = grouped.apply(lambda x: x[acc_type].std())
+
+                        avg_within_std = within_stds.mean() if len(within_stds) > 0 else np.nan
+
+                        row.extend([
+                            f"{overall_mean:.3f}",
+                            f"{between_std:.3f}",
+                            f"{avg_within_std:.3f}"
+                        ])
+
+                table_data.append(row)
+
+            headers = ['retrain', 'Feature', 'Model']
+            for act in ['All', 'Final']:
+                for task in ['Familiar', 'Novel']:
+                    headers.extend([
+                        f'{task} {acc_name} ({act})',
+                        f'{task} between-model std ({act})',
+                        f'{task} within-model std ({act})'
+                    ])
+            df_output = pd.DataFrame(table_data, columns=headers)
+            filename = f"{acc_name}_table_retrain_{retrain}.csv"
+            df_output.to_csv(os.path.join(output_path, filename), index=False)
+
+
+            for strat_type in ['loc', 'box']:
+                strategies = {'NM': ['pred', f'big-{strat_type}', 'opponents', f'small-{strat_type}'],
+                              'PGM': ['vision', 'fb-exist'],
+                              'BDM': ['fb-loc', f'b-{strat_type}', f'target-{strat_type}']}
+
+                df_output['strategy'] = df_output['Feature'].map({feature: strategy for strategy, features in strategies.items() for feature in features})
+
+                path = os.path.join(output_path, f'strats-{strat_type}')
+                os.makedirs(path, exist_ok=True)
+                plot_strategy_bar(df_output, path, strategies, retrain)
+
+
 
 
     for retrain in [True, False]:
@@ -315,7 +390,7 @@ def do_comparison(combined_path_list, last_path_list, key_param_list, key_param,
                 base_name = os.path.basename(folder)
                 base_name = base_name.replace('-retrain', '')
                 df = df.dropna(subset=['epoch'])
-                print('uniques', df['epoch'].unique())
+                #print('uniques', df['epoch'].unique())
                 df['prior'] = df['epoch'] == 0
                 df['model'] = base_name
                 df['retrain'] = 'retrain' in folder
@@ -343,8 +418,9 @@ def do_comparison(combined_path_list, last_path_list, key_param_list, key_param,
         regime = os.path.basename(folder).replace('-retrain', '')
         retrain = 'retrain' in folder
         prior = 'prior' in folder
-        individual_data = load_h5_data(os.path.join(folder, 'indy_ifr.h5'), regime=regime, retrain=retrain, prior=prior)
-        all_indy_data.append(individual_data)
+        for rep in [0, 1, 2]:
+            individual_data = load_h5_data(os.path.join(folder, f'indy_ifr{rep}.h5'), regime=regime, retrain=retrain, prior=prior)
+            all_indy_data.append(individual_data)
     all_indy_df = pd.concat(all_indy_data, ignore_index=True)
 
     if False:
@@ -462,13 +538,13 @@ def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, sk
 
     # labels for ICLR, including size just in case
     labels = [
-        'id',
+        'id', 'i-informedness', # must have these or it will break
         'opponents',
         'big-loc', 'big-box',
         'small-loc', 'small-box',
         'target-loc', 'target-box',
         'b-loc', 'b-box',
-        'fb',
+        'fb-loc', 'fb-exist',
         'vision',
               ]
 
@@ -536,8 +612,8 @@ def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, sk
         key_param_list = []
         session_params['oracle_is_target'] = False
 
-        for label, label_name in [('correct-box', 'box')]:#, ('correct-loc', 'loc')]: #[('correct-loc', 'loc'), ('correct-box', 'box'), ('shouldGetBig', 'size')]:
-            for model_type in ['clstm', ]: #['smlp', 'cnn', 'clstm', ]
+        for label, label_name in [('correct-loc', 'loc')]: #[('correct-loc', 'loc'), ('correct-box', 'box'), ('shouldGetBig', 'size')]:
+            for model_type in ['smlp', 'cnn', 'clstm', ]:
                 for regime in list(fregimes.keys()):
                     kpname = f'{model_type}-{label_name}-{regime}'
                     print(model_type + '-' + label_name, 'regime:', regime, 'train_sets:', fregimes[regime])

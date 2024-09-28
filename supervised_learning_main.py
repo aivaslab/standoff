@@ -1602,8 +1602,8 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
 
     if not skip_activations:
         print('corring activations...')
-        process_activations(save_path, [0, epochs - 1], [x for x in range(repetitions)])
-        process_activations(save_path + '-retrain', [0, epochs - 1], [x for x in range(repetitions)])
+        process_activations(save_path, [0, epochs - 1], [x for x in range(repetitions)], use_inputs=True if "clstm" in save_path else False)
+        process_activations(save_path + '-retrain', [0, epochs - 1], [x for x in range(repetitions)], use_inputs=False)
 
     return dfs_paths, last_epoch_df_paths, loss_paths
 

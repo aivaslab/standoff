@@ -1287,6 +1287,16 @@ class para_MultiGridEnv(ParallelEnv):
             #info["b-correct-box"] = [info["box-locations"][k] if x == 1 else 0 for k, x in enumerate(info["b-correct-loc"])]
             info["i-b-correct-box"] = [info["box-locations"][k] if x == 1 else 0 for k, x in enumerate(info["i-b-correct-loc"])]
 
+            def calculate_fb_loc(actual, belief):
+                fb_loc = [0] * len(actual)
+                for i in range(len(actual)):
+                    if actual[i] != belief[i] and actual[i] in belief:
+                        fb_loc[i] = 1
+
+                return fb_loc
+
+            info["fb-loc"] = calculate_fb_loc(info["loc"], info["b-loc"])
+
             for name in ["loc", "b-loc", "i-b-loc", "b-loc-diff", "i-b-loc-diff"]:
 
                 #info["scalar-" + name] = convert_to_scalar(info[name]) #broken for the diff ones?
@@ -1315,6 +1325,10 @@ class para_MultiGridEnv(ParallelEnv):
             info["b-exist"] = [
                 1 if any(abs(reward - self.bigReward) < tolerance for reward in all_rewards_seen) else 0,
                 1 if any(abs(reward - self.smallReward) < tolerance for reward in all_rewards_seen) else 0
+            ]
+            info["fb-exist"] = [
+                exist != b_exist
+                for exist, b_exist in zip(info["exist"], info["b-exist"])
             ]
             info["i-b-exist"] = [
                 1 if any(abs(reward - self.bigReward) < tolerance for reward in all_rewards_seen_imaginary) else 0,
