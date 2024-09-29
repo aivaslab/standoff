@@ -684,19 +684,21 @@ class CNNModel(nn.Module):
                        'kernels2': kernels2, 'kernel_size2': kernel_size2, 'is_fc': is_fc, 'lr':lr, 'batch_size':batch_size,}
 
         self.input_frames = 5  # Assuming a fixed number of input frames as in the original model
-        self.use_pool = use_pool
-        self.use_conv2 = use_conv2
+        self.use_pool = False
+        self.use_conv2 = True
+
+        print(self.kwargs)
 
         self.conv1 = nn.Conv2d(channels, kernels, kernel_size=kernel_size1, padding=padding1, stride=stride1)
         conv1_output_size = (7 - kernel_size1 + 2 * padding1) // stride1 + 1
 
-        if use_pool:
+        if self.use_pool:
             self.pool = nn.MaxPool2d(kernel_size=pool_kernel_size, stride=pool_stride)
             pool1_output_size = ((conv1_output_size - pool_kernel_size) // pool_stride + 1)
         else:
             pool1_output_size = conv1_output_size
 
-        if use_conv2:
+        if self.use_conv2:
             self.conv2 = nn.Conv2d(kernels, kernels2, kernel_size=kernel_size2, padding=padding2)
             conv2_output_size = ((pool1_output_size - kernel_size2 + 2 * padding2) // stride1 + 1)
             final_output_size = kernels2 * conv2_output_size * conv2_output_size * 5

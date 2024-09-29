@@ -623,6 +623,80 @@ def save_double_param_figures(save_dir, top_pairs, avg_loss, last_epoch_df):
         plt.savefig(os.path.join(os.getcwd(), os.path.join(this_save_dir, f'hist_{param1}{param2}.png')))
         plt.close()
 
+
+def plot_bar_graphs(baselines_df, results_df, save_dir, strategies):
+    for novelty in ['Familiar', 'Novel']:
+        fig, ax = plt.subplots(figsize=(24, 8))
+
+        x = []
+        tick_labels = []
+        group_labels = []
+        width = 0.12
+        datasets = ['s1', 's2', 's3'] if novelty == 'Familiar' else ['s1', 's2']
+
+        colors = plt.cm.get_cmap('tab10')(np.linspace(0, 1, 10))
+
+        for strategy, features in strategies.items():
+            for feature in features:
+                group_start = len(x)
+                baseline = baselines_df[baselines_df['Feature'] == feature]
+
+                for dataset in datasets:
+                    models = [model for model in results_df['Model'].unique() if model.endswith(dataset)]
+                    baseline_models = baseline[baseline['Model'] == dataset]
+
+                    if len(baseline_models) > 0:
+                        tick_labels.append(f"{dataset}")
+                        x.append(len(tick_labels))
+
+                        if feature != 'pred':
+                            baseline_mean = baseline_models[f'{novelty} accuracy (input-activations)'].values[0]
+                            baseline_q1 = baseline_models[f'{novelty} q1 (input-activations)'].values[0]
+                            baseline_q3 = baseline_models[f'{novelty} q3 (input-activations)'].values[0]
+                            ax.bar(x[-1] - width, baseline_mean, width,
+                                   yerr=[[baseline_mean - baseline_q1], [baseline_q3 - baseline_mean]],
+                                   capsize=5, label='baseline (perception)' if len(x) == 4 else "", color='gray')
+
+                    for i, model in enumerate(models, start=1):
+                        results = results_df[(results_df['Feature'] == feature) & (results_df['Model'] == model)]
+                        model_color = colors[i % len(colors)]
+                        if len(results) > 0:
+                            for j, activation_type in enumerate(['all', 'final-layer']):
+                                result_median = results[f'{novelty} accuracy ({activation_type}-activations)'].values[0]
+                                result_q1 = results[f'{novelty} q1 ({activation_type}-activations)'].values[0]
+                                result_q3 = results[f'{novelty} q3 ({activation_type}-activations)'].values[0]
+                                bar_color = mcolors.to_rgba(model_color, alpha=0.7 if j == 0 else 1.0)
+                                ax.bar(x[-1] + (2 * i - 2 + j) * width, result_median, width,
+                                       yerr=[[result_median - result_q1], [result_q3 - result_median]],
+                                       capsize=5, label=f'{model[:-7]} ({activation_type})' if len(x) == 1 else "",
+                                       color=bar_color)
+
+                group_center = (x[group_start] + x[-1]) / 2
+                group_labels.append((group_center, f"{strategy}\n{feature}"))
+
+        ax.set_ylabel('Accuracy')
+        ax.set_ylim(0, 1)
+        ax.set_xlim(min(x) - 0.2, max(x) + 0.7)
+        ax.set_xticks([i + (len(models)*2)*width/2 for i in x])
+        ax.set_xticklabels(tick_labels, rotation=45, ha='right')
+
+        ax.legend(bbox_to_anchor=(1.01, 1), loc='upper left')
+
+        for center, label in group_labels:
+            ax.text(center, -0.1, label, ha='center', va='top', transform=ax.get_xaxis_transform(), fontweight='bold')
+
+        # Add vertical lines to separate strategies
+        cumulative = 0
+        for strategy, features in strategies.items():
+            cumulative += len(features) * len(datasets)
+            ax.axvline(x=cumulative - 0.5, color='gray', linestyle='--', alpha=0.5)
+
+        plt.subplots_adjust(bottom=0.2, left=0.01, right=0.99, top=0.92)
+        #plt.tight_layout()
+        fig.suptitle(f'{novelty} Accuracy Comparison', fontsize=16)
+        plt.savefig(f'{save_dir}/{novelty.lower()}_accuracy_comparison.png', bbox_inches='tight')
+        plt.close(fig)
+
 def plot_strategy_bar(df, save_dir, strategies, retrain, small_mode=False):
     models = df['Model'].unique()
 
