@@ -256,49 +256,52 @@ def group_eval_df(all_epochs_df):
     return grouped_df
 
 
-def generate_accuracy_tables(combined_df, output_path):
+def do_prediction_dependency(df, acc_name, output_path, retrain):
+    results = []
+    for model in df['regime'].unique():
+        print('model', model)
+        for act in ['all-activations', 'final-layer-activations']:
 
+            # print(f"Unique values in 'regime': {df['regime'].unique()}")
+            # print(f"Unique values in 'act_key': {df['act_key'].unique()}")
+
+            act_data = df[(df['regime'] == model) & (df['act_key'] == act)]
+            for is_novel in [False, True]:
+                task_data = act_data[act_data['is_novel_task'] == is_novel]
+                grouped = task_data.groupby('id')
+                for feature in task_data['other_key'].unique():
+                    feature_acc = grouped.apply(lambda x: x[x['other_key'] == feature][acc_type].values[0]).astype(bool)
+                    pred_acc = grouped.apply(lambda x: x[x['other_key'] == 'labels'][acc_type].values[0]).astype(bool)
+
+                    f_implies_p = np.logical_or(~feature_acc, pred_acc)
+                    notf_implies_notp = np.logical_or(feature_acc, ~pred_acc)
+
+                    new_result = {
+                        'retrain': retrain,
+                        'model': model,
+                        'activation': act,
+                        'is_novel': is_novel,
+                        'feature': feature,
+                        'f_implies_p_mean': np.mean(f_implies_p),
+                        'f_implies_p_std': np.std(f_implies_p),
+                        'notf_implies_notp_mean': np.mean(notf_implies_notp),
+                        'notf_implies_notp_std': np.std(notf_implies_notp),
+                    }
+
+                    results.append(new_result)
+    headers = ['retrain', 'model', 'activation', 'is_novel', 'feature', 'f_implies_p_mean', 'f_implies_p_std', 'notf_implies_notp_mean', 'notf_implies_notp_std']
+    df_output = pd.DataFrame(results, columns=headers)
+    filename = f"{acc_name}_dependencies_retrain_{retrain}.csv"
+    df_output.to_csv(os.path.join(output_path, filename), index=False)
+
+
+def generate_accuracy_tables(combined_df, output_path, do_prediction_dep=False, small_mode=False):
     for retrain in [True, False]:
         for acc_name, acc_type in [('accuracy', 'acc')]:#, ('loss', 'aux_task_loss')]:
             df = combined_df[(combined_df['retrain'] == retrain) & (combined_df['prior'] == False)]
 
-            results = []
-            for model in df['regime'].unique():
-                print('model', model)
-                for act in ['all-activations', 'final-layer-activations']:
-
-                    #print(f"Unique values in 'regime': {df['regime'].unique()}")
-                    #print(f"Unique values in 'act_key': {df['act_key'].unique()}")
-
-                    act_data = df[(df['regime'] == model) & (df['act_key'] == act)]
-                    for is_novel in [False, True]:
-                        task_data = act_data[act_data['is_novel_task'] == is_novel]
-                        grouped = task_data.groupby('id')
-                        for feature in task_data['other_key'].unique():
-                            feature_acc = grouped.apply(lambda x: x[x['other_key'] == feature][acc_type].values[0]).astype(bool)
-                            pred_acc = grouped.apply(lambda x: x[x['other_key'] == 'labels'][acc_type].values[0]).astype(bool)
-
-                            f_implies_p = np.logical_or(~feature_acc, pred_acc)
-                            notf_implies_notp = np.logical_or(feature_acc, ~pred_acc)
-
-                            new_result = {
-                                'retrain': retrain,
-                                'model': model,
-                                'activation': act,
-                                'is_novel': is_novel,
-                                'feature': feature,
-                                'f_implies_p_mean': np.mean(f_implies_p),
-                                'f_implies_p_std': np.std(f_implies_p),
-                                'notf_implies_notp_mean': np.mean(notf_implies_notp),
-                                'notf_implies_notp_std': np.std(notf_implies_notp),
-                            }
-
-                            results.append(new_result)
-            headers = ['retrain', 'model', 'activation', 'is_novel', 'feature', 'f_implies_p_mean', 'f_implies_p_std', 'notf_implies_notp_mean', 'notf_implies_notp_std']
-            df_output = pd.DataFrame(results, columns=headers)
-            filename = f"{acc_name}_dependencies_retrain_{retrain}.csv"
-            df_output.to_csv(os.path.join(output_path, filename), index=False)
-
+            if do_prediction_dep:
+                do_prediction_dependency(df, acc_name, output_path, retrain)
 
             table_data = []
             combinations = df[['other_key', 'regime']].drop_duplicates()
@@ -307,7 +310,12 @@ def generate_accuracy_tables(combined_df, output_path):
                 feature, model = combo['other_key'], combo['regime']
                 row = [retrain, feature, model]
 
-                for act in ['all-activations', 'final-layer-activations']:
+                if small_mode:
+                    act_types = ['input-activations']
+                else:
+                    act_types = ['all-activations', 'final-layer-activations']
+
+                for act in act_types:
                     act_data = df[(df['other_key'] == feature) &
                                   (df['regime'] == model) &
                                   (df['act_key'] == act)]
@@ -315,15 +323,12 @@ def generate_accuracy_tables(combined_df, output_path):
                     for is_novel in [False, True]:
                         task_data = act_data[act_data['is_novel_task'] == is_novel]
                         grouped = task_data.groupby('repetition')
+                        print(grouped.size())
 
                         base_model_means = grouped[acc_type].mean()
-
                         overall_mean = base_model_means.mean()
-
                         between_std = base_model_means.std()
-
                         within_stds = grouped.apply(lambda x: x[acc_type].std())
-
                         avg_within_std = within_stds.mean() if len(within_stds) > 0 else np.nan
 
                         row.extend([
@@ -334,8 +339,13 @@ def generate_accuracy_tables(combined_df, output_path):
 
                 table_data.append(row)
 
+            if small_mode:
+                act_types = ['input']
+            else:
+                act_types = ['All', 'Final']
+
             headers = ['retrain', 'Feature', 'Model']
-            for act in ['All', 'Final']:
+            for act in act_types:
                 for task in ['Familiar', 'Novel']:
                     headers.extend([
                         f'{task} {acc_name} ({act})',
@@ -343,20 +353,22 @@ def generate_accuracy_tables(combined_df, output_path):
                         f'{task} within-model std ({act})'
                     ])
             df_output = pd.DataFrame(table_data, columns=headers)
-            filename = f"{acc_name}_table_retrain_{retrain}.csv"
+            filename = f"{acc_name}_table_retrain_{retrain}.csv" if not small_mode else f"base_{acc_name}_table_retrain_{retrain}.csv"
             df_output.to_csv(os.path.join(output_path, filename), index=False)
 
 
-            for strat_type in ['loc', 'box']:
+            for strat_type in ['loc']:#, 'box']:
                 strategies = {'NM': ['pred', f'big-{strat_type}', 'opponents', f'small-{strat_type}'],
                               'PGM': ['vision', 'fb-exist'],
-                              'BDM': ['fb-loc', f'b-{strat_type}', f'target-{strat_type}']}
+                              'BDM': ['fb-loc', f'b-{strat_type}', f'target-{strat_type}', 'labels']}
 
                 df_output['strategy'] = df_output['Feature'].map({feature: strategy for strategy, features in strategies.items() for feature in features})
 
+                print(df_output.head())
+
                 path = os.path.join(output_path, f'strats-{strat_type}')
                 os.makedirs(path, exist_ok=True)
-                plot_strategy_bar(df_output, path, strategies, retrain)
+                plot_strategy_bar(df_output, path, strategies, retrain, small_mode=small_mode)
 
 
 
@@ -411,8 +423,18 @@ def do_comparison(combined_path_list, last_path_list, key_param_list, key_param,
     print('duplicates removed', current_length, len(combined_ifr_df))
     #plot_learning_curves(combined_path, lp_list)
 
+    print('loading baseline h5s!!!!!')
+    all_baseline_data = []
+    base_path = os.path.dirname(list(folder_paths)[0])
+    for regime in ['s1', 's2', 's3']:
+        individual_data = load_h5_data(os.path.join(base_path, f'indy_ifr_base-{regime}-0.h5'), regime=regime, retrain=False, prior=False)
+        all_baseline_data.append(individual_data)
+    all_baseline_df = pd.concat(all_baseline_data, ignore_index=True)
+    print(all_baseline_df['act_key'].unique())
+
+
     ### Get individual data
-    print('loading h5s')
+    print('loading model h5s')
     all_indy_data = []
     for folder in folder_paths:
         regime = os.path.basename(folder).replace('-retrain', '')
@@ -422,6 +444,7 @@ def do_comparison(combined_path_list, last_path_list, key_param_list, key_param,
             individual_data = load_h5_data(os.path.join(folder, f'indy_ifr{rep}.h5'), regime=regime, retrain=retrain, prior=prior)
             all_indy_data.append(individual_data)
     all_indy_df = pd.concat(all_indy_data, ignore_index=True)
+    print(all_indy_df['act_key'].unique())
 
     if False:
         all_indy_all = all_indy_df[all_indy_df['act_key'] == 'all-activations']
@@ -434,15 +457,20 @@ def do_comparison(combined_path_list, last_path_list, key_param_list, key_param,
 
     all_epochs_df = load_dataframes(combined_path_list, key_param_list, key_param)
     all_epochs_df['is_novel_task'] = all_epochs_df.apply(is_novel_task, axis=1)
-    print('columns and epochs', all_epochs_df.columns, all_epochs_df['epoch'].unique())
+    #print('columns and epochs', all_epochs_df.columns, all_epochs_df['epoch'].unique())
+
+    all_epochs_df['regime_short'] = all_epochs_df['regime'].str[-2:]
+    merged_baselines = pd.merge(all_baseline_df, all_epochs_df[['id', 'regime_short', 'is_novel_task']], left_on=['id', 'regime'], right_on=['id', 'regime_short'], how='left')
+    all_baselines_df = merged_baselines
+    print(all_baselines_df.head())
 
     # figure out whether each item in all_indy_df is novel:
     merged_df = pd.merge(all_indy_df, all_epochs_df[['id', 'regime', 'is_novel_task']], on=['id', 'regime'], how='left')
-    print(len(merged_df), merged_df.head())
     all_indy_df = merged_df
 
     print('generating accuracy tables')
-    generate_accuracy_tables(all_indy_df, combined_path)
+    baseline_tables = generate_accuracy_tables(all_baselines_df, combined_path, small_mode=True)
+    result_tables = generate_accuracy_tables(all_indy_df, combined_path)
 
     print('Original columns and epochs:', all_epochs_df.columns, all_epochs_df['epoch'].unique())
 
@@ -537,14 +565,17 @@ def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, sk
     ]
 
     # labels for ICLR, including size just in case
+
+    model_type = "loc" # or box
     labels = [
         'id', 'i-informedness', # must have these or it will break
         'opponents',
-        'big-loc', 'big-box',
-        'small-loc', 'small-box',
-        'target-loc', 'target-box',
-        'b-loc', 'b-box',
-        'fb-loc', 'fb-exist',
+        'big-loc',
+        'small-loc',
+        'target-loc',
+        'b-loc',
+        'fb-loc',
+        'fb-exist',
         'vision',
               ]
 
@@ -613,7 +644,7 @@ def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, sk
         session_params['oracle_is_target'] = False
 
         for label, label_name in [('correct-loc', 'loc')]: #[('correct-loc', 'loc'), ('correct-box', 'box'), ('shouldGetBig', 'size')]:
-            for model_type in ['smlp', 'cnn', 'clstm', ]:
+            for model_type in ['smlp', 'cnn']:#['smlp', 'cnn', 'clstm', ]:
                 for regime in list(fregimes.keys()):
                     kpname = f'{model_type}-{label_name}-{regime}'
                     print(model_type + '-' + label_name, 'regime:', regime, 'train_sets:', fregimes[regime])

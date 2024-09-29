@@ -623,8 +623,12 @@ def save_double_param_figures(save_dir, top_pairs, avg_loss, last_epoch_df):
         plt.savefig(os.path.join(os.getcwd(), os.path.join(this_save_dir, f'hist_{param1}{param2}.png')))
         plt.close()
 
-def plot_strategy_bar(df, save_dir, strategies, retrain):
+def plot_strategy_bar(df, save_dir, strategies, retrain, small_mode=False):
     models = df['Model'].unique()
+
+    vars = ['Familiar accuracy (All)', 'Novel accuracy (All)']
+    if small_mode:
+        vars = ['Familiar accuracy (input)', 'Novel accuracy (input)']
 
     for model in models:
         model_df = df[df['Model'] == model]
@@ -634,7 +638,7 @@ def plot_strategy_bar(df, save_dir, strategies, retrain):
 
         model_df_melted = pd.melt(model_df,
                                   id_vars=['Feature', 'strategy'],
-                                  value_vars=['Familiar accuracy (All)', 'Novel accuracy (All)'],
+                                  value_vars=vars,
                                   var_name='Accuracy Type',
                                   value_name='Accuracy')
 
@@ -642,8 +646,8 @@ def plot_strategy_bar(df, save_dir, strategies, retrain):
 
         strategies_list = list(strategies.keys())
         x = np.arange(len(strategies_list))
-        width = 0.35
-        for i, acc_type in enumerate(['Familiar accuracy (All)', 'Novel accuracy (All)']):
+        width = 0.3
+        for i, acc_type in enumerate(vars):
             for j, strategy in enumerate(strategies_list):
                 strategy_data = model_df_melted[(model_df_melted['strategy'] == strategy) &
                                                 (model_df_melted['Accuracy Type'] == acc_type)]
