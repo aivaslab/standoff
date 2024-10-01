@@ -624,7 +624,7 @@ def save_double_param_figures(save_dir, top_pairs, avg_loss, last_epoch_df):
         plt.close()
 
 
-def create_faceted_heatmap(data, novelty, layer, output_file):
+def create_faceted_heatmap(data, novelty, layer, output_file, strategies):
     datasets = ['s1', 's2', 's3'] if novelty == False else ['s1', 's2']
     architectures = ['mlp', 'cnn', 'clstm']
     #layers = ['all', 'last']
@@ -632,6 +632,8 @@ def create_faceted_heatmap(data, novelty, layer, output_file):
 
     fig, axes = plt.subplots(len(datasets), len(architectures), figsize=(5 * len(architectures), 5 * len(datasets)))
     fig.suptitle(f"Prediction Dependency Heatmap - {'Novel' if novelty else 'Familiar'} Tasks", fontsize=16)
+    ordered_features = [f for group in strategies.values() for f in group if f in features]
+
 
     for i, dataset in enumerate(datasets):
         for j, architecture in enumerate(architectures):
@@ -643,7 +645,8 @@ def create_faceted_heatmap(data, novelty, layer, output_file):
                           (data['activation'] == layer)]
 
             heatmap_data = []
-            for feature in features:
+            annotations = []
+            for feature in ordered_features:
                 feature_data = subset[subset['feature'] == feature]
                 if not feature_data.empty:
                     f_implies_p = feature_data['f_implies_p_mean'].values[0]
@@ -651,16 +654,33 @@ def create_faceted_heatmap(data, novelty, layer, output_file):
                     notf_implies_notp = feature_data['notf_implies_notp_mean'].values[0]
                     notf_implies_notp_std = feature_data['notf_implies_notp_std'].values[0]
                     heatmap_data.append([f_implies_p, notf_implies_notp])
+                    annotations.append([f"{f_implies_p:.3f} ({f_implies_p_std:.3f})", f"{notf_implies_notp:.3f} ({notf_implies_notp_std:.3f})"])
                 else:
                     print(f"Warning: No data for {feature} in {dataset}-{architecture}")
                     heatmap_data.append([0, 0])
+                    annotations.append(["0.000 (±0.000)", "0.000 (±0.000)"])
 
-            sns.heatmap(heatmap_data, annot=True, fmt='.3f', cmap='YlOrRd', cbar=False, ax=ax)
+            sns.heatmap(heatmap_data, annot=np.array(annotations), fmt='', cmap='YlOrRd', cbar=False, ax=ax, annot_kws={'size': 12})
 
-            ax.set_title(f"{dataset.upper()} - {architecture.upper()}")
-            ax.set_yticks(np.arange(len(features)) + 0.5)
-            ax.set_yticklabels(features, rotation=0)
-            ax.set_xticks([])
+            if i == 0:
+                ax.set_title(f"{architecture.upper()}")
+            #ax.set_yticks(np.arange(len(ordered_features)) + 0.5)
+            ax.set_yticklabels(ordered_features, rotation=0)
+            #ax.set_xticks([0.5, 1.5])
+            ax.set_xticklabels(['P(A|F)', 'P(¬A|¬F)'])
+            ax.tick_params(axis='both', which='both', length=0)
+
+            if j == 0:
+                ax.set_ylabel(dataset.upper(), rotation=0, ha='right', va='center', fontsize=12)
+                ax.set_yticklabels(ordered_features, rotation=0)
+            else:
+                ax.set_yticklabels([])
+
+            if i == len(datasets) - 1:
+                ax.xaxis.set_ticks_position('bottom')
+            else:
+                ax.set_xticklabels([])
+
 
     plt.tight_layout(rect=[0, 0.03, 1, 0.95])
     plt.savefig(output_file, dpi=300, bbox_inches='tight')
@@ -742,7 +762,17 @@ def plot_bar_graphs_special(baselines_df, results_df, save_dir, strategies):
         plt.savefig(f'{save_dir}/{strategy.lower()}_spec_accuracy_comparison.png', bbox_inches='tight')
         plt.close(fig)
 
-def plot_bar_graphs(baselines_df, results_df, save_dir, strategies):
+def get_sort_key(model):
+    if 'mlp' in model.lower():
+        return 1
+    elif 'cnn' in model.lower():
+        return 2
+    elif 'lstm' in model.lower():
+        return 3
+    else:
+        return 4
+
+def plot_bar_graphs(baselines_df, results_df, save_dir, strategies, one_dataset=True, one_model=False):
     for novelty in ['Familiar', 'Novel']:
         fig, ax = plt.subplots(figsize=(24, 8))
 
@@ -752,7 +782,12 @@ def plot_bar_graphs(baselines_df, results_df, save_dir, strategies):
         group_labels = []
         strat_labels = []
         width = 0.2
+        if one_model:
+            width += 0.2
         datasets = ['s1', 's2', 's3'] if novelty == 'Familiar' else ['s1', 's2']
+        if one_dataset:
+            datasets = ['s2']
+
 
         colors = plt.cm.get_cmap('Dark2')(np.linspace(0, 1, 10))
 
@@ -764,6 +799,8 @@ def plot_bar_graphs(baselines_df, results_df, save_dir, strategies):
 
                 for dataset in datasets:
                     models = [model for model in results_df['Model'].unique() if model.endswith(dataset)]
+
+                    models = sorted(models,key=get_sort_key)
                     baseline_models = baseline[baseline['Model'] == dataset]
 
                     if len(baseline_models) > 0:
@@ -779,9 +816,15 @@ def plot_bar_graphs(baselines_df, results_df, save_dir, strategies):
                                    yerr=[[baseline_mean - baseline_q1], [baseline_q3 - baseline_mean]],
                                    capsize=5, label='baseline (perception)' if len(x) == 4 else "", color='gray')
 
-                    for i, model in enumerate(models, start=1):
+                    if one_model:
+                        models_real = [model for model in models if 'lstm' in model]
+                    else:
+                        models_real = models
+
+                    models_real = sorted(models_real, key=get_sort_key)
+                    for i, model in enumerate(models_real, start=1):
                         results = results_df[(results_df['Feature'] == feature) & (results_df['Model'] == model)]
-                        model_color = colors[i % len(colors)]
+                        model_color = colors[(i + 2 * (one_model)) % len(colors)]
                         if len(results) > 0:
                             for j, activation_type in enumerate(['all']): #all, final-layer
                                 result_median = results[f'{novelty} accuracy ({activation_type}-activations)'].values[0]
@@ -813,7 +856,10 @@ def plot_bar_graphs(baselines_df, results_df, save_dir, strategies):
 
         plt.subplots_adjust(bottom=0.2, left=0.01, right=0.99, top=0.92)
         fig.suptitle(f'{novelty} Accuracy Comparison', fontsize=16)
-        plt.savefig(f'{save_dir}/{novelty.lower()}_accuracy_comparison.png', bbox_inches='tight')
+        title = f'{save_dir}/{novelty.lower()}_accuracy_comparison.png' if not one_dataset else f'{save_dir}/{novelty.lower()}_accuracy_comparison-s2.png'
+        if one_model:
+            title = f'{save_dir}/{novelty.lower()}_accuracy_comparison-clstm.png'
+        plt.savefig(title, bbox_inches='tight')
         plt.close(fig)
 
 def plot_strategy_bar(df, save_dir, strategies, retrain, small_mode=False):

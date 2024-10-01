@@ -126,8 +126,8 @@ def train_mlp(inputs, other_data, regime_data, regime, opponents_data, datapoint
         input_size2 = input_data2.shape[-1] if "conv" not in model_type else inputs.shape[1]
     output_size = other_data.shape[1]
     hidden_size = 32
-    learning_rate = 1e-3
-    batch_size = 256
+    learning_rate = 1e-2
+    batch_size = 128
 
     num_epochs = num_batches // batch_size
 
@@ -138,7 +138,7 @@ def train_mlp(inputs, other_data, regime_data, regime, opponents_data, datapoint
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
 
-    train_indices, val_indices = train_test_split(all_indices, test_size=0.10, random_state=42) # all models use same train/test split for comparison of datapoints
+    train_indices, val_indices = train_test_split(all_indices, test_size=0.10, random_state=42, shuffle=False) # all models use same train/test split for comparison of datapoints
 
 
     if regime is not None:
@@ -180,6 +180,7 @@ def train_mlp(inputs, other_data, regime_data, regime, opponents_data, datapoint
         val_dataset = TensorDataset(torch.tensor(act_val, dtype=torch.float32).to(device),
                                     torch.tensor(input2_val, dtype=torch.float32).to(device),
                                     torch.tensor(other_val, dtype=torch.float32).to(device))
+        print('train data has other on index 2')
     else:
         train_dataset = TensorDataset(torch.tensor(act_train, dtype=torch.float32).to(device),
                                       torch.tensor(other_train, dtype=torch.float32).to(device))
@@ -207,8 +208,9 @@ def train_mlp(inputs, other_data, regime_data, regime, opponents_data, datapoint
 
     criterion = nn.MSELoss()
     slowcriterion = nn.MSELoss(reduction='none')
-    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-5 if l2_reg else 0)
-    scheduler = ExponentialLR(optimizer, gamma=0.95)
+    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+    #optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate)
+    scheduler = ExponentialLR(optimizer, gamma=0.99)
 
     best_val_loss = float('inf')
     train_losses = []
@@ -263,19 +265,21 @@ def train_mlp(inputs, other_data, regime_data, regime, opponents_data, datapoint
                     validation_indices.append(index_vector)
 
                     val_accuracies.append(val_acc_indy.mean().item())
+                #print('acc', val_acc_indy.mean().item())
             else:
                 for data in val_loader:
                     #act_vector, *optional_data = data[:-1]
                     #other_vector = data[-1]
                     act_vector, other_vector = data[0], data[2]
-                    index_vector = data[1]
+                    #index_vector = data[1]
                     #outputs = model(act_vector, *optional_data) if input_data2 is not None else model(act_vector)
                     outputs = model(act_vector)
+                    #print(outputs[-1], other_vector[-1])
                     val_loss = criterion(outputs, other_vector)
                     epoch_val_losses.append(val_loss.item())
 
-                    val_acc = calculate_accuracy(outputs, other_vector)
-                    val_accuracies.append(val_acc.mean().item())
+                    val_accuracies.append(calculate_accuracy(outputs, other_vector).mean().item())
+                #print('acc', val_accuracies[-1])
 
         if epoch == num_epochs - 1:
             individual_losses = torch.cat(individual_losses).cpu().numpy()
@@ -290,11 +294,8 @@ def train_mlp(inputs, other_data, regime_data, regime, opponents_data, datapoint
         val_losses.append(avg_val_loss)
         val_accuracies = [acc.item() if torch.is_tensor(acc) else acc for acc in val_accuracies]
         avg_val_acc = sum(val_accuracies) / len(val_accuracies)
-        # if (epoch + 1) % (num_epochs // num_prints) == 0:
-        #    print(f'Epoch [{epoch}/{num_epochs}], Training Loss: {loss.item():.4f}, Validation Loss: {avg_val_loss:.4f}' )
 
-
-    print('loss was', best_val_loss, avg_val_acc)
+    #print('loss was', best_val_loss, avg_val_acc, val_acc)
     return best_val_loss, train_losses, val_losses, last_epoch_val_losses, avg_val_acc, model, individual_losses_dict, individual_accuracies_dict
 
 
@@ -564,6 +565,7 @@ def correlation_thing(activation_keys, correlation_data_inputs, correlation_data
                         all_individual_accs[(act_key, other_key, epoch, repetition, ifr_rep, model_type)] = val_acc_indy
                         #all_individual_val_losses[other_key] = val_losses_indy
                         #all_val_losses[other_key] = val_losses
+                        print('val acc', val_acc)
                         ifr_df = ifr_df.append({'epoch': epoch, 'act': act_key, 'feature': other_key, 'rep': repetition, 'type': model_type, 'loss': val_loss, 'val_acc': val_acc, 'ifr_rep': ifr_rep}, ignore_index=True)
                     #print(mlp_results)
 
@@ -717,19 +719,20 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=5, do_best_f
 
     use_i = False
     use_non_h = False
-    use_inputs = False
+    use_inputs = True
 
-    desired_path = "s2"
+    desired_path = "s1"
     if desired_path not in path and use_inputs:
         print('go fish')
         return None
 
     ### clear the existing ifr_df, also do the h5s
-    if os.path.exists(os.path.join(path, 'ifr_df.csv')):
-        print('Clearing existing ifr csv path at', path)
-        os.remove(os.path.join(path, 'ifr_df.csv'))
-    else:
-        print('No existing ifr csv file found at', path)
+    if not use_inputs:
+        if os.path.exists(os.path.join(path, 'ifr_df.csv')):
+            print('Clearing existing ifr csv path at', path)
+            os.remove(os.path.join(path, 'ifr_df.csv'))
+        else:
+            print('No existing ifr csv file found at', path)
 
     print('repetitions', repetitions, path)
 
@@ -873,7 +876,11 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=5, do_best_f
                          "act_fb-loc",
                          "act_vision",
                          "act_fb-exist",
-                         "act_i-informedness"]
+                         ]
+
+            if use_inputs:
+                test_keys = [key for key in test_keys if 'pred' not in key]
+
 
             for key in test_keys:
                 new_key = key.replace("act_", "")

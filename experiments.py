@@ -478,13 +478,8 @@ def do_comparison(combined_path_list, last_path_list, key_param_list, key_param,
             print(merged_df['accuracy'].describe())
             print(merged_df['other_key'].value_counts())
             do_prediction_dependency(merged_df, 'accuracy', combined_path, False)
-
-        # make pred dep heatmaps
-        if False:
-            dep_df = pd.read_csv(os.path.join(combined_path, 'accuracy_dependencies_retrain_False.csv'))
-            print(dep_df.head())
-            create_faceted_heatmap(dep_df, True, 'final-layer-activations', os.path.join(combined_path, 'test.png'))
             exit()
+
 
         all_epochs_df['regime_short'] = all_epochs_df['regime'].str[-2:]
         merged_baselines = pd.merge(all_baseline_df, all_epochs_df[['id', 'regime_short', 'is_novel_task']], left_on=['id', 'regime'], right_on=['id', 'regime_short'], how='left')
@@ -497,8 +492,21 @@ def do_comparison(combined_path_list, last_path_list, key_param_list, key_param,
         all_indy_df = all_indy_df.drop_duplicates()
 
         print('generating accuracy tables')
-        baseline_tables = generate_accuracy_tables(all_baselines_df[(all_baselines_df['retrain'] == False) & (all_baselines_df['prior'] == False)], combined_path, is_baseline=True)
-        result_tables = generate_accuracy_tables(all_indy_df[(all_indy_df['retrain'] == False) & (all_indy_df['prior'] == False)], combined_path)
+        if False:
+            baseline_tables = generate_accuracy_tables(all_baselines_df[(all_baselines_df['retrain'] == False) & (all_baselines_df['prior'] == False)], combined_path, is_baseline=True)
+            result_tables = generate_accuracy_tables(all_indy_df[(all_indy_df['retrain'] == False) & (all_indy_df['prior'] == False)], combined_path)
+
+    # make pred dep heatmaps
+    if True:
+        strategies = {
+            'No-Mindreading': ['opponents', 'big-loc', 'small-loc'],
+            'Low-Mindreading': ['vision', 'fb-exist'],
+            'High-Mindreading': ['fb-loc', 'b-loc', 'target-loc']
+        }
+        dep_df = pd.read_csv(os.path.join(combined_path, 'accuracy_dependencies_retrain_False.csv'))
+        print(dep_df.head())
+        create_faceted_heatmap(dep_df, True, 'final-layer-activations', os.path.join(combined_path, 'test.png'), strategies)
+        exit()
 
     baseline_tables = pd.read_csv(os.path.join(combined_path, 'base_all_table_retrain_False.csv'))
     result_tables = pd.read_csv(os.path.join(combined_path, 'all_table_retrain_False.csv'))
@@ -690,7 +698,7 @@ def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, sk
         session_params['oracle_is_target'] = False
 
         for label, label_name in [('correct-loc', 'loc')]: #[('correct-loc', 'loc'), ('correct-box', 'box'), ('shouldGetBig', 'size')]:
-            for model_type in ['smlp', 'cnn', 'clstm']:#['smlp', 'cnn', 'clstm', ]:
+            for model_type in ['smlp']:#['smlp', 'cnn', 'clstm', ]:
                 for regime in list(fregimes.keys()):
                     kpname = f'{model_type}-{label_name}-{regime}'
                     print(model_type + '-' + label_name, 'regime:', regime, 'train_sets:', fregimes[regime])
