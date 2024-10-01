@@ -151,6 +151,7 @@ def register_hooks(model, hook):
 
 def load_model(model_type, model_kwargs, device):
     if model_type == 'cnn':
+        model_kwargs['use_conv2'] = True
         model = CNNModel(**model_kwargs).to(device)
     elif model_type == 'fcnn':
         model = fCNN(**model_kwargs).to(device)
@@ -1525,8 +1526,8 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
                 if not skip_eval:
                     for epoch in [epochs - 1]:
                         print('evaluating', epoch)
-                        for this_path in [save_path, retrain_path]:
-                            for eval_prior in [False, True] if this_path == save_path else [False]:
+                        for this_path in [save_path]:#, retrain_path]: #retrain path removed
+                            for eval_prior in [False]:#[False, True] if this_path == save_path else [False]:
                                 df_paths = evaluate_model(eval_sets, label, load_path=load_path,
                                                       model_type=model_type,
                                                       model_load_path=this_path,
@@ -1544,14 +1545,15 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
                                     last_epoch_df_paths.extend(df_paths)
 
                 loss_paths.append(os.path.join(save_path, f'losses-{repetition}.csv'))
-                loss_paths.append(os.path.join(retrain_path, f'losses-{repetition}.csv'))
-                for file in glob.glob(os.path.join(retrain_path, '*-rt-losses.csv')):
-                    loss_paths.append(file)
+                #loss_paths.append(os.path.join(retrain_path, f'losses-{repetition}.csv'))
+                #for file in glob.glob(os.path.join(retrain_path, '*-rt-losses.csv')):
+                #    loss_paths.append(file)
 
             dfs_paths = []
-            for this_path in [save_path, retrain_path]:
+            for this_path in [save_path]:#, retrain_path]:
                 if skip_train:
-                    dfs_paths.extend(find_df_paths(this_path, 'param_losses_*_*.csv'))
+                    #skipping prior
+                    dfs_paths.extend([path for path in find_df_paths(this_path, 'param_losses_*_*.csv') if 'prior' not in path])
                     print('sup sess dfs paths', dfs_paths, save_path)
                 if len(dfs_paths):
                     matches = []
@@ -1602,8 +1604,8 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
 
     if not skip_activations:
         print('corring activations...')
-        process_activations(save_path, [0, epochs - 1], [x for x in range(repetitions)], use_inputs=True if "clstm" in save_path else False)
-        process_activations(save_path + '-retrain', [0, epochs - 1], [x for x in range(repetitions)], use_inputs=False)
+        process_activations(save_path, [epochs - 1], [x for x in range(repetitions)], use_inputs=False) #use 0 in epochs for prior
+        #process_activations(save_path + '-retrain', [0, epochs - 1], [x for x in range(repetitions)], use_inputs=False)
 
     return dfs_paths, last_epoch_df_paths, loss_paths
 

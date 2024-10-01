@@ -624,19 +624,140 @@ def save_double_param_figures(save_dir, top_pairs, avg_loss, last_epoch_df):
         plt.close()
 
 
-def plot_bar_graphs(baselines_df, results_df, save_dir, strategies):
-    for novelty in ['Familiar', 'Novel']:
+def create_faceted_heatmap(data, novelty, layer, output_file):
+    datasets = ['s1', 's2', 's3'] if novelty == False else ['s1', 's2']
+    architectures = ['mlp', 'cnn', 'clstm']
+    #layers = ['all', 'last']
+    features = data['feature'].unique()
+
+    fig, axes = plt.subplots(len(datasets), len(architectures), figsize=(5 * len(architectures), 5 * len(datasets)))
+    fig.suptitle(f"Prediction Dependency Heatmap - {'Novel' if novelty else 'Familiar'} Tasks", fontsize=16)
+
+    for i, dataset in enumerate(datasets):
+        for j, architecture in enumerate(architectures):
+            ax = axes[i, j]
+
+            subset = data[(data['model'].str.endswith(dataset)) &
+                          (data['model'].str.contains(architecture)) &
+                          (data['is_novel'] == novelty) &
+                          (data['activation'] == layer)]
+
+            heatmap_data = []
+            for feature in features:
+                feature_data = subset[subset['feature'] == feature]
+                if not feature_data.empty:
+                    f_implies_p = feature_data['f_implies_p_mean'].values[0]
+                    f_implies_p_std = feature_data['f_implies_p_std'].values[0]
+                    notf_implies_notp = feature_data['notf_implies_notp_mean'].values[0]
+                    notf_implies_notp_std = feature_data['notf_implies_notp_std'].values[0]
+                    heatmap_data.append([f_implies_p, notf_implies_notp])
+                else:
+                    print(f"Warning: No data for {feature} in {dataset}-{architecture}")
+                    heatmap_data.append([0, 0])
+
+            sns.heatmap(heatmap_data, annot=True, fmt='.3f', cmap='YlOrRd', cbar=False, ax=ax)
+
+            ax.set_title(f"{dataset.upper()} - {architecture.upper()}")
+            ax.set_yticks(np.arange(len(features)) + 0.5)
+            ax.set_yticklabels(features, rotation=0)
+            ax.set_xticks([])
+
+    plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+    plt.savefig(output_file, dpi=300, bbox_inches='tight')
+    plt.close()
+
+def plot_bar_graphs_special(baselines_df, results_df, save_dir, strategies):
+    for strategy, features in strategies.items():
         fig, ax = plt.subplots(figsize=(24, 8))
 
         x = []
         tick_labels = []
         group_labels = []
-        width = 0.12
+        width = 1/14
+        print('results columns', results_df.columns)
+        model_types = results_df["Model_Type"].unique()
+        print('unique models', results_df['Model'].unique())
+
+        colors = plt.cm.get_cmap('Dark2')(np.linspace(0, 1, 10))
+        for novelty in ['Familiar', 'Novel']:
+            datasets = ['s1', 's2', 's3'] if novelty == 'Familiar' else ['s1', 's2']
+
+            for feature in features:
+                group_start = len(x)
+                baselines = baselines_df[(baselines_df['Feature'] == feature)]
+
+                for dataset in datasets:
+                    models = [model for model in results_df['Model'].unique() if model.endswith(dataset)]
+                    tick_labels.append(f"{dataset}")
+                    x.append(len(tick_labels)*1.1)
+
+                    for k, model_type in enumerate(model_types):
+                        baseline_models = baselines[baselines['Model_Type'] == model_type]
+                        model_color = 'gray'
+
+                        if feature != 'pred':
+                            if len(baseline_models) > 0:
+                                baseline_mean = baseline_models[f'{novelty} accuracy (input-activations)'].values[0]
+                                baseline_q1 = baseline_models[f'{novelty} q1 (input-activations)'].values[0]
+                                baseline_q3 = baseline_models[f'{novelty} q3 (input-activations)'].values[0]
+                                bar_color = mcolors.to_rgba(model_color, alpha=1.0 - 0.15 * k)
+                                ax.bar(x[-1] + width*k, baseline_mean, width*0.9,
+                                       yerr=[[baseline_mean - baseline_q1], [baseline_q3 - baseline_mean]],
+                                       capsize=5, label=f'baseline {model_type}' if len(x) == 4 else "", color=bar_color)
+
+                    results = results_df[(results_df['Feature'] == feature)]
+
+                    for i, model in enumerate(models, start=1):
+                        results_use = results[results['Model'] == model]
+                        model_color = colors[i % len(colors)]
+
+                        for k, model_type in enumerate(model_types):
+                            results_use_2 = results_use[results_use['Model_Type'] == model_type]
+                            if len(results) > 0:
+                                for j, activation_type in enumerate(['all', 'final-layer'], start=1):
+                                    result_median = results_use_2[f'{novelty} accuracy ({activation_type}-activations)'].values[0]
+                                    result_q1 = results_use_2[f'{novelty} q1 ({activation_type}-activations)'].values[0]
+                                    result_q3 = results_use_2[f'{novelty} q3 ({activation_type}-activations)'].values[0]
+                                    bar_color = mcolors.to_rgba(model_color, alpha=1.0 - 0.15*j - 0.3*k)
+                                    ax.bar(x[-1] + (4 * i - 4 + j + 2*k + 1) * width, result_median, width*0.9,
+                                           yerr=[[result_median - result_q1], [result_q3 - result_median]],
+                                           capsize=5, label=f'{model[:-7]} {model_type} ({activation_type})' if len(x) == 4 else "", color=bar_color)
+
+                group_center = (x[group_start] + x[-1]) / 2
+                group_labels.append((group_center, f"{novelty}"))
+
+        ax.set_ylabel('Accuracy')
+        ax.set_ylim(0, 1)
+        ax.set_xlim(min(x) - 0.08, max(x) + 1.0)
+        ax.set_xticks([i + (len(datasets) * 2) * width / 2 for i in x])
+        ax.set_xticklabels(tick_labels, rotation=45, ha='right')
+
+        ax.legend(bbox_to_anchor=(1.01, 1), loc='upper left')
+
+        for center, label in group_labels:
+            ax.text(center, -0.1, label, ha='center', va='top', transform=ax.get_xaxis_transform(), fontweight='bold')
+
+        plt.subplots_adjust(bottom=0.2, left=0.01, right=0.99, top=0.92)
+        fig.suptitle(f'{strategy} Intrinsic Feature Representation', fontsize=16)
+        plt.savefig(f'{save_dir}/{strategy.lower()}_spec_accuracy_comparison.png', bbox_inches='tight')
+        plt.close(fig)
+
+def plot_bar_graphs(baselines_df, results_df, save_dir, strategies):
+    for novelty in ['Familiar', 'Novel']:
+        fig, ax = plt.subplots(figsize=(24, 8))
+
+        x = []
+        xx = []
+        tick_labels = []
+        group_labels = []
+        strat_labels = []
+        width = 0.2
         datasets = ['s1', 's2', 's3'] if novelty == 'Familiar' else ['s1', 's2']
 
-        colors = plt.cm.get_cmap('tab10')(np.linspace(0, 1, 10))
+        colors = plt.cm.get_cmap('Dark2')(np.linspace(0, 1, 10))
 
         for strategy, features in strategies.items():
+            strat_start = len(xx)
             for feature in features:
                 group_start = len(x)
                 baseline = baselines_df[baselines_df['Feature'] == feature]
@@ -648,12 +769,13 @@ def plot_bar_graphs(baselines_df, results_df, save_dir, strategies):
                     if len(baseline_models) > 0:
                         tick_labels.append(f"{dataset}")
                         x.append(len(tick_labels))
+                        xx.append(len(tick_labels))
 
                         if feature != 'pred':
                             baseline_mean = baseline_models[f'{novelty} accuracy (input-activations)'].values[0]
                             baseline_q1 = baseline_models[f'{novelty} q1 (input-activations)'].values[0]
                             baseline_q3 = baseline_models[f'{novelty} q3 (input-activations)'].values[0]
-                            ax.bar(x[-1] - width, baseline_mean, width,
+                            ax.bar(x[-1] - width, baseline_mean, width*0.9,
                                    yerr=[[baseline_mean - baseline_q1], [baseline_q3 - baseline_mean]],
                                    capsize=5, label='baseline (perception)' if len(x) == 4 else "", color='gray')
 
@@ -661,18 +783,20 @@ def plot_bar_graphs(baselines_df, results_df, save_dir, strategies):
                         results = results_df[(results_df['Feature'] == feature) & (results_df['Model'] == model)]
                         model_color = colors[i % len(colors)]
                         if len(results) > 0:
-                            for j, activation_type in enumerate(['all', 'final-layer']):
+                            for j, activation_type in enumerate(['all']): #all, final-layer
                                 result_median = results[f'{novelty} accuracy ({activation_type}-activations)'].values[0]
                                 result_q1 = results[f'{novelty} q1 ({activation_type}-activations)'].values[0]
                                 result_q3 = results[f'{novelty} q3 ({activation_type}-activations)'].values[0]
-                                bar_color = mcolors.to_rgba(model_color, alpha=0.7 if j == 0 else 1.0)
-                                ax.bar(x[-1] + (2 * i - 2 + j) * width, result_median, width,
+                                bar_color = mcolors.to_rgba(model_color, alpha=0.7 if j == 1 else 1.0)
+                                ax.bar(x[-1] + (1 * i - 1 + j) * width, result_median, width*0.9,
                                        yerr=[[result_median - result_q1], [result_q3 - result_median]],
                                        capsize=5, label=f'{model[:-7]} ({activation_type})' if len(x) == 1 else "",
                                        color=bar_color)
 
-                group_center = (x[group_start] + x[-1]) / 2
-                group_labels.append((group_center, f"{strategy}\n{feature}"))
+                group_center = (x[group_start] + x[-1] + 1) / 2
+                group_labels.append((group_center, f"{feature}"))
+            strat_center = (xx[strat_start] + xx[-1] + 2) / 2
+            strat_labels.append((strat_center, f"{strategy}"))
 
         ax.set_ylabel('Accuracy')
         ax.set_ylim(0, 1)
@@ -683,16 +807,11 @@ def plot_bar_graphs(baselines_df, results_df, save_dir, strategies):
         ax.legend(bbox_to_anchor=(1.01, 1), loc='upper left')
 
         for center, label in group_labels:
-            ax.text(center, -0.1, label, ha='center', va='top', transform=ax.get_xaxis_transform(), fontweight='bold')
-
-        # Add vertical lines to separate strategies
-        cumulative = 0
-        for strategy, features in strategies.items():
-            cumulative += len(features) * len(datasets)
-            ax.axvline(x=cumulative - 0.5, color='gray', linestyle='--', alpha=0.5)
+            ax.text(center, -0.05, label, ha='center', va='top', transform=ax.get_xaxis_transform(), fontweight='bold')
+        for center, label in strat_labels:
+            ax.text(center, -0.11, label, ha='center', va='top', transform=ax.get_xaxis_transform(), fontweight='bold')
 
         plt.subplots_adjust(bottom=0.2, left=0.01, right=0.99, top=0.92)
-        #plt.tight_layout()
         fig.suptitle(f'{novelty} Accuracy Comparison', fontsize=16)
         plt.savefig(f'{save_dir}/{novelty.lower()}_accuracy_comparison.png', bbox_inches='tight')
         plt.close(fig)

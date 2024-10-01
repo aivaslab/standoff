@@ -9,10 +9,12 @@ import h5py
 
 import pandas as pd
 import tqdm
+from scipy import stats
 
 from src.pz_envs import ScenarioConfigs
 from src.supervised_learning import gen_data
-from src.utils.plotting import create_combined_histogram, plot_progression, save_key_param_figures, plot_learning_curves, make_splom, make_ifrscores, make_scatter, make_corr_things, make_splom_aux, plot_strategy_bar, plot_bar_graphs
+from src.utils.plotting import create_combined_histogram, plot_progression, save_key_param_figures, plot_learning_curves, make_splom, make_ifrscores, make_scatter, make_corr_things, make_splom_aux, plot_strategy_bar, \
+    create_faceted_heatmap, plot_bar_graphs, plot_bar_graphs_special
 from supervised_learning_main import run_supervised_session, calculate_statistics, write_metrics_to_file, save_figures, \
     train_model
 import numpy as np
@@ -184,7 +186,7 @@ def load_h5_data(h5_path, regime, retrain, prior):
 
                 #act_key, other_key, epoch, repetition = base_name.split('_')
 
-                act_key, other_key, epoch, repetition, ifr_rep = new_name.split('_')
+                act_key, other_key, epoch, repetition, ifr_rep, model_type = new_name.split('_')
                 indices = f[f"{base_name}_indices"][:]
                 values = f[f"{base_name}_values"][:]
                 acc_values = f[f"{base_name}_acc_values"][:]
@@ -196,6 +198,7 @@ def load_h5_data(h5_path, regime, retrain, prior):
                         'epoch': int(epoch),
                         'repetition': int(repetition),
                         'ifr_rep': int(ifr_rep),
+                        'model_type': model_type,
                         'id': idx,
                         'aux_task_loss': value,
                         'regime': regime,
@@ -268,13 +271,23 @@ def do_prediction_dependency(df, acc_name, output_path, retrain):
             act_data = df[(df['regime'] == model) & (df['act_key'] == act)]
             for is_novel in [False, True]:
                 task_data = act_data[act_data['is_novel_task'] == is_novel]
-                grouped = task_data.groupby('id')
+                grouped = task_data.groupby(['id', 'repetition'])
                 for feature in task_data['other_key'].unique():
-                    feature_acc = grouped.apply(lambda x: x[x['other_key'] == feature][acc_type].values[0]).astype(bool)
-                    pred_acc = grouped.apply(lambda x: x[x['other_key'] == 'labels'][acc_type].values[0]).astype(bool)
+                    feature_acc = grouped.apply(lambda x: x[x['other_key'] == feature]['acc'].values[0]).astype(bool)
+                    pred_acc = grouped.apply(lambda x: x['accuracy'].values[0]).astype(bool)
 
                     f_implies_p = np.logical_or(~feature_acc, pred_acc)
                     notf_implies_notp = np.logical_or(feature_acc, ~pred_acc)
+
+                    f_implies_p_mean_per_id = f_implies_p.groupby('id').mean()
+                    notf_implies_notp_mean_per_id = notf_implies_notp.groupby('id').mean()
+
+                    n_trials = len(f_implies_p_mean_per_id)
+                    n_successes_f = np.sum(f_implies_p_mean_per_id > 0.5)
+                    n_successes_notf = np.sum(notf_implies_notp_mean_per_id > 0.5)
+
+                    p_value_f = stats.binom_test(n_successes_f, n_trials, p=0.5, alternative='greater')
+                    p_value_notf = stats.binom_test(n_successes_notf, n_trials, p=0.5, alternative='greater')
 
                     new_result = {
                         'retrain': retrain,
@@ -282,14 +295,16 @@ def do_prediction_dependency(df, acc_name, output_path, retrain):
                         'activation': act,
                         'is_novel': is_novel,
                         'feature': feature,
-                        'f_implies_p_mean': np.mean(f_implies_p),
-                        'f_implies_p_std': np.std(f_implies_p),
-                        'notf_implies_notp_mean': np.mean(notf_implies_notp),
-                        'notf_implies_notp_std': np.std(notf_implies_notp),
+                        'f_implies_p_mean': f_implies_p_mean_per_id.mean(),
+                        'f_implies_p_std': f_implies_p_mean_per_id.std(),
+                        'f_implies_p_p_value': p_value_f,
+                        'notf_implies_notp_mean': notf_implies_notp_mean_per_id.mean(),
+                        'notf_implies_notp_std': notf_implies_notp_mean_per_id.std(),
+                        'notf_implies_notp_p_value': p_value_notf,
                     }
 
                     results.append(new_result)
-    headers = ['retrain', 'model', 'activation', 'is_novel', 'feature', 'f_implies_p_mean', 'f_implies_p_std', 'notf_implies_notp_mean', 'notf_implies_notp_std']
+    headers = ['retrain', 'model', 'activation', 'is_novel', 'feature', 'f_implies_p_mean', 'f_implies_p_std', 'f_implies_p_p_value', 'notf_implies_notp_mean', 'notf_implies_notp_std', 'notf_implies_notp_p_value']
     df_output = pd.DataFrame(results, columns=headers)
     filename = f"{acc_name}_dependencies_retrain_{retrain}.csv"
     df_output.to_csv(os.path.join(output_path, filename), index=False)
@@ -297,18 +312,19 @@ def do_prediction_dependency(df, acc_name, output_path, retrain):
 
 def generate_accuracy_tables(df, output_path, is_baseline=False, retrain=False):
     table_data = []
-    combinations = df[['other_key', 'regime']].drop_duplicates()
+    combinations = df[['other_key', 'regime', 'model_type']].drop_duplicates()
     act_types = ['all-activations', 'final-layer-activations'] if not is_baseline else ['input-activations']
 
-    for _, combo in combinations.iterrows():
-        feature, model = combo['other_key'], combo['regime']
-        row = [feature, model]
+    for _, combo in tqdm.tqdm(combinations.iterrows()):
+        feature, model, model_type = combo['other_key'], combo['regime'], combo['model_type']
+        row = [feature, model, model_type]
 
 
         for act in act_types:
             act_data = df[(df['other_key'] == feature) &
                           (df['regime'] == model) &
-                          (df['act_key'] == act)]
+                          (df['act_key'] == act) &
+                          (df['model_type'] == model_type)]
 
             for is_novel in [False, True]:
                 task_data = act_data[act_data['is_novel_task'] == is_novel]
@@ -332,7 +348,7 @@ def generate_accuracy_tables(df, output_path, is_baseline=False, retrain=False):
 
         table_data.append(row)
 
-    headers = ['Feature', 'Model']
+    headers = ['Feature', 'Model', 'Model_Type']
     for act in act_types:
         for task in ['Familiar', 'Novel']:
             headers.extend([
@@ -400,18 +416,23 @@ def do_comparison(combined_path_list, last_path_list, key_param_list, key_param,
     print('duplicates removed', current_length, len(combined_ifr_df))
     #plot_learning_curves(combined_path, lp_list)
 
-    print('loading baseline h5s!!!!!')
-    all_baseline_data = []
-    base_path = os.path.dirname(list(folder_paths)[0])
-    for regime in ['s1', 's2', 's3']:
-        individual_data = load_h5_data(os.path.join(base_path, f'indy_ifr_base-{regime}-0.h5'), regime=regime, retrain=False, prior=False)
-        all_baseline_data.append(individual_data)
-    all_baseline_df = pd.concat(all_baseline_data, ignore_index=True)
-    print(all_baseline_df['act_key'].unique())
-
-
-    ### Get individual data
     if False:
+        print('loading baseline h5s!!!!!')
+        all_baseline_data = []
+        base_path = os.path.dirname(list(folder_paths)[0])
+        for regime in ['s1', 's2', 's3']:
+            individual_data = load_h5_data(os.path.join(base_path, f'indy_ifr_base-{regime}-0.h5'), regime=regime, retrain=False, prior=False)
+            all_baseline_data.append(individual_data)
+        all_baseline_df = pd.concat(all_baseline_data, ignore_index=True)
+        #filtered = all_baseline_df[all_baseline_df['model_type'] == 'mlp1']
+        #if len(filtered):
+        #    all_baseline_df = filtered
+        #else:
+        #    print("couldn't find mlp1 baselines")
+        #print(all_baseline_df['act_key'].unique())
+
+
+        ### Get individual data
         print('loading model h5s')
         all_indy_data = []
         for folder in folder_paths:
@@ -422,7 +443,14 @@ def do_comparison(combined_path_list, last_path_list, key_param_list, key_param,
                 individual_data = load_h5_data(os.path.join(folder, f'indy_ifr{rep}.h5'), regime=regime, retrain=retrain, prior=prior)
                 all_indy_data.append(individual_data)
         all_indy_df = pd.concat(all_indy_data, ignore_index=True)
-        print(all_indy_df['act_key'].unique())
+        #filtered = all_indy_df[all_indy_df['model_type'] == 'mlp1']
+        #if len(filtered):
+        #    all_indy_df = filtered
+        #else:
+        #    print("couldn't find mlp1 baselines")
+        #print(all_indy_df['act_key'].unique())
+
+
 
         if False:
             all_indy_all = all_indy_df[all_indy_df['act_key'] == 'all-activations']
@@ -437,14 +465,36 @@ def do_comparison(combined_path_list, last_path_list, key_param_list, key_param,
         all_epochs_df['is_novel_task'] = all_epochs_df.apply(is_novel_task, axis=1)
         #print('columns and epochs', all_epochs_df.columns, all_epochs_df['epoch'].unique())
 
+        # run experiment 3:
+        if False:
+            print('running experiment 3')
+            print(all_epochs_df.columns)
+            print(all_indy_df.columns)
+            merged_df = pd.merge(all_indy_df[(all_indy_df['model_type'] == 'mlp1')], all_epochs_df[['id', 'regime', 'is_novel_task', 'accuracy', 'repetition']], on=['id', 'regime', 'repetition'], how='left')
+            merged_df = merged_df.drop_duplicates()
+            print(len(merged_df))
+            print(merged_df.head())
+            print(merged_df.dtypes)
+            print(merged_df['accuracy'].describe())
+            print(merged_df['other_key'].value_counts())
+            do_prediction_dependency(merged_df, 'accuracy', combined_path, False)
+
+        # make pred dep heatmaps
+        if False:
+            dep_df = pd.read_csv(os.path.join(combined_path, 'accuracy_dependencies_retrain_False.csv'))
+            print(dep_df.head())
+            create_faceted_heatmap(dep_df, True, 'final-layer-activations', os.path.join(combined_path, 'test.png'))
+            exit()
+
         all_epochs_df['regime_short'] = all_epochs_df['regime'].str[-2:]
         merged_baselines = pd.merge(all_baseline_df, all_epochs_df[['id', 'regime_short', 'is_novel_task']], left_on=['id', 'regime'], right_on=['id', 'regime_short'], how='left')
         all_baselines_df = merged_baselines
-        print(all_baselines_df.head())
+        all_baselines_df = all_baselines_df.drop_duplicates()
 
         # figure out whether each item in all_indy_df is novel:
         merged_df = pd.merge(all_indy_df, all_epochs_df[['id', 'regime', 'is_novel_task']], on=['id', 'regime'], how='left')
         all_indy_df = merged_df
+        all_indy_df = all_indy_df.drop_duplicates()
 
         print('generating accuracy tables')
         baseline_tables = generate_accuracy_tables(all_baselines_df[(all_baselines_df['retrain'] == False) & (all_baselines_df['prior'] == False)], combined_path, is_baseline=True)
@@ -457,11 +507,16 @@ def do_comparison(combined_path_list, last_path_list, key_param_list, key_param,
     print(baseline_tables.columns, result_tables.columns)
 
     strategies = {
-        'NM': ['pred', 'big-loc', 'opponents', 'small-loc'],
-        'PGM': ['vision', 'fb-exist'],
-        'BDM': ['fb-loc', 'b-loc', 'target-loc', 'labels']
+        'Opponents': ['opponents'],
+        'Location Beliefs': ['b-loc']
     }
-    plot_bar_graphs(baseline_tables, result_tables, os.path.join(combined_path, 'strats'), strategies)
+    plot_bar_graphs_special(baseline_tables, result_tables, os.path.join(combined_path, 'strats'), strategies)
+    strategies = {
+        'No-Mindreading': ['pred', 'opponents', 'big-loc', 'small-loc'],
+        'Low-Mindreading': ['vision', 'fb-exist'],
+        'High-Mindreading': ['fb-loc', 'b-loc', 'target-loc', 'labels']
+    }
+    plot_bar_graphs(baseline_tables[(baseline_tables['Model_Type'] == 'mlp1')], result_tables[(result_tables['Model_Type'] == 'mlp1')], os.path.join(combined_path, 'strats'), strategies)
 
     print('Original columns and epochs:', all_epochs_df.columns, all_epochs_df['epoch'].unique())
 
@@ -635,7 +690,7 @@ def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, sk
         session_params['oracle_is_target'] = False
 
         for label, label_name in [('correct-loc', 'loc')]: #[('correct-loc', 'loc'), ('correct-box', 'box'), ('shouldGetBig', 'size')]:
-            for model_type in ['cnn']:#['smlp', 'cnn', 'clstm', ]:
+            for model_type in ['smlp', 'cnn', 'clstm']:#['smlp', 'cnn', 'clstm', ]:
                 for regime in list(fregimes.keys()):
                     kpname = f'{model_type}-{label_name}-{regime}'
                     print(model_type + '-' + label_name, 'regime:', regime, 'train_sets:', fregimes[regime])
@@ -653,8 +708,8 @@ def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, sk
                     )
                     conditions = [
                         (lambda x: 'prior' not in x and 'retrain' not in x, ''),
-                        (lambda x: 'prior' in x and 'retrain' not in x, '-prior'),
-                        (lambda x: 'prior' not in x and 'retrain' in x, '-retrain')
+                        #(lambda x: 'prior' in x and 'retrain' not in x, '-prior'),
+                        #(lambda x: 'prior' not in x and 'retrain' in x, '-retrain')
                     ]
 
                     print('paths found', combined_paths, last_epoch_paths)

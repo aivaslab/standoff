@@ -203,13 +203,14 @@ def train_mlp(inputs, other_data, regime_data, regime, opponents_data, datapoint
 
     model, l2_reg, num_epochs = get_model_type(model_type, input_size, input_size2, output_size, hidden_size, device, num_epochs)
 
+    print('model type is:', model)
+
     criterion = nn.MSELoss()
     slowcriterion = nn.MSELoss(reduction='none')
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-5 if l2_reg else 0)
     scheduler = ExponentialLR(optimizer, gamma=0.95)
 
     best_val_loss = float('inf')
-    epochs_no_improve = 0
     train_losses = []
     val_losses = []
     last_epoch_val_losses = []
@@ -292,15 +293,8 @@ def train_mlp(inputs, other_data, regime_data, regime, opponents_data, datapoint
         # if (epoch + 1) % (num_epochs // num_prints) == 0:
         #    print(f'Epoch [{epoch}/{num_epochs}], Training Loss: {loss.item():.4f}, Validation Loss: {avg_val_loss:.4f}' )
 
-        if avg_val_loss < best_val_loss:
-            best_val_loss = avg_val_loss
-            epochs_no_improve = 0
-        else:
-            epochs_no_improve += 1
-            '''if epochs_no_improve == patience:
-                break'''
-        '''if avg_val_loss <= 0.005:
-            break'''
+
+    print('loss was', best_val_loss, avg_val_acc)
     return best_val_loss, train_losses, val_losses, last_epoch_val_losses, avg_val_acc, model, individual_losses_dict, individual_accuracies_dict
 
 
@@ -462,7 +456,7 @@ def get_keys(model_type, used_cor_inputs, correlation_data2, correlation_data_co
     return input_keys, output_keys, output_size, input_size, second_input_keys
 
 
-def correlation_thing(activation_keys, correlation_data_inputs, correlation_data_outputs, test_keys, path, umapping=False, cca=False, rsa=False, pearson_figs=False, max_samples=-1, mlp_test=True, repetition=-1, epoch=-1, use_inputs=True, desired_path=''):
+def correlation_thing(activation_keys, correlation_data_inputs, correlation_data_outputs, test_keys, path, umapping=False, cca=False, rsa=False, pearson_figs=False, max_samples=-1, mlp_test=True, repetition=-1, epoch=-1, use_inputs=False, desired_path=''):
     # final heatmap is feature vs layer, mean neuron abs correlation
     major_cor_results = {}
     cca_results = {}
@@ -536,6 +530,7 @@ def correlation_thing(activation_keys, correlation_data_inputs, correlation_data
 
         for other_key in tqdm.tqdm(test_keys):
             other_data = np.asarray(correlation_data_outputs[other_key])[:max_samples]
+            print(other_key, other_data.shape, other_data[0])
             if other_key == '' or 'oracle' in other_key:
                 continue
             if umapping:
@@ -557,6 +552,7 @@ def correlation_thing(activation_keys, correlation_data_inputs, correlation_data
                 for ifr_rep in [0, 1, 2]:
                     assert activations.shape[0] == other_data.shape[0]
                     for model_type in ['mlp1', 'linear']:
+                        print('using inputs:', use_inputs, act_key)
                         val_loss, train_losses, val_losses, val_losses_indy, val_acc, _, val_loss_indy, val_acc_indy = train_mlp(activations, other_data,
                                                                                                                                  None, None, None,
                                                                                                                                  model_type=model_type,
@@ -721,17 +717,19 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=5, do_best_f
 
     use_i = False
     use_non_h = False
-
-    ### clear the existing ifr_df, also do the h5s
-
-    print('clearing existing ifr csv path at', path)
-    os.remove(os.path.join(path, f'ifr_df.csv'))
+    use_inputs = False
 
     desired_path = "s2"
-    if desired_path not in path:
+    if desired_path not in path and use_inputs:
         print('go fish')
         return None
 
+    ### clear the existing ifr_df, also do the h5s
+    if os.path.exists(os.path.join(path, 'ifr_df.csv')):
+        print('Clearing existing ifr csv path at', path)
+        os.remove(os.path.join(path, 'ifr_df.csv'))
+    else:
+        print('No existing ifr csv file found at', path)
 
     print('repetitions', repetitions, path)
 
@@ -848,7 +846,10 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=5, do_best_f
                         new_value = value.reshape((num_sequences, timesteps, feature_dim))
                         correlation_data_lstm[new_key + "_h"] = new_value
 
-                        correlation_data_last_ts[new_key] = correlation_data_lstm[new_key + "_h"][:, -1, :]
+                        print(key, new_value.shape)
+
+                        correlation_data_last_ts[new_key] = new_value[:, -1, :]
+                        print(key, correlation_data_last_ts[new_key].shape)
                         #print('corlstmshape', new_key, correlation_data_last_ts[new_key].shape)
 
                         if do_sequences_and_conv:
@@ -863,26 +864,6 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=5, do_best_f
 
                             correlation_data_lstm_inputs[new_key] = modified_sequences
                             correlation_data_lstm_outputs[new_key] = modified_final
-                        # print('corstepsshape', new_key, correlation_data_lstm_inputs[new_key].shape)
-                        # print('corlastshape', new_key, correlation_data_lstm_outputs[new_key].shape)
-                    #elif key == 'act_opponents':
-                    #    correlation_data_last_ts[key] = correlation_data[key]
-
-
-            #correlation_data2["scalar"] = np.random.randint(2, size=(1,))
-            #correlation_data["scalar"] = np.random.randint(2, size=(8844, 1,))
-            # correlation_data_conv["rand_vec5"] = np.random.randint(2, size=(8, 1, 7, 7))
-            # correlation_data_conv_flat["rand_vec5"] = np.random.randint(2, size=(length, 1 * 7 * 7))
-            print(correlation_data.keys())
-            pred_d = correlation_data["pred"]
-            labels_d = correlation_data["labels"]
-            #pred_d2 = correlation_data_lstm_outputs["vision"]
-            random_indices = np.random.choice(len(pred_d), size=3, replace=False)
-
-            #correlation_data_last_ts["pred"] = correlation_data["pred"]
-            #print("pred datapoints:", pred_d[random_indices], labels_d[random_indices], correlation_data["act_big-loc"][random_indices], correlation_data["act_big-b-loc"][random_indices])
-            # print("pred datapoints:", pred_d2[random_indices])
-            # print(correlation_data_lstm_inputs.keys())
 
             test_keys = ['act_opponents', 'labels', 'pred',
                          'act_big-loc',
@@ -895,8 +876,19 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=5, do_best_f
                          "act_i-informedness"]
 
             for key in test_keys:
+                new_key = key.replace("act_", "")
                 if key not in correlation_data_last_ts.keys():
-                    correlation_data_last_ts[key] = correlation_data[key]
+                    if new_key in correlation_data_last_ts.keys():
+                        correlation_data_last_ts[key] = correlation_data_last_ts[new_key]
+                    elif key in correlation_data.keys():
+                        correlation_data_last_ts[key] = correlation_data[key]
+            print(correlation_data.keys())
+            pred_d = correlation_data_last_ts["big-loc"]
+            random_indices = np.random.choice(len(pred_d), size=3, replace=False)
+
+            print('all test keys:')
+            for key in test_keys:
+                print(key, correlation_data_last_ts[key].shape, correlation_data_last_ts[key][random_indices])
             #print(correlation_data["inputs"].shape, correlation_data_last_ts['act_vision'].shape)
             ### Correlation thing
 
@@ -904,7 +896,7 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=5, do_best_f
             if True:
                 print('running IFR calculation', path)
                 activation_keys = [x for x in correlation_data.keys() if 'act_' not in x and x not in ['inputs', 'oracles', '', ]]
-                correlation_thing(activation_keys, correlation_data, correlation_data_last_ts, test_keys, path, repetition=repetition, epoch=epoch_number, use_inputs=False, desired_path=desired_path)
+                correlation_thing(activation_keys, correlation_data, correlation_data_last_ts, test_keys, path, repetition=repetition, epoch=epoch_number, use_inputs=use_inputs, desired_path=desired_path)
                 print('finished correlation thing!!!')
 
             # MLP F2F DATA
