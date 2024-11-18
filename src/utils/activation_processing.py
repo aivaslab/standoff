@@ -507,7 +507,7 @@ def correlation_thing(activation_keys, correlation_data_inputs, correlation_data
 
 
     # this was for running sequentially... iffy when changing things
-    if os.path.exists(csv_path):
+    if os.path.exists(csv_path) and repetition > 0:
         ifr_df = pd.read_csv(csv_path)
     else:
         ifr_df = pd.DataFrame()
@@ -719,7 +719,6 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=5, do_best_f
 
     use_i = False
     use_non_h = False
-    use_inputs = True
 
     desired_path = "s1"
     if desired_path not in path and use_inputs:
@@ -727,7 +726,7 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=5, do_best_f
         return None
 
     ### clear the existing ifr_df, also do the h5s
-    if not use_inputs:
+    if not use_inputs and False:
         if os.path.exists(os.path.join(path, 'ifr_df.csv')):
             print('Clearing existing ifr csv path at', path)
             os.remove(os.path.join(path, 'ifr_df.csv'))
@@ -736,7 +735,10 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=5, do_best_f
 
     print('repetitions', repetitions, path)
 
+    print(epoch_numbers)
+
     for epoch_number in epoch_numbers:
+        print('epoch number', epoch_number, 'of', epoch_numbers)
         for repetition in repetitions:
             print(path, f'activations_{epoch_number}_{repetition}.pkl')
             try:
@@ -876,6 +878,12 @@ def process_activations(path, epoch_numbers, repetitions, timesteps=5, do_best_f
                          "act_fb-loc",
                          "act_vision",
                          "act_fb-exist",
+                         'act_big-box',
+                         'act_small-box',
+                         'act_b-box',
+                         'act_target-box',
+                         "act_fb-box",
+                         "act_box-locations"
                          ]
 
             if use_inputs:

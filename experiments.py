@@ -1,9 +1,10 @@
 import argparse
 import ast
-import itertools
 import json
 import os
 import traceback
+import multiprocessing
+from itertools import product
 
 import h5py
 
@@ -14,12 +15,11 @@ from scipy import stats
 from src.pz_envs import ScenarioConfigs
 from src.supervised_learning import gen_data
 from src.utils.plotting import create_combined_histogram, plot_progression, save_key_param_figures, plot_learning_curves, make_splom, make_ifrscores, make_scatter, make_corr_things, make_splom_aux, plot_strategy_bar, \
-    create_faceted_heatmap, plot_bar_graphs, plot_bar_graphs_special
+    create_faceted_heatmap, plot_bar_graphs, plot_bar_graphs_special, plot_bar_graphs_new, plot_dependency_bar_graphs, plot_dependency_bar_graphs_new
 from supervised_learning_main import run_supervised_session, calculate_statistics, write_metrics_to_file, save_figures, \
     train_model
 import numpy as np
 import random
-from sklearn.feature_selection import mutual_info_regression
 
 import warnings
 
@@ -273,38 +273,47 @@ def do_prediction_dependency(df, acc_name, output_path, retrain):
                 task_data = act_data[act_data['is_novel_task'] == is_novel]
                 grouped = task_data.groupby(['id', 'repetition'])
                 for feature in task_data['other_key'].unique():
-                    feature_acc = grouped.apply(lambda x: x[x['other_key'] == feature]['acc'].values[0]).astype(bool)
-                    pred_acc = grouped.apply(lambda x: x['accuracy'].values[0]).astype(bool)
+                    #print(feature, act, is_novel)
+                    has_matches = grouped.apply(lambda x: len(x[x['other_key'] == feature]) > 0)
+                    if all(has_matches):
+                        feature_acc = grouped.apply(lambda x: x[x['other_key'] == feature]['acc'].values[0]).astype(bool)
+                        pred_acc = grouped.apply(lambda x: x['accuracy'].values[0]).astype(bool)
 
-                    f_implies_p = np.logical_or(~feature_acc, pred_acc)
-                    notf_implies_notp = np.logical_or(feature_acc, ~pred_acc)
+                        feature_acc_mean_per_id = feature_acc.groupby('id').mean().mean()
+                        feature_acc_std_per_id = feature_acc.groupby('id').mean().std()
 
-                    f_implies_p_mean_per_id = f_implies_p.groupby('id').mean()
-                    notf_implies_notp_mean_per_id = notf_implies_notp.groupby('id').mean()
+                        f_implies_p = np.logical_or(~feature_acc, pred_acc)
+                        notf_implies_p = np.logical_or(feature_acc, pred_acc)
 
-                    n_trials = len(f_implies_p_mean_per_id)
-                    n_successes_f = np.sum(f_implies_p_mean_per_id > 0.5)
-                    n_successes_notf = np.sum(notf_implies_notp_mean_per_id > 0.5)
+                        f_implies_p_mean_per_id = f_implies_p.groupby('id').mean()
+                        notf_implies_p_mean_per_id = notf_implies_p.groupby('id').mean()
 
-                    p_value_f = stats.binom_test(n_successes_f, n_trials, p=0.5, alternative='greater')
-                    p_value_notf = stats.binom_test(n_successes_notf, n_trials, p=0.5, alternative='greater')
+                        #n_trials = len(f_implies_p_mean_per_id)
+                        #n_successes_f = np.sum(f_implies_p_mean_per_id > 0.5)
+                        #n_successes_notf = np.sum(notf_implies_notp_mean_per_id > 0.5)
 
-                    new_result = {
-                        'retrain': retrain,
-                        'model': model,
-                        'activation': act,
-                        'is_novel': is_novel,
-                        'feature': feature,
-                        'f_implies_p_mean': f_implies_p_mean_per_id.mean(),
-                        'f_implies_p_std': f_implies_p_mean_per_id.std(),
-                        'f_implies_p_p_value': p_value_f,
-                        'notf_implies_notp_mean': notf_implies_notp_mean_per_id.mean(),
-                        'notf_implies_notp_std': notf_implies_notp_mean_per_id.std(),
-                        'notf_implies_notp_p_value': p_value_notf,
-                    }
+                        #p_value_f = stats.binom_test(n_successes_f, n_trials, p=0.5, alternative='greater')
+                        #p_value_notf = stats.binom_test(n_successes_notf, n_trials, p=0.5, alternative='greater')
 
-                    results.append(new_result)
-    headers = ['retrain', 'model', 'activation', 'is_novel', 'feature', 'f_implies_p_mean', 'f_implies_p_std', 'f_implies_p_p_value', 'notf_implies_notp_mean', 'notf_implies_notp_std', 'notf_implies_notp_p_value']
+                        new_result = {
+                            'retrain': retrain,
+                            'model': model,
+                            'activation': act,
+                            'is_novel': is_novel,
+                            'feature': feature,
+                            'feature_acc': feature_acc_mean_per_id,
+                            'feature_acc_std': feature_acc_std_per_id,
+                            'f_implies_p_mean': f_implies_p_mean_per_id.mean(),
+                            'f_implies_p_std': f_implies_p_mean_per_id.std(),
+                            #'f_implies_p_p_value': p_value_f,
+                            'notf_implies_p_mean': notf_implies_p_mean_per_id.mean(),
+                            'notf_implies_p_std': notf_implies_p_mean_per_id.std(),
+                            #'notf_implies_notp_p_value': p_value_notf,
+                        }
+
+                        results.append(new_result)
+    #headers = ['retrain', 'model', 'activation', 'is_novel', 'feature', 'f_implies_p_mean', 'f_implies_p_std', 'f_implies_p_p_value', 'notf_implies_notp_mean', 'notf_implies_notp_std', 'notf_implies_notp_p_value']
+    headers = ['retrain', 'model', 'activation', 'is_novel', 'feature', 'feature_acc', 'feature_acc_std', 'f_implies_p_mean', 'f_implies_p_std', 'notf_implies_p_mean', 'notf_implies_p_std']
     df_output = pd.DataFrame(results, columns=headers)
     filename = f"{acc_name}_dependencies_retrain_{retrain}.csv"
     df_output.to_csv(os.path.join(output_path, filename), index=False)
@@ -328,13 +337,15 @@ def generate_accuracy_tables(df, output_path, is_baseline=False, retrain=False):
 
             for is_novel in [False, True]:
                 task_data = act_data[act_data['is_novel_task'] == is_novel]
-                grouped = task_data.groupby('repetition')
+                grouped = task_data.groupby(['repetition', 'ifr_rep'])
 
-                base_model_means = grouped['acc'].mean()
-                overall_mean = base_model_means.mean()
-                between_std = base_model_means.std()
-                q1 = base_model_means.quantile(0.25)
-                q3 = base_model_means.quantile(0.75)
+                combination_means = grouped['acc'].mean()
+
+                overall_mean = combination_means.mean()
+                between_std = combination_means.std()
+                q1 = combination_means.quantile(0.25)
+                q3 = combination_means.quantile(0.75)
+
                 within_stds = grouped.apply(lambda x: x['acc'].std())
                 avg_within_std = within_stds.mean() if len(within_stds) > 0 else np.nan
 
@@ -406,17 +417,14 @@ def do_comparison(combined_path_list, last_path_list, key_param_list, key_param,
     if len(dataframes) > 0:
         combined_ifr_df = pd.concat(dataframes, ignore_index=True)
         combined_ifr_df.to_csv(os.path.join(combined_path, 'combined_ifr_df.csv'), index=False)
-    #combined_ifr_df = combined_ifr_df.dropna(subset=['epoch'])
-    #combined_ifr_df['label'] = np.where(combined_ifr_df['retrain'], combined_ifr_df['epoch'] + 20, 0)
     columns_to_ignore = ['loss']
     columns_to_consider = [col for col in combined_ifr_df.columns if col not in columns_to_ignore]
     current_length = len(combined_ifr_df)
     combined_ifr_df = combined_ifr_df.drop_duplicates(subset=columns_to_consider)
     combined_ifr_df = adjust_epochs(combined_ifr_df)
     print('duplicates removed', current_length, len(combined_ifr_df))
-    #plot_learning_curves(combined_path, lp_list)
 
-    if False:
+    if True:
         print('loading baseline h5s!!!!!')
         all_baseline_data = []
         base_path = os.path.dirname(list(folder_paths)[0])
@@ -443,12 +451,6 @@ def do_comparison(combined_path_list, last_path_list, key_param_list, key_param,
                 individual_data = load_h5_data(os.path.join(folder, f'indy_ifr{rep}.h5'), regime=regime, retrain=retrain, prior=prior)
                 all_indy_data.append(individual_data)
         all_indy_df = pd.concat(all_indy_data, ignore_index=True)
-        #filtered = all_indy_df[all_indy_df['model_type'] == 'mlp1']
-        #if len(filtered):
-        #    all_indy_df = filtered
-        #else:
-        #    print("couldn't find mlp1 baselines")
-        #print(all_indy_df['act_key'].unique())
 
 
 
@@ -461,70 +463,97 @@ def do_comparison(combined_path_list, last_path_list, key_param_list, key_param,
 
         print('loading evaluation results')
 
+
         all_epochs_df = load_dataframes(combined_path_list, key_param_list, key_param)
         all_epochs_df['is_novel_task'] = all_epochs_df.apply(is_novel_task, axis=1)
-        #print('columns and epochs', all_epochs_df.columns, all_epochs_df['epoch'].unique())
+        print('columns and epochs', all_epochs_df.columns, all_epochs_df['epoch'].unique())
 
         # run experiment 3:
-        if False:
+        if True:
             print('running experiment 3')
             print(all_epochs_df.columns)
             print(all_indy_df.columns)
-            merged_df = pd.merge(all_indy_df[(all_indy_df['model_type'] == 'mlp1')], all_epochs_df[['id', 'regime', 'is_novel_task', 'accuracy', 'repetition']], on=['id', 'regime', 'repetition'], how='left')
-            merged_df = merged_df.drop_duplicates()
-            print(len(merged_df))
-            print(merged_df.head())
-            print(merged_df.dtypes)
-            print(merged_df['accuracy'].describe())
-            print(merged_df['other_key'].value_counts())
-            do_prediction_dependency(merged_df, 'accuracy', combined_path, False)
-            exit()
+            for retrain in [True, False]:
+                merged_df = pd.merge(all_indy_df[(all_indy_df['model_type'] == 'mlp1') & (all_indy_df['retrain'] == retrain)], all_epochs_df[['id', 'regime', 'is_novel_task', 'accuracy', 'repetition']], on=['id', 'regime', 'repetition'], how='left')
+                merged_df = merged_df.drop_duplicates()
+                print(len(merged_df))
+                print(merged_df.head())
+                print(merged_df.dtypes)
+                print(merged_df['accuracy'].describe())
+                print(merged_df['other_key'].value_counts())
+                do_prediction_dependency(merged_df, 'accuracy', combined_path, retrain)
 
 
         all_epochs_df['regime_short'] = all_epochs_df['regime'].str[-2:]
-        merged_baselines = pd.merge(all_baseline_df, all_epochs_df[['id', 'regime_short', 'is_novel_task']], left_on=['id', 'regime'], right_on=['id', 'regime_short'], how='left')
+        merged_baselines = pd.merge(all_baseline_df, all_epochs_df[['id', 'regime_short', 'is_novel_task', 'retrain']], left_on=['id', 'regime', 'retrain'], right_on=['id', 'regime_short', 'retrain'], how='left')
         all_baselines_df = merged_baselines
         all_baselines_df = all_baselines_df.drop_duplicates()
 
         # figure out whether each item in all_indy_df is novel:
-        merged_df = pd.merge(all_indy_df, all_epochs_df[['id', 'regime', 'is_novel_task']], on=['id', 'regime'], how='left')
+        merged_df = pd.merge(all_indy_df, all_epochs_df[['id', 'regime', 'is_novel_task', 'retrain']], on=['id', 'regime', 'retrain'], how='left')
         all_indy_df = merged_df
         all_indy_df = all_indy_df.drop_duplicates()
 
         print('generating accuracy tables')
         if False:
-            baseline_tables = generate_accuracy_tables(all_baselines_df[(all_baselines_df['retrain'] == False) & (all_baselines_df['prior'] == False)], combined_path, is_baseline=True)
-            result_tables = generate_accuracy_tables(all_indy_df[(all_indy_df['retrain'] == False) & (all_indy_df['prior'] == False)], combined_path)
+            for retrain in [True, False]:
+                baseline_tables = generate_accuracy_tables(all_baselines_df[(all_baselines_df['retrain'] == retrain) & (all_baselines_df['prior'] == False)], combined_path, is_baseline=True, retrain=retrain)
+                result_tables = generate_accuracy_tables(all_indy_df[(all_indy_df['retrain'] == retrain) & (all_indy_df['prior'] == False)], combined_path, retrain=retrain)
 
     # make pred dep heatmaps
     if True:
-        strategies = {
-            'No-Mindreading': ['opponents', 'big-loc', 'small-loc'],
-            'Low-Mindreading': ['vision', 'fb-exist'],
-            'High-Mindreading': ['fb-loc', 'b-loc', 'target-loc']
-        }
-        dep_df = pd.read_csv(os.path.join(combined_path, 'accuracy_dependencies_retrain_False.csv'))
-        print(dep_df.head())
-        create_faceted_heatmap(dep_df, True, 'final-layer-activations', os.path.join(combined_path, 'test.png'), strategies)
-        exit()
+        print('doing dependency heatmaps')
+        for strat in ['normal', 'box']:
+            if strat == "normal":
+                strategies = {
+                    'No-Mindreading': ['opponents', 'big-loc', 'small-loc'],
+                    'Low-Mindreading': ['vision', 'fb-exist'],
+                    'High-Mindreading': ['fb-loc', 'b-loc', 'target-loc']
+                }
+            else:
+                strategies = {
+                    'No-Mindreading': ['big-loc', 'big-box', 'small-loc', 'small-box'],
+                    'High-Mindreading': ['fb-loc', 'fb-box', 'b-loc', 'b-box', 'target-loc', 'target-box',]
+                }
 
-    baseline_tables = pd.read_csv(os.path.join(combined_path, 'base_all_table_retrain_False.csv'))
-    result_tables = pd.read_csv(os.path.join(combined_path, 'all_table_retrain_False.csv'))
 
-    print('made acc tables', len(baseline_tables), len(result_tables))
-    print(baseline_tables.columns, result_tables.columns)
+            for retrain in [False, True]:
+                dep_df = pd.read_csv(os.path.join(combined_path, f'accuracy_dependencies_retrain_{retrain}.csv'))
 
-    strategies = {
+                for layer in ['all-activations', 'final-layer-activations']:
+                        plot_dependency_bar_graphs_new(dep_df, combined_path, strategies, True, retrain=retrain, strat=strat, layer=layer)
+            #create_faceted_heatmap(dep_df, True, 'final-layer-activations', os.path.join(combined_path, 'test.png'), strategies)
+
+    strategies_short = {
         'Opponents': ['opponents'],
         'Location Beliefs': ['b-loc']
     }
-    plot_bar_graphs_special(baseline_tables, result_tables, os.path.join(combined_path, 'strats'), strategies)
-    strategies = {
+    strategies_long = {
         'No-Mindreading': ['pred', 'opponents', 'big-loc', 'small-loc'],
         'Low-Mindreading': ['vision', 'fb-exist'],
         'High-Mindreading': ['fb-loc', 'b-loc', 'target-loc', 'labels']
     }
-    plot_bar_graphs(baseline_tables[(baseline_tables['Model_Type'] == 'mlp1')], result_tables[(result_tables['Model_Type'] == 'mlp1')], os.path.join(combined_path, 'strats'), strategies)
+    strategies_both = {
+        'No-Mindreading': ['big-loc', 'big-box', 'small-loc', 'small-box'],
+        'High-Mindreading': ['fb-loc', 'fb-box', 'b-loc', 'b-box', 'target-loc', 'target-box', ]
+    }
+    for retrain in [True, False]:
+        baseline_tables = pd.read_csv(os.path.join(combined_path, f'base_all_table_retrain_False.csv'))
+        result_tables = pd.read_csv(os.path.join(combined_path, f'all_table_retrain_{retrain}.csv'))
+
+        print('made acc tables', len(baseline_tables), len(result_tables))
+        print(baseline_tables.columns, result_tables.columns)
+
+        this_path = os.path.join(combined_path, f'strats-rt-{retrain}')
+
+        for result_type in ['mlp1', 'linear']:
+            for layer in ['all', 'final-layer']:
+                plot_bar_graphs_new(baseline_tables[(baseline_tables['Model_Type'] == result_type)], result_tables[(result_tables['Model_Type'] == result_type)], this_path, strategies_short, layer=layer, r_type=f'spec-{result_type}')
+                plot_bar_graphs_new(baseline_tables[(baseline_tables['Model_Type'] == result_type)], result_tables[(result_tables['Model_Type'] == result_type)], this_path, strategies_long, layer=layer, r_type=result_type)
+                plot_bar_graphs_new(baseline_tables[(baseline_tables['Model_Type'] == result_type)], result_tables[(result_tables['Model_Type'] == result_type)], this_path, strategies_both, layer=layer, r_type=f'both-{result_type}')
+
+        #plot_bar_graphs_special(baseline_tables, result_tables, os.path.join(combined_path, 'strats'), strategies)
+        #plot_bar_graphs(baseline_tables[(baseline_tables['Model_Type'] == 'mlp1')], result_tables[(result_tables['Model_Type'] == 'mlp1')], os.path.join(combined_path, f'strats-rt-{retrain}'), strategies)
 
     print('Original columns and epochs:', all_epochs_df.columns, all_epochs_df['epoch'].unique())
 
@@ -569,7 +598,8 @@ def do_comparison(combined_path_list, last_path_list, key_param_list, key_param,
 
 
 def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, skip_calc=False, batch_size=64, desired_evals=5,
-                skip_eval=False, skip_activations=False, last_timestep=True, retrain=False):
+                skip_eval=False, skip_activations=False, last_timestep=True, retrain=False, current_model_type=None, current_label=None, current_label_name=None,
+                comparison=False):
     """What is the overall performance of naive, off-the-shelf models on this task? Which parameters of competitive
     feeding settings are the most sensitive to overall model performance? To what extent are different models
     sensitive to different parameters? """
@@ -631,6 +661,12 @@ def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, sk
         'fb-loc',
         'fb-exist',
         'vision',
+        'big-box',
+        'small-box',
+        'target-box',
+        'b-box',
+        'fb-box',
+        'box-locations'
               ]
 
     # box-locations could be added to check for type conversions
@@ -697,8 +733,15 @@ def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, sk
         key_param_list = []
         session_params['oracle_is_target'] = False
 
-        for label, label_name in [('correct-loc', 'loc')]: #[('correct-loc', 'loc'), ('correct-box', 'box'), ('shouldGetBig', 'size')]:
-            for model_type in ['smlp']:#['smlp', 'cnn', 'clstm', ]:
+        if current_model_type != None:
+            model_types = [current_model_type]
+            label_tuples = [(current_label, current_label_name)]
+        else:
+            model_types = ['cnn', 'smlp', 'clstm']
+            label_tuples = [('correct-loc', 'loc')]
+
+        for label, label_name in label_tuples: #[('correct-loc', 'loc'), ('correct-box', 'box'), ('shouldGetBig', 'size')]:
+            for model_type in model_types:#['smlp', 'cnn', 'clstm', ]:
                 for regime in list(fregimes.keys()):
                     kpname = f'{model_type}-{label_name}-{regime}'
                     print(model_type + '-' + label_name, 'regime:', regime, 'train_sets:', fregimes[regime])
@@ -728,20 +771,67 @@ def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, sk
                         key_param_list.append(kpname + suffix)
                     lp_list.append(lp) # has x, x-retrain currently
 
-        do_comparison(combined_path_list, last_path_list, key_param_list, key_param, exp_name, params, prior_metrics, lp_list)
+        if comparison:
+            do_comparison(combined_path_list, last_path_list, key_param_list, key_param, exp_name, params, prior_metrics, lp_list)
+
+    if 22 in todo:
+        print('Running experiment 22: ablate')
+
+        combined_path_list = []
+        last_path_list = []
+        lp_list = []
+        key_param = 'regime'
+        key_param_list = []
+        session_params['oracle_is_target'] = False
+
+        if current_model_type != None:
+            model_types = [current_model_type]
+            label_tuples = [(current_label, current_label_name)]
+        else:
+            model_types = ['ablate-hardcoded']
+            label_tuples = [('correct-loc', 'loc')]
+
+        for label, label_name in label_tuples:
+            for model_type in model_types:
+                for regime in list(fregimes.keys()):
+                    kpname = f'{model_type}-{label_name}-{regime}'
+                    print(model_type + '-' + label_name, 'regime:', regime, 'train_sets:', fregimes[regime])
+                    combined_paths, last_epoch_paths, lp = run_supervised_session(
+                        save_path=os.path.join('supervised', exp_name, kpname),
+                        train_sets=fregimes[regime],
+                        eval_sets=fregimes['s3'],
+                        oracle_labels=[None],
+                        key_param=key_param,
+                        key_param_value=kpname,
+                        label=label,
+                        model_type=model_type,
+                        do_retrain_model=retrain,
+                        **session_params
+                    )
+                    conditions = [
+                        (lambda x: 'prior' not in x and 'retrain' not in x, ''),
+                        #(lambda x: 'prior' in x and 'retrain' not in x, '-prior'),
+                        #(lambda x: 'prior' not in x and 'retrain' in x, '-retrain')
+                    ]
+
+                    print('paths found', combined_paths, last_epoch_paths)
+
+                    for condition, suffix in conditions:
+                        last_path_list.append([x for x in last_epoch_paths if condition(x)])
+                        combined_path_list.append([x for x in combined_paths if condition(x)])
+                        key_param_list.append(kpname + suffix)
+                    lp_list.append(lp)
+
+        if comparison:
+            do_comparison(combined_path_list, last_path_list, key_param_list, key_param, exp_name, params, prior_metrics, lp_list)
 
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description="Run experiments with various options.")
+def run_single_experiment(args_tuple):
+    model_type, (label, label_name), args = args_tuple
+    print(f"Running experiment with model_type: {model_type}, label: {label}, label_name: {label_name}")
+    print(f"Process: {multiprocessing.current_process().name}")
 
-    parser.add_argument('-t', action='store_true', help='training')
-    parser.add_argument('-e', action='store_true', help='evaluation')
-    parser.add_argument('-c', action='store_true', help='calculation')
-    parser.add_argument('-a', action='store_true', help='activations')
-    parser.add_argument('-r', action='store_true', help='Retrain the model')
-
-    args = parser.parse_args()
-    experiments([2],
+    experiments([22],
                 repetitions=3,
                 batches=10000,
                 skip_train=not args.t,
@@ -751,4 +841,46 @@ if __name__ == '__main__':
                 retrain=args.r,
                 batch_size=256,
                 desired_evals=1,
-                last_timestep=True)
+                last_timestep=True,
+                current_model_type=model_type,
+                current_label=label,
+                current_label_name=label_name,
+                comparison=False)
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description="Run experiments with various options.")
+
+    parser.add_argument('-t', action='store_true', help='training')
+    parser.add_argument('-e', action='store_true', help='evaluation')
+    parser.add_argument('-c', action='store_true', help='calculation')
+    parser.add_argument('-a', action='store_true', help='activations')
+    parser.add_argument('-r', action='store_true', help='Retrain the model')
+    parser.add_argument('-d', action='store_true', help='dont run in parallel and do the end thing')
+    parser.add_argument('-g', action='store_true', help='generate dataset')
+
+    args = parser.parse_args()
+
+    #model_types = [ 'cnn', 'smlp', 'clstm']
+    model_types = ['clstm']
+    labels = [('correct-loc', 'loc')]
+
+    if (not args.d) and (not args.g):
+        experiment_args = [(model_type, label, args) for model_type, label in product(model_types, labels)]
+
+        with multiprocessing.Pool() as pool:
+            pool.map(run_single_experiment, experiment_args)
+    else:
+        experiments([22] if not args.g else [0],
+                repetitions=3,
+                batches=10000,
+                skip_train=not args.t,
+                skip_eval=not args.e,
+                skip_calc=not args.c,
+                skip_activations=not args.a,
+                retrain=args.r,
+                batch_size=256,
+                desired_evals=1,
+                last_timestep=True,
+                comparison=args.d)
+
+    print("finished")

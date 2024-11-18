@@ -18,6 +18,7 @@ import heapq
 from scipy.stats import sem, t
 from torch.optim.lr_scheduler import ExponentialLR
 
+from src.models.modules import AblationArchitecture
 from src.utils.activation_processing import process_activations
 from src.utils.plotting import save_double_param_figures, save_single_param_figures, save_fixed_double_param_figures, \
     save_fixed_triple_param_figures, save_key_param_figures, save_delta_figures, plot_regime_lengths
@@ -165,6 +166,32 @@ def load_model(model_type, model_kwargs, device):
         model = cRNNModel(**model_kwargs).to(device)
     elif model_type == 'clstm':
         model = cLstmModel(**model_kwargs).to(device)
+    elif model_type == 'ablate-hardcoded':
+        use_neural = False
+        configs = {
+            'perception': use_neural,
+            'my_belief': use_neural,
+            'op_belief': use_neural,
+            'my_greedy_decision': use_neural,
+            'op_greedy_decision': use_neural,
+            'sub_decision': use_neural,
+            'final_output': use_neural
+        }
+
+        model = AblationArchitecture(configs).to(device)
+    elif model_type == 'ablate-neural':
+        use_neural = True
+        configs = {
+            'perception': use_neural,
+            'my_belief': use_neural,
+            'op_belief': use_neural,
+            'my_greedy_decision': use_neural,
+            'op_greedy_decision': use_neural,
+            'sub_decision': use_neural,
+            'final_output': use_neural
+        }
+
+        model = AblationArchitecture(configs).to(device)
 
     return model
 
@@ -217,10 +244,16 @@ def load_model_data_eval_retrain(test_sets, load_path, target_label, last_timest
     special_criterion = nn.CrossEntropyLoss(reduction='none')
     oracle_criterion = nn.MSELoss(reduction='none')
 
-    model_kwargs, state_dict = load_model_eval(model_save_path, repetition, use_prior, desired_epoch=desired_epoch)#f'{repetition}-model_epoch{epoch_number}.pt'))
-    batch_size = model_kwargs['batch_size']
-    model = load_model(model_type, model_kwargs, device)
-    model.load_state_dict(state_dict)
+    if 'hardcoded' not in model_type:
+        model_kwargs, state_dict = load_model_eval(model_save_path, repetition, use_prior, desired_epoch=desired_epoch)#f'{repetition}-model_epoch{epoch_number}.pt'))
+        batch_size = model_kwargs['batch_size']
+        model = load_model(model_type, model_kwargs, device)
+        model.load_state_dict(state_dict)
+    else:
+        model_kwargs = {}
+        batch_size = 128
+
+        model = load_model(model_type, model_kwargs, device)
 
     if len(oracle_labels) and oracle_labels[0] is None:
         oracle_labels = []
@@ -377,7 +410,7 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_load_
                 #big_food_selected = (pred == torch.argmax(metrics['big-loc'][:, -1, :, 1], dim=1))
                 #neither_food_selected = ~(small_food_selected | big_food_selected)
 
-                tq.update(1)
+                #tq.update(1)
 
                 if i < num_activation_batches or num_activation_batches < 0:
                     real_batch_size = len(labels)
@@ -573,7 +606,7 @@ def train_model_retrain(model, train_loader, test_loader, save_path,
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-        t.update(1)
+        #t.update(1)
 
         if record_loss and ((batch % epoch_length == 0) or (batch == max_batches - 1)):
             total_loss += loss.item()
@@ -737,7 +770,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-        t.update(1)
+        #t.update(1)
 
         if batch % epoch_length == 0:
             scheduler.step()
@@ -1525,8 +1558,8 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
                                   retrain_batches=batches)
                 if not skip_eval:
                     for epoch in [epochs - 1]:
-                        print('evaluating', epoch)
-                        for this_path in [save_path]:#, retrain_path]: #retrain path removed
+                        print('evaluating', epoch, model_name)
+                        for this_path in [save_path, retrain_path]:#, retrain_path]: #retrain path removed
                             for eval_prior in [False]:#[False, True] if this_path == save_path else [False]:
                                 df_paths = evaluate_model(eval_sets, label, load_path=load_path,
                                                       model_type=model_type,
@@ -1545,12 +1578,12 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
                                     last_epoch_df_paths.extend(df_paths)
 
                 loss_paths.append(os.path.join(save_path, f'losses-{repetition}.csv'))
-                #loss_paths.append(os.path.join(retrain_path, f'losses-{repetition}.csv'))
+                loss_paths.append(os.path.join(retrain_path, f'losses-{repetition}.csv'))
                 #for file in glob.glob(os.path.join(retrain_path, '*-rt-losses.csv')):
                 #    loss_paths.append(file)
 
             dfs_paths = []
-            for this_path in [save_path]:#, retrain_path]:
+            for this_path in [save_path, retrain_path]:#, retrain_path]:
                 if skip_train:
                     #skipping prior
                     dfs_paths.extend([path for path in find_df_paths(this_path, 'param_losses_*_*.csv') if 'prior' not in path])
@@ -1605,7 +1638,7 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
     if not skip_activations:
         print('corring activations...')
         process_activations(save_path, [epochs - 1], [x for x in range(repetitions)], use_inputs=False) #use 0 in epochs for prior
-        #process_activations(save_path + '-retrain', [0, epochs - 1], [x for x in range(repetitions)], use_inputs=False)
+        process_activations(save_path + '-retrain', [epochs - 1], [x for x in range(repetitions)], use_inputs=False)
 
     return dfs_paths, last_epoch_df_paths, loss_paths
 

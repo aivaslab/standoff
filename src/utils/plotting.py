@@ -623,11 +623,191 @@ def save_double_param_figures(save_dir, top_pairs, avg_loss, last_epoch_df):
         plt.savefig(os.path.join(os.getcwd(), os.path.join(this_save_dir, f'hist_{param1}{param2}.png')))
         plt.close()
 
+from matplotlib.patches import Rectangle
+
+
+def plot_dependency_bar_graphs_new(data, save_dir, strategies, novelty, layer='all-activations', retrain=False, strat=""):
+    datasets = ['s1', 's2', 's3'] if not novelty else ['s1', 's2']
+    architectures = ['mlp', 'cnn', 'clstm']
+    architecture_colors = {'mlp': '#B22222', 'cnn': '#663399', 'clstm': '#4682B4'}
+
+    fig, axs = plt.subplots(len(architectures), len(datasets),
+                            figsize=(8 * len(datasets), 2.5 * len(architectures) + 0.8),
+                            squeeze=False)
+    fig.suptitle(f'Dependency Comparison Across Models and Datasets - {"Novel" if novelty else "Familiar"} Tasks',
+                 fontsize=16)
+
+    bar_width = 0.35
+    feature_gap = 0.2
+    strategy_gap = 0.25
+
+    background_colors = ['#FFBBBB', '#FFFFBB', '#BBFFBB']
+
+    for row, architecture in enumerate(architectures):
+        for col, dataset in enumerate(datasets):
+            ax = axs[row, col]
+
+            # Add background colors for strategy sections
+            strategy_widths = [len(features) * (bar_width + feature_gap) + 0.5*strategy_gap for features in strategies.values()]
+            start = 0
+            for color, width in zip(background_colors, strategy_widths):
+                ax.add_patch(Rectangle((start - 0.25, 0), width, 1, fill=True, color=color, alpha=0.3, zorder=0))
+                start += width
+
+            x_offset = 0
+            for strategy_idx, (strategy, features) in enumerate(strategies.items()):
+                for feature in features:
+                    subset = data[(data['model'].str.endswith(dataset)) &
+                                  (data['model'].str.contains(architecture)) &
+                                  (data['is_novel'] == novelty) &
+                                  (data['activation'] == layer) &
+                                  (data['feature'] == feature)]
+
+                    if not subset.empty:
+                        # Calculate portions for stacked bars
+                        feature_acc = subset['feature_acc'].values[0]  # Total feature accuracy
+                        pred_given_feat = subset['f_implies_p_mean'].values[0]  # Prediction accuracy when feature is correct
+                        pred_given_not_feat = subset['notf_implies_p_mean'].values[0]  # Prediction accuracy when feature is incorrect
+
+                        # Feature is correct bar (bottom)
+                        ax.bar(x_offset, feature_acc, bar_width,
+                               color=architecture_colors[architecture],
+                               label='Feature Correct' if row == 0 and col == 0 else "")
+
+                        # Prediction accuracy within feature correct
+                        ax.bar(x_offset, feature_acc * pred_given_feat, bar_width*0.5,
+                               color='white', alpha=1.0,
+                               label='Prediction Correct' if row == 0 and col == 0 else "")
+
+                        # Feature is incorrect bar (top)
+                        ax.bar(x_offset, 1 - feature_acc, bar_width,
+                               bottom=feature_acc,
+                               color=architecture_colors[architecture], alpha=0.5,
+                               label='Feature Incorrect' if row == 0 and col == 0 else "")
+
+                        # Prediction accuracy within feature incorrect
+                        ax.bar(x_offset, (1 - feature_acc) * pred_given_not_feat, bar_width*0.5,
+                               bottom=feature_acc,
+                               color='white', alpha=1.0,
+                               label='Prediction Correct' if row == 0 and col == 0 else "")
+
+                        ax.text(x_offset - 0.25, feature_acc, f'{feature_acc:.0%}',
+                                ha='center', va='center', fontsize=8)
+                        ax.text(x_offset + 0.25, feature_acc * pred_given_feat,
+                                f'{pred_given_feat:.0%}', ha='center', va='center',
+                                fontsize=8, color='darkblue')
+                        ax.text(x_offset + 0.25, feature_acc + (1 - feature_acc) * pred_given_not_feat,
+                                f'{pred_given_not_feat:.0%}', ha='center', va='center',
+                                fontsize=8, color='darkblue')
+
+                        # Feature labels
+                        ax.text(x_offset, -0.05, feature, ha='center', va='top', fontsize=8)
+
+                    x_offset += bar_width + feature_gap
+                x_offset += strategy_gap
+
+            ax.set_ylabel('Probability' if col == 0 else '')
+            ax.set_ylim(-0.1, 1.1)  # Adjusted to make room for labels
+            ax.set_xlim(-bar_width, x_offset - strategy_gap)
+            ax.set_xticks([])
+            #ax.yaxis.set_major_formatter(matplotlib.ticker.PercentFormatter(1.0))
+
+            if col != 0:
+                ax.yaxis.set_ticks([])
+
+            if row == 0:
+                ax.set_title(f'{dataset.upper()}', fontsize=14)
+            if col == 0:
+                ax.text(-0.1, 0.5, f'{architecture.upper()}', va='center', ha='right',
+                        rotation=90, transform=ax.transAxes, fontsize=14)
+
+    # Add legend
+    handles, labels = ax.get_legend_handles_labels()
+    fig.legend(handles, labels, loc='lower center', bbox_to_anchor=(0.5, 0),
+               ncol=2, fontsize=10)
+
+    plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+    plt.savefig(f'{save_dir}/dependency_comparison_{layer}_{"novel" if novelty else "familiar"}_rt_{retrain}_{strat}.png',
+                bbox_inches='tight', dpi=300)
+    plt.close(fig)
+
+def plot_dependency_bar_graphs(data, save_dir, strategies, novelty, layer='all-activations', retrain=False, strat=""):
+    datasets = ['s1', 's2', 's3'] if not novelty else ['s1', 's2']
+    architectures = ['mlp', 'cnn', 'clstm']
+    architecture_colors = {'mlp': '#B22222', 'cnn': '#663399', 'clstm': '#4682B4'}  # Slightly duller colors
+
+    fig, axs = plt.subplots(len(architectures), len(datasets), figsize=(8 * len(datasets), 2.5 * len(architectures) + 0.8), squeeze=False)
+    fig.suptitle(f'Dependency Comparison Across Models and Datasets - {"Novel" if novelty else "Familiar"} Tasks', fontsize=16)
+
+    all_features = sorted(set([feature for features in strategies.values() for feature in features]))
+
+    bar_width = 0.35
+    feature_gap = 0.05
+    strategy_gap = 0.25
+
+    background_colors = ['#FFBBBB', '#FFFFBB', '#BBFFBB']  # Light red, yellow, green
+
+    for row, architecture in enumerate(architectures):
+        for col, dataset in enumerate(datasets):
+            ax = axs[row, col]
+
+            # Add background colors
+            strategy_widths = [len(features) * (2 * bar_width + feature_gap) - feature_gap + strategy_gap for features in strategies.values()]
+            start = 0
+            for color, width in zip(background_colors, strategy_widths):
+                ax.add_patch(Rectangle((start - 0.25, 0), width, 1, fill=True, color=color, alpha=0.3, zorder=0))
+                start += width
+
+            x_offset = 0
+            for strategy_idx, (strategy, features) in enumerate(strategies.items()):
+                for feature_idx, feature in enumerate(features):
+                    subset = data[(data['model'].str.endswith(dataset)) &
+                                  (data['model'].str.contains(architecture)) &
+                                  (data['is_novel'] == novelty) &
+                                  (data['activation'] == layer) &
+                                  (data['feature'] == feature)]
+
+                    if not subset.empty:
+                        f_implies_p = subset['f_implies_p_mean'].values[0]
+                        f_implies_p_std = subset['f_implies_p_std'].values[0]
+                        notf_implies_notp = subset['notf_implies_notp_mean'].values[0]
+                        notf_implies_notp_std = subset['notf_implies_notp_std'].values[0]
+
+                        ax.bar(x_offset, f_implies_p, bar_width, color=architecture_colors[architecture], label='P(A|F)' if row == 0 and col == 0 and feature_idx == 0 else "")
+                        ax.bar(x_offset + bar_width, notf_implies_notp, bar_width, color=architecture_colors[architecture], alpha=0.5, label='P(¬A|¬F)' if row == 0 and col == 0 and feature_idx == 0 else "")
+
+                        # Add feature labels below the bars
+                        ax.text(x_offset + bar_width / 2, -0.05, feature, ha='center', va='top', fontsize=8)
+
+                    x_offset += 2 * bar_width + feature_gap
+
+                x_offset += strategy_gap
+
+            ax.set_ylabel('Probability' if col == 0 else '')
+            ax.set_ylim(0, 1)
+            ax.set_xlim(-bar_width, x_offset - strategy_gap)
+            ax.set_xticks([])
+
+            if col != 0:
+                ax.yaxis.set_ticks([])
+
+            if row == 0:
+                ax.set_title(f'{dataset.upper()}', fontsize=14)
+            if col == 0:
+                ax.text(-0.1, 0.5, f'{architecture.upper()}', va='center', ha='right', rotation=90, transform=ax.transAxes, fontsize=14)
+
+    # Add legend
+    handles, labels = axs[0, 0].get_legend_handles_labels()
+    #fig.legend(handles, labels, loc='lower center', bbox_to_anchor=(0.5, 0), ncol=2, fontsize=10)
+
+    plt.tight_layout(rect=[0, 0.01, 1, 0.95])
+    plt.savefig(f'{save_dir}/dependency_comparison_{layer}_{"novel" if novelty else "familiar"}_rt_{retrain}_{strat}.png', bbox_inches='tight', dpi=300)
+    plt.close(fig)
+
 
 def create_faceted_heatmap(data, novelty, layer, output_file, strategies):
     datasets = ['s1', 's2', 's3'] if novelty == False else ['s1', 's2']
     architectures = ['mlp', 'cnn', 'clstm']
-    #layers = ['all', 'last']
     features = data['feature'].unique()
 
     fig, axes = plt.subplots(len(datasets), len(architectures), figsize=(5 * len(architectures), 5 * len(datasets)))
@@ -664,9 +844,7 @@ def create_faceted_heatmap(data, novelty, layer, output_file, strategies):
 
             if i == 0:
                 ax.set_title(f"{architecture.upper()}")
-            #ax.set_yticks(np.arange(len(ordered_features)) + 0.5)
             ax.set_yticklabels(ordered_features, rotation=0)
-            #ax.set_xticks([0.5, 1.5])
             ax.set_xticklabels(['P(A|F)', 'P(¬A|¬F)'])
             ax.tick_params(axis='both', which='both', length=0)
 
@@ -771,6 +949,102 @@ def get_sort_key(model):
         return 3
     else:
         return 4
+
+
+def plot_bar_graphs_new(baselines_df, results_df, save_dir, strategies, one_dataset=True, one_model=False, layer='all', r_type='mlp1'):
+    model_classes = sorted(set([model[:-7] for model in results_df['Model'].unique()]), key=get_sort_key)
+    datasets = sorted(set([model[-2:] for model in results_df['Model'].unique()]))
+    all_features = sorted(set([feature for features in strategies.values() for feature in features]))
+
+    fig, axs = plt.subplots(len(model_classes), len(datasets), figsize=(8 * len(datasets), 4 * len(model_classes) + 1), squeeze=False)
+    fig.suptitle('Accuracy Comparison Across Models and Datasets', fontsize=16)
+
+    strategies2 = {
+        'No-Mindreading': ['pred', 'opponents', 'big-loc', 'small-loc'],
+        'Low-Mindreading': ['vision', 'fb-exist'],
+        'High-Mindreading': ['fb-loc', 'b-loc', 'target-loc', 'labels']
+    }
+    all_features2 = sorted(set([feature for features in strategies2.values() for feature in features]))
+    feature_colors = {feature: color for feature, color in zip(all_features2, plt.cm.get_cmap('tab20')(np.linspace(0, 1, len(all_features2))))}
+
+    bar_width = 0.15
+    feature_gap = 0.03
+    strategy_gap = 0.25
+    if 'spe' in r_type:
+        strategy_gap = 0.15
+
+    for row, model_class in enumerate(model_classes):
+        for col, dataset in enumerate(datasets):
+            ax = axs[row, col]
+
+            x_offset = 0
+            for strategy_idx, (strategy, features) in enumerate(strategies.items()):
+                for feature_idx, feature in enumerate(features):
+                    baseline = baselines_df[(baselines_df['Feature'] == feature) & (baselines_df['Model'] == dataset)]
+                    results = results_df[(results_df['Feature'] == feature) & (results_df['Model'] == f"{model_class}-loc-{dataset}")]
+
+                    if len(baseline) > 0:
+                        baseline_familiar = baseline['Familiar accuracy (input-activations)'].values[0]
+                        baseline_novel = baseline['Novel accuracy (input-activations)'].values[0]
+                        baseline_familiar_err = [baseline['Familiar q1 (input-activations)'].values[0], baseline['Familiar q3 (input-activations)'].values[0]]
+                        baseline_novel_err = [baseline['Novel q1 (input-activations)'].values[0], baseline['Novel q3 (input-activations)'].values[0]]
+                        if baseline_familiar >= baseline_novel:
+                            ax.bar(x_offset, baseline_familiar, bar_width, yerr=[[baseline_familiar - baseline_familiar_err[0]], [baseline_familiar_err[1] - baseline_familiar]], capsize=3, color='white', edgecolor='gray', hatch='///')
+                            ax.bar(x_offset, baseline_novel, bar_width, yerr=[[baseline_novel - baseline_novel_err[0]], [baseline_novel_err[1] - baseline_novel]], capsize=3, color='gray', )
+                        else:
+                            ax.bar(x_offset, baseline_novel, bar_width, yerr=[[baseline_novel - baseline_novel_err[0]], [baseline_novel_err[1] - baseline_novel]], capsize=3, color='gray', )
+                            ax.bar(x_offset, baseline_familiar, bar_width, yerr=[[baseline_familiar - baseline_familiar_err[0]], [baseline_familiar_err[1] - baseline_familiar]], capsize=3,  color='white', edgecolor='gray', hatch='///')
+
+                        x_offset += 1 * bar_width
+
+                    if len(results) > 0:
+                        result_familiar = results[f'Familiar accuracy ({layer}-activations)'].values[0]
+                        result_novel = results[f'Novel accuracy ({layer}-activations)'].values[0]
+                        result_familiar_err = [results[f'Familiar q1 ({layer}-activations)'].values[0], results[f'Familiar q3 ({layer}-activations)'].values[0]]
+                        result_novel_err = [results[f'Novel q1 ({layer}-activations)'].values[0], results[f'Novel q3 ({layer}-activations)'].values[0]]
+
+                        if result_familiar >= result_novel or np.isnan(result_novel):
+                            ax.bar(x_offset, result_familiar, bar_width, yerr=[[result_familiar - result_familiar_err[0]], [result_familiar_err[1] - result_familiar]], capsize=3,  color='white', edgecolor=feature_colors[feature], hatch='///')
+                            ax.bar(x_offset, result_novel, bar_width, yerr=[[result_novel - result_novel_err[0]], [result_novel_err[1] - result_novel]], label=feature if row == 0 and col == 0 else "", capsize=3, color=feature_colors[feature])
+                        else:
+                            ax.bar(x_offset, result_novel, bar_width, yerr=[[result_novel - result_novel_err[0]], [result_novel_err[1] - result_novel]], capsize=3, label=feature if row == 0 and col == 0 else "", color=feature_colors[feature])
+                            ax.bar(x_offset, result_familiar, bar_width, yerr=[[result_familiar - result_familiar_err[0]], [result_familiar_err[1] - result_familiar]], capsize=3, color='white', alpha=0.5, edgecolor=feature_colors[feature], hatch='///')
+
+                        x_offset += 1 * bar_width + feature_gap
+
+                x_offset += strategy_gap
+
+            ax.set_ylabel('Accuracy' if col == 0 else '')
+            ax.set_ylim(0, 1)
+            ax.set_xlim(-bar_width, x_offset - strategy_gap)
+            ax.set_xticks([])
+
+            if col != 0:
+                ax.yaxis.set_ticks([])
+
+            if row == 0:
+                ax.set_title(f'{dataset.upper()}', fontsize=14)
+            if col == 0:
+                ax.text(-0.1, 0.5, f'{model_class}', va='center', ha='right', rotation=90, transform=ax.transAxes, fontsize=14)
+
+            if row == len(model_classes) - 1:
+                strategy_centers = []
+                current_center = 0
+                for strategy, features in strategies.items():
+                    width = len(features) * (2 * bar_width + feature_gap) - feature_gap
+                    center = current_center + width / 2
+                    strategy_centers.append(center)
+                    current_center += width + strategy_gap
+                ax.set_xticks(strategy_centers)
+                ax.set_xticklabels(strategies.keys(), rotation=0, ha='center', fontsize=14)
+
+    handles, labels = axs[0, 0].get_legend_handles_labels()
+    fig.legend(handles, labels, loc='lower center', bbox_to_anchor=(0.5, 0), ncol=len(all_features), fontsize=14)
+
+    plt.tight_layout(rect=[0, 0.05, 1, 0.95])
+    plt.savefig(f'{save_dir}/{layer}_models_datasets_accuracy_comparison_{r_type}.png', bbox_inches='tight', dpi=300)
+    plt.close(fig)
+
 
 def plot_bar_graphs(baselines_df, results_df, save_dir, strategies, one_dataset=True, one_model=False):
     for novelty in ['Familiar', 'Novel']:

@@ -1287,6 +1287,9 @@ class para_MultiGridEnv(ParallelEnv):
             #info["b-correct-box"] = [info["box-locations"][k] if x == 1 else 0 for k, x in enumerate(info["b-correct-loc"])]
             info["i-b-correct-box"] = [info["box-locations"][k] if x == 1 else 0 for k, x in enumerate(info["i-b-correct-loc"])]
 
+            # rewrite correct box to a scalar to align with correct loc
+            info['correct-box'] = np.argmax(info['correct-box'])
+
             def calculate_fb_loc(actual, belief):
                 fb_loc = [0] * len(actual)
                 for i in range(len(actual)):
@@ -1297,8 +1300,8 @@ class para_MultiGridEnv(ParallelEnv):
 
             info["fb-loc"] = calculate_fb_loc(info["loc"], info["b-loc"])
 
-            for name in ["loc", "b-loc", "i-b-loc", "b-loc-diff", "i-b-loc-diff"]:
 
+            for name in ["loc", "b-loc", "i-b-loc", "b-loc-diff", "i-b-loc-diff"]:
                 #info["scalar-" + name] = convert_to_scalar(info[name]) #broken for the diff ones?
                 info["big-" + name] = [x[0] for x in info[name]]
                 info["small-" + name] = [x[1] for x in info[name]]
@@ -1310,6 +1313,8 @@ class para_MultiGridEnv(ParallelEnv):
                     if loc_vector[loc] == 1:
                         box_info[box] = 1
                 return box_info
+
+            info["fb-box"] = loc_to_box(info["fb-loc"], info["box-locations"])
             info["big-box"] = loc_to_box(info["big-loc"], info["box-locations"])
             info["small-box"] = loc_to_box(info["small-loc"], info["box-locations"])
             info["big-b-box"] = loc_to_box(info["big-b-loc"], info["b-box-locations"])
@@ -1458,18 +1463,18 @@ class para_MultiGridEnv(ParallelEnv):
             # bypass rendering, just do dense function
             mapping = view_grid.obj_reg.key_to_obj_map
 
-            visibility = vis_mask
             obs = np.zeros((len(self.rich_observation_layers), agent.view_size, agent.view_size))
             for i, layer in enumerate(self.rich_observation_layers):
                 if len(mapping) < 2:
                     continue
                 if isinstance(layer, str):
                     if layer == 'vis':
-                        obs[i, :, :] = visibility
+                        obs[i, :, :] = vis_mask
                     elif layer == 'gaze':
                         obs[i, :, :] = puppet_mask
                 else:
-                    obs[i, :, :] = np.multiply(np.vectorize(layer)(view_grid.grid, mapping), visibility)
+                    #obs[i, :, :] = np.multiply(np.vectorize(layer)(view_grid.grid, mapping), vis_mask)
+                    obs[i, :, :] = np.vectorize(layer)(view_grid.grid, mapping)
 
             # remove this to speed up training, though it's useful for debugging
             '''
