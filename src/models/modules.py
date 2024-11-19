@@ -76,32 +76,31 @@ class PerceptionModule(BaseModule):
         return NormalizedPerceptionNetwork()
     
     def _hardcoded_forward(self, perceptual_field: torch.Tensor) -> Dict[str, torch.Tensor]:
-        batch_size = perceptual_field.shape[0]
-
-        for timestep in range(5):
-            for layer in [2, 3]:
-                indices = torch.nonzero(perceptual_field[0, 4, 2:4])
-
-                for pos in indices:
-                    print(f"timestep {pos[0]}, layer {pos[1] + 2}, value:", perceptual_field[0, 4, pos[1] + 2, pos[0], pos[2]])
-
-        treats_visible = torch.randn(batch_size, 5, 2, 6)  # [batch, timestep, large/small, position]
-        treats_visible = F.softmax(treats_visible, dim=-1) # this was from random initialization here
-
         # channel 0 is agents
         # channel 1 is boxes... always 3?
-        # channel 2 is treat1
-        # channel 3 is treat2
+        # channel 2 is treat1, at x=3 and y=1-6
+        # channel 3 is treat2, at x=3 and y=1-6
         # channel 4 is walls
 
-        y_index = 5 #idk what this should be
-        x_index = 5
+        batch_size = perceptual_field.shape[0]
 
+        device = perceptual_field.device
 
-        opponent_vision = torch.randn(batch_size, 5)       # [batch, timestep]
-        opponent_presence = torch.randn(batch_size, 1) 
-        
-        # Todo: Fill in treat finding
+        treats_visible = perceptual_field[:, :, 2:4, 1:6, 3] > 0
+        treats_visible = torch.flip(treats_visible, dims=[3]) # AAAAAHHH
+        opponent_vision = perceptual_field[:, :, 4, 3, 2] == 1
+        opponent_presence = perceptual_field[:, 0, 0, 3, 0].unsqueeze(1)
+
+        # this adds the 6th treat position when the others are empty
+        no_treats = ~treats_visible.any(dim=3, keepdim=True)
+        treats_visible = torch.cat([treats_visible, no_treats], dim=3)
+
+        #print('sizes', treats_visible.shape, opponent_vision.shape, opponent_presence.shape)
+
+        #print('field', perceptual_field[0, 0, 0])
+
+        #print('perception:', treats_visible[0], opponent_vision[0], opponent_presence[0])
+
         return {
             'treats_visible': treats_visible,
             'opponent_vision': opponent_vision,
@@ -140,14 +139,13 @@ class BeliefModule(BaseModule):
         device = visible_treats.device
         belief_vectors = []
 
-        
         for batch in range(batch_size):
             belief_vector = torch.zeros(2, 6, device=device)
             
             for treat_type in range(2):
                 found = False
                 for t in range(4, -1, -1):
-                    if vision[batch, t] > 0.5 and visible_treats[batch, t, treat_type, :5].max() > 0.5:
+                    if vision[batch, 4-t] and visible_treats[batch, t, treat_type, :5].max() > 0.5:
                         belief_vector[treat_type] = visible_treats[batch, t, treat_type]
                         found = True
                         break
@@ -156,7 +154,8 @@ class BeliefModule(BaseModule):
                     belief_vector[treat_type, 5] = 1
                     
             belief_vectors.append(belief_vector)
-            
+
+        #print('belief:', belief_vectors[0])
         return torch.stack(belief_vectors)
 
 # Greedy Decision module
@@ -208,16 +207,14 @@ class DecisionModule(BaseModule):
                 large_treats = belief_vector[batch, 0].clone()
                 small_treats = belief_vector[batch, 1].clone()
                 dom_idx = torch.argmax(dominant_decision[batch]).long()
-                large_treats[dom_idx] = float('-inf')
-                small_treats[dom_idx] = float('-inf')
                 
                 large_best = torch.argmax(large_treats[:5])
-                if large_best != 5:
+                if large_best != dom_idx: # if the dominant isn't going large, we do
                     decisions.append(F.one_hot(large_best, num_classes=5))
-                else:
+                else: # otherwise, dominant gets large, so we get small
                     small_best = torch.argmax(small_treats[:5])
                     decisions.append(F.one_hot(small_best, num_classes=5))
-        
+        #print('decision', self.is_subordinate, decisions[0])
         return torch.stack(decisions).float().to(device)
 
 # Final output module
@@ -251,14 +248,18 @@ class FinalOutputModule(BaseModule):
             return torch.stack(decisions).to(device)
     
     def _hardcoded_forward(self, opponent_presence: torch.Tensor, greedy_decision: torch.Tensor, sub_decision: torch.Tensor) -> torch.Tensor:
-        return sub_decision if opponent_presence else greedy_decision
+        return torch.where(
+            opponent_presence.unsqueeze(1),
+            sub_decision,
+            greedy_decision
+        )
 
 
 class AblationArchitecture(nn.Module):
     def __init__(self, module_configs: Dict[str, bool]):
         super().__init__()
         self.kwargs = {'module_configs': module_configs}
-        self.perception = PerceptionModule(use_neural=module_configs.get('perception', True))
+        self.perception = PerceptionModule(use_neural=module_configs.get('perception', True)) # get from dict, but if it doesn't exist return true
         self.my_belief = BeliefModule(use_neural=module_configs.get('my_belief', True))
         self.op_belief = BeliefModule(use_neural=module_configs.get('op_belief', True))
         self.my_greedy_decision = DecisionModule(is_subordinate=False, use_neural=module_configs.get('my_greedy_decision', True))

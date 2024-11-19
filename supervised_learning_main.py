@@ -30,7 +30,7 @@ from torch.utils.data import DataLoader, random_split
 import tqdm
 import torch.nn as nn
 import torch
-from src.supervised_learning import TrainDatasetBig, EvalDatasetBig, custom_collate, cLstmModel, CNNModel, cRNNModel, fCNN, tCNN, sRNN, sMLP
+from src.supervised_learning import TrainDatasetBig, EvalDatasetBig, custom_collate, cLstmModel, CNNModel, cRNNModel, fCNN, tCNN, sRNN, sMLP, SimpleMultiDataset
 import traceback
 import torch.multiprocessing as mp
 
@@ -240,6 +240,8 @@ def load_model_eval(model_save_path, repetition, use_prior=False, desired_epoch=
 def load_model_data_eval_retrain(test_sets, load_path, target_label, last_timestep, prior_metrics, model_save_path,
                                  repetition, model_type, oracle_labels, save_labels, act_label_names, test_percent,
                                  use_prior=False, desired_epoch=None):
+    # November 24: Removed mmap mode 'r'
+    mmap_mode = None
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     special_criterion = nn.CrossEntropyLoss(reduction='none')
     oracle_criterion = nn.MSELoss(reduction='none')
@@ -264,9 +266,9 @@ def load_model_data_eval_retrain(test_sets, load_path, target_label, last_timest
     data, labels, params, oracles, act_labels = [], [], [], [], []
     for val_set_name in test_sets:
         dir = os.path.join(load_path, val_set_name)
-        data.append(np.load(os.path.join(dir, 'obs.npz'), mmap_mode='r')['arr_0'])
+        data.append(np.load(os.path.join(dir, 'obs.npz'), mmap_mode=mmap_mode)['arr_0'])
         labels_raw = np.load(os.path.join(dir, 'label-' + target_label + '.npz'), mmap_mode='r')['arr_0']  # todo: try labelcheck
-        # print('loaded eval labels', val_set_name, labels_raw.shape)
+        print('loaded eval labels', val_set_name, target_label, labels_raw.shape)
         if target_label == 'shouldGetBig':
             # it's 5 bools, so we take the last and turn it into 1-hot
             if last_timestep:
@@ -285,9 +287,9 @@ def load_model_data_eval_retrain(test_sets, load_path, target_label, last_timest
             labels.append(labels_raw.reshape(-1, 25))
             # labels.append(labels_raw)
         # print('first', np.sum(labels_raw, axis=0), labels_raw[15, -1])
-        params.append(np.load(os.path.join(dir, 'params.npz'), mmap_mode='r')['arr_0'])
+        params.append(np.load(os.path.join(dir, 'params.npz'), mmap_mode=mmap_mode)['arr_0'])
         for metric in set(prior_metrics):
-            metric_data = np.load(os.path.join(dir, 'label-' + metric + '.npz'), mmap_mode='r')['arr_0']
+            metric_data = np.load(os.path.join(dir, 'label-' + metric + '.npz'), mmap_mode=mmap_mode)['arr_0']
             if metric in prior_metrics_data.keys():
                 prior_metrics_data[metric].append(metric_data)
             else:
@@ -313,10 +315,16 @@ def load_model_data_eval_retrain(test_sets, load_path, target_label, last_timest
     for metric, arrays in prior_metrics_data.items():
         prior_metrics_data[metric] = np.concatenate(arrays, axis=0)
 
-    test_indices = filter_indices(data, labels, params, oracles, is_train=False, test_percent=test_percent)
+    print('shape', labels[0].shape)
 
-    val_dataset = EvalDatasetBig(data, labels, params, oracles, test_indices, metrics=prior_metrics_data, act_list=act_labels)
-    test_loaders.append(DataLoader(val_dataset, batch_size=batch_size, shuffle=True, collate_fn=custom_collate))
+    # November 2024 simplification, will temporarily break train/test split
+
+    #test_indices = filter_indices(data, labels, params, oracles, is_train=False, test_percent=test_percent)
+    #val_dataset = EvalDatasetBig(data, labels, params, oracles, test_indices, metrics=prior_metrics_data, act_list=act_labels)
+    #test_loaders.append(DataLoader(val_dataset, batch_size=batch_size, shuffle=True, collate_fn=custom_collate))
+
+    val_dataset = SimpleMultiDataset(data, labels, params, oracles, metrics=prior_metrics_data, act_list=act_labels)
+    test_loaders.append(DataLoader(val_dataset, batch_size=batch_size, shuffle=False))
 
     return test_loaders, special_criterion, oracle_criterion, model, device, data, labels, params, oracles, act_labels, batch_size, prior_metrics_data, model_kwargs
 
@@ -370,6 +378,8 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_load_
     model.eval()
 
     print('num_activation_batches', num_activation_batches)
+    overall_correct = 0
+    overall_total = 0
 
     # i have commented out oracle related things
     # this includes oracle_is_target check
@@ -381,6 +391,7 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_load_
             for i, (inputs, labels, params, _, metrics, act_labels_dict) in enumerate(_val_loader):
                 inputs, labels = inputs.to(device), labels.to(device)
                 #inputs, labels, oracles = inputs.to(device), labels.to(device), oracles.to(device)
+                #print(labels.shape)
                 max_labels = torch.argmax(labels, dim=1)
                 #if torch.isnan(max_labels).any():
                 #    print("labels has nan")
@@ -388,6 +399,9 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_load_
                 outputs = model(inputs, oracles)
                 losses = special_criterion(outputs, max_labels)
                 predicted = outputs.argmax(1)
+
+                #print(params, predicted[:10], max_labels[:10], labels[0])
+
                 #oracle_accuracy = torch.zeros(labels.size(0), device=device)
                 #oracle_outputs = torch.zeros((labels.size(0), 10), device=device)
 
@@ -405,7 +419,12 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_load_
                 '''
 
                 corrects = predicted.eq(max_labels)
+                total = corrects.numel()
+                num_correct = corrects.sum().item()
                 pred = predicted.cpu()
+                print(num_correct / total)
+                overall_correct += num_correct
+                overall_total += total
                 #small_food_selected = (pred == torch.argmax(metrics['small-loc'][:, -1, :, 0], dim=1))
                 #big_food_selected = (pred == torch.argmax(metrics['big-loc'][:, -1, :, 1], dim=1))
                 #neither_food_selected = ~(small_food_selected | big_food_selected)
@@ -475,6 +494,7 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_load_
 
                 param_losses_list.extend(batch_param_losses)
 
+    print(overall_correct, overall_total)
     # save dfs periodically to free up ram:
     df_paths = []
     os.makedirs(model_load_path, exist_ok=True)

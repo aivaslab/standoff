@@ -128,6 +128,7 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
 
         _subject_is_dominant = [False] if role_type == '' else [True] if role_type == 'D' else [True, False]
         _subject_valence = [1] if pref_type == '' else [2] if pref_type == 'd' else [1, 2]
+        print('dom', _subject_is_dominant, 'val', _subject_valence)
 
         data_name = f'{configName}'
         informedness = data_name[3:-1]
@@ -155,10 +156,8 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
                     params["num_puppets"] = params["num_puppets"][0]
 
                 env_config['config_name'] = configName
-                env_config['agents'] = [GridAgentInterface(**player_interface_config) for _ in
-                                        range(params['num_agents'])]
-                env_config['puppets'] = [GridAgentInterface(**puppet_interface_config) for _ in
-                                         range(params['num_puppets'])]
+                env_config['agents'] = [GridAgentInterface(**player_interface_config) for _ in range(params['num_agents'])]
+                env_config['puppets'] = [GridAgentInterface(**puppet_interface_config) for _ in range(params['num_puppets'])]
 
                 difficulty = 3
                 env_config['opponent_visible_decs'] = (difficulty < 1)
@@ -210,10 +209,12 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
                         this_ob[pos, :, :, :] = obs['p_0']
                         obs, _, _, info = env.step({'p_0': 2})
 
+                        print(onehot_labels)
+
                         for label in check_labels:
                             temp_labels[label].append(info['p_0'][label])
                         for label in onehot_labels:
-                            data = one_hot(5, info['p_0'][label])
+                            data = one_hot(6, info['p_0'][label]) #changed to 6
                             one_labels[label].append(data)
 
 
@@ -224,6 +225,8 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
                                 data_labels[label].append(np.stack(temp_labels[label]))
                             for label in onehot_labels:
                                 data_labels[label].append(np.stack(one_labels[label]))
+
+
 
                             #data_labels['informedness'].append(informedness)
                             #if informedness != info['p_0']['informedness'] and params["num_puppets"] > 0:
@@ -265,7 +268,7 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
         os.makedirs(this_path, exist_ok=True)
 
         np.savez_compressed(os.path.join(this_path, 'obs'), np.array(data_obs))
-        np.savez_compressed(os.path.join(this_path,  'params'), np.array(data_params))
+        np.savez_compressed(os.path.join(this_path, 'params'), np.array(data_params))
         for label in all_labels:
             if len(data_labels[label]) > 0:
                 np.savez_compressed(os.path.join(this_path, 'label-' + label), np.array(data_labels[label]))
@@ -450,6 +453,50 @@ class CustomDataset(Dataset):
         metrics = self.metrics[index] if len(self.metrics) else None
         return data, labels, self.params[index], oracles, metrics
 
+
+class SimpleMultiDataset(Dataset):
+    def __init__(self, data_list, label_list, param_list, oracle_list=None, metrics=None, act_list=None):
+        all_data = []
+        for data_arr in data_list:
+            for d in data_arr:
+                all_data.append(torch.from_numpy(pickle.loads(d)).float())
+        self.data = torch.stack(all_data)
+        self.labels = torch.from_numpy(np.concatenate(label_list)).float()
+        all_params = []
+        for params in param_list:
+            for p in params:
+                if isinstance(p, str):
+                    byte_list = [ord(c) for c in p]
+                    padded_byte_list = byte_list + [0] * (12 - len(byte_list))
+                    all_params.append(torch.tensor(padded_byte_list, dtype=torch.int))
+                else:
+                    all_params.append(torch.from_numpy(np.array(p)))
+        self.params = torch.stack(all_params)
+        self.oracles = torch.from_numpy(np.concatenate(oracle_list)).float() if oracle_list else None
+        self.metrics = metrics
+
+        if act_list:
+            self.act_list = {}
+            all_keys = set().union(*[d.keys() for d in act_list])
+            for key in all_keys:
+                arrays = [d[key] for d in act_list if key in d]
+                self.act_list[key] = torch.from_numpy(np.concatenate(arrays)).float()
+        else:
+            self.act_list = None
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, idx):
+        sample = (
+            self.data[idx],
+            self.labels[idx],
+            self.params[idx],
+            self.oracles[idx] if self.oracles is not None else torch.tensor([]),
+            {k: v[idx] for k, v in self.metrics.items()} if self.metrics else {},
+            {k: v[idx] for k, v in self.act_list.items()} if self.act_list else {}
+        )
+        return sample
 
 class BaseDatasetBig(Dataset):
     def __init__(self, data_list, labels_list, params_list, oracles_list, included_indices, metrics=None):

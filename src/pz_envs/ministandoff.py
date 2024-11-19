@@ -7,6 +7,14 @@ from ..puppets import pathfind
 import copy
 from ..pz_envs.scenario_configs import ScenarioConfigs
 
+
+def get_rewards(obj):
+    if hasattr(obj, "contains") and obj.contains is not None:
+        obj = obj.contains
+    r = obj.reward if hasattr(obj, "reward") else 0
+    sr = obj.sub_obs_reward if hasattr(obj, "sub_obs_reward") else 0
+    return r, sr
+
 def index_permutations(permutations, seed):
     result = [-1] * len(permutations)
     for i in range(len(permutations)-1, -1, -1):
@@ -133,7 +141,7 @@ class MiniStandoffEnv(para_MultiGridEnv):
             self.agent_goal[agent] = 2 #self.deterministic_seed % boxes if self.deterministic else random.choice(range(boxes))
             self.best_reward[agent] = -100
             for box in range(boxes):
-                self.last_seen_reward[agent + str(box)] = -100
+                self.last_seen_reward[agent + str(box)] = -1000
                 if agent + str(box) not in self.can_see.keys():
                     self.can_see[agent + str(box)] = True  # default to not hidden until it is
 
@@ -383,11 +391,18 @@ class MiniStandoffEnv(para_MultiGridEnv):
 
     def append_food_locs(self, obj, loc):
         if hasattr(obj, "reward") and obj.reward == self.bigReward:
-            if len(self.big_food_locations) == 0 or (self.big_food_locations[-1] != loc):
+            if (len(self.big_food_locations) == 0) or (self.big_food_locations[-1] != loc):
                 self.big_food_locations.append(loc)
         elif hasattr(obj, "reward") and obj.reward == self.smallReward:
-            if len(self.small_food_locations) == 0 or (self.small_food_locations[-1] != loc):
+            if (len(self.small_food_locations) == 0) or (self.small_food_locations[-1] != loc):
                 self.small_food_locations.append(loc)
+        elif hasattr(obj, "contains") and hasattr(obj.contains, "reward"):
+            if obj.contains.reward == self.bigReward:
+                if (len(self.big_food_locations) == 0) or (self.big_food_locations[-1] != loc):
+                    self.big_food_locations.append(loc)
+            elif obj.contains.reward == self.smallReward:
+                if (len(self.small_food_locations) == 0) or (self.small_food_locations[-1] != loc):
+                    self.small_food_locations.append(loc)
 
     def get_all_paths(self, maze, position, offset=0):
         maze = np.array(maze).astype(int)
@@ -535,10 +550,13 @@ class MiniStandoffEnv(para_MultiGridEnv):
                 self.box_color_order[e1] = self.box_color_order[e2]
                 self.box_color_order[e2] = temp
             else:
-                r1 = b1.reward if hasattr(b1, "reward") else 0
-                r2 = b2.reward if hasattr(b2, "reward") else 0
-                sr1 = b1.sub_obs_reward if hasattr(b1, "sub_obs_reward") else 0
-                sr2 = b2.sub_obs_reward if hasattr(b2, "sub_obs_reward") else 0
+                # November 24 changed to check for containers and delete old objects correctly instead of just removing reference
+
+                r1, sr1 = get_rewards(b1)
+                r2, sr2 = get_rewards(b2)
+
+                self.del_obj(e1 + 1, y)
+                self.del_obj(e2 + 1, y)
 
                 obj1 = Goal(reward=r2, size=r2 * 0.01, color='green', hide=self.hidden, sub_obs_reward=sr2)
                 obj2 = Goal(reward=r1, size=r1 * 0.01, color='green', hide=self.hidden, sub_obs_reward=sr1)
@@ -585,18 +603,28 @@ class MiniStandoffEnv(para_MultiGridEnv):
                         # if hasattr(tile, "reward") and hasattr(tile, "size"):
                         if tile is not None and tile.type == "Goal":
                             if name == "sw":
-                                for key, value in self.last_seen_reward.items():
+                                if not did_swap:
+                                    did_swap = True
+                                    b1 = agent + str(int(event[1]))
+                                    b2 = agent + str(int(event[2]))
+                                    temp = self.last_seen_reward[b1]
+                                    self.last_seen_reward[b1] = self.last_seen_reward[b2]
+                                    self.last_seen_reward[b2] = temp
+                                '''for key, value in self.last_seen_reward.items():
                                     if value == tile.reward and not did_swap:
                                         # set to the other tile of this swap...
                                         did_swap = True
-                                        #b1 = agent + str(int(event[1]))
-                                        #b2 = agent + str(int(event[2]))
+                                        b1 = agent + str(int(event[1]))
+                                        b2 = agent + str(int(event[2]))
                                         #tile2 = self.grid.get(int(event[2]) + 1, y)
 
                                         # we don't swap last seen rewards here because it's a visible swap and those might be missing
                                         #self.last_seen_reward[b1] = tile2.get_reward() if hasattr(tile2, 'get_reward') else 0
                                         #self.last_seen_reward[b2] = tile.get_reward() if hasattr(tile, 'get_reward') else 0
-                                        #print('swapped tiles', self.last_seen_reward)
+                                        temp = self.last_seen_reward[b1]
+                                        self.last_seen_reward[b1] = self.last_seen_reward[b2]
+                                        self.last_seen_reward[b2] = temp
+                                        #print('swapped tiles', self.last_seen_reward)'''
                             if hasattr(tile, 'get_reward'):
                                 self.last_seen_reward[agent + str(box)] = tile.get_reward()
                             #print(self.last_seen_reward)
@@ -642,13 +670,12 @@ class MiniStandoffEnv(para_MultiGridEnv):
             info = self.infos['p_0']
             if len(self.puppets):
                 info['puppet_goal'] = self.agent_goal[self.puppets[-1]]
-                if len(self.big_food_locations) > 0 and self.agent_goal[self.puppets[-1]] == self.big_food_locations[-1]:
+                if len(self.big_food_locations) > 0 and info['puppet_goal'] == self.big_food_locations[-1]:
                     info['shouldAvoidBig'] = not self.subject_is_dominant
                     info['shouldGetBig'] = False
                     info['shouldGetSmall'] = True
                     info['shouldAvoidSmall'] = False
-                elif len(self.small_food_locations) > 0 and self.agent_goal[self.puppets[-1]] == \
-                        self.small_food_locations[-1]:
+                elif len(self.small_food_locations) > 0 and info['puppet_goal'] == self.small_food_locations[-1]:
                     info['shouldAvoidSmall'] = not self.subject_is_dominant
                     info['shouldAvoidBig'] = False
                     info['shouldGetBig'] = True
