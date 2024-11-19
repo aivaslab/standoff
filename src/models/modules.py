@@ -88,7 +88,8 @@ class PerceptionModule(BaseModule):
 
         treats_visible = perceptual_field[:, :, 2:4, 1:6, 3] > 0
         treats_visible = torch.flip(treats_visible, dims=[3]) # AAAAAHHH
-        opponent_vision = perceptual_field[:, :, 4, 3, 2] == 1
+        opponent_vision = perceptual_field[:, :, 4, 3, 2] != 1
+        #print(perceptual_field[:, :, 4, 3, 2])
         opponent_presence = perceptual_field[:, 0, 0, 3, 0].unsqueeze(1)
 
         # this adds the 6th treat position when the others are empty
@@ -145,7 +146,7 @@ class BeliefModule(BaseModule):
             for treat_type in range(2):
                 found = False
                 for t in range(4, -1, -1):
-                    if vision[batch, 4-t] and visible_treats[batch, t, treat_type, :5].max() > 0.5:
+                    if vision[batch, t] and visible_treats[batch, t, treat_type, :5].max() > 0.5:
                         belief_vector[treat_type] = visible_treats[batch, t, treat_type]
                         found = True
                         break
@@ -273,27 +274,29 @@ class AblationArchitecture(nn.Module):
 
         perception_output = self.perception.forward(perceptual_field)
         device = perceptual_field.device
-        #print('Perception output', perception_output[0])
+        #print('Perception output', perception_output['treats_visible'][0])
+        #print('Vision output', perception_output['opponent_vision'][0])
+        #print('Presence output', perception_output['opponent_presence'][0])
         treats_visible = perception_output['treats_visible']
         opponent_vision = perception_output['opponent_vision']
         opponent_presence = perception_output['opponent_presence']
-        #print("Opponent presence distribution:", opponent_presence.mean().item())
 
         batch_size = perceptual_field.shape[0]
         my_belief_vector = self.my_belief.forward(treats_visible, torch.ones(batch_size, 5, device=device))
-        #print("My belief argmax distribution:", torch.argmax(my_belief_vector, dim=-1).unique(return_counts=True))
         op_belief_vector = self.op_belief.forward(treats_visible, opponent_vision)
+        #print('My belief', my_belief_vector[0])
+        #print('Op belief', op_belief_vector[0])
         
         my_greedy_decision = self.my_greedy_decision.forward(my_belief_vector)
-        #print("My greedy decision distribution:", torch.bincount(my_greedy_decision))
         op_greedy_decision = self.op_greedy_decision.forward(op_belief_vector)
-        #print("Op greedy decision distribution:", torch.bincount(op_greedy_decision))
+        #print('My dec', my_greedy_decision[0])
+        #print('Op dec', op_greedy_decision[0])
 
         sub_decision = self.sub_decision.forward(my_belief_vector, op_greedy_decision)
-        #print("Sub decision distribution:", torch.bincount(sub_decision))
+        #print('My dec2', sub_decision[0])
         
         final_decision = self.final_output.forward(opponent_presence, my_greedy_decision, sub_decision)
-        #print("Final decision distribution:", torch.bincount(final_decision))
+        #print('My out', final_decision[0])
         
         return final_decision
 

@@ -380,6 +380,7 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_load_
     print('num_activation_batches', num_activation_batches)
     overall_correct = 0
     overall_total = 0
+    np.set_printoptions(threshold=sys.maxsize)
 
     # i have commented out oracle related things
     # this includes oracle_is_target check
@@ -422,7 +423,6 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_load_
                 total = corrects.numel()
                 num_correct = corrects.sum().item()
                 pred = predicted.cpu()
-                print(num_correct / total)
                 overall_correct += num_correct
                 overall_total += total
                 #small_food_selected = (pred == torch.argmax(metrics['small-loc'][:, -1, :, 0], dim=1))

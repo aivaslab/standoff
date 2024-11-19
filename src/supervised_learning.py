@@ -206,10 +206,10 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
                     one_labels = {label: [] for label in onehot_labels}
 
                     while pos <= frames:
-                        this_ob[pos, :, :, :] = obs['p_0']
                         obs, _, _, info = env.step({'p_0': 2})
+                        this_ob[pos, :, :, :] = obs['p_0']
 
-                        print(onehot_labels)
+                        #print(onehot_labels)
 
                         for label in check_labels:
                             temp_labels[label].append(info['p_0'][label])
