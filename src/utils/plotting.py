@@ -951,6 +951,206 @@ def get_sort_key(model):
         return 4
 
 
+def plot_bar_graphs_new3(baselines_df, results_df, save_dir, strategies, one_dataset=True, one_model=False, layer='all', r_type='mlp1'):
+    model_classes = sorted(set([model[:-7] for model in results_df['Model'].unique()]), key=get_sort_key)
+    datasets = sorted(set([model[-2:] for model in results_df['Model'].unique()]))
+    all_features = sorted(set([feature for features in strategies.values() for feature in features]))
+
+    model_name_map = {
+        'smlp': 'MLP Model',
+        'cnn': 'CNN Model',
+        'clstm': 'CLSTM Model'
+    }
+
+    model_colors = {
+        'Raw Input': '#808080',
+        'smlp': '#FF4444',
+        'cnn': '#9944FF',
+        'clstm': '#4444FF'
+    }
+
+    strategy_colors = {
+        'No-Mindreading': '#FFE5E5',
+        'Low-Mindreading': '#FFFAE5',
+        'High-Mindreading': '#E5F0FF'
+    }
+
+    dataset_name_map = {
+        's1': 'Stage 1 Training',
+        's2': 'Stage 2 Training',
+        's3': 'Stage 3 Training'
+    }
+
+    fig = plt.figure(figsize=(8 * len(datasets), 5.5 * (len(model_classes) + 1) + 2))
+
+    gs = fig.add_gridspec(len(model_classes) + 2, len(datasets),
+                          height_ratios=[4] * (len(model_classes) + 1) + [1],
+                          hspace=0.45,
+                          wspace=0.05)
+    axs = [[fig.add_subplot(gs[i, j]) for j in range(len(datasets))] for i in range(len(model_classes) + 1)]
+
+    bar_width = 0.15
+    feature_gap = 0.03
+    strategy_gap = 0.25 if 'spe' not in r_type else 0.15
+    error_offset = bar_width * 0.25
+
+    # Calculate total width for each strategy group
+    strategy_widths = {}
+    for strategy, features in strategies.items():
+        total_bars = len(features)
+        strategy_widths[strategy] = total_bars * bar_width + (total_bars - 1) * feature_gap + strategy_gap
+
+    # Add strategy backgrounds
+    for col in range(len(datasets)):
+        ax = axs[0][col]
+        x_offset = -bar_width
+        for strategy, features in strategies.items():
+            width = strategy_widths[strategy]
+            rect = plt.Rectangle((x_offset, 0), width, 1,
+                                 facecolor=strategy_colors[strategy],
+                                 transform=ax.get_xaxis_transform(),
+                                 zorder=-1,
+                                 clip_on=False)
+            ax.add_patch(rect)
+
+            for row in range(1, len(model_classes) + 1):
+                rect = plt.Rectangle((x_offset, 0), width, 1,
+                                     facecolor=strategy_colors[strategy],
+                                     transform=axs[row][col].get_xaxis_transform(),
+                                     zorder=-1,
+                                     clip_on=False)
+                axs[row][col].add_patch(rect)
+            x_offset += width
+
+    # Plot baselines row (row 0)
+    for col, dataset in enumerate(datasets):
+        ax = axs[0][col]
+        x_offset = 0
+
+        for strategy_idx, (strategy, features) in enumerate(strategies.items()):
+            for feature_idx, feature in enumerate(features):
+                baseline = baselines_df[(baselines_df['Feature'] == feature) &
+                                        (baselines_df['Model'] == dataset)]
+
+                if len(baseline) > 0:
+                    baseline_familiar = baseline['Familiar accuracy (input-activations)'].values[0]
+                    baseline_novel = baseline['Novel accuracy (input-activations)'].values[0]
+                    baseline_familiar_err = [baseline['Familiar q1 (input-activations)'].values[0],
+                                             baseline['Familiar q3 (input-activations)'].values[0]]
+                    baseline_novel_err = [baseline['Novel q1 (input-activations)'].values[0],
+                                          baseline['Novel q3 (input-activations)'].values[0]]
+
+                    # Draw bars without error bars
+                    ax.bar(x_offset, baseline_familiar, bar_width,
+                           color='white', edgecolor=model_colors['Raw Input'])
+                    ax.bar(x_offset, baseline_novel, bar_width,
+                           color=model_colors['Raw Input'])
+
+                    # Add error bars separately with offset
+                    ax.errorbar(x_offset + error_offset, baseline_familiar,
+                                yerr=[[baseline_familiar - baseline_familiar_err[0]],
+                                      [baseline_familiar_err[1] - baseline_familiar]],
+                                color='black', capsize=3, fmt='none')
+                    ax.errorbar(x_offset - error_offset, baseline_novel,
+                                yerr=[[baseline_novel - baseline_novel_err[0]],
+                                      [baseline_novel_err[1] - baseline_novel]],
+                                color='black', capsize=3, fmt='none')
+
+                    ax.text(x_offset, -0.05, feature, ha='right', va='top',
+                            rotation=45, rotation_mode='anchor', fontsize=12)
+
+                x_offset += bar_width + feature_gap
+            x_offset += strategy_gap
+
+        ax.set_ylabel('Accuracy' if col == 0 else '')
+        ax.set_ylim(0, 1)
+        ax.set_xlim(-bar_width, x_offset - strategy_gap)
+        ax.set_xticks([])
+        for spine in ax.spines.values():
+            spine.set_visible(False)
+
+        if col == 0:
+            ax.text(-0.25, 0.5, 'Raw Input', va='center', ha='right',
+                    color=model_colors['Raw Input'], fontsize=24, fontweight='bold')
+
+        if col != 0:
+            ax.yaxis.set_ticks([])
+
+        ax.set_title(dataset_name_map[dataset], fontsize=16, fontweight='bold')
+
+    # Plot model results (rows 1 onwards)
+    for row, model_class in enumerate(model_classes, start=1):
+        for col, dataset in enumerate(datasets):
+            ax = axs[row][col]
+            x_offset = 0
+
+            for strategy_idx, (strategy, features) in enumerate(strategies.items()):
+                for feature_idx, feature in enumerate(features):
+                    model_name = f"{model_class}-loc-{dataset}"
+                    results = results_df[(results_df['Feature'] == feature) &
+                                         (results_df['Model'] == model_name)]
+
+                    if len(results) > 0:
+                        result_familiar = results[f'Familiar accuracy ({layer}-activations)'].values[0]
+                        result_novel = results[f'Novel accuracy ({layer}-activations)'].values[0]
+                        result_familiar_err = [results[f'Familiar q1 ({layer}-activations)'].values[0],
+                                               results[f'Familiar q3 ({layer}-activations)'].values[0]]
+                        result_novel_err = [results[f'Novel q1 ({layer}-activations)'].values[0],
+                                            results[f'Novel q3 ({layer}-activations)'].values[0]]
+
+                        # Draw bars without error bars
+                        ax.bar(x_offset, result_familiar, bar_width,
+                               color='white', edgecolor=model_colors[model_class])
+                        ax.bar(x_offset, result_novel, bar_width,
+                               color=model_colors[model_class])
+
+                        # Add error bars separately with offset
+                        ax.errorbar(x_offset + error_offset, result_familiar,
+                                    yerr=[[result_familiar - result_familiar_err[0]],
+                                          [result_familiar_err[1] - result_familiar]],
+                                    color=model_colors[model_class], capsize=3, fmt='none')
+                        ax.errorbar(x_offset - error_offset, result_novel,
+                                    yerr=[[result_novel - result_novel_err[0]],
+                                          [result_novel_err[1] - result_novel]],
+                                    color=model_colors[model_class], capsize=3, fmt='none')
+
+                        ax.text(x_offset, -0.05, feature, ha='right', va='top',
+                                rotation=45, rotation_mode='anchor', fontsize=12)
+
+                    x_offset += bar_width + feature_gap
+                x_offset += strategy_gap
+
+            ax.set_ylabel('Accuracy' if col == 0 else '')
+            ax.set_ylim(0, 1)
+            ax.set_xlim(-bar_width, x_offset - strategy_gap)
+            ax.set_xticks([])
+            for spine in ax.spines.values():
+                spine.set_visible(False)
+
+            if col != 0:
+                ax.yaxis.set_ticks([])
+
+            if col == 0:
+                ax.text(-0.25, 0.5, model_name_map[model_class], va='center', ha='right',
+                        color=model_colors[model_class], fontsize=24, fontweight='bold')
+
+    # Add strategy labels at bottom
+    for col in range(len(datasets)):
+        ax = axs[-1][col]
+        x_offset = -bar_width
+        for strategy, features in strategies.items():
+            width = strategy_widths[strategy]
+            center = x_offset + width / 2
+            strategy_text = strategy.replace('-', '\n')
+            ax.text(center, -0.3, strategy_text, ha='center', va='top',
+                    fontsize=16, fontweight='bold')
+            x_offset += width
+        ax.axis('off')
+
+    plt.savefig(f'{save_dir}/{layer}_models_datasets_accuracy_comparison_{r_type}.png',
+                bbox_inches='tight', dpi=300)
+    plt.close(fig)
+
 def plot_bar_graphs_new(baselines_df, results_df, save_dir, strategies, one_dataset=True, one_model=False, layer='all', r_type='mlp1'):
     model_classes = sorted(set([model[:-7] for model in results_df['Model'].unique()]), key=get_sort_key)
     datasets = sorted(set([model[-2:] for model in results_df['Model'].unique()]))

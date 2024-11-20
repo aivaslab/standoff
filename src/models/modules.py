@@ -82,9 +82,9 @@ class PerceptionModule(BaseModule):
         # channel 3 is treat2, at x=3 and y=1-6
         # channel 4 is walls
 
-        batch_size = perceptual_field.shape[0]
+        #batch_size = perceptual_field.shape[0]
 
-        device = perceptual_field.device
+        #device = perceptual_field.device
 
         treats_visible = perceptual_field[:, :, 2:4, 1:6, 3] > 0
         treats_visible = torch.flip(treats_visible, dims=[3]) # AAAAAHHH
@@ -237,7 +237,7 @@ class FinalOutputModule(BaseModule):
 
     def forward(self, opponent_presence: torch.Tensor, greedy_decision: torch.Tensor, sub_decision: torch.Tensor) -> torch.Tensor:
         if self.use_neural:
-            batch_size = opponent_presence.shape[0]
+            #batch_size = opponent_presence.shape[0]
             x = torch.cat([opponent_presence, greedy_decision, sub_decision], dim=1)
             probs = self.neural_network(x)
             return probs
@@ -262,10 +262,10 @@ class AblationArchitecture(nn.Module):
         self.kwargs = {'module_configs': module_configs}
         self.perception = PerceptionModule(use_neural=module_configs.get('perception', True)) # get from dict, but if it doesn't exist return true
         self.my_belief = BeliefModule(use_neural=module_configs.get('my_belief', True))
-        self.op_belief = BeliefModule(use_neural=module_configs.get('op_belief', True))
+        self.op_belief = BeliefModule(use_neural=module_configs.get('op_belief', True)) if not module_configs['shared_belief'] else self.my_belief
         self.my_greedy_decision = DecisionModule(is_subordinate=False, use_neural=module_configs.get('my_greedy_decision', True))
-        self.op_greedy_decision = DecisionModule(is_subordinate=False, use_neural=module_configs.get('op_greedy_decision', True))
-        self.sub_decision = DecisionModule(is_subordinate=True, use_neural=module_configs.get('sub_decision', True))
+        self.op_greedy_decision = DecisionModule(is_subordinate=False, use_neural=module_configs.get('op_greedy_decision', True)) if not module_configs['shared_decision'] else self.my_greedy_decision
+        self.sub_decision = DecisionModule(is_subordinate=True, use_neural=module_configs.get('sub_decision', True)) if not module_configs['shared_decision'] else self.my_greedy_decision
         self.final_output = FinalOutputModule(use_neural=module_configs.get('final_output', True))
     
     def forward(self, perceptual_field: torch.Tensor, additional_input: torch.Tensor) -> torch.Tensor:
