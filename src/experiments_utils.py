@@ -406,162 +406,163 @@ def do_comparison(combined_path_list, last_path_list, key_param_list, key_param,
             except Exception as e:
                 print(f"Error reading {csv_path}: {e}")
 
+    all_epochs_df = load_dataframes(combined_path_list, key_param_list, key_param)
+    all_epochs_df['is_novel_task'] = all_epochs_df.apply(is_novel_task, axis=1)
+
     if len(dataframes) > 0:
         combined_ifr_df = pd.concat(dataframes, ignore_index=True)
         combined_ifr_df.to_csv(os.path.join(combined_path, 'combined_ifr_df.csv'), index=False)
-    columns_to_ignore = ['loss']
-    columns_to_consider = [col for col in combined_ifr_df.columns if col not in columns_to_ignore]
-    current_length = len(combined_ifr_df)
-    combined_ifr_df = combined_ifr_df.drop_duplicates(subset=columns_to_consider)
-    combined_ifr_df = adjust_epochs(combined_ifr_df)
-    print('duplicates removed', current_length, len(combined_ifr_df))
+        columns_to_ignore = ['loss']
+        columns_to_consider = [col for col in combined_ifr_df.columns if col not in columns_to_ignore]
+        current_length = len(combined_ifr_df)
+        combined_ifr_df = combined_ifr_df.drop_duplicates(subset=columns_to_consider)
+        combined_ifr_df = adjust_epochs(combined_ifr_df)
+        print('duplicates removed', current_length, len(combined_ifr_df))
 
-    if True:
-        print('loading baseline h5s!!!!!')
-        all_baseline_data = []
-        base_path = os.path.dirname(list(folder_paths)[0])
-        for regime in ['s1', 's2', 's3']:
-            individual_data = load_h5_data(os.path.join(base_path, f'indy_ifr_base-{regime}-0.h5'), regime=regime, retrain=False, prior=False)
-            all_baseline_data.append(individual_data)
-        all_baseline_df = pd.concat(all_baseline_data, ignore_index=True)
-
-
-        ### Get individual data
-        print('loading model h5s')
-        all_indy_data = []
-        for folder in folder_paths:
-            regime = os.path.basename(folder).replace('-retrain', '')
-            retrain = 'retrain' in folder
-            prior = 'prior' in folder
-            for rep in [0, 1, 2]:
-                individual_data = load_h5_data(os.path.join(folder, f'indy_ifr{rep}.h5'), regime=regime, retrain=retrain, prior=prior)
-                all_indy_data.append(individual_data)
-        all_indy_df = pd.concat(all_indy_data, ignore_index=True)
-
-
-
-        if False:
-            all_indy_all = all_indy_df[all_indy_df['act_key'] == 'all-activations']
-            all_indy_final = all_indy_df[all_indy_df['act_key'] == 'final-layer-activations']
-            make_splom_aux(all_indy_all, 'all', os.path.join(combined_path, 'sploms'))
-            make_splom_aux(all_indy_final, 'final', os.path.join(combined_path, 'sploms'))
-            make_scatters2(all_indy_all, all_indy_final, other_keys, combined_path)
-
-        print('loading evaluation results')
-
-
-        all_epochs_df = load_dataframes(combined_path_list, key_param_list, key_param)
-        all_epochs_df['is_novel_task'] = all_epochs_df.apply(is_novel_task, axis=1)
-        print('columns and epochs', all_epochs_df.columns, all_epochs_df['epoch'].unique())
-
-        # run experiment 3:
         if True:
-            print('running experiment 3')
-            print(all_epochs_df.columns)
-            print(all_indy_df.columns)
-            for retrain in [True, False]:
-                merged_df = pd.merge(all_indy_df[(all_indy_df['model_type'] == 'mlp1') & (all_indy_df['retrain'] == retrain)], all_epochs_df[['id', 'regime', 'is_novel_task', 'accuracy', 'repetition']], on=['id', 'regime', 'repetition'], how='left')
-                merged_df = merged_df.drop_duplicates()
-                print(len(merged_df))
-                print(merged_df.head())
-                print(merged_df.dtypes)
-                print(merged_df['accuracy'].describe())
-                print(merged_df['other_key'].value_counts())
-                do_prediction_dependency(merged_df, 'accuracy', combined_path, retrain)
+            print('loading baseline h5s!!!!!')
+            all_baseline_data = []
+            base_path = os.path.dirname(list(folder_paths)[0])
+            for regime in ['s1', 's2', 's3']:
+                individual_data = load_h5_data(os.path.join(base_path, f'indy_ifr_base-{regime}-0.h5'), regime=regime, retrain=False, prior=False)
+                all_baseline_data.append(individual_data)
+            all_baseline_df = pd.concat(all_baseline_data, ignore_index=True)
 
 
-        all_epochs_df['regime_short'] = all_epochs_df['regime'].str[-2:]
-        merged_baselines = pd.merge(all_baseline_df, all_epochs_df[['id', 'regime_short', 'is_novel_task', 'retrain']], left_on=['id', 'regime', 'retrain'], right_on=['id', 'regime_short', 'retrain'], how='left')
-        all_baselines_df = merged_baselines
-        all_baselines_df = all_baselines_df.drop_duplicates()
-
-        # figure out whether each item in all_indy_df is novel:
-        merged_df = pd.merge(all_indy_df, all_epochs_df[['id', 'regime', 'is_novel_task', 'retrain']], on=['id', 'regime', 'retrain'], how='left')
-        all_indy_df = merged_df
-        all_indy_df = all_indy_df.drop_duplicates()
-
-        print('generating accuracy tables')
-        if False:
-            for retrain in [True, False]:
-                baseline_tables = generate_accuracy_tables(all_baselines_df[(all_baselines_df['retrain'] == retrain) & (all_baselines_df['prior'] == False)], combined_path, is_baseline=True, retrain=retrain)
-                result_tables = generate_accuracy_tables(all_indy_df[(all_indy_df['retrain'] == retrain) & (all_indy_df['prior'] == False)], combined_path, retrain=retrain)
-
-    # make pred dep heatmaps
-    if True:
-        print('doing dependency heatmaps')
-        for strat in ['normal', 'box']:
-            if strat == "normal":
-                strategies = {
-                    'No-Mindreading': ['opponents', 'big-loc', 'small-loc'],
-                    'Low-Mindreading': ['vision', 'fb-exist'],
-                    'High-Mindreading': ['fb-loc', 'b-loc', 'target-loc']
-                }
-            else:
-                strategies = {
-                    'No-Mindreading': ['big-loc', 'big-box', 'small-loc', 'small-box'],
-                    'High-Mindreading': ['fb-loc', 'fb-box', 'b-loc', 'b-box', 'target-loc', 'target-box',]
-                }
+            ### Get individual data
+            print('loading model h5s')
+            all_indy_data = []
+            for folder in folder_paths:
+                regime = os.path.basename(folder).replace('-retrain', '')
+                retrain = 'retrain' in folder
+                prior = 'prior' in folder
+                for rep in [0, 1, 2]:
+                    individual_data = load_h5_data(os.path.join(folder, f'indy_ifr{rep}.h5'), regime=regime, retrain=retrain, prior=prior)
+                    all_indy_data.append(individual_data)
+            all_indy_df = pd.concat(all_indy_data, ignore_index=True)
 
 
-            for retrain in [False, True]:
-                dep_df = pd.read_csv(os.path.join(combined_path, f'accuracy_dependencies_retrain_{retrain}.csv'))
 
-                for layer in ['all-activations', 'final-layer-activations']:
-                        plot_dependency_bar_graphs_new(dep_df, combined_path, strategies, True, retrain=retrain, strat=strat, layer=layer)
-            #create_faceted_heatmap(dep_df, True, 'final-layer-activations', os.path.join(combined_path, 'test.png'), strategies)
+            if False:
+                all_indy_all = all_indy_df[all_indy_df['act_key'] == 'all-activations']
+                all_indy_final = all_indy_df[all_indy_df['act_key'] == 'final-layer-activations']
+                make_splom_aux(all_indy_all, 'all', os.path.join(combined_path, 'sploms'))
+                make_splom_aux(all_indy_final, 'final', os.path.join(combined_path, 'sploms'))
+                make_scatters2(all_indy_all, all_indy_final, other_keys, combined_path)
 
-    strategies_short = {
-        'Opponents': ['opponents'],
-        'Location Beliefs': ['b-loc']
-    }
-    strategies_long = {
-        'No-Mindreading': ['pred', 'opponents', 'big-loc', 'small-loc'],
-        'Low-Mindreading': ['vision', 'fb-exist'],
-        'High-Mindreading': ['fb-loc', 'b-loc', 'target-loc', 'labels']
-    }
-    strategies_both = {
-        'No-Mindreading': ['big-loc', 'big-box', 'small-loc', 'small-box'],
-        'High-Mindreading': ['fb-loc', 'fb-box', 'b-loc', 'b-box', 'target-loc', 'target-box', ]
-    }
-    for retrain in [True, False]:
-        baseline_tables = pd.read_csv(os.path.join(combined_path, f'base_all_table_retrain_False.csv'))
-        result_tables = pd.read_csv(os.path.join(combined_path, f'all_table_retrain_{retrain}.csv'))
+            print('loading evaluation results')
 
-        print('made acc tables', len(baseline_tables), len(result_tables))
-        print(baseline_tables.columns, result_tables.columns)
 
-        this_path = os.path.join(combined_path, f'strats-rt-{retrain}')
+            #print('columns and epochs', all_epochs_df.columns, all_epochs_df['epoch'].unique())
 
-        for result_type in ['mlp1', 'linear']:
-            for layer in ['all', 'final-layer']:
-                plot_bar_graphs_new(baseline_tables[(baseline_tables['Model_Type'] == result_type)], result_tables[(result_tables['Model_Type'] == result_type)], this_path, strategies_short, layer=layer, r_type=f'spec-{result_type}')
-                plot_bar_graphs_new(baseline_tables[(baseline_tables['Model_Type'] == result_type)], result_tables[(result_tables['Model_Type'] == result_type)], this_path, strategies_long, layer=layer, r_type=result_type)
-                plot_bar_graphs_new(baseline_tables[(baseline_tables['Model_Type'] == result_type)], result_tables[(result_tables['Model_Type'] == result_type)], this_path, strategies_both, layer=layer, r_type=f'both-{result_type}')
+            # run experiment 3:
+            if True:
+                print('running experiment 3')
+                print(all_epochs_df.columns)
+                print(all_indy_df.columns)
+                for retrain in [True, False]:
+                    merged_df = pd.merge(all_indy_df[(all_indy_df['model_type'] == 'mlp1') & (all_indy_df['retrain'] == retrain)], all_epochs_df[['id', 'regime', 'is_novel_task', 'accuracy', 'repetition']], on=['id', 'regime', 'repetition'], how='left')
+                    merged_df = merged_df.drop_duplicates()
+                    print(len(merged_df))
+                    print(merged_df.head())
+                    print(merged_df.dtypes)
+                    print(merged_df['accuracy'].describe())
+                    print(merged_df['other_key'].value_counts())
+                    do_prediction_dependency(merged_df, 'accuracy', combined_path, retrain)
 
-        #plot_bar_graphs_special(baseline_tables, result_tables, os.path.join(combined_path, 'strats'), strategies)
-        #plot_bar_graphs(baseline_tables[(baseline_tables['Model_Type'] == 'mlp1')], result_tables[(result_tables['Model_Type'] == 'mlp1')], os.path.join(combined_path, f'strats-rt-{retrain}'), strategies)
 
-    print('Original columns and epochs:', all_epochs_df.columns, all_epochs_df['epoch'].unique())
+            all_epochs_df['regime_short'] = all_epochs_df['regime'].str[-2:]
+            merged_baselines = pd.merge(all_baseline_df, all_epochs_df[['id', 'regime_short', 'is_novel_task', 'retrain']], left_on=['id', 'regime', 'retrain'], right_on=['id', 'regime_short', 'retrain'], how='left')
+            all_baselines_df = merged_baselines
+            all_baselines_df = all_baselines_df.drop_duplicates()
 
-    all_epochs_df = adjust_epochs(all_epochs_df)
+            # figure out whether each item in all_indy_df is novel:
+            merged_df = pd.merge(all_indy_df, all_epochs_df[['id', 'regime', 'is_novel_task', 'retrain']], on=['id', 'regime', 'retrain'], how='left')
+            all_indy_df = merged_df
+            all_indy_df = all_indy_df.drop_duplicates()
 
-    grouped_df = group_eval_df(all_epochs_df)
+            if False:
+                print('generating accuracy tables')
+                for retrain in [True, False]:
+                    baseline_tables = generate_accuracy_tables(all_baselines_df[(all_baselines_df['retrain'] == retrain) & (all_baselines_df['prior'] == False)], combined_path, is_baseline=True, retrain=retrain)
+                    result_tables = generate_accuracy_tables(all_indy_df[(all_indy_df['retrain'] == retrain) & (all_indy_df['prior'] == False)], combined_path, retrain=retrain)
 
-    print('merging dfs')
-    merged_df = pd.merge(combined_ifr_df, grouped_df, on=['rep', 'model', 'epoch', 'retrain', 'prior'])
-    print('after merge', merged_df['epoch'].unique(), merged_df['retrain'].unique(), merged_df['prior'].unique())
+        # make pred dep heatmaps
+        if True:
+            print('doing dependency heatmaps')
+            for strat in ['normal', 'box']:
+                if strat == "normal":
+                    strategies = {
+                        'No-Mindreading': ['opponents', 'big-loc', 'small-loc'],
+                        'Low-Mindreading': ['vision', 'fb-exist'],
+                        'High-Mindreading': ['fb-loc', 'b-loc', 'target-loc']
+                    }
+                else:
+                    strategies = {
+                        'No-Mindreading': ['big-loc', 'big-box', 'small-loc', 'small-box'],
+                        'High-Mindreading': ['fb-loc', 'fb-box', 'b-loc', 'b-box', 'target-loc', 'target-box',]
+                    }
 
-    # SPLOM
-    for act in ['all_activations', 'final_layer_activations', 'input_activations']:
-        try:
-            make_splom(merged_df[(merged_df['act'] == act)], combined_path, act, False, True)
-            make_scatter(merged_df[merged_df['act'] == act], combined_path, act)
-        except BaseException as e:
-            print('failed a splom', e)
 
-    make_corr_things(merged_df, combined_path)
+                for retrain in [False, True]:
+                    dep_df = pd.read_csv(os.path.join(combined_path, f'accuracy_dependencies_retrain_{retrain}.csv'))
 
-    #mean_correlation_df = correlation_df.groupby('feature')['correlation'].mean().reset_index()
+                    for layer in ['all-activations', 'final-layer-activations']:
+                            plot_dependency_bar_graphs_new(dep_df, combined_path, strategies, True, retrain=retrain, strat=strat, layer=layer)
+                #create_faceted_heatmap(dep_df, True, 'final-layer-activations', os.path.join(combined_path, 'test.png'), strategies)
+
+        strategies_short = {
+            'Opponents': ['opponents'],
+            'Location Beliefs': ['b-loc']
+        }
+        strategies_long = {
+            'No-Mindreading': ['pred', 'opponents', 'big-loc', 'small-loc'],
+            'Low-Mindreading': ['vision', 'fb-exist'],
+            'High-Mindreading': ['fb-loc', 'b-loc', 'target-loc', 'labels']
+        }
+        strategies_both = {
+            'No-Mindreading': ['big-loc', 'big-box', 'small-loc', 'small-box'],
+            'High-Mindreading': ['fb-loc', 'fb-box', 'b-loc', 'b-box', 'target-loc', 'target-box', ]
+        }
+        for retrain in [True, False]:
+            baseline_tables = pd.read_csv(os.path.join(combined_path, f'base_all_table_retrain_False.csv'))
+            result_tables = pd.read_csv(os.path.join(combined_path, f'all_table_retrain_{retrain}.csv'))
+
+            print('made acc tables', len(baseline_tables), len(result_tables))
+            print(baseline_tables.columns, result_tables.columns)
+
+            this_path = os.path.join(combined_path, f'strats-rt-{retrain}')
+
+            for result_type in ['mlp1']:
+                for layer in ['all', 'final-layer']:
+                    plot_bar_graphs_new3(baseline_tables[(baseline_tables['Model_Type'] == result_type)], result_tables[(result_tables['Model_Type'] == result_type)], this_path, strategies_short, layer=layer, r_type=f'spec-{result_type}')
+                    plot_bar_graphs_new3(baseline_tables[(baseline_tables['Model_Type'] == result_type)], result_tables[(result_tables['Model_Type'] == result_type)], this_path, strategies_long, layer=layer, r_type=result_type)
+                    plot_bar_graphs_new3(baseline_tables[(baseline_tables['Model_Type'] == result_type)], result_tables[(result_tables['Model_Type'] == result_type)], this_path, strategies_both, layer=layer, r_type=f'both-{result_type}')
+
+            #plot_bar_graphs_special(baseline_tables, result_tables, os.path.join(combined_path, 'strats'), strategies)
+            #plot_bar_graphs(baseline_tables[(baseline_tables['Model_Type'] == 'mlp1')], result_tables[(result_tables['Model_Type'] == 'mlp1')], os.path.join(combined_path, f'strats-rt-{retrain}'), strategies)
+
+        print('Original columns and epochs:', all_epochs_df.columns, all_epochs_df['epoch'].unique())
+
+        all_epochs_df = adjust_epochs(all_epochs_df)
+
+        grouped_df = group_eval_df(all_epochs_df)
+
+        print('merging dfs')
+        merged_df = pd.merge(combined_ifr_df, grouped_df, on=['rep', 'model', 'epoch', 'retrain', 'prior'])
+        print('after merge', merged_df['epoch'].unique(), merged_df['retrain'].unique(), merged_df['prior'].unique())
+
+        # SPLOM
+        for act in ['all_activations', 'final_layer_activations', 'input_activations']:
+            try:
+                make_splom(merged_df[(merged_df['act'] == act)], combined_path, act, False, True)
+                make_scatter(merged_df[merged_df['act'] == act], combined_path, act)
+            except BaseException as e:
+                print('failed a splom', e)
+
+        make_corr_things(merged_df, combined_path)
+
+        #mean_correlation_df = correlation_df.groupby('feature')['correlation'].mean().reset_index()
 
     last_epoch_df = load_dataframes(last_path_list, key_param_list, key_param)
 
@@ -575,9 +576,8 @@ def do_comparison(combined_path_list, last_path_list, key_param_list, key_param,
             skip_3x=True, skip_1x=True, key_param=key_param, used_regimes=used_regimes, savepath=os.path.join('supervised', exp_name), last_timestep=True)
 
 
-
-    write_metrics_to_file(os.path.join(combined_path, 'metrics.txt'), last_epoch_df, ranges_1, params, stats,
-                          key_param=key_param, d_s=delta_sum, d_x=delta_x)
+    combined_ifr_df = None # temporary
+    write_metrics_to_file(os.path.join(combined_path, 'metrics.txt'), last_epoch_df, ranges_1, params, stats, key_param=key_param, d_s=delta_sum, d_x=delta_x)
     save_figures(combined_path, combined_ifr_df, avg_loss, ranges_2, range_dict, range_dict3,
                  params, last_epoch_df, num=12, key_param_stats=key_param_stats, oracle_stats=oracle_stats,
                  key_param=key_param, delta_sum=delta_sum, delta_x=delta_x)

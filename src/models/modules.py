@@ -3,7 +3,15 @@ import torch.nn as nn
 from abc import ABC 
 import torch.nn.functional as F
 from typing import Dict
+from .old_modules import PerceptionModuleOld, BeliefModuleOld, FinalOutputModuleOld, DecisionModuleOld
 
+def softargmax(x, dim=-1, temperature=1.0):
+    return F.softmax(x / temperature, dim=dim).mul(torch.arange(x.size(dim)).to(x.device)).sum(dim=dim)
+
+def differentiable_one_hot(x, num_classes=5, temperature=0.05):
+    #return F.one_hot(x, num_classes = num_classes)
+    scaled = -((torch.arange(num_classes, device=x.device).float().unsqueeze(0) - x.unsqueeze(1)) ** 2) / temperature
+    return F.softmax(scaled, dim=1)
 
 class BaseModule(nn.Module, ABC):
     def __init__(self, use_neural: bool = True):
@@ -86,14 +94,24 @@ class PerceptionModule(BaseModule):
 
         #device = perceptual_field.device
 
-        treats_visible = perceptual_field[:, :, 2:4, 1:6, 3] > 0
+        #treats_visible = perceptual_field[:, :, 2:4, 1:6, 3] > 0
+
+        treats_visible = torch.sigmoid(50 * (perceptual_field[:, :, 2:4, 1:6, 3] - 0.5)) # uses a sharp sigmoid to retain gradients instead of > 0
+
         treats_visible = torch.flip(treats_visible, dims=[3]) # AAAAAHHH
-        opponent_vision = perceptual_field[:, :, 4, 3, 2] != 1
+        #opponent_vision = perceptual_field[:, :, 4, 3, 2] != 1
+
+        #opponent_vision = torch.sigmoid(50 * torch.abs(perceptual_field[:, :, 4, 3, 2] - 1.0) - 0.5) # likewise a sharp sigmod and abs for differentiable "!="
+        opponent_vision = torch.sigmoid(50 * (torch.abs(perceptual_field[:, :, 4, 3, 2] - 1.0) - 0.5))
         #print(perceptual_field[:, :, 4, 3, 2])
         opponent_presence = perceptual_field[:, 0, 0, 3, 0].unsqueeze(1)
 
         # this adds the 6th treat position when the others are empty
-        no_treats = ~treats_visible.any(dim=3, keepdim=True)
+        #no_treats = ~treats_visible.any(dim=3, keepdim=True)
+
+        treat_sums = treats_visible.sum(dim=3, keepdim=True)
+        no_treats = torch.sigmoid(50 * (0.1 - treat_sums))  # close to 1 when sum is close to 0, and differentiable
+
         treats_visible = torch.cat([treats_visible, no_treats], dim=3)
 
         #print('sizes', treats_visible.shape, opponent_vision.shape, opponent_presence.shape)
@@ -121,11 +139,14 @@ class NormalizedBeliefNetwork(nn.Module):
         
     def forward(self, treats, vision):
         batch_size = treats.shape[0]
-        x = torch.cat([treats.reshape(batch_size, -1), vision], dim=1)
+        treats_flat = treats.reshape(batch_size, -1)
+        vision_shaped = vision.reshape(batch_size, -1)
+
+        x = torch.cat([treats_flat, vision_shaped], dim=1)
         x = F.relu(self.fc1(x))
         x = self.fc2(x)
         x = x.view(batch_size, 2, 6)
-        x = F.softmax(x, dim=1)
+        x = F.softmax(x, dim=-1)
         return x
 
 class BeliefModule(BaseModule):
@@ -134,31 +155,61 @@ class BeliefModule(BaseModule):
     
     def _create_neural_network(self) -> nn.Module:
         return NormalizedBeliefNetwork()
-    
+
     def _hardcoded_forward(self, visible_treats: torch.Tensor, vision: torch.Tensor) -> torch.Tensor:
+
         batch_size = visible_treats.shape[0]
         device = visible_treats.device
-        belief_vectors = []
 
-        for batch in range(batch_size):
-            belief_vector = torch.zeros(2, 6, device=device)
-            
-            for treat_type in range(2):
-                found = False
-                for t in range(4, -1, -1):
-                    if vision[batch, t] and visible_treats[batch, t, treat_type, :5].max() > 0.5:
-                        belief_vector[treat_type] = visible_treats[batch, t, treat_type]
-                        found = True
-                        break
-                
-                if not found:
-                    belief_vector[treat_type, 5] = 1
-                    
-            belief_vectors.append(belief_vector)
+        #time_weights = torch.exp(torch.arange(5, device=device) * 20.0).unsqueeze(-1)
 
-        #print('belief:', belief_vectors[0])
-        return torch.stack(belief_vectors)
+        # so for treat 1, position beliefs are all the same, despite ever see treat being 1. time weights are in the range 1-2^30.
+        # has treat was 1, 0, 0, 0, 0
 
+        # so position beliefs are broken. They're a sum of weighted positions. Weighted positions was positions (assumed correct because has treat) and
+        # Okay so the later position beliefs are far too large.
+
+        # Next iteration. Op beliefs are selecting non 5 despite no vision. Why? Ever see treat is incorrectly 1. Or wrong index.
+        # no, ever see treat with 0 vision is becoming 4.5 e-5. Is that too big? Time weights scale from -16 to -12. And then no treat belief becomes 0.2, should be 1. Made it 1.
+
+        beliefs = []
+        for treat_type in range(2):
+            treats = visible_treats[:, :, treat_type]  # [batch, 5, 6]
+            positions = treats[..., :5]  # [batch, 5, 5]
+
+            # First determine if each timestep sees a treat
+            has_treat = torch.sigmoid(20 * (positions.max(dim=-1)[0] - 0.5))  # [batch, 5]
+            #print('has treat', treat_type, has_treat[0])
+            #print('vision', vision[0])
+
+            # Mask with vision
+            valid_observations = has_treat * vision  # [batch, 5]
+            # Calculate if we ever see a treat across all timesteps
+            ever_see_treat = torch.sigmoid(20 * (valid_observations.max(dim=1)[0] - 0.5))  # [batch]
+            #print('ever_see_treat', treat_type, ever_see_treat[0])
+
+            # If we ever see a treat, create position beliefs using time weights
+            time_weights = torch.exp(torch.arange(5, device=device) * 2.0).view(1, 5)  # [1, 5]
+            time_weights = time_weights * valid_observations
+            #print('time_weights', treat_type, time_weights[0])
+            weighted_positions = positions * time_weights.unsqueeze(-1)  # [batch, 5, 5]
+            position_beliefs = weighted_positions.sum(dim=1)  # [batch, 5]
+            #print('position_beliefs', treat_type, position_beliefs[0])
+            position_beliefs = position_beliefs / (time_weights.sum(dim=1, keepdim=True) + 1e-10)  # [batch, 5]
+            #print('position_beliefs rescaled', treat_type, position_beliefs[0])
+
+            no_treat_belief = (1 - ever_see_treat).unsqueeze(-1)  # [batch, 1]
+            #print('no_treat_belief', treat_type, no_treat_belief[0])
+            belief = torch.cat([position_beliefs, no_treat_belief], dim=1)  # [batch, 6]
+
+            # Normalize with stability
+            #belief = belief + 1e-10
+            belief = belief / belief.sum(dim=1, keepdim=True)
+
+            beliefs.append(belief)
+
+        result = torch.stack(beliefs, dim=1)
+        return result
 # Greedy Decision module
 # Inputs: Belief vector
 # Output: Decision
@@ -191,33 +242,28 @@ class DecisionModule(BaseModule):
     def _hardcoded_forward(self, belief_vector: torch.Tensor, dominant_decision: torch.Tensor = None) -> torch.Tensor:
         batch_size = belief_vector.shape[0]
         device = belief_vector.device
-        decisions = []
-        
-        for batch in range(batch_size):
-            if not self.is_subordinate:
-                large_treats = belief_vector[batch, 0]
-                small_treats = belief_vector[batch, 1]
 
-                if torch.argmax(large_treats) != 5:
-                    decisions.append(F.one_hot(torch.argmax(large_treats), num_classes=5))
-                elif torch.argmax(small_treats) != 5:
-                    decisions.append(F.one_hot(torch.argmax(small_treats), num_classes=5))
-                else:
-                    decisions.append(F.one_hot(torch.tensor(2, device=device), num_classes=5))
-            else:
-                large_treats = belief_vector[batch, 0].clone()
-                small_treats = belief_vector[batch, 1].clone()
-                dom_idx = torch.argmax(dominant_decision[batch]).long()
-                
-                large_best = torch.argmax(large_treats[:5])
-                if large_best != dom_idx: # if the dominant isn't going large, we do
-                    decisions.append(F.one_hot(large_best, num_classes=5))
-                else: # otherwise, dominant gets large, so we get small
-                    small_best = torch.argmax(small_treats[:5])
-                    decisions.append(F.one_hot(small_best, num_classes=5))
-        #print('decision', self.is_subordinate, decisions[0])
-        return torch.stack(decisions).float().to(device)
+        if not self.is_subordinate:
+            default_choice = torch.zeros(batch_size, 5, device=device)
+            default_choice[:, 2] = 1.0
 
+            large_no_treat = torch.sigmoid(50 * (belief_vector[:, 0, 5] - belief_vector[:, 0, :5].max(dim=1)[0]))
+            small_no_treat = torch.sigmoid(50 * (belief_vector[:, 1, 5] - belief_vector[:, 1, :5].max(dim=1)[0]))
+
+            large_choice = F.softmax(belief_vector[:, 0, :5] * 50, dim=1)
+            small_choice = F.softmax(belief_vector[:, 1, :5] * 50, dim=1)
+
+            both_no_treat = large_no_treat * small_no_treat
+            large_exists = 1 - large_no_treat
+            small_exists = 1 - small_no_treat
+
+            return both_no_treat.unsqueeze(1) * default_choice + large_exists.unsqueeze(1) * large_choice + (1 - large_exists).unsqueeze(1) * small_exists.unsqueeze(1) * small_choice
+        else:
+            large_choice = F.softmax(belief_vector[:, 0, :5] * 20, dim=1)
+            small_choice = F.softmax(belief_vector[:, 1, :5] * 20, dim=1)
+            conflict = torch.sum(large_choice * dominant_decision, dim=1, keepdim=True)
+            conflict = torch.sigmoid(20 * (conflict - 0.5))
+            return (1 - conflict) * large_choice + conflict * small_choice
 # Final output module
 # Inputs: Opponent presence, Greedy decision (sub), Sub decision
 # Outputs: The correct label
@@ -249,17 +295,15 @@ class FinalOutputModule(BaseModule):
             return torch.stack(decisions).to(device)
     
     def _hardcoded_forward(self, opponent_presence: torch.Tensor, greedy_decision: torch.Tensor, sub_decision: torch.Tensor) -> torch.Tensor:
-        return torch.where(
-            opponent_presence.unsqueeze(1),
-            sub_decision,
-            greedy_decision
-        )
+        presence_weight = torch.sigmoid(50 * (opponent_presence - 0.5))
+        return presence_weight * sub_decision + (1 - presence_weight) * greedy_decision
 
 
 class AblationArchitecture(nn.Module):
     def __init__(self, module_configs: Dict[str, bool]):
         super().__init__()
         self.kwargs = {'module_configs': module_configs}
+        self.kwargs['batch_size'] = 128
         self.perception = PerceptionModule(use_neural=module_configs.get('perception', True)) # get from dict, but if it doesn't exist return true
         self.my_belief = BeliefModule(use_neural=module_configs.get('my_belief', True))
         self.op_belief = BeliefModule(use_neural=module_configs.get('op_belief', True)) if not module_configs['shared_belief'] else self.my_belief
@@ -267,36 +311,131 @@ class AblationArchitecture(nn.Module):
         self.op_greedy_decision = DecisionModule(is_subordinate=False, use_neural=module_configs.get('op_greedy_decision', True)) if not module_configs['shared_decision'] else self.my_greedy_decision
         self.sub_decision = DecisionModule(is_subordinate=True, use_neural=module_configs.get('sub_decision', True)) if not module_configs['shared_decision'] else self.my_greedy_decision
         self.final_output = FinalOutputModule(use_neural=module_configs.get('final_output', True))
+
+
+        self.perception_old = PerceptionModuleOld(use_neural=False)
+        self.my_belief_old = BeliefModuleOld(use_neural=False)
+        self.op_belief_old = BeliefModuleOld(use_neural=False)
+        self.my_greedy_decision_old = DecisionModuleOld(is_subordinate=False, use_neural=False)
+        self.op_greedy_decision_old = DecisionModuleOld(is_subordinate=False, use_neural=False)
+        self.sub_decision_old = DecisionModuleOld(is_subordinate=True, use_neural=False)
+        self.final_output_old = FinalOutputModuleOld(use_neural=False)
+
+    def compare_tensors(self, name: str, new_tensor: torch.Tensor, old_tensor: torch.Tensor, threshold: float = 0.1, **inputs):
+        if isinstance(new_tensor, dict):
+            for k in new_tensor.keys():
+                self.compare_tensors(f"{name}[{k}]", new_tensor[k], old_tensor[k], threshold, **inputs)
+            return
+
+        if torch.isnan(new_tensor).any():
+            print(f"\nNANs detected in {name}:")
+            for i in range(new_tensor.shape[0]):
+                if torch.isnan(new_tensor[i]).any():
+                    print(f"Batch {i} contains NANs")
+                    print("Inputs:")
+                    for input_name, input_tensor in inputs.items():
+                        if isinstance(input_tensor, dict):
+                            print(f"{input_name}:")
+                            for k, v in input_tensor.items():
+                                print(f"  {k}:")
+                                print(v[i])
+                        else:
+                            print(f"{input_name}:")
+                            print(input_tensor[i])
+                    print("Output with NANs:")
+                    print(new_tensor[i])
+                    break
+            return
+
+        # Iterate through batch dimension
+        for i in range(new_tensor.shape[0]):
+            # Compare decisions instead of raw values
+            new_decision = torch.argmax(new_tensor[i].float(), dim=-1) if len(new_tensor[i].shape) > 0 else new_tensor[i]
+            old_decision = torch.argmax(old_tensor[i].float(), dim=-1) if len(old_tensor[i].shape) > 0 else old_tensor[i]
+
+            if not torch.equal(new_decision, old_decision):
+                print(f"\nDecision difference in {name} at batch {i}:")
+                print("Inputs:")
+                for input_name, input_tensor in inputs.items():
+                    if isinstance(input_tensor, dict):
+                        print(f"{input_name}:")
+                        for k, v in input_tensor.items():
+                            print(f"  {k}:")
+                            print(v[i])
+                            if len(v[i].shape) > 0:
+                                print(f"  {k} decisions:")
+                                print(torch.argmax(v[i], dim=-1))
+                    else:
+                        print(f"{input_name}:")
+                        print(input_tensor[i])
+                        if len(input_tensor[i].shape) > 0:
+                            print(f"{input_name} decisions:")
+                            print(torch.argmax(input_tensor[i], dim=-1))
+                print("New output & decision:")
+                print(new_tensor[i])
+                print(new_decision)
+                print("Old output & decision:")
+                print(old_tensor[i])
+                print(old_decision)
+                break
     
     def forward(self, perceptual_field: torch.Tensor, additional_input: torch.Tensor) -> torch.Tensor:
-
-        #print('Perception input', perceptual_field[0])
-
         perception_output = self.perception.forward(perceptual_field)
-        device = perceptual_field.device
-        #print('Perception output', perception_output['treats_visible'][0])
-        #print('Vision output', perception_output['opponent_vision'][0])
-        #print('Presence output', perception_output['opponent_presence'][0])
-        treats_visible = perception_output['treats_visible']
-        opponent_vision = perception_output['opponent_vision']
-        opponent_presence = perception_output['opponent_presence']
-
         batch_size = perceptual_field.shape[0]
-        my_belief_vector = self.my_belief.forward(treats_visible, torch.ones(batch_size, 5, device=device))
+        device = perceptual_field.device
+
+        treats_visible = perception_output['treats_visible'].float()
+        opponent_vision = perception_output['opponent_vision'].float()
+        opponent_presence = perception_output['opponent_presence'].float()
+
+        my_belief_vector = self.my_belief.forward(treats_visible, torch.ones(batch_size, 5, device=device, dtype=torch.float))
         op_belief_vector = self.op_belief.forward(treats_visible, opponent_vision)
-        #print('My belief', my_belief_vector[0])
-        #print('Op belief', op_belief_vector[0])
-        
         my_greedy_decision = self.my_greedy_decision.forward(my_belief_vector)
         op_greedy_decision = self.op_greedy_decision.forward(op_belief_vector)
-        #print('My dec', my_greedy_decision[0])
-        #print('Op dec', op_greedy_decision[0])
-
         sub_decision = self.sub_decision.forward(my_belief_vector, op_greedy_decision)
-        #print('My dec2', sub_decision[0])
-        
         final_decision = self.final_output.forward(opponent_presence, my_greedy_decision, sub_decision)
-        #print('My out', final_decision[0])
+
+        '''perception_output_old = self.perception_old(perceptual_field)
+        treats_visible_old = perception_output_old['treats_visible'].float()
+        opponent_vision_old = perception_output_old['opponent_vision'].float()
+        opponent_presence_old = perception_output_old['opponent_presence'].float()
+
+        my_belief_vector_old = self.my_belief_old(treats_visible_old, torch.ones(batch_size, 5, device=device, dtype=torch.float))
+        op_belief_vector_old = self.op_belief_old(treats_visible_old, opponent_vision_old)
+
+        my_greedy_decision_old = self.my_greedy_decision_old(my_belief_vector_old)
+        op_greedy_decision_old = self.op_greedy_decision_old(op_belief_vector_old)
+        sub_decision_old = self.sub_decision_old(my_belief_vector_old, op_greedy_decision_old)
+        final_decision_old = self.final_output_old(opponent_presence_old, my_greedy_decision_old, sub_decision_old)
+
+        self.compare_tensors("perception", perception_output, perception_output_old,
+                             perceptual_field=perceptual_field)
+
+        # For belief comparison:
+        self.compare_tensors("my_belief", my_belief_vector, my_belief_vector_old,
+                             treats_visible=treats_visible,
+                             vision=torch.ones(batch_size, 5, device=device, dtype=torch.float))
+
+        self.compare_tensors("op_belief", op_belief_vector, op_belief_vector_old,
+                             treats_visible=treats_visible,
+                             vision=opponent_vision)
+
+        # For decision comparison:
+        self.compare_tensors("my_greedy_decision", my_greedy_decision, my_greedy_decision_old,
+                             belief_vector=my_belief_vector)
+
+        self.compare_tensors("op_greedy_decision", op_greedy_decision, op_greedy_decision_old,
+                             belief_vector=op_belief_vector)
+
+        self.compare_tensors("sub_decision", sub_decision, sub_decision_old,
+                             belief_vector=my_belief_vector,
+                             dominant_decision=op_greedy_decision)
+
+        # For final output comparison:
+        self.compare_tensors("final_decision", final_decision, final_decision_old,
+                             opponent_presence=opponent_presence,
+                             greedy_decision=my_greedy_decision,
+                             sub_decision=sub_decision)'''
         
         return final_decision
 

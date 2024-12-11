@@ -1,6 +1,8 @@
 import os
 
 import numpy as np
+
+from src.models.modules import AblationArchitecture
 from src.rendering import InteractivePlayerWindow
 from src.agents import GridAgentInterface
 from src.pz_envs import env_from_config
@@ -74,7 +76,7 @@ configs = conf.standoff
 
 # configName = 'all'
 # reset_configs = {**configs["defaults"],  **configs[configName]}
-configName = 'sl-Nf0'
+configName = 'sl-Nf1'
 events = conf.stages[configName]['events']
 reset_configs = configs[conf.stages[configName]['params']]
 params = configs[conf.stages[configName]['params']]
@@ -129,6 +131,18 @@ env.current_param_group_pos = 58
 env.deterministic_seed = env.current_param_group_pos
 env.record_oracle_labels = True
 
+use_neural = False
+configs = {
+    'perception': use_neural,
+    'my_belief': use_neural,
+    'op_belief': use_neural,
+    'my_greedy_decision': use_neural,
+    'op_greedy_decision': use_neural,
+    'sub_decision': use_neural,
+    'final_output': use_neural
+}
+test_model = AblationArchitecture(configs)
+
 for i in range(100):
     obs = env.reset()
     print(env_name, env.configName, env.current_event_list_name, env.current_param_group, 'pos', env.current_param_group_pos, env.param_groups[env.current_param_group]['params'],
@@ -154,6 +168,7 @@ for i in range(100):
 
         if done['p_0']:
             print(info)
+            #test_model(obs, None)
             break
     # render special screen here
     img = Image.fromarray(env.grid.render(15, None) * 0, 'RGB')

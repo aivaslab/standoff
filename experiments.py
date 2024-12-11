@@ -144,7 +144,7 @@ def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, sk
         print('Running hyperparameter search on all regimes, pref_types, role_types')
         run_hparam_search(trials=100, repetitions=3, log_file='hparam_file.txt', train_sets=regimes['direct'], epochs=20)
 
-    if 3 in todo:
+    if 2 in todo:
         print('Running experiment 1: base, different models and answers')
 
         combined_path_list = []
@@ -158,7 +158,7 @@ def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, sk
             model_types = [current_model_type]
             label_tuples = [(current_label, current_label_name)]
         else:
-            model_types = ['cnn', 'smlp', 'clstm']
+            model_types = ['smlp', 'cnn', 'clstm']
             label_tuples = [('correct-loc', 'loc')]
 
         for label, label_name in label_tuples: #[('correct-loc', 'loc'), ('correct-box', 'box'), ('shouldGetBig', 'size')]:
@@ -192,7 +192,9 @@ def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, sk
                         key_param_list.append(kpname + suffix)
                     lp_list.append(lp) # has x, x-retrain currently
 
+        #print('comparison time')
         if comparison:
+            #print('doing comparison')
             do_comparison(combined_path_list, last_path_list, key_param_list, key_param, exp_name, params, prior_metrics, lp_list)
 
     if 22 in todo:
@@ -209,7 +211,7 @@ def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, sk
             model_types = [current_model_type]
             label_tuples = [(current_label, current_label_name)]
         else:
-            model_types = ['ablate-hardcoded']
+            model_types = ['a-mixed-n-belief', 'a-mixed-n-output', 'a-neural-split', 'a-neural-shared', 'a-mixed-n-decision'] #'''a-hardcoded','''
             label_tuples = [('correct-loc', 'loc')]
 
         for label, label_name in label_tuples:
@@ -252,8 +254,8 @@ def run_single_experiment(args_tuple):
     print(f"Running experiment with model_type: {model_type}, label: {label}, label_name: {label_name}")
     print(f"Process: {multiprocessing.current_process().name}")
 
-    experiments([3],
-                repetitions=1,
+    experiments([22],
+                repetitions=3,
                 batches=10000,
                 skip_train=not args.t,
                 skip_eval=not args.e,
@@ -276,24 +278,24 @@ if __name__ == '__main__':
     parser.add_argument('-c', action='store_true', help='calculation')
     parser.add_argument('-a', action='store_true', help='activations')
     parser.add_argument('-r', action='store_true', help='Retrain the model')
-    parser.add_argument('-d', action='store_true', help='dont run in parallel and do the end thing')
+    parser.add_argument('-p', action='store_false', help='run in parallel, dont do end')
     parser.add_argument('-g', action='store_true', help='generate dataset')
 
     args = parser.parse_args()
 
     #model_types = [ 'cnn', 'smlp', 'clstm']
-    model_types = ['clstm']
+    model_types = 'a-mixed-n-belief', 'a-mixed-n-output', 'a-neural-split', 'a-neural-shared', 'a-mixed-n-decision'
     labels = [('correct-loc', 'loc')]
 
-    if (not args.d) and (not args.g):
+    if (not args.p) and (not args.g):
         experiment_args = [(model_type, label, args) for model_type, label in product(model_types, labels)]
 
         with multiprocessing.Pool() as pool:
             pool.map(run_single_experiment, experiment_args)
     else:
-        experiments([3] if not args.g else [0],
-                repetitions=1,
-                batches=10000,
+        experiments([22] if not args.g else [0],
+                repetitions=3,
+                batches=500,
                 skip_train=not args.t,
                 skip_eval=not args.e,
                 skip_calc=not args.c,
@@ -302,6 +304,6 @@ if __name__ == '__main__':
                 batch_size=256,
                 desired_evals=1,
                 last_timestep=True,
-                comparison=args.d)
+                comparison=args.p)
 
     print("finished")
