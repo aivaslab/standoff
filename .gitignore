@@ -129,7 +129,6 @@ dmypy.json
 .pyre/
 *.xml
 *.iml
-../standoff_models/human_player.py
 *.pyc
 *.pyc
 *.npy
@@ -137,11 +136,9 @@ dmypy.json
 *.pt
 *.txt
 *.csv
-*.txt
 *.npz
 *.h5
 *.pkl
-*.zip
 *.zip
 *.model
 AAAI24_experiments.py
