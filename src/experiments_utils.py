@@ -14,7 +14,7 @@ import tqdm
 from src.pz_envs import ScenarioConfigs
 from src.supervised_learning import gen_data
 from src.utils.plotting import create_combined_histogram, plot_progression, save_key_param_figures, plot_learning_curves, make_splom, make_ifrscores, make_scatter, make_corr_things, make_splom_aux, plot_strategy_bar, \
-    create_faceted_heatmap, plot_bar_graphs, plot_bar_graphs_special, plot_bar_graphs_new, plot_dependency_bar_graphs, plot_dependency_bar_graphs_new
+    create_faceted_heatmap, plot_bar_graphs, plot_bar_graphs_special, plot_bar_graphs_new, plot_dependency_bar_graphs, plot_dependency_bar_graphs_new, plot_dependency_bar_graphs_flipped
 from supervised_learning_main import run_supervised_session, calculate_statistics, write_metrics_to_file, save_figures, \
     train_model
 import numpy as np
@@ -166,7 +166,7 @@ def is_novel_task(row):
         's1': [x + '0' for x in sub_regime_keys],
         'homogeneous': ['Tt0', 'Ff0', 'Nn0', 'Tt1', 'Ff1', 'Nn1']
     }
-    train_regime = row['regime'].split('-')[2]
+    train_regime = row['regime'].split('-')[-1]
     return not row['test_regime'] in train_map[train_regime]
 
 
@@ -277,11 +277,20 @@ def do_prediction_dependency(df, acc_name, output_path, retrain):
                         feature_acc_mean_per_id = feature_acc.groupby('id').mean().mean()
                         feature_acc_std_per_id = feature_acc.groupby('id').mean().std()
 
+                        pred_acc_mean_per_id = pred_acc.groupby('id').mean().mean()
+                        pred_acc_std_per_id = pred_acc.groupby('id').mean().std()
+
                         f_implies_p = np.logical_or(~feature_acc, pred_acc)
                         notf_implies_p = np.logical_or(feature_acc, pred_acc)
 
                         f_implies_p_mean_per_id = f_implies_p.groupby('id').mean()
                         notf_implies_p_mean_per_id = notf_implies_p.groupby('id').mean()
+
+                        p_implies_f = np.logical_or(~pred_acc, feature_acc)
+                        notp_implies_f = np.logical_or(pred_acc, feature_acc)
+
+                        p_implies_f_mean_per_id = p_implies_f.groupby('id').mean()
+                        notp_implies_f_mean_per_id = notp_implies_f.groupby('id').mean()
 
                         #n_trials = len(f_implies_p_mean_per_id)
                         #n_successes_f = np.sum(f_implies_p_mean_per_id > 0.5)
@@ -298,17 +307,23 @@ def do_prediction_dependency(df, acc_name, output_path, retrain):
                             'feature': feature,
                             'feature_acc': feature_acc_mean_per_id,
                             'feature_acc_std': feature_acc_std_per_id,
+                            'pred_acc': pred_acc_mean_per_id,
+                            'pred_acc_std': pred_acc_std_per_id,
                             'f_implies_p_mean': f_implies_p_mean_per_id.mean(),
                             'f_implies_p_std': f_implies_p_mean_per_id.std(),
                             #'f_implies_p_p_value': p_value_f,
                             'notf_implies_p_mean': notf_implies_p_mean_per_id.mean(),
                             'notf_implies_p_std': notf_implies_p_mean_per_id.std(),
+                            'p_implies_f_mean': p_implies_f_mean_per_id.mean(),
+                            'p_implies_f_std': p_implies_f_mean_per_id.std(),
+                            'notp_implies_f_mean': notp_implies_f_mean_per_id.mean(),
+                            'notp_implies_f_std': notp_implies_f_mean_per_id.std(),
                             #'notf_implies_notp_p_value': p_value_notf,
                         }
 
                         results.append(new_result)
     #headers = ['retrain', 'model', 'activation', 'is_novel', 'feature', 'f_implies_p_mean', 'f_implies_p_std', 'f_implies_p_p_value', 'notf_implies_notp_mean', 'notf_implies_notp_std', 'notf_implies_notp_p_value']
-    headers = ['retrain', 'model', 'activation', 'is_novel', 'feature', 'feature_acc', 'feature_acc_std', 'f_implies_p_mean', 'f_implies_p_std', 'notf_implies_p_mean', 'notf_implies_p_std']
+    headers = ['retrain', 'model', 'activation', 'is_novel', 'feature', 'feature_acc', 'feature_acc_std', 'pred_acc', 'pred_acc_std', 'f_implies_p_mean', 'f_implies_p_std', 'notf_implies_p_mean', 'notf_implies_p_std', 'p_implies_f_mean', 'p_implies_f_std', 'notp_implies_f_mean', 'notp_implies_f_std']
     df_output = pd.DataFrame(results, columns=headers)
     filename = f"{acc_name}_dependencies_retrain_{retrain}.csv"
     df_output.to_csv(os.path.join(output_path, filename), index=False)
@@ -381,6 +396,8 @@ def do_comparison(combined_path_list, last_path_list, key_param_list, key_param,
 
     combined_path = os.path.join('supervised', exp_name, 'c')
     os.makedirs(combined_path, exist_ok=True)
+
+    #plot_learning_curves(combined_path, lp_list)
 
     print('loading IFRs')
     folder_paths = set()
@@ -508,7 +525,7 @@ def do_comparison(combined_path_list, last_path_list, key_param_list, key_param,
                     dep_df = pd.read_csv(os.path.join(combined_path, f'accuracy_dependencies_retrain_{retrain}.csv'))
 
                     for layer in ['all-activations', 'final-layer-activations']:
-                            plot_dependency_bar_graphs_new(dep_df, combined_path, strategies, True, retrain=retrain, strat=strat, layer=layer)
+                            plot_dependency_bar_graphs_flipped(dep_df, combined_path, strategies, True, retrain=retrain, strat=strat, layer=layer)
                 #create_faceted_heatmap(dep_df, True, 'final-layer-activations', os.path.join(combined_path, 'test.png'), strategies)
 
         strategies_short = {

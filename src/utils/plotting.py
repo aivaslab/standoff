@@ -731,6 +731,110 @@ def plot_dependency_bar_graphs_new(data, save_dir, strategies, novelty, layer='a
                 bbox_inches='tight', dpi=300)
     plt.close(fig)
 
+def plot_dependency_bar_graphs_flipped(data, save_dir, strategies, novelty, layer='all-activations', retrain=False, strat=""):
+    datasets = ['s1', 's2', 's3'] if not novelty else ['s1', 's2']
+    architectures = ['mlp', 'cnn', 'clstm']
+    architecture_colors = {'mlp': '#B22222', 'cnn': '#663399', 'clstm': '#4682B4'}
+
+    fig, axs = plt.subplots(len(architectures), len(datasets),
+                           figsize=(8 * len(datasets), 2.5 * len(architectures) + 0.8),
+                           squeeze=False)
+    fig.suptitle(f'Prediction Implies Feature - {"Novel" if novelty else "Familiar"} Tasks',
+                 fontsize=16)
+
+    bar_width = 0.35
+    feature_gap = 0.2
+    strategy_gap = 0.25
+
+    background_colors = ['#FFBBBB', '#FFFFBB', '#BBFFBB']
+
+    for row, architecture in enumerate(architectures):
+        for col, dataset in enumerate(datasets):
+            ax = axs[row, col]
+
+            # Add background colors for strategy sections
+            strategy_widths = [len(features) * (bar_width + feature_gap) + 0.5*strategy_gap for features in strategies.values()]
+            start = 0
+            for color, width in zip(background_colors, strategy_widths):
+                ax.add_patch(Rectangle((start - 0.25, 0), width, 1, fill=True, color=color, alpha=0.3, zorder=0))
+                start += width
+
+            x_offset = 0
+            for strategy_idx, (strategy, features) in enumerate(strategies.items()):
+                for feature in features:
+                    subset = data[(data['model'].str.endswith(dataset)) &
+                                (data['model'].str.contains(architecture)) &
+                                (data['is_novel'] == novelty) &
+                                (data['activation'] == layer) &
+                                (data['feature'] == feature)]
+
+                    if not subset.empty:
+                        # For flipped analysis: prediction accuracy is now the primary metric
+                        pred_acc = subset['pred_acc'].values[0]  # Total prediction accuracy
+                        feat_given_pred = subset['p_implies_f_mean'].values[0]  # Feature accuracy when prediction is correct
+                        feat_given_not_pred = subset['notp_implies_f_mean'].values[0]  # Feature accuracy when prediction is incorrect
+
+                        # Prediction is correct bar (bottom)
+                        ax.bar(x_offset, pred_acc, bar_width,
+                              color=architecture_colors[architecture],
+                              label='Prediction Correct' if row == 0 and col == 0 else "")
+
+                        # Feature accuracy within prediction correct
+                        ax.bar(x_offset, pred_acc * feat_given_pred, bar_width*0.5,
+                              color='white', alpha=1.0,
+                              label='Feature Correct' if row == 0 and col == 0 else "")
+
+                        # Prediction is incorrect bar (top)
+                        ax.bar(x_offset, 1 - pred_acc, bar_width,
+                              bottom=pred_acc,
+                              color=architecture_colors[architecture], alpha=0.5,
+                              label='Prediction Incorrect' if row == 0 and col == 0 else "")
+
+                        # Feature accuracy within prediction incorrect
+                        ax.bar(x_offset, (1 - pred_acc) * feat_given_not_pred, bar_width*0.5,
+                              bottom=pred_acc,
+                              color='white', alpha=1.0,
+                              label='Feature Correct' if row == 0 and col == 0 else "")
+
+                        # Add percentage labels
+                        ax.text(x_offset - 0.25, pred_acc, f'{pred_acc:.0%}',
+                              ha='center', va='center', fontsize=8)
+                        ax.text(x_offset + 0.25, pred_acc * feat_given_pred,
+                              f'{feat_given_pred:.0%}', ha='center', va='center',
+                              fontsize=8, color='darkblue')
+                        ax.text(x_offset + 0.25, pred_acc + (1 - pred_acc) * feat_given_not_pred,
+                              f'{feat_given_not_pred:.0%}', ha='center', va='center',
+                              fontsize=8, color='darkblue')
+
+                        # Feature labels
+                        ax.text(x_offset, -0.05, feature, ha='center', va='top', fontsize=8)
+
+                    x_offset += bar_width + feature_gap
+                x_offset += strategy_gap
+
+            ax.set_ylabel('Probability' if col == 0 else '')
+            ax.set_ylim(-0.1, 1.1)
+            ax.set_xlim(-bar_width, x_offset - strategy_gap)
+            ax.set_xticks([])
+
+            if col != 0:
+                ax.yaxis.set_ticks([])
+
+            if row == 0:
+                ax.set_title(f'{dataset.upper()}', fontsize=14)
+            if col == 0:
+                ax.text(-0.1, 0.5, f'{architecture.upper()}', va='center', ha='right',
+                        rotation=90, transform=ax.transAxes, fontsize=14)
+
+    handles, labels = ax.get_legend_handles_labels()
+    fig.legend(handles, labels, loc='lower center', bbox_to_anchor=(0.5, 0),
+              ncol=2, fontsize=10)
+
+    plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+    plt.savefig(f'{save_dir}/p_implies_f_{layer}_{"novel" if novelty else "familiar"}_rt_{retrain}_{strat}.png',
+                bbox_inches='tight', dpi=300)
+    plt.close(fig)
+
 def plot_dependency_bar_graphs(data, save_dir, strategies, novelty, layer='all-activations', retrain=False, strat=""):
     datasets = ['s1', 's2', 's3'] if not novelty else ['s1', 's2']
     architectures = ['mlp', 'cnn', 'clstm']
@@ -2126,6 +2230,8 @@ def plot_learning_curves(save_dir, lp_list):
     for group in lp_list:
         for filename in group:
             experiment, repetition, is_retrain = parse_filename(filename)
+            if not os.path.exists(filename):
+                continue
             if experiment not in experiments:
                 experiments[experiment] = {}
             if repetition not in experiments[experiment]:
@@ -2155,14 +2261,14 @@ def plot_learning_curves(save_dir, lp_list):
 
         if original_data:
             for k, df in enumerate(original_data):
-                plt.plot(df['Batch'], df['Loss'], color=color, alpha=0.33*(k+1), label=f'{experiment}' if k == 2 else None)
+                plt.plot(df['Batch'], df['Accuracy'], color=color, alpha=0.33*(k+1), label=f'{experiment}' if k == 2 else None)
 
         if retrain_data:
             for k, df in enumerate(retrain_data):
-                plt.plot(df['Batch'] + 10000, df['Loss'], color=color, alpha=0.33*(k+1))
+                plt.plot(df['Batch'] + 10000, df['Accuracy'], color=color, alpha=0.33*(k+1))
 
     plt.xlabel('Batch')
-    plt.ylabel('Loss')
+    plt.ylabel('Accuracy')
     plt.title('Learning Curves')
     plt.legend(bbox_to_anchor=(1, 1), loc='upper right')
     plt.savefig(os.path.join(save_dir, 'learncurves.png'))
@@ -2240,19 +2346,25 @@ def plot_learning_curves(save_dir, lp_list):
     print('plotting learning curves')
     for type in ['loc', 'box', 'size']:
         plt.figure(figsize=(10, 6))
+        breaking = False
         for l in lp_list:
             if os.path.exists(l[0]):
                 head, tail = os.path.split(l[0])
                 name = os.path.basename(head)
                 if type in name:
                     df = pd.read_csv(l[0])
-                    plt.plot(df['Batch'], df['Loss'], label=name)
+                    plt.plot(df['Batch'], df['Accuracy'], label=name)
+            #else:
+            #    breaking = True
+            #    break
+        #if breaking:
+        #    continue
         plt.xlabel('Batch')
-        plt.ylabel('Loss')
-        plt.ylim([0, 2.0])
-        plt.title('Validation Loss')
+        plt.ylabel('Accuracy')
+        plt.ylim([0, 1.0])
+        plt.title('Validation Accuracy')
         plt.legend()
-        plt.savefig(os.path.join(save_dir, f'loss-{type}.png'))
+        plt.savefig(os.path.join(save_dir, f'loss-{type}2.png'))
         plt.close()
 
     print('plotting rt learning curves')

@@ -5,30 +5,47 @@ import torch.nn.functional as F
 from typing import Dict
 from .old_modules import PerceptionModuleOld, BeliefModuleOld, FinalOutputModuleOld, DecisionModuleOld
 
-def softargmax(x, dim=-1, temperature=1.0):
-    return F.softmax(x / temperature, dim=dim).mul(torch.arange(x.size(dim)).to(x.device)).sum(dim=dim)
-
-def differentiable_one_hot(x, num_classes=5, temperature=0.05):
-    #return F.one_hot(x, num_classes = num_classes)
-    scaled = -((torch.arange(num_classes, device=x.device).float().unsqueeze(0) - x.unsqueeze(1)) ** 2) / temperature
-    return F.softmax(scaled, dim=1)
-
 class BaseModule(nn.Module, ABC):
-    def __init__(self, use_neural: bool = True):
+    def __init__(self, use_neural: bool = True, random_prob: float = 0.0, sigmoid_temp: float = 20.0):
         super().__init__()
         self.use_neural = use_neural
         self.neural_network = self._create_neural_network() if use_neural else None
+        self.random_prob = random_prob
+        self.sigmoid_temp = sigmoid_temp
     
     def _create_neural_network(self) -> nn.Module:
         pass
     
     def _hardcoded_forward(self, *args, **kwargs):
         pass
-    
+
+    def _random_forward(self, *args, **kwargs):
+        pass
+
     def forward(self, *args, **kwargs):
         if self.use_neural:
             return self.neural_network(*args, **kwargs)
-        return self._hardcoded_forward(*args, **kwargs)
+
+        batch_size = args[0].shape[0]
+        device = args[0].device
+
+        hardcoded = self._hardcoded_forward(*args, **kwargs)
+        rand_output = self._random_forward(*args, **kwargs)
+
+        if isinstance(hardcoded, dict):
+            result = {}
+            for k in hardcoded.keys():
+                use_random = torch.rand(batch_size, device=device) < self.random_prob
+                mask_shape = [batch_size] + [1] * (hardcoded[k].dim() - 1)
+                result[k] = torch.where(use_random.view(*mask_shape),
+                                        rand_output[k],
+                                        hardcoded[k])
+            return result
+        else:
+            use_random = torch.rand(batch_size, device=device) < self.random_prob
+            return torch.where(use_random.view(batch_size, *([1] * (hardcoded.dim() - 1))),
+                               rand_output,
+                               hardcoded)
 
 # Perception module
 # Inputs: The original perceptual field (5x5x7x7)
@@ -77,8 +94,8 @@ class NormalizedPerceptionNetwork(nn.Module):
         }
 
 class PerceptionModule(BaseModule):
-    def __init__(self, use_neural: bool = True):
-        super().__init__(use_neural)
+    def __init__(self, use_neural: bool = True, random_prob: float = 0.0, sigmoid_temp: float = 20.0):
+        super().__init__(use_neural, random_prob, sigmoid_temp)
         
     def _create_neural_network(self) -> nn.Module:
         return NormalizedPerceptionNetwork()
@@ -96,29 +113,51 @@ class PerceptionModule(BaseModule):
 
         #treats_visible = perceptual_field[:, :, 2:4, 1:6, 3] > 0
 
-        treats_visible = torch.sigmoid(50 * (perceptual_field[:, :, 2:4, 1:6, 3] - 0.5)) # uses a sharp sigmoid to retain gradients instead of > 0
+        noise_std = 0.1
+
+        treats_visible = torch.sigmoid(self.sigmoid_temp * (perceptual_field[:, :, 2:4, 1:6, 3] - 0.5)) # uses a sharp sigmoid to retain gradients instead of > 0
 
         treats_visible = torch.flip(treats_visible, dims=[3]) # AAAAAHHH
         #opponent_vision = perceptual_field[:, :, 4, 3, 2] != 1
 
         #opponent_vision = torch.sigmoid(50 * torch.abs(perceptual_field[:, :, 4, 3, 2] - 1.0) - 0.5) # likewise a sharp sigmod and abs for differentiable "!="
-        opponent_vision = torch.sigmoid(50 * (torch.abs(perceptual_field[:, :, 4, 3, 2] - 1.0) - 0.5))
+        opponent_vision = torch.sigmoid(self.sigmoid_temp * (torch.abs(perceptual_field[:, :, 4, 3, 2] - 1.0) - 0.5))
+        opponent_vision = opponent_vision + torch.randn_like(opponent_vision) * noise_std
         #print(perceptual_field[:, :, 4, 3, 2])
         opponent_presence = perceptual_field[:, 0, 0, 3, 0].unsqueeze(1)
+        opponent_presence = opponent_presence + torch.randn_like(opponent_presence) * noise_std
 
         # this adds the 6th treat position when the others are empty
         #no_treats = ~treats_visible.any(dim=3, keepdim=True)
 
         treat_sums = treats_visible.sum(dim=3, keepdim=True)
-        no_treats = torch.sigmoid(50 * (0.1 - treat_sums))  # close to 1 when sum is close to 0, and differentiable
+        no_treats = torch.sigmoid(self.sigmoid_temp * (0.1 - treat_sums))  # close to 1 when sum is close to 0, and differentiable
 
         treats_visible = torch.cat([treats_visible, no_treats], dim=3)
+        treats_visible = treats_visible + torch.randn_like(treats_visible) * noise_std
 
         #print('sizes', treats_visible.shape, opponent_vision.shape, opponent_presence.shape)
 
         #print('field', perceptual_field[0, 0, 0])
 
         #print('perception:', treats_visible[0], opponent_vision[0], opponent_presence[0])
+
+        return {
+            'treats_visible': treats_visible,
+            'opponent_vision': opponent_vision,
+            'opponent_presence': opponent_presence
+        }
+
+    def _random_forward(self, perceptual_field: torch.Tensor) -> Dict[str, torch.Tensor]:
+        batch_size = perceptual_field.shape[0]
+        device = perceptual_field.device
+
+        treats_visible = torch.rand(batch_size, 5, 2, 6, device=device)
+        treats_visible = F.softmax(treats_visible, dim=-1)
+
+        opponent_vision = torch.rand(batch_size, 5, device=device)
+
+        opponent_presence = torch.rand(batch_size, 1, device=device)
 
         return {
             'treats_visible': treats_visible,
@@ -150,75 +189,57 @@ class NormalizedBeliefNetwork(nn.Module):
         return x
 
 class BeliefModule(BaseModule):
-    def __init__(self, use_neural: bool = True):
-        super().__init__(use_neural)
+    def __init__(self, use_neural: bool = True, random_prob: float = 0.0, sigmoid_temp: float = 20.0):
+        super().__init__(use_neural, random_prob, sigmoid_temp)
     
     def _create_neural_network(self) -> nn.Module:
         return NormalizedBeliefNetwork()
 
     def _hardcoded_forward(self, visible_treats: torch.Tensor, vision: torch.Tensor) -> torch.Tensor:
-
-        batch_size = visible_treats.shape[0]
         device = visible_treats.device
 
-        #time_weights = torch.exp(torch.arange(5, device=device) * 20.0).unsqueeze(-1)
-
-        # so for treat 1, position beliefs are all the same, despite ever see treat being 1. time weights are in the range 1-2^30.
-        # has treat was 1, 0, 0, 0, 0
-
-        # so position beliefs are broken. They're a sum of weighted positions. Weighted positions was positions (assumed correct because has treat) and
-        # Okay so the later position beliefs are far too large.
-
-        # Next iteration. Op beliefs are selecting non 5 despite no vision. Why? Ever see treat is incorrectly 1. Or wrong index.
-        # no, ever see treat with 0 vision is becoming 4.5 e-5. Is that too big? Time weights scale from -16 to -12. And then no treat belief becomes 0.2, should be 1. Made it 1.
 
         beliefs = []
         for treat_type in range(2):
             treats = visible_treats[:, :, treat_type]  # [batch, 5, 6]
             positions = treats[..., :5]  # [batch, 5, 5]
 
-            # First determine if each timestep sees a treat
-            has_treat = torch.sigmoid(20 * (positions.max(dim=-1)[0] - 0.5))  # [batch, 5]
-            #print('has treat', treat_type, has_treat[0])
-            #print('vision', vision[0])
+            has_treat = torch.sigmoid(self.sigmoid_temp * (positions.max(dim=-1)[0] - 0.5))  # [batch, 5]
 
-            # Mask with vision
             valid_observations = has_treat * vision  # [batch, 5]
-            # Calculate if we ever see a treat across all timesteps
-            ever_see_treat = torch.sigmoid(20 * (valid_observations.max(dim=1)[0] - 0.5))  # [batch]
-            #print('ever_see_treat', treat_type, ever_see_treat[0])
+            ever_see_treat = torch.sigmoid(self.sigmoid_temp * (valid_observations.max(dim=1)[0] - 0.5))  # [batch]
 
-            # If we ever see a treat, create position beliefs using time weights
             time_weights = torch.exp(torch.arange(5, device=device) * 2.0).view(1, 5)  # [1, 5]
             time_weights = time_weights * valid_observations
-            #print('time_weights', treat_type, time_weights[0])
             weighted_positions = positions * time_weights.unsqueeze(-1)  # [batch, 5, 5]
             position_beliefs = weighted_positions.sum(dim=1)  # [batch, 5]
-            #print('position_beliefs', treat_type, position_beliefs[0])
             position_beliefs = position_beliefs / (time_weights.sum(dim=1, keepdim=True) + 1e-10)  # [batch, 5]
-            #print('position_beliefs rescaled', treat_type, position_beliefs[0])
 
             no_treat_belief = (1 - ever_see_treat).unsqueeze(-1)  # [batch, 1]
-            #print('no_treat_belief', treat_type, no_treat_belief[0])
             belief = torch.cat([position_beliefs, no_treat_belief], dim=1)  # [batch, 6]
 
-            # Normalize with stability
-            #belief = belief + 1e-10
-            belief = belief / belief.sum(dim=1, keepdim=True)
-
-            beliefs.append(belief)
+            beliefs.append(belief / belief.sum(dim=1, keepdim=True))
 
         result = torch.stack(beliefs, dim=1)
         return result
+
+    def _random_forward(self, visible_treats: torch.Tensor, vision: torch.Tensor) -> torch.Tensor:
+        batch_size = visible_treats.shape[0]
+        device = visible_treats.device
+
+        beliefs = torch.rand(batch_size, 2, 6, device=device)
+
+        return F.softmax(beliefs, dim=-1)
+
 # Greedy Decision module
 # Inputs: Belief vector
 # Output: Decision
 # Method: Argmax of the large treat belief unless it is 5, else argmax of small treat belief unless it is 5, else 2
 
 class DecisionModule(BaseModule):
-    def __init__(self, is_subordinate: bool = False, use_neural: bool = True):
+    def __init__(self, is_subordinate: bool = False, use_neural: bool = True, random_prob: float = 0.0, sigmoid_temp: float = 20.0):
         self.is_subordinate = is_subordinate
-        super().__init__(use_neural)
+        super().__init__(use_neural, random_prob, sigmoid_temp)
     
     def _create_neural_network(self) -> nn.Module:
         input_size = 12 if not self.is_subordinate else 12 + 5
@@ -247,11 +268,11 @@ class DecisionModule(BaseModule):
             default_choice = torch.zeros(batch_size, 5, device=device)
             default_choice[:, 2] = 1.0
 
-            large_no_treat = torch.sigmoid(50 * (belief_vector[:, 0, 5] - belief_vector[:, 0, :5].max(dim=1)[0]))
-            small_no_treat = torch.sigmoid(50 * (belief_vector[:, 1, 5] - belief_vector[:, 1, :5].max(dim=1)[0]))
+            large_no_treat = torch.sigmoid(self.sigmoid_temp * (belief_vector[:, 0, 5] - belief_vector[:, 0, :5].max(dim=1)[0]))
+            small_no_treat = torch.sigmoid(self.sigmoid_temp * (belief_vector[:, 1, 5] - belief_vector[:, 1, :5].max(dim=1)[0]))
 
-            large_choice = F.softmax(belief_vector[:, 0, :5] * 50, dim=1)
-            small_choice = F.softmax(belief_vector[:, 1, :5] * 50, dim=1)
+            large_choice = F.softmax(belief_vector[:, 0, :5] * self.sigmoid_temp, dim=1)
+            small_choice = F.softmax(belief_vector[:, 1, :5] * self.sigmoid_temp, dim=1)
 
             both_no_treat = large_no_treat * small_no_treat
             large_exists = 1 - large_no_treat
@@ -259,19 +280,28 @@ class DecisionModule(BaseModule):
 
             return both_no_treat.unsqueeze(1) * default_choice + large_exists.unsqueeze(1) * large_choice + (1 - large_exists).unsqueeze(1) * small_exists.unsqueeze(1) * small_choice
         else:
-            large_choice = F.softmax(belief_vector[:, 0, :5] * 20, dim=1)
-            small_choice = F.softmax(belief_vector[:, 1, :5] * 20, dim=1)
+            large_choice = F.softmax(belief_vector[:, 0, :5] * self.sigmoid_temp, dim=1)
+            small_choice = F.softmax(belief_vector[:, 1, :5] * self.sigmoid_temp, dim=1)
             conflict = torch.sum(large_choice * dominant_decision, dim=1, keepdim=True)
-            conflict = torch.sigmoid(20 * (conflict - 0.5))
+            conflict = torch.sigmoid(self.sigmoid_temp * (conflict - 0.5))
             return (1 - conflict) * large_choice + conflict * small_choice
+
+    def _random_forward(self, belief_vector: torch.Tensor, dominant_decision: torch.Tensor = None) -> torch.Tensor:
+        batch_size = belief_vector.shape[0]
+        device = belief_vector.device
+
+        decisions = torch.rand(batch_size, 5, device=device)
+        decisions = F.softmax(decisions, dim=-1)
+
+        return decisions
 # Final output module
 # Inputs: Opponent presence, Greedy decision (sub), Sub decision
 # Outputs: The correct label
 # Greedy decision if no opponent, sub decision if opponent
 
 class FinalOutputModule(BaseModule):
-    def __init__(self, use_neural: bool = True):
-        super().__init__(use_neural)
+    def __init__(self, use_neural: bool = True, random_prob: float = 0.0, sigmoid_temp: float = 20.0):
+        super().__init__(use_neural, random_prob, sigmoid_temp)
     
     def _create_neural_network(self) -> nn.Module:
         return nn.Sequential(
@@ -295,31 +325,72 @@ class FinalOutputModule(BaseModule):
             return torch.stack(decisions).to(device)
     
     def _hardcoded_forward(self, opponent_presence: torch.Tensor, greedy_decision: torch.Tensor, sub_decision: torch.Tensor) -> torch.Tensor:
-        presence_weight = torch.sigmoid(50 * (opponent_presence - 0.5))
+        presence_weight = torch.sigmoid(self.sigmoid_temp * (opponent_presence - 0.5))
         return presence_weight * sub_decision + (1 - presence_weight) * greedy_decision
+
+    def _random_forward(self, opponent_presence: torch.Tensor, greedy_decision: torch.Tensor, sub_decision: torch.Tensor) -> torch.Tensor:
+        batch_size = opponent_presence.shape[0]
+        device = opponent_presence.device
+
+        final_decisions = torch.rand(batch_size, 5, device=device)
+        final_decisions = F.softmax(final_decisions, dim=-1)
+
+        return final_decisions
 
 
 class AblationArchitecture(nn.Module):
-    def __init__(self, module_configs: Dict[str, bool]):
+    def __init__(self, module_configs: Dict[str, bool], random_probs: Dict[str, float] = None):
         super().__init__()
         self.kwargs = {'module_configs': module_configs}
         self.kwargs['batch_size'] = 128
-        self.perception = PerceptionModule(use_neural=module_configs.get('perception', True)) # get from dict, but if it doesn't exist return true
-        self.my_belief = BeliefModule(use_neural=module_configs.get('my_belief', True))
-        self.op_belief = BeliefModule(use_neural=module_configs.get('op_belief', True)) if not module_configs['shared_belief'] else self.my_belief
-        self.my_greedy_decision = DecisionModule(is_subordinate=False, use_neural=module_configs.get('my_greedy_decision', True))
-        self.op_greedy_decision = DecisionModule(is_subordinate=False, use_neural=module_configs.get('op_greedy_decision', True)) if not module_configs['shared_decision'] else self.my_greedy_decision
-        self.sub_decision = DecisionModule(is_subordinate=True, use_neural=module_configs.get('sub_decision', True)) if not module_configs['shared_decision'] else self.my_greedy_decision
-        self.final_output = FinalOutputModule(use_neural=module_configs.get('final_output', True))
 
+        sigmoid_temp = module_configs.get('sigmoid_temp', 20.0)
 
-        self.perception_old = PerceptionModuleOld(use_neural=False)
-        self.my_belief_old = BeliefModuleOld(use_neural=False)
-        self.op_belief_old = BeliefModuleOld(use_neural=False)
-        self.my_greedy_decision_old = DecisionModuleOld(is_subordinate=False, use_neural=False)
-        self.op_greedy_decision_old = DecisionModuleOld(is_subordinate=False, use_neural=False)
-        self.sub_decision_old = DecisionModuleOld(is_subordinate=True, use_neural=False)
-        self.final_output_old = FinalOutputModuleOld(use_neural=False)
+        if random_probs is None:
+            random_probs = {k: 0.0 for k in module_configs.keys()}
+
+        self.perception = PerceptionModule(
+            use_neural=module_configs['perception'],
+            random_prob=random_probs['perception'],
+            sigmoid_temp=sigmoid_temp
+        )
+        self.my_belief = BeliefModule(
+            use_neural=module_configs['my_belief'],
+            random_prob=random_probs['my_belief'],
+            sigmoid_temp=sigmoid_temp
+        )
+        self.op_belief = (BeliefModule(
+            use_neural=module_configs['op_belief'],
+            random_prob=random_probs['op_belief'],
+            sigmoid_temp=sigmoid_temp
+        ) if not module_configs['shared_belief'] else self.my_belief)
+
+        self.my_greedy_decision = DecisionModule(
+            is_subordinate=False,
+            use_neural=module_configs['my_greedy_decision'],
+            random_prob=random_probs['my_greedy_decision'],
+            sigmoid_temp=sigmoid_temp
+        )
+        self.op_greedy_decision = (DecisionModule(
+            is_subordinate=False,
+            use_neural=module_configs['op_greedy_decision'],
+            random_prob=random_probs['op_greedy_decision'],
+            sigmoid_temp=sigmoid_temp
+        ) if not module_configs['shared_decision'] else self.my_greedy_decision)
+
+        self.sub_decision = (DecisionModule(
+            is_subordinate=True,
+            use_neural=module_configs['sub_decision'],
+            random_prob=random_probs['sub_decision'],
+            sigmoid_temp=sigmoid_temp
+        ) if not module_configs['shared_decision'] else self.my_greedy_decision)
+
+        self.final_output = FinalOutputModule(
+            use_neural=module_configs['final_output'],
+            random_prob=random_probs['final_output'],
+            sigmoid_temp=sigmoid_temp
+        )
+
 
     def compare_tensors(self, name: str, new_tensor: torch.Tensor, old_tensor: torch.Tensor, threshold: float = 0.1, **inputs):
         if isinstance(new_tensor, dict):

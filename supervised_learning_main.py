@@ -12,6 +12,7 @@ import time
 
 import numpy as np
 from functools import lru_cache
+from ablation_configs import *
 
 import pandas as pd
 import heapq
@@ -150,50 +151,27 @@ def register_hooks(model, hook):
         save_inputs = False
 
 
+
 def load_model(model_type, model_kwargs, device):
-    if model_type == 'cnn':
-        model_kwargs['use_conv2'] = True
-        model = CNNModel(**model_kwargs).to(device)
-    elif model_type == 'fcnn':
-        model = fCNN(**model_kwargs).to(device)
-    elif model_type == 'tcnn':
-        model = tCNN(**model_kwargs).to(device)
-    elif model_type == 'srnn':
-        model = sRNN(**model_kwargs).to(device)
-    elif model_type == 'smlp':
-        model = sMLP(**model_kwargs).to(device)
-    elif model_type == 'crnn':
-        model = cRNNModel(**model_kwargs).to(device)
-    elif model_type == 'clstm':
-        model = cLstmModel(**model_kwargs).to(device)
-    elif model_type == 'ablate-hardcoded':
-        use_neural = False
-        configs = {
-            'perception': use_neural,
-            'my_belief': use_neural,
-            'op_belief': use_neural,
-            'my_greedy_decision': use_neural,
-            'op_greedy_decision': use_neural,
-            'sub_decision': use_neural,
-            'final_output': use_neural
-        }
+    if model_type[0] != 'a':
+        model_class = {
+            'cnn': lambda: CNNModel(use_conv2=True, **model_kwargs),
+            'fcnn': lambda: fCNN(**model_kwargs),
+            'tcnn': lambda: tCNN(**model_kwargs),
+            'srnn': lambda: sRNN(**model_kwargs),
+            'smlp': lambda: sMLP(**model_kwargs),
+            'crnn': lambda: cRNNModel(**model_kwargs),
+            'clstm': lambda: cLstmModel(**model_kwargs),
+        }[model_type]()
+        return model_class.to(device)
 
-        model = AblationArchitecture(configs).to(device)
-    elif model_type == 'ablate-neural':
-        use_neural = True
-        configs = {
-            'perception': use_neural,
-            'my_belief': use_neural,
-            'op_belief': use_neural,
-            'my_greedy_decision': use_neural,
-            'op_greedy_decision': use_neural,
-            'sub_decision': use_neural,
-            'final_output': use_neural
-        }
+    config = BASE_CONFIG.copy()
+    random_probs = BASE_RANDOM.copy()
+    model_config, model_random = MODEL_SPECS[model_type]
+    config.update(model_config)
+    random_probs.update(model_random)
+    return AblationArchitecture(config, random_probs).to(device)
 
-        model = AblationArchitecture(configs).to(device)
-
-    return model
 
 def load_last_model(model_save_path, repetition):
     files = [f for f in os.listdir(model_save_path) if f.startswith(f'{repetition}-checkpoint-') and f.endswith('.pt')]
@@ -225,6 +203,8 @@ def load_model_eval(model_save_path, repetition, use_prior=False, desired_epoch=
         file_name = f'{repetition}-checkpoint-{desired_epoch}.pt'
         if desired_epoch == 49: # we name things badly
             file_name = f'{repetition}-checkpoint-{19}.pt'
+            if not os.path.exists(model_save_path):
+                os.makedirs(model_save_path)
             files = [f for f in os.listdir(model_save_path) if f == file_name]
             if not files:
                 file_name = load_last_model(model_save_path, repetition)
@@ -246,7 +226,7 @@ def load_model_data_eval_retrain(test_sets, load_path, target_label, last_timest
     special_criterion = nn.CrossEntropyLoss(reduction='none')
     oracle_criterion = nn.MSELoss(reduction='none')
 
-    if 'hardcoded' not in model_type:
+    if 'hardcoded' not in model_type and '-r-' not in model_type:
         model_kwargs, state_dict = load_model_eval(model_save_path, repetition, use_prior, desired_epoch=desired_epoch)#f'{repetition}-model_epoch{epoch_number}.pt'))
         batch_size = model_kwargs['batch_size']
         model = load_model(model_type, model_kwargs, device)
@@ -254,7 +234,6 @@ def load_model_data_eval_retrain(test_sets, load_path, target_label, last_timest
     else:
         model_kwargs = {}
         batch_size = 128
-
         model = load_model(model_type, model_kwargs, device)
 
     if len(oracle_labels) and oracle_labels[0] is None:
@@ -353,7 +332,7 @@ def retrain_model(test_sets, target_label, load_path='supervised/', model_load_p
 
 
 def evaluate_model(test_sets, target_label, load_path='supervised/', model_load_path='', oracle_labels=[], repetition=0,
-                   epoch_number=0, prior_metrics=[], num_activation_batches=-1, oracle_is_target=False, act_label_names=[], save_labels=True,
+                   epoch_number=0, prior_metrics=[], num_activation_batches=-1, oracle_is_target=False, act_label_names=[], save_labels=False,
                    oracle_early=False, last_timestep=True, model_type=None, seed=0, test_percent=0.2, use_prior=False):
     test_loaders, special_criterion, oracle_criterion, model, device, \
     data, labels, params, oracles, act_labels, batch_size, prior_metrics_data, \
@@ -429,7 +408,7 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_load_
                 #big_food_selected = (pred == torch.argmax(metrics['big-loc'][:, -1, :, 1], dim=1))
                 #neither_food_selected = ~(small_food_selected | big_food_selected)
 
-                #tq.update(1)
+                tq.update(1)
 
                 if i < num_activation_batches or num_activation_batches < 0:
                     real_batch_size = len(labels)
@@ -495,6 +474,9 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_load_
                 param_losses_list.extend(batch_param_losses)
 
     print(overall_correct, overall_total)
+
+    print('returning without saving a csv!!!!!!')
+    return None
     # save dfs periodically to free up ram:
     df_paths = []
     os.makedirs(model_load_path, exist_ok=True)
@@ -739,6 +721,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
 
     device = torch.device('cuda' if use_cuda else 'cpu')
 
+
     model = load_model(model_type, model_kwargs, device)
     criterion = nn.CrossEntropyLoss()
     oracle_criterion = nn.MSELoss()
@@ -756,11 +739,11 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
             loaded_model_kwargs, loaded_model_state_dict = loaded_model_info
             model.load_state_dict(loaded_model_state_dict)
 
-    epoch_length = batches // 20
+    epoch_length = batches // 10
 
     t = tqdm.trange(batches)
     iter_loader = iter(train_loader)
-    epoch_losses_df = pd.DataFrame(columns=['Batch', 'Loss'])
+    epoch_losses_df = pd.DataFrame(columns=['Batch', 'Loss', 'Accuracy'])
 
     if save_models:
         os.makedirs(save_path, exist_ok=True)
@@ -790,21 +773,43 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-        #t.update(1)
+        t.update(1)
 
         if batch % epoch_length == 0:
             scheduler.step()
 
         if record_loss and ((batch % epoch_length == 0) or (batch == batches - 1)):
             total_loss += loss.item()
+            model.eval()
+            test_losses = []
+            all_preds = []
+            all_targets = []
+
             with torch.no_grad():
-                test_loss = 0.0
                 for inputs, target_labels, _, oracle_inputs, _ in test_loader:
-                    inputs, target_labels, oracle_inputs = inputs.to(device), target_labels.to(device), oracle_inputs.to(device)
+                    inputs = inputs.to(device)
+                    target_labels = target_labels.to(device)
+                    oracle_inputs = oracle_inputs.to(device)
+
                     outputs = model(inputs, oracle_inputs)
                     loss = criterion(outputs, torch.argmax(target_labels, dim=1))
-                    test_loss += loss.item()
-                epoch_losses_df = epoch_losses_df.append({'Batch': batch, 'Loss': test_loss / len(test_loader)}, ignore_index=True)
+                    test_losses.append(loss.item())
+
+                    all_preds.append(outputs.argmax(dim=1))
+                    all_targets.append(torch.argmax(target_labels, dim=1))
+
+            test_loss = sum(test_losses) / len(test_losses)
+            all_preds = torch.cat(all_preds)
+            all_targets = torch.cat(all_targets)
+            accuracy = (all_preds == all_targets).float().mean().item()
+
+            new_row = pd.DataFrame({
+                'Batch': [batch],
+                'Loss': [test_loss],
+                'Accuracy': [accuracy]
+            })
+            epoch_losses_df = pd.concat([epoch_losses_df, new_row], ignore_index=True)
+            model.train()
 
             if save_models:
                 os.makedirs(save_path, exist_ok=True)
@@ -971,11 +976,11 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=True, skip_2x1=False
     print('found unique vals', unique_vals)
     for par, val in unique_vals.items():
         print(par, type(val[0]))
-    if last_timestep:
+    '''if last_timestep:
         print('reducing timesteps')
         for param in unique_vals:
 
-            last_epoch_df[param] = last_epoch_df[param].apply(get_last_timestep)
+            last_epoch_df[param] = last_epoch_df[param].apply(get_last_timestep)'''
             #This is redundant with above extract part and also doesn't work properly.
     unique_vals = {param: last_epoch_df[param].unique() for param in params}
     print('new unique vals', unique_vals)
@@ -1458,7 +1463,7 @@ def write_metrics_to_file(filepath, df, ranges, params, stats, key_param=None, d
                 std_accuracy = group['accuracy'].std()
                 f.write(f"Acc {key_param}: {key}: {mean_accuracy} ({std_accuracy})\n")
 
-                train_regime = key.split('-')[2] # get the train regime
+                train_regime = key.split('-')[-1] # get the train regime
                 # aggregate the mean but only where test-regime is not in the train regime set...
                 test_regimes = group['test_regime']
                 sub_regime_keys = [
@@ -1579,7 +1584,7 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
                 if not skip_eval:
                     for epoch in [epochs - 1]:
                         print('evaluating', epoch, model_name)
-                        for this_path in [save_path, retrain_path]:#, retrain_path]: #retrain path removed
+                        for this_path in [save_path]:#, retrain_path]: #retrain path removed
                             for eval_prior in [False]:#[False, True] if this_path == save_path else [False]:
                                 df_paths = evaluate_model(eval_sets, label, load_path=load_path,
                                                       model_type=model_type,
@@ -1592,10 +1597,12 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
                                                       act_label_names=act_label_names,
                                                       oracle_early=oracle_early,
                                                       last_timestep=last_timestep,
-                                                      use_prior=eval_prior)
-                                dfs_paths.extend(df_paths)
-                                if epoch == epochs - 1 or eval_prior:
-                                    last_epoch_df_paths.extend(df_paths)
+                                                      use_prior=eval_prior,
+                                                      num_activation_batches=0)
+                                if df_paths is not None:
+                                    dfs_paths.extend(df_paths)
+                                    if epoch == epochs - 1 or eval_prior:
+                                        last_epoch_df_paths.extend(df_paths)
 
                 loss_paths.append(os.path.join(save_path, f'losses-{repetition}.csv'))
                 loss_paths.append(os.path.join(retrain_path, f'losses-{repetition}.csv'))

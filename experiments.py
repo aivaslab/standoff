@@ -18,23 +18,9 @@ warnings.filterwarnings("ignore", category=np.VisibleDeprecationWarning)
 warnings.filterwarnings("ignore", category=UserWarning)
 
 
-
-def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, skip_calc=False, batch_size=64, desired_evals=5,
-                skip_eval=False, skip_activations=False, last_timestep=True, retrain=False, current_model_type=None, current_label=None, current_label_name=None,
-                comparison=False):
-    """What is the overall performance of naive, off-the-shelf models on this task? Which parameters of competitive
-    feeding settings are the most sensitive to overall model performance? To what extent are different models
-    sensitive to different parameters? """
-    save_every = max(1, epochs // desired_evals)
-
-    params = ['visible_baits', 'swaps', 'visible_swaps', 'first_swap_is_both',
-              'second_swap_to_first_loc', 'delay_2nd_bait', 'first_bait_size',
-              'uninformed_bait', 'uninformed_swap', 'first_swap', 'test_regime']
-    prior_metrics = ['shouldAvoidSmall', 'correct-loc', 'incorrect-loc',
-                     'shouldGetBig', 'informedness', 'p-b-0', 'p-b-1', 'p-s-0', 'p-s-1', 'delay', 'opponents']
-
+def init_regimes():
     sub_regime_keys = [
-        "Nn","Fn", "Nf","Tn", "Nt","Ff","Tf", "Ft","Tt"
+        "Nn", "Fn", "Nf", "Tn", "Nt", "Ff", "Tf", "Ft", "Tt"
     ]
     all_regimes = ['sl-' + x + '0' for x in sub_regime_keys] + ['sl-' + x + '1' for x in sub_regime_keys]
     mixed_regimes = {k: ['sl-' + x + '0' for x in sub_regime_keys] + ['sl-' + k + '1'] for k in sub_regime_keys}
@@ -45,7 +31,7 @@ def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, sk
     regimes['everything'] = all_regimes
     hregime = {}
     hregime['homogeneous'] = ['sl-Tt0', 'sl-Ff0', 'sl-Nn0', 'sl-Tt1', 'sl-Ff1', 'sl-Nn1']
-    #hregime['identity'] = ['sl-' + x + '0' for x in sub_regime_keys] + ['sl-Tt1', 'sl-Ff1', 'sl-Nn1']
+    # hregime['identity'] = ['sl-' + x + '0' for x in sub_regime_keys] + ['sl-Tt1', 'sl-Ff1', 'sl-Nn1']
     sregime = {}
     sregime['special'] = ['sl-Tt0', 'sl-Tt1', 'sl-Nt0', 'sl-Nt1', 'sl-Nf0', 'sl-Nf1', 'sl-Nn0', 'sl-Nn1']
 
@@ -53,7 +39,7 @@ def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, sk
     fregimes['s1'] = regimes['noOpponent']
     fregimes['s3'] = regimes['everything']
     fregimes['s2'] = mixed_regimes['Tt']
-    #fregimes['homogeneous'] = hregime['homogeneous']
+    # fregimes['homogeneous'] = hregime['homogeneous']
 
     single_regimes = {k[3:]: [k] for k in all_regimes}
     leave_one_out_regimes = {}
@@ -64,17 +50,14 @@ def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, sk
         leave_one_out_regimes[regime_name].extend(ones)
 
     pref_types = [
-        ('same', ''), # ('different', 'd'), # ('varying', 'v'),
+        ('same', ''),  # ('different', 'd'), # ('varying', 'v'),
     ]
     role_types = [
-        ('subordinate', ''), # ('dominant', 'D'), # ('varying', 'V'),
+        ('subordinate', ''),  # ('dominant', 'D'), # ('varying', 'V'),
     ]
 
-    # labels for ICLR, including size just in case
-
-    model_type = "loc" # or box
     labels = [
-        'id', 'i-informedness', # must have these or it will break
+        'id', 'i-informedness',  # must have these or it will break
         'opponents',
         'big-loc',
         'small-loc',
@@ -82,14 +65,14 @@ def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, sk
         'b-loc',
         'fb-loc',
         'fb-exist',
-        'vision',
-        'big-box',
-        'small-box',
-        'target-box',
-        'b-box',
-        'fb-box',
-        'box-locations'
-              ]
+        # 'vision',
+        # 'big-box',
+        # 'small-box',
+        # 'target-box',
+        # 'b-box',
+        # 'fb-box',
+        # 'box-locations'
+    ]
 
     # box-locations could be added to check for type conversions
 
@@ -111,6 +94,55 @@ def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, sk
     ### Removed these to speed it up
     for name in ["loc", "b-loc", "i-b-loc", "b-loc-diff", "i-b-loc-diff"]:
         labels += ["big-" + name, "small-" + name]#, , "any-" + name,] "scalar-" + name,'''
+
+    neural_models = [
+        'a-mixed-n-perception',
+        'a-mixed-n-belief-op',
+        'a-mixed-n-belief-my',
+        'a-mixed-n-decision-op',
+        'a-mixed-n-decision-my',
+        'a-mixed-n-output',
+        'a-mixed-n-belief-shared',
+        'a-mixed-n-decision-shared',
+        'a-neural-split',
+        'a-neural-shared',
+    ]
+    non_neural_models = [
+        # 'a-hardcoded',
+        'a-mixed-r-perception-100',
+        'a-mixed-r-perception-50',
+        'a-mixed-r-belief-op-100',
+        'a-mixed-r-belief-op-50',
+        'a-mixed-r-belief-my-100',
+        'a-mixed-r-belief-my-50',
+        'a-mixed-r-decision-op-100',
+        'a-mixed-r-decision-op-50',
+        'a-mixed-r-decision-my-100',
+        'a-mixed-r-decision-my-50',
+        'a-mixed-r-output-100',
+        'a-mixed-r-output-50'
+    ]
+
+    params = ['visible_baits', 'swaps', 'visible_swaps', 'first_swap_is_both',
+              'second_swap_to_first_loc', 'delay_2nd_bait', 'first_bait_size',
+              'uninformed_bait', 'uninformed_swap', 'first_swap', 'test_regime']
+    prior_metrics = ['shouldAvoidSmall', 'correct-loc', 'incorrect-loc',
+                     'shouldGetBig', 'informedness', 'opponents']  # 'p-b-0', 'p-b-1', 'p-s-0', 'p-s-1', 'delay',
+
+    return regimes, hregime, sregime, fregimes, leave_one_out_regimes, pref_types, role_types, labels, neural_models, non_neural_models, params, prior_metrics
+
+def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, skip_calc=False, batch_size=64, desired_evals=5,
+                skip_eval=False, skip_activations=False, last_timestep=True, retrain=False, current_model_type=None, current_label=None, current_label_name=None,
+                comparison=False, model_types=None):
+    """What is the overall performance of naive, off-the-shelf models on this task? Which parameters of competitive
+    feeding settings are the most sensitive to overall model performance? To what extent are different models
+    sensitive to different parameters? """
+    save_every = max(1, epochs // desired_evals)
+
+    regimes, hregime, sregime, fregimes, leave_one_out_regimes, pref_types, role_types, labels, neural_models, non_neural_models, params, prior_metrics = init_regimes()
+
+    model_type = "loc" # or box
+
 
     conf = ScenarioConfigs()
     exp_name = f'exp_{todo[0]}'
@@ -190,11 +222,9 @@ def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, sk
                         last_path_list.append([x for x in last_epoch_paths if condition(x)])
                         combined_path_list.append([x for x in combined_paths if condition(x)])
                         key_param_list.append(kpname + suffix)
-                    lp_list.append(lp) # has x, x-retrain currently
+                    lp_list.append(lp)
 
-        #print('comparison time')
         if comparison:
-            #print('doing comparison')
             do_comparison(combined_path_list, last_path_list, key_param_list, key_param, exp_name, params, prior_metrics, lp_list)
 
     if 22 in todo:
@@ -210,18 +240,22 @@ def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, sk
         if current_model_type != None:
             model_types = [current_model_type]
             label_tuples = [(current_label, current_label_name)]
-        else:
-            model_types = ['a-mixed-n-belief', 'a-mixed-n-output', 'a-neural-split', 'a-neural-shared', 'a-mixed-n-decision'] #'''a-hardcoded','''
+        elif model_types is not None:
             label_tuples = [('correct-loc', 'loc')]
+        else:
+            model_types = neural_models
+            label_tuples = [('correct-loc', 'loc')]
+
+        real_regimes = {'eval': fregimes['s3']}
 
         for label, label_name in label_tuples:
             for model_type in model_types:
-                for regime in list(fregimes.keys()):
+                for regime in list(real_regimes.keys()):
                     kpname = f'{model_type}-{label_name}-{regime}'
-                    print(model_type + '-' + label_name, 'regime:', regime, 'train_sets:', fregimes[regime])
+                    print(model_type + '-' + label_name, 'regime:', regime, 'train_sets:', real_regimes[regime])
                     combined_paths, last_epoch_paths, lp = run_supervised_session(
                         save_path=os.path.join('supervised', exp_name, kpname),
-                        train_sets=fregimes[regime],
+                        train_sets=real_regimes[regime],
                         eval_sets=fregimes['s3'],
                         oracle_labels=[None],
                         key_param=key_param,
@@ -250,12 +284,13 @@ def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, sk
 
 
 def run_single_experiment(args_tuple):
-    model_type, (label, label_name), args = args_tuple
+    model_type, (label, label_name), args, func, func_args = args_tuple
     print(f"Running experiment with model_type: {model_type}, label: {label}, label_name: {label_name}")
     print(f"Process: {multiprocessing.current_process().name}")
 
+
     experiments([22],
-                repetitions=3,
+                repetitions=1,
                 batches=10000,
                 skip_train=not args.t,
                 skip_eval=not args.e,
@@ -284,7 +319,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     #model_types = [ 'cnn', 'smlp', 'clstm']
-    model_types = 'a-mixed-n-belief', 'a-mixed-n-output', 'a-neural-split', 'a-neural-shared', 'a-mixed-n-decision'
+    model_types = ['a-hardcoded-t20',  'a-hardcoded-t8', 'a-hardcoded-t10', 'a-hardcoded-t15', 'a-hardcoded-t30', 'a-hardcoded-t50', 'a-hardcoded-t100', ] #['a-mixed-n-belief-my', 'a-mixed-n-belief-op', 'a-mixed-n-decision-my', 'a-mixed-n-decision-op']
     labels = [('correct-loc', 'loc')]
 
     if (not args.p) and (not args.g):
@@ -293,9 +328,10 @@ if __name__ == '__main__':
         with multiprocessing.Pool() as pool:
             pool.map(run_single_experiment, experiment_args)
     else:
+        print('running the else one')
         experiments([22] if not args.g else [0],
-                repetitions=3,
-                batches=500,
+                repetitions=1,
+                batches=10000,
                 skip_train=not args.t,
                 skip_eval=not args.e,
                 skip_calc=not args.c,
@@ -304,6 +340,7 @@ if __name__ == '__main__':
                 batch_size=256,
                 desired_evals=1,
                 last_timestep=True,
-                comparison=args.p)
+                comparison=args.p,
+                model_types=model_types)
 
     print("finished")
