@@ -1,0 +1,24 @@
+setuptools==65
+
+#git+https://github.com/Pythoniasm/gym-fork.git@fix-v0.21.0
+# the above brands itself as 0.21.1
+# to install I run with --no-deps on all, then rerun without on [all but those that depend on gym]
+matplotlib==3.2.2
+moviepy==0.2.3.5
+numba
+numpy
+pandas==1.3.5
+Pillow==9.2.0
+pyglet==1.5.0
+scipy
+scikit-learn
+umap-learn
+h5py==2.10.0
+seaborn
+tqdm==4.64.0
+imageio-ffmpeg==0.4.6
+importlib_metadata==4.11.3
+imageio~=2.15.0
+opencv-python~=3.4.18.65
+torch
+xxhash
