@@ -1303,8 +1303,8 @@ class para_MultiGridEnv(ParallelEnv):
 
             for name in ["loc", "b-loc", "i-b-loc", "b-loc-diff", "i-b-loc-diff"]:
                 #info["scalar-" + name] = convert_to_scalar(info[name]) #broken for the diff ones?
-                info["big-" + name] = [x[0] for x in info[name]]
-                info["small-" + name] = [x[1] for x in info[name]]
+                info[name + "-large"] = [x[0] for x in info[name]]
+                info[name + "-small"] = [x[1] for x in info[name]]
                 #info["any-" + name] = [int(x != [0, 0]) for x in info[name]]
 
             def loc_to_box(loc_vector, box_locations):
@@ -1315,15 +1315,15 @@ class para_MultiGridEnv(ParallelEnv):
                 return box_info
 
             info["fb-box"] = loc_to_box(info["fb-loc"], info["box-locations"])
-            info["big-box"] = loc_to_box(info["big-loc"], info["box-locations"])
-            info["small-box"] = loc_to_box(info["small-loc"], info["box-locations"])
-            info["big-b-box"] = loc_to_box(info["big-b-loc"], info["b-box-locations"])
-            info["small-b-box"] = loc_to_box(info["small-b-loc"], info["b-box-locations"])
+            info["box-large"] = loc_to_box(info["loc-large"], info["box-locations"])
+            info["box-small"] = loc_to_box(info["loc-small"], info["box-locations"])
+            info["b-box-large"] = loc_to_box(info["b-loc-large"], info["b-box-locations"])
+            info["b-box-small"] = loc_to_box(info["b-loc-small"], info["b-box-locations"])
             info["b-box"] = [
                 [1, 0] if big == 1 else
                 [0, 1] if small == 1 else
                 [0, 0]
-                for big, small in zip(info["big-b-box"], info["small-b-box"])
+                for big, small in zip(info["b-box-large"], info["b-box-small"])
             ]
 
             info["exist"] = [1 if self.bigReward in real_box_rewards else 0, 1 if self.smallReward in real_box_rewards else 0]

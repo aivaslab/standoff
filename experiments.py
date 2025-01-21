@@ -4,18 +4,18 @@ import multiprocessing
 from itertools import product
 import pandas as pd
 
-from src.experiments_utils import run_hparam_search, do_comparison
-from src.pz_envs import ScenarioConfigs
-from src.supervised_learning import gen_data
-from supervised_learning_main import run_supervised_session
-import numpy as np
-
 import warnings
+import numpy as np
 
 warnings.filterwarnings("ignore", category=pd.errors.DtypeWarning)
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 warnings.filterwarnings("ignore", category=np.VisibleDeprecationWarning)
 warnings.filterwarnings("ignore", category=UserWarning)
+
+from src.experiments_utils import run_hparam_search, do_comparison
+from src.pz_envs import ScenarioConfigs
+from src.supervised_learning import gen_data
+from supervised_learning_main import run_supervised_session
 
 
 def init_regimes():
@@ -59,11 +59,12 @@ def init_regimes():
     labels = [
         'id', 'i-informedness',  # must have these or it will break
         'opponents',
-        'big-loc',
-        'small-loc',
+        'loc-large',
+        'loc-small',
         'target-loc',
-        'b-loc',
-        'fb-loc',
+        'b-loc-large',
+        'b-loc-small',
+        'fb-loc', # describes whether actual and belief are different, while belief contains the actual somewhere else
         'fb-exist',
         # 'vision',
         # 'big-box',
