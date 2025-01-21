@@ -1,5 +1,5 @@
 setuptools==65
-gym==0.21.0 #there is an issue with versioning in setuptools for this since March that OpenAI won't fix
+#gym==0.21.0 #there is an issue with versioning in setuptools for this since March that OpenAI won't fix
 #git+https://github.com/Pythoniasm/gym-fork.git@fix-v0.21.0
 # the above brands itself as 0.21.1
 # to install I run with --no-deps on all, then rerun without on [all but those that depend on gym]
@@ -18,7 +18,7 @@ umap-learn
 stable_baselines3==1.6.1
 sb3-contrib==1.6.1
 SuperSuit==3.3.3
-h5py==2.10.0
+h5py==3.11.0
 seaborn
 tqdm==4.64.0
 imageio-ffmpeg==0.4.6
