@@ -717,10 +717,16 @@ class MiniStandoffEnv(para_MultiGridEnv):
                     info['incorrect-loc'] = -1
                 else:
                     assert self.step_count < 4 # this shouldn't happen ever
+                    print('error')
                     info['correct-loc'] = -1
                     info['shouldGetSmall'] = True
                     info['shouldGetBig'] = False
                     info['incorrect-loc'] = self.big_food_locations[-1]
+
+            if info['correct-loc'] == -1 and self.step_count > 0:
+                print('was -1')
+                print(self.infos['p_0'], self.step_count)
+                print(self.big_food_locations, self.small_food_locations)
 
             if len(self.puppets) == 0:
                 if info['shouldGetBig'] == False and self.step_count == 4:

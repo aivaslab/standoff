@@ -88,11 +88,9 @@ def string_to_list(s):
 
 def informedness_to_str(informedness_list):
     mapping = {0: 'N', 1: 'F', 2: 'T'}
-    if isinstance(informedness_list[0], list):
-        # for some reason something in the Tt regime has an informedness list of length 5
-        informedness_list = informedness_list[-1]
-    first_val = mapping[informedness_list[0]]
-    second_val = mapping[informedness_list[1]].lower()
+    last_ts = informedness_list[-1]
+    first_val = mapping[last_ts[0]]
+    second_val = mapping[last_ts[1]].lower()
     return first_val + second_val
 
 def load_dataframes(combined_path_list, value_names, key_param):
@@ -107,7 +105,7 @@ def load_dataframes(combined_path_list, value_names, key_param):
         print('value name', value_name)
 
         for df_path in df_paths:
-            #print(df_path, ('prior' in df_path) )
+            print(df_path, ('prior' in df_path) )
             file_name = os.path.basename(df_path)
             repetition = int(file_name.split('_')[-1].split('.')[0])
 
@@ -157,6 +155,12 @@ def special_heatmap(df_path_list2, df_path_list, key_param='regime', key_param_l
     print('done special')
 
 def is_novel_task(row):
+    
+    if 'hard' in row['regime']:
+        return False
+        
+    train_regime = row['regime'].split('-')[-1]
+
     sub_regime_keys = [
         "Nn", "Fn", "Nf", "Tn", "Nt", "Ff", "Tf", "Ft", "Tt"
     ]
@@ -166,7 +170,8 @@ def is_novel_task(row):
         's1': [x + '0' for x in sub_regime_keys],
         'homogeneous': ['Tt0', 'Ff0', 'Nn0', 'Tt1', 'Ff1', 'Nn1']
     }
-    train_regime = row['regime'].split('-')[-1]
+    
+
     return not row['test_regime'] in train_map[train_regime]
 
 
@@ -394,10 +399,11 @@ def generate_accuracy_tables(df, output_path, is_baseline=False, retrain=False):
 
 def do_comparison(combined_path_list, last_path_list, key_param_list, key_param, exp_name, params, prior_metrics, lp_list, used_regimes=None):
 
+    print('combined paths', combined_path_list)
     combined_path = os.path.join('supervised', exp_name, 'c')
     os.makedirs(combined_path, exist_ok=True)
 
-    #plot_learning_curves(combined_path, lp_list)
+    plot_learning_curves(combined_path, lp_list)
 
     print('loading IFRs')
     folder_paths = set()

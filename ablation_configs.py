@@ -9,7 +9,7 @@ BASE_CONFIG = {
     'final_output': False,
     'shared_belief': False,
     'shared_decision': False,
-    'sigmoid_temp': 20.0
+    'sigmoid_temp': 50.0
 }
 
 BASE_RANDOM = {k: 0.0 for k in BASE_CONFIG if k not in ['shared_belief', 'shared_decision']}
@@ -32,14 +32,14 @@ NEURAL_CONFIGS = {
     'a-hardcoded': {},
     'a-neural-split': {k: True for k in BASE_CONFIG if k not in ['shared_belief', 'shared_decision']},
     'a-neural-shared': {k: True for k in BASE_CONFIG},
-    'a-mixed-n-perception': {'perception': True, 'shared_belief': True, 'shared_decision': True},
-    'a-mixed-n-belief-shared': {'my_belief': True, 'op_belief': True, 'shared_belief': True, 'shared_decision': True},
-    'a-mixed-n-belief-op': {'op_belief': True, 'shared_decision': True},
-    'a-mixed-n-belief-my': {'my_belief': True, 'shared_decision': True},
-    'a-mixed-n-decision-shared': {'my_greedy_decision': True, 'op_greedy_decision': True, 'shared_belief': True, 'shared_decision': True},
-    'a-mixed-n-decision-op': {'op_greedy_decision': True, 'shared_belief': True},
-    'a-mixed-n-decision-my': {'my_greedy_decision': True, 'shared_belief': True},
-    'a-mixed-n-output': {'final_output': True, 'shared_belief': True, 'shared_decision': True}
+    'a-mix-n-perception': {'perception': True, 'shared_belief': True, 'shared_decision': True},
+    'a-mix-n-belief-shared': {'my_belief': True, 'op_belief': True, 'shared_belief': True, 'shared_decision': True},
+    'a-mix-n-belief-op': {'op_belief': True, 'shared_decision': True},
+    'a-mix-n-belief-my': {'my_belief': True, 'shared_decision': True},
+    'a-mix-n-decision-shared': {'my_greedy_decision': True, 'op_greedy_decision': True, 'shared_belief': True, 'shared_decision': True},
+    'a-mix-n-decision-op': {'op_greedy_decision': True, 'shared_belief': True},
+    'a-mix-n-decision-my': {'my_greedy_decision': True, 'shared_belief': True},
+    'a-mix-n-output': {'final_output': True, 'shared_belief': True, 'shared_decision': True}
 }
 
 RANDOM_VARIANTS = {}
@@ -48,7 +48,7 @@ for model_name, config in NEURAL_CONFIGS.items():
         neural_key = next(k for k, v in config.items() if v is True and k not in ['shared_belief', 'shared_decision'])
         base_config = {k: v for k, v in config.items() if k in ['shared_belief', 'shared_decision']}
         for prob in [100, 50]:
-            variant_name = model_name.replace('mixed-n-', 'mixed-r-') + f"-{prob}"
+            variant_name = model_name.replace('mix-n-', 'mix-r-') + f"-{prob}"
             RANDOM_VARIANTS[variant_name] = (base_config, {neural_key: prob/100})
 
 MODEL_SPECS = {name: (config, {}) for name, config in {**NEURAL_CONFIGS, **TEMP_CONFIGS}.items()}

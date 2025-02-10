@@ -12,6 +12,9 @@ import time
 
 import numpy as np
 from functools import lru_cache
+
+from matplotlib import pyplot as plt
+
 from ablation_configs import *
 
 import pandas as pd
@@ -22,7 +25,8 @@ from torch.optim.lr_scheduler import ExponentialLR
 from src.models.modules import AblationArchitecture
 from src.utils.activation_processing import process_activations
 from src.utils.plotting import save_double_param_figures, save_single_param_figures, save_fixed_double_param_figures, \
-    save_fixed_triple_param_figures, save_key_param_figures, save_delta_figures, plot_regime_lengths
+    save_fixed_triple_param_figures, save_key_param_figures, save_delta_figures, plot_regime_lengths, \
+    plot_awareness_results, plot_accuracy_vs_vision
 
 sys.path.append(os.getcwd())
 
@@ -170,6 +174,8 @@ def load_model(model_type, model_kwargs, device):
     model_config, model_random = MODEL_SPECS[model_type]
     config.update(model_config)
     random_probs.update(model_random)
+
+    print('random probs:', random_probs)
     return AblationArchitecture(config, random_probs).to(device)
 
 
@@ -294,7 +300,7 @@ def load_model_data_eval_retrain(test_sets, load_path, target_label, last_timest
     for metric, arrays in prior_metrics_data.items():
         prior_metrics_data[metric] = np.concatenate(arrays, axis=0)
 
-    print('shape', labels[0].shape)
+    print('shape', labels[0].shape, 'last timestep', last_timestep)
 
     # November 2024 simplification, will temporarily break train/test split
 
@@ -331,6 +337,52 @@ def retrain_model(test_sets, target_label, load_path='supervised/', model_load_p
         train_model_retrain(model, train_loader, val_loader, retrain_path, model_kwargs=model_kwargs, opt=optimizer, max_tries=5, repetition=repetition, max_batches=retrain_batches)
 
 
+def analyze_batch_awareness(model, inputs, vision_prob, num_samples=1):
+    device = inputs.device
+    batch_size = inputs.shape[0]
+
+    full_perception = model.perception(inputs)
+    full_beliefs = model.my_belief(full_perception['treats_visible'],
+                                   torch.ones(batch_size, 5, device=device))
+
+    gt_null = full_beliefs[..., 5] > 0.5  # [batch, 2]
+    gt_positions = full_beliefs[..., :5].argmax(dim=2)  # [batch, 2]
+
+    vision = torch.rand(batch_size, 5, device=device) < vision_prob
+    #masked_opponent_vision = full_perception['opponent_vision'] * vision
+
+    masked_input = inputs * vision.unsqueeze(-1).unsqueeze(-1).unsqueeze(-1)
+    masked_perception = model.perception(masked_input)
+    beliefs = model.op_belief(masked_perception['treats_visible'], vision.float())
+
+    pred_null = beliefs[..., 5] > 0.5  # [batch, 2]
+    pred_positions = beliefs[..., :5].argmax(dim=2)  # [batch, 2]
+
+    # Determine states per treat
+    correct = ~gt_null & ~pred_null & (pred_positions == gt_positions)
+    incorrect = ~gt_null & ~pred_null & (pred_positions != gt_positions)
+    null = pred_null
+
+    # Compute combined states
+    state_masks = [
+        correct[:, 0] & correct[:, 1],  # TT
+        correct[:, 0] & incorrect[:, 1],  # TF
+        correct[:, 0] & null[:, 1],  # TN
+        incorrect[:, 0] & correct[:, 1],  # FT
+        incorrect[:, 0] & incorrect[:, 1],  # FF
+        incorrect[:, 0] & null[:, 1],  # FN
+        null[:, 0] & correct[:, 1],  # NT
+        null[:, 0] & incorrect[:, 1],  # NF
+        null[:, 0] & null[:, 1],  # NN
+    ]
+
+    awareness = torch.zeros(batch_size, 9, device=device)
+    for i, mask in enumerate(state_masks):
+        awareness[:, i] = mask.float()
+
+    state_names = ['TT', 'TF', 'TN', 'FT', 'FF', 'FN', 'NT', 'NF', 'NN']
+    return {name: awareness[:, i] for i, name in enumerate(state_names)}
+
 def evaluate_model(test_sets, target_label, load_path='supervised/', model_load_path='', oracle_labels=[], repetition=0,
                    epoch_number=0, prior_metrics=[], num_activation_batches=-1, oracle_is_target=False, act_label_names=[], save_labels=False,
                    oracle_early=False, last_timestep=True, model_type=None, seed=0, test_percent=0.2, use_prior=False):
@@ -361,6 +413,19 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_load_
     overall_total = 0
     np.set_printoptions(threshold=sys.maxsize)
 
+    num_visions = 10
+    if True:
+        print('evaluating vision changes')
+        vision_probs = np.arange(0, 1.05, 0.1)
+        uncertainties = [0, 0.1, 0.3, 0.5, 1]
+        accuracy_results1 = {u: {prob: [] for prob in vision_probs} for u in uncertainties}
+        #awareness_results = {prob: [] for prob in vision_probs}
+        #accuracy_results1 = {prob: [] for prob in vision_probs}
+
+        #accuracy_results2 = {prob: [] for prob in vision_probs}
+
+
+
     # i have commented out oracle related things
     # this includes oracle_is_target check
     for idx, _val_loader in enumerate(test_loaders):
@@ -375,8 +440,50 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_load_
                 max_labels = torch.argmax(labels, dim=1)
                 #if torch.isnan(max_labels).any():
                 #    print("labels has nan")
+                vision_prob = 1.0
+                #masked_vision = (torch.rand(inputs.size(0), 5, device=inputs.device) <= vision_prob).float()
+                #masked_input = inputs * masked_vision.unsqueeze(-1).unsqueeze(-1).unsqueeze(-1)
+                model.my_belief.uncertainty = 0.3
+                outputs = model(inputs, None)
+                if True:
+                    for uncertainty in uncertainties:
+                        for vision_prob in vision_probs:
+                            model.vision_prob = vision_prob
+                            model.my_belief.uncertainty = uncertainty
+                            model.num_visions = num_visions
 
-                outputs = model(inputs, oracles)
+                            outputs = model(inputs, None)
+                            predicted = outputs.argmax(1)
+                            accuracy = (predicted == max_labels).float().mean().item()
+
+                            accuracy_results1[uncertainty][vision_prob].append(accuracy)
+
+
+
+                            #batch_awareness = analyze_batch_awareness(model, inputs, vision_prob)
+
+                            '''
+                            masked_vision = (torch.rand(inputs.size(0), 5, device=inputs.device) <= vision_prob).float()
+                            masked_input = inputs * masked_vision.unsqueeze(-1).unsqueeze(-1).unsqueeze(-1)
+                            model.my_belief.uncertainty = 0.3
+                            outputs = model(masked_input, masked_vision)
+                            predicted = outputs.argmax(1)
+                            accuracy = (predicted == max_labels).float().mean().item()
+                            accuracy_results1[vision_prob].append(accuracy)
+    
+                            # using these to see difference
+                            masked_vision = (torch.rand(inputs.size(0), 5, device=inputs.device) <= vision_prob).float()
+                            masked_input = inputs * masked_vision.unsqueeze(-1).unsqueeze(-1).unsqueeze(-1)
+                            model.my_belief.uncertainty = 0.0
+                            outputs = model(masked_input, masked_vision)
+                            predicted = outputs.argmax(1)
+                            accuracy = (predicted == max_labels).float().mean().item()
+                            accuracy_results2[vision_prob].append(accuracy)
+    
+                            for k in range(len(inputs)):
+                                awareness_results[vision_prob].append(
+                                    {key: v[k].item() for key, v in batch_awareness.items()}
+                                )'''
                 losses = special_criterion(outputs, max_labels)
                 predicted = outputs.argmax(1)
 
@@ -460,6 +567,7 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_load_
                         **decode_event_name(param),
                         **epoch_number_dict,
                         'pred': pred.item(),
+                        'label': max_label.item(),
                         'loss': loss.item(),
                         'accuracy': correct.item(),
                         #'small_food_selected': small.item(),
@@ -468,15 +576,43 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_load_
                         **{x: v[k].numpy() if hasattr(v[k], 'numpy') else v[k] for x, v in metrics.items()}
                     }
                     #for k, (param, loss, correct, small, big, neither, pred) in enumerate(zip(params, losses, corrects, small_food_selected, big_food_selected, neither_food_selected, pred))
-                    for k, (param, loss, correct, pred) in enumerate(zip(params, losses, corrects, pred))
+                    for k, (param, loss, correct, pred, max_label) in enumerate(zip(params, losses, corrects, pred, max_labels))
                 ]
 
                 param_losses_list.extend(batch_param_losses)
 
-    print(overall_correct, overall_total)
+    print('correct', overall_correct, overall_total)
 
-    print('returning without saving a csv!!!!!!')
-    return None
+    fig = plot_accuracy_vs_vision(accuracy_results1, vision_probs, uncertainties)
+    save_path = os.path.join(load_path, f'accuracy_plot_epoch{epoch_number}-{num_visions}.png')
+    plt.savefig(save_path, bbox_inches='tight', dpi=300)
+
+    if False:
+        final_awareness_results = []
+        for prob in vision_probs:
+            avg_result = {
+                'visionProb': prob * 100,
+                **{key: np.mean([r[key] for r in awareness_results[prob]])
+                   for key in ['TT', 'TF', 'TN', 'FT', 'FF', 'FN', 'NT', 'NF', 'NN']},
+                'uncertain-accuracy': np.mean(accuracy_results1[prob]),
+                'certain-accuracy': np.mean(accuracy_results2[prob]),
+            }
+            final_awareness_results.append(avg_result)
+
+        fig = plot_awareness_results(final_awareness_results)
+
+        save_path = os.path.join(load_path, f'awareness_plot_epoch{epoch_number}-o.png')
+        plt.savefig(save_path, bbox_inches='tight', dpi=300)
+        plt.close()
+
+        fig = plot_awareness_results(final_awareness_results, merge_states=True)
+        save_path = os.path.join(load_path, f'awareness_plot_epoch{epoch_number}-m-o.png')
+        plt.savefig(save_path, bbox_inches='tight', dpi=300)
+        plt.close()
+
+
+    #print('returning without saving a csv!!!!!!')
+    #return None
     # save dfs periodically to free up ram:
     df_paths = []
     os.makedirs(model_load_path, exist_ok=True)
@@ -490,10 +626,46 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_load_
     #df[['small_food_selected', 'big_food_selected', 'neither_food_selected']] =  df[['small_food_selected', 'big_food_selected', 'neither_food_selected']].astype(int)
 
     #int_columns = ['visible_baits', 'swaps', 'visible_swaps', 'first_bait_size', 'small_food_selected', 'big_food_selected', 'neither_food_selected', 'epoch']
-    int_columns = ['visible_baits', 'swaps', 'visible_swaps', 'first_bait_size', 'epoch']
+    int_columns = ['visible_baits', 'swaps', 'visible_swaps', 'first_bait_size', 'epoch', 'pred']
+
+    def convert_tensor(x):
+        if isinstance(x, torch.Tensor):
+            return x.cpu().numpy()
+        return x
+
+    df['pred'] = df['pred'].apply(convert_tensor)
+
+    # why is opponents an object
 
     for col in int_columns:
         df[col] = pd.to_numeric(df[col], downcast='integer')
+
+
+    i_inf_str = df['i-informedness'].apply(lambda x: ''.join(map(str, x[-1])))
+    unique_regimes = i_inf_str.unique()
+
+    op_str = df['opponents'].astype(str)
+    unique_ops = op_str.unique()
+
+    print("Distributions by Regime:")
+
+    print(df.keys())
+
+
+
+    for regime in unique_regimes:
+        for op in unique_ops:
+            regime_data = df[(i_inf_str == regime) & (op_str == op)]
+
+            pred_dist = np.bincount(regime_data['pred'].astype(int), minlength=5) / len(regime_data)
+            accurate = regime_data['accuracy'].astype(float).mean()
+            # Convert one-hot to indices for label distribution
+            label_dist = np.bincount(regime_data['label'].astype(int), minlength=5) / len(regime_data)
+
+            print(f"Regime {regime}, {op}:")
+            print(f"Prediction distribution: {pred_dist}")
+            print(f"Label distribution: {label_dist}")
+            print(f"Accuracy: {accurate}")
 
     #float_columns = ['o_acc']
     #for col in float_columns:
@@ -664,6 +836,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
                 oracle_is_target=False, batches=5000, last_timestep=True,
                 seed=0, test_percent=0.2):
     use_cuda = torch.cuda.is_available()
+    print(torch.cuda.is_available())
     if len(oracle_labels) == 0 or oracle_labels[0] == None:
         oracle_labels = []
     data, labels, params, oracles = [], [], [], []
@@ -725,7 +898,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
     model = load_model(model_type, model_kwargs, device)
     criterion = nn.CrossEntropyLoss()
     oracle_criterion = nn.MSELoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+    optimizer = torch.optim.Adam(model.parameters(), lr=5e-4)
     # optimizer = torch.optim.SGD(model.parameters(), lr=lr, momentum=0.99)
     scheduler = ExponentialLR(optimizer, gamma=0.95)
 
@@ -1476,12 +1649,12 @@ def write_metrics_to_file(filepath, df, ranges, params, stats, key_param=None, d
                     'homogeneous': ['Tt0', 'Ff0', 'Nn0', 'Tt1', 'Ff1', 'Nn1']
                 }
 
-                group['is_novel_task'] = ~test_regimes.isin(train_map[train_regime])
+                group['is_novel_task'] = ~test_regimes.isin(train_map[train_regime]) if 'hard' not in key else False
                 mean_novel_accuracy = group.loc[group['is_novel_task'], 'accuracy'].mean()
                 std_novel_accuracy = group.loc[group['is_novel_task'], 'accuracy'].std()
                 f.write(f"Novel acc {key_param}: {key}: {mean_novel_accuracy} ({std_novel_accuracy})\n")
 
-                group['isnt_novel_task'] = test_regimes.isin(train_map[train_regime])
+                group['isnt_novel_task'] = test_regimes.isin(train_map[train_regime]) if 'hard' not in key else True
                 mean_xnovel_accuracy = group.loc[group['isnt_novel_task'], 'accuracy'].mean()
                 std_xnovel_accuracy = group.loc[group['isnt_novel_task'], 'accuracy'].std()
                 f.write(f"Old acc {key_param}: {key}: {mean_xnovel_accuracy} ({std_xnovel_accuracy})\n")
@@ -1658,6 +1831,8 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
 
                     test_names.append(model_name)
             test += 1
+        except KeyboardInterrupt:
+            raise
         except BaseException as e:
             print(e)
             traceback.print_exc()

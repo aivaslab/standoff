@@ -97,38 +97,40 @@ def init_regimes():
         labels += ["big-" + name, "small-" + name]#, , "any-" + name,] "scalar-" + name,'''
 
     neural_models = [
-        'a-mixed-n-perception',
-        'a-mixed-n-belief-op',
-        'a-mixed-n-belief-my',
-        'a-mixed-n-decision-op',
-        'a-mixed-n-decision-my',
-        'a-mixed-n-output',
-        'a-mixed-n-belief-shared',
-        'a-mixed-n-decision-shared',
+        'a-mix-n-perception',
+        'a-mix-n-belief-op',
+        'a-mix-n-belief-my',
+        'a-mix-n-decision-op',
+        'a-mix-n-decision-my',
+        'a-mix-n-output',
+        'a-mix-n-belief-shared',
+        'a-mix-n-decision-shared',
         'a-neural-split',
         'a-neural-shared',
     ]
     non_neural_models = [
         # 'a-hardcoded',
-        'a-mixed-r-perception-100',
-        'a-mixed-r-perception-50',
-        'a-mixed-r-belief-op-100',
-        'a-mixed-r-belief-op-50',
-        'a-mixed-r-belief-my-100',
-        'a-mixed-r-belief-my-50',
-        'a-mixed-r-decision-op-100',
-        'a-mixed-r-decision-op-50',
-        'a-mixed-r-decision-my-100',
-        'a-mixed-r-decision-my-50',
-        'a-mixed-r-output-100',
-        'a-mixed-r-output-50'
+        'a-mix-r-perception-100',
+        'a-mix-r-perception-50',
+        'a-mix-r-belief-op-100',
+        'a-mix-r-belief-op-50',
+        'a-mix-r-belief-my-100',
+        'a-mix-r-belief-my-50',
+        'a-mix-r-decision-op-100',
+        'a-mix-r-decision-op-50',
+        'a-mix-r-decision-my-100',
+        'a-mix-r-decision-my-50',
+        'a-mix-r-output-100',
+        'a-mix-r-output-50'
     ]
 
     params = ['visible_baits', 'swaps', 'visible_swaps', 'first_swap_is_both',
               'second_swap_to_first_loc', 'delay_2nd_bait', 'first_bait_size',
               'uninformed_bait', 'uninformed_swap', 'first_swap', 'test_regime']
-    prior_metrics = ['shouldAvoidSmall', 'correct-loc', 'incorrect-loc',
-                     'shouldGetBig', 'informedness', 'opponents']  # 'p-b-0', 'p-b-1', 'p-s-0', 'p-s-1', 'delay',
+
+    # shortening for faster iteration
+    params = ['test_regime']
+    prior_metrics = [ 'correct-loc', 'incorrect-loc',  'informedness', 'opponents']  # 'shouldGetBig', 'shouldAvoidSmall', 'p-b-0', 'p-b-1', 'p-s-0', 'p-s-1', 'delay',
 
     return regimes, hregime, sregime, fregimes, leave_one_out_regimes, pref_types, role_types, labels, neural_models, non_neural_models, params, prior_metrics
 
@@ -228,8 +230,8 @@ def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, sk
         if comparison:
             do_comparison(combined_path_list, last_path_list, key_param_list, key_param, exp_name, params, prior_metrics, lp_list)
 
-    if 22 in todo:
-        print('Running experiment 22: ablate')
+    if 24 in todo:
+        print('Running experiment 24: ablate')
 
         combined_path_list = []
         last_path_list = []
@@ -238,16 +240,22 @@ def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, sk
         key_param_list = []
         session_params['oracle_is_target'] = False
 
+        print(current_model_type, model_types)
+
         if current_model_type != None:
             model_types = [current_model_type]
             label_tuples = [(current_label, current_label_name)]
         elif model_types is not None:
             label_tuples = [('correct-loc', 'loc')]
+            if model_types == 'neural':
+                model_types = neural_models
+            if model_types == 'random':
+                model_types = non_neural_models
         else:
             model_types = neural_models
             label_tuples = [('correct-loc', 'loc')]
 
-        real_regimes = {'eval': fregimes['s3']}
+        real_regimes = {'s2': fregimes['s2']}
 
         for label, label_name in label_tuples:
             for model_type in model_types:
@@ -290,8 +298,8 @@ def run_single_experiment(args_tuple):
     print(f"Process: {multiprocessing.current_process().name}")
 
 
-    experiments([22],
-                repetitions=1,
+    experiments([24],
+                repetitions=3,
                 batches=10000,
                 skip_train=not args.t,
                 skip_eval=not args.e,
@@ -304,7 +312,7 @@ def run_single_experiment(args_tuple):
                 current_model_type=model_type,
                 current_label=label,
                 current_label_name=label_name,
-                comparison=False)
+                comparison=args.p)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Run experiments with various options.")
@@ -320,7 +328,9 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     #model_types = [ 'cnn', 'smlp', 'clstm']
-    model_types = ['a-hardcoded-t20',  'a-hardcoded-t8', 'a-hardcoded-t10', 'a-hardcoded-t15', 'a-hardcoded-t30', 'a-hardcoded-t50', 'a-hardcoded-t100', ] #['a-mixed-n-belief-my', 'a-mixed-n-belief-op', 'a-mixed-n-decision-my', 'a-mixed-n-decision-op']
+    model_types = ['a-mixed-n-belief-my'] #
+
+    #model_types = ['a-hardcoded',] #['a-mixed-n-belief-my', 'a-mixed-n-belief-op', 'a-mixed-n-decision-my', 'a-mixed-n-decision-op']
     labels = [('correct-loc', 'loc')]
 
     if (not args.p) and (not args.g):
@@ -330,7 +340,7 @@ if __name__ == '__main__':
             pool.map(run_single_experiment, experiment_args)
     else:
         print('running the else one')
-        experiments([22] if not args.g else [0],
+        experiments([24] if not args.g else [0],
                 repetitions=1,
                 batches=10000,
                 skip_train=not args.t,

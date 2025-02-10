@@ -1838,6 +1838,132 @@ def make_scatter(merged_df, save_path, act):
             plt.close()
 
 
+def plot_accuracy_vs_vision(accuracy_results1, vision_probs, uncertainties, save_path=None):
+
+    plt.figure(figsize=(12, 8))
+
+    colors = plt.cm.viridis(np.linspace(0, 1, len(uncertainties)))
+
+    for idx, uncertainty in enumerate(uncertainties):
+        accuracies1 = [np.mean(accuracy_results1[uncertainty][prob]) for prob in vision_probs]
+
+        plt.plot(vision_probs, accuracies1, color=colors[idx], linewidth=2,
+                 label=f'Uncertainty={uncertainty}', marker='o', markersize=4)
+
+
+    plt.xlabel('Vision Probability', fontsize=12)
+    plt.ylabel('Accuracy', fontsize=12)
+    plt.title('Accuracy vs Vision Prob', fontsize=14, pad=20)
+
+    plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left', borderaxespad=0.)
+
+    plt.xlim(-0.05, 1.05)
+    plt.ylim(-0.05, 1.05)
+
+    plt.tight_layout()
+
+    if save_path:
+        plt.savefig(save_path, bbox_inches='tight', dpi=300)
+
+    return plt.gcf()
+
+def plot_awareness_results(final_awareness_results, save_path=None, merge_states=False):
+    """
+    Plot awareness results with option to merge symmetric states
+
+    Args:
+        final_awareness_results: List of dicts with awareness probabilities
+        save_path: Optional path to save the plot
+        merge_states: If True, merges symmetric states (TF/FT, TN/NT, etc.)
+    """
+    plt.figure(figsize=(12, 8))
+
+    if merge_states:
+        # Define merged states and their colors
+        colors = {
+            'TT': '#2196F3',  # Both correct - blue
+            'TF/FT': '#4CAF50',  # One correct, one wrong - green
+            'TN/NT': '#FFC107',  # One correct/wrong, one null - yellow
+            'FN/NF': '#3F0137',  # One correct/wrong, one null - yellow
+            'FF': '#F44336',  # Both wrong - red
+            'NN': '#9E9E9E',  # Both null - gray
+        }
+
+        # Compute merged states
+        vision_probs = []
+        merged_results = []
+
+        for result in final_awareness_results:
+            merged = {
+                'TT': result['TT'],
+                'TF/FT': result['TF'] + result['FT'],
+                'TN/NT': result['TN'] + result['NT'],
+                'FN/NF': result['FN'] + result['NF'],
+                'FF': result['FF'],
+                'NN': result['NN']
+            }
+            merged_results.append(merged)
+            vision_probs.append(result['visionProb'])
+
+        plot_data = merged_results
+        title = 'The effect of random vision on informedness'
+
+    else:
+        # Original detailed states
+        colors = {
+            'TT': '#2196F3',  # Both correct - blue
+            'TF': '#4CAF50',  # First correct, second wrong - green
+            'TN': '#FFC107',  # First correct, second null - yellow
+            'FT': '#9C27B0',  # First wrong, second correct - purple
+            'FF': '#F44336',  # Both wrong - red
+            'FN': '#795548',  # First wrong, second null - brown
+            'NT': '#607D8B',  # First null, second correct - gray-blue
+            'NF': '#FF5722',  # First null, second wrong - orange
+            'NN': '#9E9E9E',  # Both null - gray
+        }
+
+        vision_probs = [r['visionProb'] for r in final_awareness_results]
+        plot_data = final_awareness_results
+        title = 'The effect of random vision on informedness'
+
+    # Plot states
+    for key, color in colors.items():
+        values = [r[key] for r in plot_data]
+        plt.plot(vision_probs, values, color=color, linewidth=2,
+                 label=key, marker='o', markersize=4)
+
+    # Plot accuracy as a black dotted line
+    if 'uncertain-accuracy' in final_awareness_results[0]:
+        accuracy_values = [r['uncertain-accuracy'] for r in final_awareness_results]
+        plt.plot(vision_probs, accuracy_values, color='black', linewidth=2,
+                 label='Uncertain Accuracy', marker='o', markersize=4, linestyle='--')
+
+    if 'certain-accuracy' in final_awareness_results[0]:
+        accuracy_values = [r['certain-accuracy'] for r in final_awareness_results]
+        plt.plot(vision_probs, accuracy_values, color='black', linewidth=2,
+                 label='Certain Accuracy', marker='o', markersize=3, linestyle=':')
+
+    # Customize the plot
+    plt.xlabel('Vision Probability', fontsize=12)
+    plt.ylabel('State Probability', fontsize=12)
+    plt.title(title, fontsize=14, pad=20)
+
+    plt.grid(True, linestyle='--', alpha=0.7)
+    plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left', borderaxespad=0.,
+               title='Informedness States')
+
+    plt.xlim(-5, 105)
+    plt.ylim(-0.05, 1.05)
+
+    plt.tight_layout()
+
+    if save_path:
+        if merge_states:
+            save_path = save_path.replace('.png', '_merged.png')
+        plt.savefig(save_path, bbox_inches='tight', dpi=300)
+
+    return plt.gcf()
+
 def save_key_param_figures(save_dir, key_param_stats, oracle_stats, key_param, key_param_stats_special=[]):
     save_key_param_heatmap(save_dir, key_param_stats, key_param)
     this_save_dir = os.path.join(save_dir, 'key_param')
@@ -2346,19 +2472,29 @@ def plot_learning_curves(save_dir, lp_list):
     print('plotting learning curves')
     for type in ['loc', 'box', 'size']:
         plt.figure(figsize=(10, 6))
-        breaking = False
+        name_to_color = {}
+        name_to_data = {}
+
         for l in lp_list:
-            if os.path.exists(l[0]):
-                head, tail = os.path.split(l[0])
-                name = os.path.basename(head)
-                if type in name:
-                    df = pd.read_csv(l[0])
-                    plt.plot(df['Batch'], df['Accuracy'], label=name)
-            #else:
-            #    breaking = True
-            #    break
-        #if breaking:
-        #    continue
+            for ll in l:
+                if os.path.exists(ll):
+                    head, tail = os.path.split(ll)
+                    name = os.path.basename(head)
+                    if type in name:
+                        df = pd.read_csv(ll)
+                        if name not in name_to_data:
+                            name_to_data[name] = []
+                        name_to_data[name].append((df['Batch'], df['Accuracy']))
+
+        for i, (name, data_list) in enumerate(name_to_data.items()):
+            color = f'C{i}'
+            name_to_color[name] = color
+            for batch, accuracy in data_list:
+                plt.plot(batch, accuracy, color=color)
+
+        for name, color in name_to_color.items():
+            plt.plot([], [], color=color, label=name)
+
         plt.xlabel('Batch')
         plt.ylabel('Accuracy')
         plt.ylim([0, 1.0])

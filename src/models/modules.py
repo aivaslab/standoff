@@ -1,17 +1,19 @@
+import numpy as np
 import torch
 import torch.nn as nn
 from abc import ABC 
 import torch.nn.functional as F
 from typing import Dict
-from .old_modules import PerceptionModuleOld, BeliefModuleOld, FinalOutputModuleOld, DecisionModuleOld
 
 class BaseModule(nn.Module, ABC):
-    def __init__(self, use_neural: bool = True, random_prob: float = 0.0, sigmoid_temp: float = 20.0):
+    def __init__(self, use_neural: bool = True, random_prob: float = 0.0, sigmoid_temp: float = 50.0):
         super().__init__()
         self.use_neural = use_neural
         self.neural_network = self._create_neural_network() if use_neural else None
         self.random_prob = random_prob
         self.sigmoid_temp = sigmoid_temp
+
+        #print('random prob', self.random_prob)
     
     def _create_neural_network(self) -> nn.Module:
         pass
@@ -19,30 +21,36 @@ class BaseModule(nn.Module, ABC):
     def _hardcoded_forward(self, *args, **kwargs):
         pass
 
+    def _neural_forward(self, *args, **kwargs):
+        return self.neural_network(*args, **kwargs)
+        pass
+
     def _random_forward(self, *args, **kwargs):
         pass
 
     def forward(self, *args, **kwargs):
         if self.use_neural:
-            return self.neural_network(*args, **kwargs)
+            return self._neural_forward(*args, **kwargs)
 
         batch_size = args[0].shape[0]
         device = args[0].device
+        use_random = torch.rand(batch_size, device=device) < self.random_prob
+
 
         hardcoded = self._hardcoded_forward(*args, **kwargs)
         rand_output = self._random_forward(*args, **kwargs)
+        #print(f"Fraction using random: {use_random.float().mean().item()}, {self.random_prob}")
+
 
         if isinstance(hardcoded, dict):
             result = {}
             for k in hardcoded.keys():
-                use_random = torch.rand(batch_size, device=device) < self.random_prob
                 mask_shape = [batch_size] + [1] * (hardcoded[k].dim() - 1)
                 result[k] = torch.where(use_random.view(*mask_shape),
                                         rand_output[k],
                                         hardcoded[k])
             return result
         else:
-            use_random = torch.rand(batch_size, device=device) < self.random_prob
             return torch.where(use_random.view(batch_size, *([1] * (hardcoded.dim() - 1))),
                                rand_output,
                                hardcoded)
@@ -113,7 +121,7 @@ class PerceptionModule(BaseModule):
 
         #treats_visible = perceptual_field[:, :, 2:4, 1:6, 3] > 0
 
-        noise_std = 0.1
+        #noise_std = 0.1
 
         treats_visible = torch.sigmoid(self.sigmoid_temp * (perceptual_field[:, :, 2:4, 1:6, 3] - 0.5)) # uses a sharp sigmoid to retain gradients instead of > 0
 
@@ -122,10 +130,14 @@ class PerceptionModule(BaseModule):
 
         #opponent_vision = torch.sigmoid(50 * torch.abs(perceptual_field[:, :, 4, 3, 2] - 1.0) - 0.5) # likewise a sharp sigmod and abs for differentiable "!="
         opponent_vision = torch.sigmoid(self.sigmoid_temp * (torch.abs(perceptual_field[:, :, 4, 3, 2] - 1.0) - 0.5))
-        opponent_vision = opponent_vision + torch.randn_like(opponent_vision) * noise_std
+        
+
+        #opponent_vision = opponent_vision + torch.randn_like(opponent_vision) * noise_std
+
         #print(perceptual_field[:, :, 4, 3, 2])
         opponent_presence = perceptual_field[:, 0, 0, 3, 0].unsqueeze(1)
-        opponent_presence = opponent_presence + torch.randn_like(opponent_presence) * noise_std
+
+        #opponent_presence = opponent_presence + torch.randn_like(opponent_presence) * noise_std
 
         # this adds the 6th treat position when the others are empty
         #no_treats = ~treats_visible.any(dim=3, keepdim=True)
@@ -134,7 +146,8 @@ class PerceptionModule(BaseModule):
         no_treats = torch.sigmoid(self.sigmoid_temp * (0.1 - treat_sums))  # close to 1 when sum is close to 0, and differentiable
 
         treats_visible = torch.cat([treats_visible, no_treats], dim=3)
-        treats_visible = treats_visible + torch.randn_like(treats_visible) * noise_std
+
+        #treats_visible = treats_visible + torch.randn_like(treats_visible) * noise_std
 
         #print('sizes', treats_visible.shape, opponent_vision.shape, opponent_presence.shape)
 
@@ -189,15 +202,55 @@ class NormalizedBeliefNetwork(nn.Module):
         return x
 
 class BeliefModule(BaseModule):
-    def __init__(self, use_neural: bool = True, random_prob: float = 0.0, sigmoid_temp: float = 20.0):
+    def __init__(self, use_neural: bool = True, random_prob: float = 0.0, sigmoid_temp: float = 20.0, uncertainty=0.0):
         super().__init__(use_neural, random_prob, sigmoid_temp)
+        self.uncertainty = uncertainty
     
     def _create_neural_network(self) -> nn.Module:
         return NormalizedBeliefNetwork()
 
     def _hardcoded_forward(self, visible_treats: torch.Tensor, vision: torch.Tensor) -> torch.Tensor:
         device = visible_treats.device
+        batch_size = visible_treats.shape[0]
 
+        beliefs = []
+        for treat_type in range(2):
+            treats = visible_treats[:, :, treat_type]
+            positions = treats[..., :5]
+
+            has_treat = torch.sigmoid(self.sigmoid_temp * (positions.max(dim=-1)[0] - 0.5))  # [batch, 5]
+            valid_observations = has_treat * vision
+
+            time_weights = torch.exp(torch.arange(5, device=device) * 2.0).view(1, 5)
+            time_weighted_valid_obs = time_weights * valid_observations
+            time_weighted_uncertain = time_weights * (1 - vision)
+            # there are 3 types of timesteps: seen with treats, seen without, and unseen
+
+            weighted_positions = time_weighted_valid_obs.unsqueeze(-1) * positions + \
+                                 self.uncertainty * torch.ones_like(positions) * time_weighted_uncertain.unsqueeze(-1)
+
+            # so we have weighted positions, including 0.2 for all unseen ones
+            # now, if any position was unseen before the end, it should be reduced, or uncertainty should be ADDED to all others.
+
+            position_beliefs = weighted_positions.sum(dim=1)
+            position_beliefs = position_beliefs / ((time_weighted_valid_obs + time_weighted_uncertain).sum(dim=1, keepdim=True) + 1e-10)
+
+            ever_see_treat = torch.sigmoid(self.sigmoid_temp * (valid_observations.max(dim=1)[0] + (1 - vision).sum(dim=1)[0] * self.uncertainty - 0.5))
+            no_treat_belief = (1 - ever_see_treat).unsqueeze(-1)
+
+            if self.uncertainty > 0 and False:
+                print('vision', vision[0])
+                print("time_weighted_uncertain:", time_weighted_uncertain[0])
+                print("contribution from uncertain:",
+                      (self.uncertainty * 100 * torch.ones_like(positions) * time_weighted_uncertain.unsqueeze(-1))[0])
+                print("weighted_positions before normalization:", weighted_positions[0])
+                print("position_beliefs after normalization:", position_beliefs[0])
+
+            belief = torch.cat([position_beliefs, no_treat_belief], dim=1)
+            beliefs.append(belief / belief.sum(dim=1, keepdim=True))
+
+        result1 = torch.stack(beliefs, dim=1)
+        return result1
 
         beliefs = []
         for treat_type in range(2):
@@ -210,18 +263,19 @@ class BeliefModule(BaseModule):
             ever_see_treat = torch.sigmoid(self.sigmoid_temp * (valid_observations.max(dim=1)[0] - 0.5))  # [batch]
 
             time_weights = torch.exp(torch.arange(5, device=device) * 2.0).view(1, 5)  # [1, 5]
-            time_weights = time_weights * valid_observations
-            weighted_positions = positions * time_weights.unsqueeze(-1)  # [batch, 5, 5]
+            time_weighted_valid_obs = time_weights * valid_observations
+            weighted_positions = positions * time_weighted_valid_obs.unsqueeze(-1)  # [batch, 5, 5]
             position_beliefs = weighted_positions.sum(dim=1)  # [batch, 5]
-            position_beliefs = position_beliefs / (time_weights.sum(dim=1, keepdim=True) + 1e-10)  # [batch, 5]
+            position_beliefs = position_beliefs / (time_weighted_valid_obs.sum(dim=1, keepdim=True) + 1e-10)  # [batch, 5]
 
             no_treat_belief = (1 - ever_see_treat).unsqueeze(-1)  # [batch, 1]
             belief = torch.cat([position_beliefs, no_treat_belief], dim=1)  # [batch, 6]
 
             beliefs.append(belief / belief.sum(dim=1, keepdim=True))
 
-        result = torch.stack(beliefs, dim=1)
-        return result
+        result2 = torch.stack(beliefs, dim=1)
+        #print(self.uncertainty, result1[0], result2[0])
+        return result2
 
     def _random_forward(self, visible_treats: torch.Tensor, vision: torch.Tensor) -> torch.Tensor:
         batch_size = visible_treats.shape[0]
@@ -230,6 +284,59 @@ class BeliefModule(BaseModule):
         beliefs = torch.rand(batch_size, 2, 6, device=device)
 
         return F.softmax(beliefs, dim=-1)
+
+
+class UncertaintyNetwork(nn.Module):
+    def __init__(self, belief_dim=6, hidden_dim=32):
+        super().__init__()
+
+        self.belief_encoder = nn.Sequential(
+            nn.Linear(belief_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, hidden_dim)
+        )
+
+        self.combiner = nn.Sequential(
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, belief_dim)
+        )
+
+    def forward(self, beliefs):
+        batch_size = beliefs.shape[0]
+        num_beliefs = beliefs.shape[1]
+
+        beliefs_flat = beliefs.view(-1, beliefs.shape[-1])  # (batch_size * num_beliefs * 2, belief_dim)
+        encoded = self.belief_encoder(beliefs_flat)
+        encoded = encoded.view(batch_size, num_beliefs, 2, -1)  # (batch_size, num_beliefs, 2, hidden_dim)
+
+        pooled = encoded.mean(dim=1)  # (batch_size, 2, hidden_dim)
+
+        combined = self.combiner(pooled)  # (batch_size, 2, belief_dim)
+
+        return F.softmax(combined, dim=-1)
+
+class UncertaintyModule(BaseModule):
+    def __init__(self, use_neural: bool = True, random_prob: float = 0.0, sigmoid_temp: float = 20.0):
+        super().__init__(use_neural, random_prob, sigmoid_temp)
+
+    def _random_forward(self, beliefs: torch.Tensor ) -> torch.Tensor:
+        batch_size = beliefs.shape[0]
+        device = beliefs.device
+
+        random_beliefs = torch.rand(batch_size, 2, 6, device=device)
+        return F.softmax(random_beliefs, dim=-1)
+
+    def _hardcoded_forward(self, beliefs: torch.Tensor ) -> torch.Tensor:
+        probs = F.softmax(beliefs, dim=-1)
+        entropy = -(probs * torch.log(probs + 1e-10)).sum(dim=-1)  # (batch_size, num_visions, 2)
+
+        weights = F.softmax(-entropy * self.sigmoid_temp, dim=1)  # (batch_size, num_visions, 2)
+
+        weighted_beliefs = beliefs * weights.unsqueeze(-1)  # (batch_size, num_visions, 2, 6)
+        combined_beliefs = weighted_beliefs.sum(dim=1)  # (batch_size, 2, 6)
+
+        return F.softmax(combined_beliefs, dim=-1)
 
 # Greedy Decision module
 # Inputs: Belief vector
@@ -250,7 +357,15 @@ class DecisionModule(BaseModule):
             nn.Softmax(dim=-1)
         )
 
-    def forward(self, belief_vector: torch.Tensor, dominant_decision: torch.Tensor = None) -> torch.Tensor:
+    def _neural_forward(self, belief_vector: torch.Tensor, dominant_decision: torch.Tensor = None) -> torch.Tensor:
+        batch_size = belief_vector.shape[0]
+        if self.is_subordinate:
+            x = torch.cat([belief_vector.reshape(batch_size, -1), dominant_decision], dim=-1)
+        else:
+            x = belief_vector.reshape(batch_size, -1)
+        return self.neural_network(x)
+
+    '''def forward(self, belief_vector: torch.Tensor, dominant_decision: torch.Tensor = None) -> torch.Tensor:
         batch_size = belief_vector.shape[0]
         if self.use_neural:
             if self.is_subordinate:
@@ -258,7 +373,7 @@ class DecisionModule(BaseModule):
             else:
                 x = belief_vector.reshape(batch_size, -1)
             return self.neural_network(x)
-        return self._hardcoded_forward(belief_vector, dominant_decision)
+        return self._hardcoded_forward(belief_vector, dominant_decision)'''
     
     def _hardcoded_forward(self, belief_vector: torch.Tensor, dominant_decision: torch.Tensor = None) -> torch.Tensor:
         batch_size = belief_vector.shape[0]
@@ -311,18 +426,10 @@ class FinalOutputModule(BaseModule):
             nn.Softmax(dim=-1)
         )
 
-    def forward(self, opponent_presence: torch.Tensor, greedy_decision: torch.Tensor, sub_decision: torch.Tensor) -> torch.Tensor:
-        if self.use_neural:
-            #batch_size = opponent_presence.shape[0]
-            x = torch.cat([opponent_presence, greedy_decision, sub_decision], dim=1)
-            probs = self.neural_network(x)
-            return probs
-        else:
-            device = opponent_presence.device
-            decisions = []
-            for op, gd, sd in zip(opponent_presence, greedy_decision, sub_decision):
-                decisions.append(sd if op > 0.5 else gd)
-            return torch.stack(decisions).to(device)
+    def _neural_forward(self, opponent_presence: torch.Tensor, greedy_decision: torch.Tensor,
+                        sub_decision: torch.Tensor) -> torch.Tensor:
+        x = torch.cat([opponent_presence, greedy_decision, sub_decision], dim=1)
+        return self.neural_network(x)
     
     def _hardcoded_forward(self, opponent_presence: torch.Tensor, greedy_decision: torch.Tensor, sub_decision: torch.Tensor) -> torch.Tensor:
         presence_weight = torch.sigmoid(self.sigmoid_temp * (opponent_presence - 0.5))
@@ -343,8 +450,12 @@ class AblationArchitecture(nn.Module):
         super().__init__()
         self.kwargs = {'module_configs': module_configs}
         self.kwargs['batch_size'] = 128
+        self.vision_prob = 1.0
+        self.num_visions = 1
 
-        sigmoid_temp = module_configs.get('sigmoid_temp', 20.0)
+        sigmoid_temp = module_configs.get('sigmoid_temp', 50.0)
+
+        print('temperature:', sigmoid_temp)
 
         if random_probs is None:
             random_probs = {k: 0.0 for k in module_configs.keys()}
@@ -359,6 +470,13 @@ class AblationArchitecture(nn.Module):
             random_prob=random_probs['my_belief'],
             sigmoid_temp=sigmoid_temp
         )
+
+        self.uncertainty = UncertaintyModule(
+            use_neural=module_configs['uncertainty'],
+            random_prob=random_probs['uncertainty'],
+            sigmoid_temp=sigmoid_temp
+        )
+
         self.op_belief = (BeliefModule(
             use_neural=module_configs['op_belief'],
             random_prob=random_probs['op_belief'],
@@ -378,12 +496,12 @@ class AblationArchitecture(nn.Module):
             sigmoid_temp=sigmoid_temp
         ) if not module_configs['shared_decision'] else self.my_greedy_decision)
 
-        self.sub_decision = (DecisionModule(
+        self.sub_decision = DecisionModule(
             is_subordinate=True,
             use_neural=module_configs['sub_decision'],
             random_prob=random_probs['sub_decision'],
             sigmoid_temp=sigmoid_temp
-        ) if not module_configs['shared_decision'] else self.my_greedy_decision)
+        )
 
         self.final_output = FinalOutputModule(
             use_neural=module_configs['final_output'],
@@ -418,9 +536,7 @@ class AblationArchitecture(nn.Module):
                     break
             return
 
-        # Iterate through batch dimension
         for i in range(new_tensor.shape[0]):
-            # Compare decisions instead of raw values
             new_decision = torch.argmax(new_tensor[i].float(), dim=-1) if len(new_tensor[i].shape) > 0 else new_tensor[i]
             old_decision = torch.argmax(old_tensor[i].float(), dim=-1) if len(old_tensor[i].shape) > 0 else old_tensor[i]
 
@@ -451,6 +567,7 @@ class AblationArchitecture(nn.Module):
                 break
     
     def forward(self, perceptual_field: torch.Tensor, additional_input: torch.Tensor) -> torch.Tensor:
+
         perception_output = self.perception.forward(perceptual_field)
         batch_size = perceptual_field.shape[0]
         device = perceptual_field.device
@@ -458,11 +575,27 @@ class AblationArchitecture(nn.Module):
         treats_visible = perception_output['treats_visible'].float()
         opponent_vision = perception_output['opponent_vision'].float()
         opponent_presence = perception_output['opponent_presence'].float()
+        # vision for me was torch.ones(batch_size, 5, device=device, dtype=torch.float)
 
-        my_belief_vector = self.my_belief.forward(treats_visible, torch.ones(batch_size, 5, device=device, dtype=torch.float))
+        beliefs_list = []
+
+        for i in range(self.num_visions):
+            masked_vision = (torch.rand(treats_visible.size(0), 5, device=treats_visible.device) <= self.vision_prob).float()
+            masked_input = treats_visible * masked_vision.unsqueeze(-1).unsqueeze(-1)
+            beliefs_list.append(self.my_belief.forward(masked_input, masked_vision))
+
+        my_beliefs_vector = torch.stack(beliefs_list, dim=1)
+
+        # Uncertainty bit! Uses the additional input as mask
+
+        #print(type(additional_input), additional_input.shape if torch.is_tensor(additional_input) else len(additional_input))
+        my_belief_vector = self.uncertainty.forward(my_beliefs_vector)
+
         op_belief_vector = self.op_belief.forward(treats_visible, opponent_vision)
+
         my_greedy_decision = self.my_greedy_decision.forward(my_belief_vector)
         op_greedy_decision = self.op_greedy_decision.forward(op_belief_vector)
+
         sub_decision = self.sub_decision.forward(my_belief_vector, op_greedy_decision)
         final_decision = self.final_output.forward(opponent_presence, my_greedy_decision, sub_decision)
 
@@ -524,6 +657,8 @@ if __name__ == "__main__":
     }
 
     network = AblationArchitecture(configs)
+
+
     dummy_input = torch.randn(50, 5, 5, 7, 7)
     output = network.forward(dummy_input, dummy_input)
     print(output)

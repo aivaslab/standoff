@@ -216,6 +216,7 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
                         for label in onehot_labels:
                             data = one_hot(6, info['p_0'][label]) #changed to 6
                             one_labels[label].append(data)
+                            #print(info['p_0'][label])
 
 
                         if pos == frames or env.has_released:
