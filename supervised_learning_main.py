@@ -445,7 +445,7 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_load_
                 #masked_input = inputs * masked_vision.unsqueeze(-1).unsqueeze(-1).unsqueeze(-1)
                 model.my_belief.uncertainty = 0.3
                 outputs = model(inputs, None)
-                if True:
+                if False:
                     for uncertainty in uncertainties:
                         for vision_prob in vision_probs:
                             model.vision_prob = vision_prob
@@ -741,7 +741,6 @@ def train_model_retrain(model, train_loader, test_loader, save_path,
                         opt='sgd'):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     lr = model_kwargs['lr']
-    print('lr:', lr)
     old_weights = [param.data.clone() for param in model.parameters()]
 
     criterion = nn.CrossEntropyLoss()
@@ -842,6 +841,9 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
     data, labels, params, oracles = [], [], [], []
     batch_size = model_kwargs['batch_size']
     lr = model_kwargs['lr']
+    batch_size = 128
+
+    print('lr:', lr, 'bs:', batch_size)
 
     for data_name in train_sets:
         dir = os.path.join(load_path, data_name)
@@ -880,7 +882,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
 
     if record_loss:
         print('recording loss')
-        train_size = int(0.8 * len(train_dataset))
+        train_size = int(0.9 * len(train_dataset))
         test_size = len(train_dataset) - train_size
         train_dataset, test_dataset = random_split(train_dataset, [train_size, test_size], generator=torch.Generator().manual_seed(42))
         train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=0)
@@ -896,11 +898,13 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
 
 
     model = load_model(model_type, model_kwargs, device)
+
     criterion = nn.CrossEntropyLoss()
     oracle_criterion = nn.MSELoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=5e-4)
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-2)
     # optimizer = torch.optim.SGD(model.parameters(), lr=lr, momentum=0.99)
-    scheduler = ExponentialLR(optimizer, gamma=0.95)
+    scheduler = ExponentialLR(optimizer, gamma=0.99)
+
 
     if False:  # if loading previous model, only for progressions
         last_digit = int(save_path[-1])
@@ -931,9 +935,9 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
             inputs, target_labels, _, oracles, _ = next(iter_loader)
         inputs, target_labels, oracles = inputs.to(device), target_labels.to(device), oracles.to(device)
         if not oracle_is_target:
-            drop_mask = torch.bernoulli(0.5 * torch.ones_like(oracles)).to(device)
-            oracles = oracles * drop_mask
-            outputs = model(inputs, oracles)
+            #drop_mask = torch.bernoulli(0.5 * torch.ones_like(oracles)).to(device)
+            #oracles = oracles * drop_mask
+            outputs = model(inputs, None)
             # print(outputs.shape, target_labels.shape, torch.argmax(target_labels, dim=1))
             loss = criterion(outputs, torch.argmax(target_labels, dim=1))
         else:
@@ -948,8 +952,9 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
         optimizer.step()
         t.update(1)
 
-        if batch % epoch_length == 0:
+        if (batch + 1) % epoch_length == 0:
             scheduler.step()
+            print(scheduler.get_lr())
 
         if record_loss and ((batch % epoch_length == 0) or (batch == batches - 1)):
             total_loss += loss.item()

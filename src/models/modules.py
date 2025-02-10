@@ -32,6 +32,11 @@ class BaseModule(nn.Module, ABC):
         if self.use_neural:
             return self._neural_forward(*args, **kwargs)
 
+        ## NOTE WE ARE SKIPPING RANDOM!!!!
+        return self._hardcoded_forward(*args, **kwargs)
+
+
+
         batch_size = args[0].shape[0]
         device = args[0].device
         use_random = torch.rand(batch_size, device=device) < self.random_prob
@@ -187,22 +192,22 @@ class NormalizedBeliefNetwork(nn.Module):
     def __init__(self):
         super().__init__()
         self.fc1 = nn.Linear(65, 32)
-        self.fc2 = nn.Linear(32, 12)
+        self.fc2 = nn.Linear(32, 48)
+        self.fc3 = nn.Linear(48, 12)
         
     def forward(self, treats, vision):
         batch_size = treats.shape[0]
-        treats_flat = treats.reshape(batch_size, -1)
-        vision_shaped = vision.reshape(batch_size, -1)
 
-        x = torch.cat([treats_flat, vision_shaped], dim=1)
+        x = torch.cat([treats.reshape(batch_size, -1), vision.reshape(batch_size, -1)], dim=1)
         x = F.relu(self.fc1(x))
-        x = self.fc2(x)
+        x = F.relu(self.fc2(x))
+        x = self.fc3(x)
         x = x.view(batch_size, 2, 6)
         x = F.softmax(x, dim=-1)
         return x
 
 class BeliefModule(BaseModule):
-    def __init__(self, use_neural: bool = True, random_prob: float = 0.0, sigmoid_temp: float = 20.0, uncertainty=0.0):
+    def __init__(self, use_neural: bool = True, random_prob: float = 0.0, sigmoid_temp: float = 20.0, uncertainty=0.3):
         super().__init__(use_neural, random_prob, sigmoid_temp)
         self.uncertainty = uncertainty
     
@@ -286,7 +291,7 @@ class BeliefModule(BaseModule):
         return F.softmax(beliefs, dim=-1)
 
 
-class UncertaintyNetwork(nn.Module):
+class CombinerNetwork(nn.Module):
     def __init__(self, belief_dim=6, hidden_dim=32):
         super().__init__()
 
@@ -306,6 +311,9 @@ class UncertaintyNetwork(nn.Module):
         batch_size = beliefs.shape[0]
         num_beliefs = beliefs.shape[1]
 
+        if num_beliefs == 1:
+            return beliefs.squeeze(1)
+
         beliefs_flat = beliefs.view(-1, beliefs.shape[-1])  # (batch_size * num_beliefs * 2, belief_dim)
         encoded = self.belief_encoder(beliefs_flat)
         encoded = encoded.view(batch_size, num_beliefs, 2, -1)  # (batch_size, num_beliefs, 2, hidden_dim)
@@ -316,9 +324,12 @@ class UncertaintyNetwork(nn.Module):
 
         return F.softmax(combined, dim=-1)
 
-class UncertaintyModule(BaseModule):
+class CombinerModule(BaseModule):
     def __init__(self, use_neural: bool = True, random_prob: float = 0.0, sigmoid_temp: float = 20.0):
         super().__init__(use_neural, random_prob, sigmoid_temp)
+
+    def _create_neural_network(self) -> nn.Module:
+        return CombinerNetwork()
 
     def _random_forward(self, beliefs: torch.Tensor ) -> torch.Tensor:
         batch_size = beliefs.shape[0]
@@ -432,8 +443,8 @@ class FinalOutputModule(BaseModule):
         return self.neural_network(x)
     
     def _hardcoded_forward(self, opponent_presence: torch.Tensor, greedy_decision: torch.Tensor, sub_decision: torch.Tensor) -> torch.Tensor:
-        presence_weight = torch.sigmoid(self.sigmoid_temp * (opponent_presence - 0.5))
-        return presence_weight * sub_decision + (1 - presence_weight) * greedy_decision
+
+        return opponent_presence * sub_decision + (1 - opponent_presence) * greedy_decision
 
     def _random_forward(self, opponent_presence: torch.Tensor, greedy_decision: torch.Tensor, sub_decision: torch.Tensor) -> torch.Tensor:
         batch_size = opponent_presence.shape[0]
@@ -450,8 +461,8 @@ class AblationArchitecture(nn.Module):
         super().__init__()
         self.kwargs = {'module_configs': module_configs}
         self.kwargs['batch_size'] = 128
-        self.vision_prob = 1.0
-        self.num_visions = 1
+        self.vision_prob = module_configs.get('vision_prob', 1.0)
+        self.num_visions = module_configs.get('num_beliefs', 1)
 
         sigmoid_temp = module_configs.get('sigmoid_temp', 50.0)
 
@@ -471,9 +482,9 @@ class AblationArchitecture(nn.Module):
             sigmoid_temp=sigmoid_temp
         )
 
-        self.uncertainty = UncertaintyModule(
-            use_neural=module_configs['uncertainty'],
-            random_prob=random_probs['uncertainty'],
+        self.combiner = CombinerModule(
+            use_neural=module_configs['combiner'],
+            random_prob=random_probs['combiner'],
             sigmoid_temp=sigmoid_temp
         )
 
@@ -589,7 +600,7 @@ class AblationArchitecture(nn.Module):
         # Uncertainty bit! Uses the additional input as mask
 
         #print(type(additional_input), additional_input.shape if torch.is_tensor(additional_input) else len(additional_input))
-        my_belief_vector = self.uncertainty.forward(my_beliefs_vector)
+        my_belief_vector = self.combiner.forward(my_beliefs_vector)
 
         op_belief_vector = self.op_belief.forward(treats_visible, opponent_vision)
 

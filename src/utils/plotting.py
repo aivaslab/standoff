@@ -2524,7 +2524,7 @@ def plot_learning_curves(save_dir, lp_list):
                     plt.plot(df['Batch'], df['Loss'], label=name[:-len('-rt-losses.csv')])
         plt.xlabel('Batch')
         plt.ylabel('Loss')
-        plt.ylim([0, 0.6])
+        plt.ylim([0, 1.6])
         plt.title(f'Validation Loss for {os.path.basename(head)}')
         plt.legend()
         plt.savefig(os.path.join(head, f'loss-{os.path.basename(head)}.png'))

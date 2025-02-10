@@ -230,8 +230,8 @@ def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, sk
         if comparison:
             do_comparison(combined_path_list, last_path_list, key_param_list, key_param, exp_name, params, prior_metrics, lp_list)
 
-    if 24 in todo:
-        print('Running experiment 24: ablate')
+    if 25 in todo:
+        print('Running experiment 25: ablate')
 
         combined_path_list = []
         last_path_list = []
@@ -293,14 +293,14 @@ def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, sk
 
 
 def run_single_experiment(args_tuple):
-    model_type, (label, label_name), args, func, func_args = args_tuple
+    model_type, (label, label_name), args = args_tuple
     print(f"Running experiment with model_type: {model_type}, label: {label}, label_name: {label_name}")
     print(f"Process: {multiprocessing.current_process().name}")
 
 
-    experiments([24],
-                repetitions=3,
-                batches=10000,
+    experiments([25],
+                repetitions=1,
+                batches=20000,
                 skip_train=not args.t,
                 skip_eval=not args.e,
                 skip_calc=not args.c,
@@ -328,7 +328,17 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     #model_types = [ 'cnn', 'smlp', 'clstm']
-    model_types = ['a-mixed-n-belief-my'] #
+    model_types = ['a-mix-n-belief-my',
+                   'a-mix-n-belief-my-v75-b1', 'a-mix-n-belief-my-v75-b3', 'a-mix-n-belief-my-v75-b5',
+                   'a-mix-n-belief-my-v50-b1', 'a-mix-n-belief-my-v50-b3', 'a-mix-n-belief-my-v50-b5'] #
+
+    model_types = ['a-mix-n-belief-shared',
+                          'a-mix-n-belief-shared-v75-b1', 'a-mix-n-belief-shared-v75-b3', 'a-mix-n-belief-shared-v75-b5',
+                          'a-mix-n-belief-shared-v50-b1', 'a-mix-n-belief-shared-v50-b3', 'a-mix-n-belief-shared-v50-b5']
+
+    model_types = ['a-mix-n-belief-combiner-shared',
+                          'a-mix-n-belief-combiner-shared-v75-b1', 'a-mix-n-belief-combiner-shared-v75-b3', 'a-mix-n-belief-combiner-shared-v75-b5',
+                          'a-mix-n-belief-combiner-shared-v50-b1', 'a-mix-n-belief-combiner-shared-v50-b3', 'a-mix-n-belief-combiner-shared-v50-b5']
 
     #model_types = ['a-hardcoded',] #['a-mixed-n-belief-my', 'a-mixed-n-belief-op', 'a-mixed-n-decision-my', 'a-mixed-n-decision-op']
     labels = [('correct-loc', 'loc')]
@@ -340,9 +350,9 @@ if __name__ == '__main__':
             pool.map(run_single_experiment, experiment_args)
     else:
         print('running the else one')
-        experiments([24] if not args.g else [0],
+        experiments([25] if not args.g else [0],
                 repetitions=1,
-                batches=10000,
+                batches=20000,
                 skip_train=not args.t,
                 skip_eval=not args.e,
                 skip_calc=not args.c,
