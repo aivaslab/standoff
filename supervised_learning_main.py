@@ -443,7 +443,7 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_load_
                 vision_prob = 1.0
                 #masked_vision = (torch.rand(inputs.size(0), 5, device=inputs.device) <= vision_prob).float()
                 #masked_input = inputs * masked_vision.unsqueeze(-1).unsqueeze(-1).unsqueeze(-1)
-                model.my_belief.uncertainty = 0.3
+                #model.my_belief.uncertainty = 0.3
                 outputs = model(inputs, None)
                 if False:
                     for uncertainty in uncertainties:

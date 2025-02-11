@@ -31,6 +31,7 @@ BASE_NEURAL_CONFIGS = {
     'a-mix-n-perception': {'perception': True, 'shared_belief': True, 'shared_decision': True},
     'a-mix-n-belief-shared': {'my_belief': True, 'op_belief': True, 'shared_belief': True, 'shared_decision': True},
     'a-mix-n-belief-combiner-shared': {'my_belief': True, 'op_belief': True, 'shared_belief': True, 'shared_decision': True, 'combiner': True},
+    'a-mix-n-belief-combiner-split': {'my_belief': True, 'op_belief': True, 'shared_belief': False, 'shared_decision': True, 'combiner': True},
     'a-mix-n-belief-op': {'op_belief': True, 'shared_decision': True},
     'a-mix-n-belief-my': {'my_belief': True, 'shared_decision': True},
     'a-mix-n-combiner': {'combiner': True, 'shared_decision': True},
