@@ -882,14 +882,14 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
 
     if record_loss:
         print('recording loss')
-        train_size = int(0.9 * len(train_dataset))
+        train_size = int(0.8 * len(train_dataset))
         test_size = len(train_dataset) - train_size
-        train_dataset, test_dataset = random_split(train_dataset, [train_size, test_size], generator=torch.Generator().manual_seed(42))
+        train_dataset, test_dataset = random_split(train_dataset, [train_size, test_size], generator=torch.Generator().manual_seed(42+repetition))
         train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=0)
         test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=0)
 
     model_kwargs['oracle_len'] = 0 if len(oracle_labels) == 0 else len(train_dataset.oracles_list[0][0])
-    print('oracle length:', model_kwargs['oracle_len'])
+    #print('oracle length:', model_kwargs['oracle_len'])
     model_kwargs['output_len'] = 5  # np.prod(labels.shape[1:])
     model_kwargs['channels'] = 5  # np.prod(params.shape[2])
     model_kwargs['oracle_is_target'] = oracle_is_target
@@ -901,9 +901,12 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
 
     criterion = nn.CrossEntropyLoss()
     oracle_criterion = nn.MSELoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=1e-2)
-    # optimizer = torch.optim.SGD(model.parameters(), lr=lr, momentum=0.99)
-    scheduler = ExponentialLR(optimizer, gamma=0.99)
+    #optimizer = torch.optim.Adam(model.parameters(), lr=5e-3)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4)
+    print(lr)
+    #optimizer = torch.optim.SGD(model.parameters(), lr=1e-6)
+    scheduler = ExponentialLR(optimizer, gamma=0.92)
+    #torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
 
 
     if False:  # if loading previous model, only for progressions
@@ -950,11 +953,11 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-        t.update(1)
+        #t.update(1)
 
         if (batch + 1) % epoch_length == 0:
             scheduler.step()
-            print(scheduler.get_lr())
+            #print(scheduler.get_lr())
 
         if record_loss and ((batch % epoch_length == 0) or (batch == batches - 1)):
             total_loss += loss.item()
@@ -986,6 +989,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
                 'Loss': [test_loss],
                 'Accuracy': [accuracy]
             })
+            #print(accuracy)
             epoch_losses_df = pd.concat([epoch_losses_df, new_row], ignore_index=True)
             model.train()
 

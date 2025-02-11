@@ -9,7 +9,7 @@ BASE_CONFIG = {
     'final_output': False,
     'shared_belief': False,
     'shared_decision': False,
-    'sigmoid_temp': 10.0,
+    'sigmoid_temp': 90.0,
     'combiner': False,
     'num_beliefs': 1,
     'vision_prob': 1.0

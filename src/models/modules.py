@@ -101,7 +101,8 @@ class NormalizedPerceptionNetwork(nn.Module):
         presence = torch.sigmoid(self.fc_presence(x.reshape(batch_size, -1)))
         
         return {
-            'treats_visible': treats,
+            'treats_l': treats[:,:,0],
+            'treats_s': treats[:,:,1],
             'opponent_vision': vision,
             'opponent_presence': presence
         }
@@ -128,10 +129,19 @@ class PerceptionModule(BaseModule):
 
         #noise_std = 0.1
 
-        treats_visible = torch.sigmoid(self.sigmoid_temp * (perceptual_field[:, :, 2:4, 1:6, 3] - 0.5)) # uses a sharp sigmoid to retain gradients instead of > 0
+        treats = torch.sigmoid(self.sigmoid_temp * (perceptual_field[:, :, 2:4, 1:6, 3] - 0.5))  # [batch, time, 2, 5]
+        treats = torch.flip(treats, dims=[3])  # Flip y dimension
 
-        treats_visible = torch.flip(treats_visible, dims=[3]) # AAAAAHHH
-        #opponent_vision = perceptual_field[:, :, 4, 3, 2] != 1
+        # Handle no-treats for both types at once
+        treat_sums = treats.sum(dim=3, keepdim=True)  # [batch, time, 2, 1]
+        no_treats = torch.sigmoid(self.sigmoid_temp * (0.1 - treat_sums))
+
+        # Add no-treats position
+        treats = torch.cat([treats, no_treats], dim=3)  # [batch, time, 2, 6]
+
+        # Split into large and small treats
+        treats_l = treats[:, :, 0]  # [batch, time, 6]
+        treats_s = treats[:, :, 1]  # [batch, time, 6]
 
         #opponent_vision = torch.sigmoid(50 * torch.abs(perceptual_field[:, :, 4, 3, 2] - 1.0) - 0.5) # likewise a sharp sigmod and abs for differentiable "!="
         opponent_vision = torch.sigmoid(self.sigmoid_temp * (torch.abs(perceptual_field[:, :, 4, 3, 2] - 1.0) - 0.5))
@@ -147,10 +157,10 @@ class PerceptionModule(BaseModule):
         # this adds the 6th treat position when the others are empty
         #no_treats = ~treats_visible.any(dim=3, keepdim=True)
 
-        treat_sums = treats_visible.sum(dim=3, keepdim=True)
-        no_treats = torch.sigmoid(self.sigmoid_temp * (0.1 - treat_sums))  # close to 1 when sum is close to 0, and differentiable
+        #treat_sums = treats_visible.sum(dim=3, keepdim=True)
+        #no_treats = torch.sigmoid(self.sigmoid_temp * (0.1 - treat_sums))  # close to 1 when sum is close to 0, and differentiable
 
-        treats_visible = torch.cat([treats_visible, no_treats], dim=3)
+        #treats_visible = torch.cat([treats_visible, no_treats], dim=3)
 
         #treats_visible = treats_visible + torch.randn_like(treats_visible) * noise_std
 
@@ -161,7 +171,8 @@ class PerceptionModule(BaseModule):
         #print('perception:', treats_visible[0], opponent_vision[0], opponent_presence[0])
 
         return {
-            'treats_visible': treats_visible,
+            'treats_l': treats_l,
+            'treats_s': treats_s,
             'opponent_vision': opponent_vision,
             'opponent_presence': opponent_presence
         }
@@ -178,7 +189,8 @@ class PerceptionModule(BaseModule):
         opponent_presence = torch.rand(batch_size, 1, device=device)
 
         return {
-            'treats_visible': treats_visible,
+            'treats_l': treats_visible[:, :, 0],
+            'treats_s': treats_visible[:, :, 1],
             'opponent_vision': opponent_vision,
             'opponent_presence': opponent_presence
         }
@@ -186,23 +198,25 @@ class PerceptionModule(BaseModule):
 # Belief module
 # Inputs: Visible Treats, Vision (1s if subject)
 # Outputs: Belief vector at last timestep (2x6, normalized)
-# Method: Start at the last timestep, and step backwards until we find the last visible instance of each treat 
+# Method: Start at the last timestep, and step backwards until we find the last visible instance of each treat
 
 class NormalizedBeliefNetwork(nn.Module):
     def __init__(self):
         super().__init__()
-        self.fc1 = nn.Linear(65, 32)
+        self.input_norm = nn.BatchNorm1d(35)
+        self.fc1 = nn.Linear(35, 32)
         self.fc2 = nn.Linear(32, 48)
-        self.fc3 = nn.Linear(48, 12)
+        self.fc3 = nn.Linear(48, 6)
         
     def forward(self, treats, vision):
         batch_size = treats.shape[0]
 
         x = torch.cat([treats.reshape(batch_size, -1), vision.reshape(batch_size, -1)], dim=1)
+        x = self.input_norm(x)
         x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
         x = self.fc3(x)
-        x = x.view(batch_size, 2, 6)
+        x = x.view(batch_size, 6)
         x = F.softmax(x, dim=-1)
         return x
 
@@ -218,44 +232,43 @@ class BeliefModule(BaseModule):
         device = visible_treats.device
         batch_size = visible_treats.shape[0]
 
-        beliefs = []
-        for treat_type in range(2):
-            treats = visible_treats[:, :, treat_type]
-            positions = treats[..., :5]
+        #beliefs = []
+        treats = visible_treats[:, :]
+        positions = treats[..., :5]
 
-            has_treat = torch.sigmoid(self.sigmoid_temp * (positions.max(dim=-1)[0] - 0.5))  # [batch, 5]
-            valid_observations = has_treat * vision
+        has_treat = torch.sigmoid(self.sigmoid_temp * (positions.max(dim=-1)[0] - 0.5))  # [batch, 5]
+        valid_observations = has_treat * vision
 
-            time_weights = torch.exp(torch.arange(5, device=device) * 2.0).view(1, 5)
-            time_weighted_valid_obs = time_weights * valid_observations
-            time_weighted_uncertain = time_weights * (1 - vision)
-            # there are 3 types of timesteps: seen with treats, seen without, and unseen
+        time_weights = torch.exp(torch.arange(5, device=device) * 2.0).view(1, 5)
+        time_weighted_valid_obs = time_weights * valid_observations
+        time_weighted_uncertain = time_weights * (1 - vision)
+        # there are 3 types of timesteps: seen with treats, seen without, and unseen
 
-            weighted_positions = time_weighted_valid_obs.unsqueeze(-1) * positions + \
-                                 self.uncertainty * torch.ones_like(positions) * time_weighted_uncertain.unsqueeze(-1)
+        weighted_positions = time_weighted_valid_obs.unsqueeze(-1) * positions + \
+                             self.uncertainty * torch.ones_like(positions) * time_weighted_uncertain.unsqueeze(-1)
 
-            # so we have weighted positions, including 0.2 for all unseen ones
-            # now, if any position was unseen before the end, it should be reduced, or uncertainty should be ADDED to all others.
+        # so we have weighted positions, including 0.2 for all unseen ones
+        # now, if any position was unseen before the end, it should be reduced, or uncertainty should be ADDED to all others.
 
-            position_beliefs = weighted_positions.sum(dim=1)
-            position_beliefs = position_beliefs / ((time_weighted_valid_obs + time_weighted_uncertain).sum(dim=1, keepdim=True) + 1e-10)
+        position_beliefs = weighted_positions.sum(dim=1)
+        position_beliefs = position_beliefs / ((time_weighted_valid_obs + time_weighted_uncertain).sum(dim=1, keepdim=True) + 1e-10)
 
-            ever_see_treat = torch.sigmoid(self.sigmoid_temp * (valid_observations.max(dim=1)[0] + (1 - vision).sum(dim=1)[0] * self.uncertainty - 0.5))
-            no_treat_belief = (1 - ever_see_treat).unsqueeze(-1)
+        ever_see_treat = torch.sigmoid(self.sigmoid_temp * (valid_observations.max(dim=1)[0] + (1 - vision).sum(dim=1)[0] * self.uncertainty - 0.5))
+        no_treat_belief = (1 - ever_see_treat).unsqueeze(-1)
 
-            if self.uncertainty > 0 and False:
-                print('vision', vision[0])
-                print("time_weighted_uncertain:", time_weighted_uncertain[0])
-                print("contribution from uncertain:",
-                      (self.uncertainty * 100 * torch.ones_like(positions) * time_weighted_uncertain.unsqueeze(-1))[0])
-                print("weighted_positions before normalization:", weighted_positions[0])
-                print("position_beliefs after normalization:", position_beliefs[0])
+        if self.uncertainty > 0 and False:
+            print('vision', vision[0])
+            print("time_weighted_uncertain:", time_weighted_uncertain[0])
+            print("contribution from uncertain:",
+                  (self.uncertainty * 100 * torch.ones_like(positions) * time_weighted_uncertain.unsqueeze(-1))[0])
+            print("weighted_positions before normalization:", weighted_positions[0])
+            print("position_beliefs after normalization:", position_beliefs[0])
 
-            belief = torch.cat([position_beliefs, no_treat_belief], dim=1)
-            beliefs.append(belief / belief.sum(dim=1, keepdim=True))
+        beliefs = torch.cat([position_beliefs, no_treat_belief], dim=1)
+        #beliefs.append(belief / belief.sum(dim=1, keepdim=True))
 
-        result1 = torch.stack(beliefs, dim=1)
-        return result1
+        #result1 = torch.stack(beliefs, dim=1)
+        return beliefs
 
         beliefs = []
         for treat_type in range(2):
@@ -583,29 +596,41 @@ class AblationArchitecture(nn.Module):
         batch_size = perceptual_field.shape[0]
         device = perceptual_field.device
 
-        treats_visible = perception_output['treats_visible'].float()
+        treats_l = perception_output['treats_l'].float()
+        treats_s = perception_output['treats_s'].float()
         opponent_vision = perception_output['opponent_vision'].float()
         opponent_presence = perception_output['opponent_presence'].float()
         # vision for me was torch.ones(batch_size, 5, device=device, dtype=torch.float)
 
+        op_beliefs = []
         beliefs_list = []
-
         for i in range(self.num_visions):
-            masked_vision = (torch.rand(treats_visible.size(0), 5, device=treats_visible.device) <= self.vision_prob).float()
-            masked_input = treats_visible * masked_vision.unsqueeze(-1).unsqueeze(-1)
-            beliefs_list.append(self.my_belief.forward(masked_input, masked_vision))
+            masked_vision = (torch.rand(batch_size, 5, device=device) <= self.vision_prob).float()
 
-        my_beliefs_vector = torch.stack(beliefs_list, dim=1)
+            belief_l = self.my_belief.forward(treats_l * masked_vision.unsqueeze(-1), masked_vision)
+            belief_s = self.my_belief.forward(treats_s * masked_vision.unsqueeze(-1), masked_vision)
+
+            #print(belief_l.shape)
+
+            beliefs = torch.stack([belief_l, belief_s], dim=1)  # [batch, 2, 6]
+            beliefs_list.append(beliefs)
+            if i == 0:
+                op_belief_l = self.op_belief.forward(treats_l, opponent_vision)
+                op_belief_s = self.op_belief.forward(treats_s, opponent_vision)
+                op_beliefs = torch.stack([op_belief_l, op_belief_s], dim=1)
+
+        beliefs_tensor = torch.stack(beliefs_list, dim=1)
+
+        #print(beliefs_tensor.shape)
 
         # Uncertainty bit! Uses the additional input as mask
 
         #print(type(additional_input), additional_input.shape if torch.is_tensor(additional_input) else len(additional_input))
-        my_belief_vector = self.combiner.forward(my_beliefs_vector)
-
-        op_belief_vector = self.op_belief.forward(treats_visible, opponent_vision)
+        my_belief_vector = self.combiner.forward(beliefs_tensor)
+        #print('sss', my_belief_vector.shape)
 
         my_greedy_decision = self.my_greedy_decision.forward(my_belief_vector)
-        op_greedy_decision = self.op_greedy_decision.forward(op_belief_vector)
+        op_greedy_decision = self.op_greedy_decision.forward(op_beliefs)
 
         sub_decision = self.sub_decision.forward(my_belief_vector, op_greedy_decision)
         final_decision = self.final_output.forward(opponent_presence, my_greedy_decision, sub_decision)
