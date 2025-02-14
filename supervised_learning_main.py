@@ -2,6 +2,7 @@ import ast
 import glob
 import hashlib
 import itertools
+import math
 import pickle
 import re
 
@@ -20,7 +21,7 @@ from ablation_configs import *
 import pandas as pd
 import heapq
 from scipy.stats import sem, t
-from torch.optim.lr_scheduler import ExponentialLR
+from torch.optim.lr_scheduler import ExponentialLR, OneCycleLR
 
 from src.models.modules import AblationArchitecture
 from src.utils.activation_processing import process_activations
@@ -155,6 +156,32 @@ def register_hooks(model, hook):
         save_inputs = False
 
 
+class SigmoidTempScheduler:
+    def __init__(self, model, start_temp=1.0, end_temp=100.0, total_steps=10000):
+        self.model = model
+        self.start_temp = start_temp
+        self.end_temp = end_temp
+        self.total_steps = total_steps
+        self.current_step = 0
+
+    def step(self):
+        self.current_step = min(self.current_step + 1, self.total_steps)
+        current_temp = self.get_temp()
+
+        # Update all module temps
+        self.model.perception.sigmoid_temp = current_temp
+        self.model.my_belief.sigmoid_temp = current_temp
+        self.model.op_belief.sigmoid_temp = current_temp
+        self.model.my_greedy_decision.sigmoid_temp = current_temp
+        self.model.op_greedy_decision.sigmoid_temp = current_temp
+        self.model.sub_decision.sigmoid_temp = current_temp
+        self.model.final_output.sigmoid_temp = current_temp
+        print('current temp:', current_temp)
+
+    def get_temp(self):
+        progress = self.current_step / self.total_steps
+        cosine_progress = 0.5 * (1 + math.cos(math.pi * (1 - progress)))
+        return self.start_temp + (self.end_temp - self.start_temp) * cosine_progress
 
 def load_model(model_type, model_kwargs, device):
     if model_type[0] != 'a':
@@ -895,6 +922,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
     model_kwargs['oracle_is_target'] = oracle_is_target
 
     device = torch.device('cuda' if use_cuda else 'cpu')
+    total_steps = 10
 
 
     model = load_model(model_type, model_kwargs, device)
@@ -902,11 +930,20 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
     criterion = nn.CrossEntropyLoss()
     oracle_criterion = nn.MSELoss()
     #optimizer = torch.optim.Adam(model.parameters(), lr=5e-3)
-    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4)
-    print(lr)
     #optimizer = torch.optim.SGD(model.parameters(), lr=1e-6)
-    scheduler = ExponentialLR(optimizer, gamma=0.92)
-    #torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+    print(lr)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4, betas=(0.9, 0.999))
+    sigmoid_scheduler = SigmoidTempScheduler(model, start_temp=1.0, end_temp=90.0, total_steps=total_steps)
+    #scheduler = ExponentialLR(optimizer, gamma=0.92)
+    scheduler = OneCycleLR(
+        optimizer,
+        max_lr=2e-4,
+        total_steps=total_steps,
+        pct_start=0.3,
+        div_factor=5,  # Initial LR
+        final_div_factor=2,  # Final LR
+    )
+    #
 
 
     if False:  # if loading previous model, only for progressions
@@ -919,7 +956,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
             loaded_model_kwargs, loaded_model_state_dict = loaded_model_info
             model.load_state_dict(loaded_model_state_dict)
 
-    epoch_length = batches // 10
+    epoch_length = batches // total_steps
 
     t = tqdm.trange(batches)
     iter_loader = iter(train_loader)
@@ -952,11 +989,13 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
             loss = typical_loss + 10 * oracle_loss
         optimizer.zero_grad()
         loss.backward()
+        #torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
         optimizer.step()
         #t.update(1)
 
         if (batch + 1) % epoch_length == 0:
             scheduler.step()
+            sigmoid_scheduler.step()
             #print(scheduler.get_lr())
 
         if record_loss and ((batch % epoch_length == 0) or (batch == batches - 1)):
@@ -989,7 +1028,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
                 'Loss': [test_loss],
                 'Accuracy': [accuracy]
             })
-            #print(accuracy)
+            print(accuracy, scheduler.get_lr())
             epoch_losses_df = pd.concat([epoch_losses_df, new_row], ignore_index=True)
             model.train()
 

@@ -66,37 +66,56 @@ class BaseModule(nn.Module, ABC):
 class NormalizedPerceptionNetwork(nn.Module):
     def __init__(self):
         super().__init__()
-        self.conv1 = nn.Conv2d(5, 16, kernel_size=3, padding=1)
-        self.conv2 = nn.Conv2d(16, 32, kernel_size=3, padding=1)
-        self.fc = nn.Linear(32 * 7 * 7, 13)  # 2*6 + 1 = 13 outputs per timestep
-        self.fc_presence = nn.Linear(5 * 5 * 7 * 7, 1)
+        self.input_bn = nn.BatchNorm2d(5)
+        self.attention = nn.Conv2d(5, 1, kernel_size=1)
+        self.conv1 = nn.Conv2d(5, 24, kernel_size=3, padding=0)
+        #self.bn1 = nn.BatchNorm2d(24)
+        self.conv2 = nn.Conv2d(24, 32, kernel_size=3, padding=0)
+        self.dropout = nn.Dropout(p=0.1)
+        self.fc = nn.Linear(31 * 3 * 3, 16)  # 2*6 + 1 = 13 outputs per timestep
+        self.fc2 = nn.Linear(16, 13)
+        self.fc_presence = nn.Linear(5 * 1 * 3 * 3, 1)
+
+        nn.init.kaiming_normal_(self.conv1.weight, mode='fan_out', nonlinearity='relu')
+        #nn.init.zeros_(self.conv1.bias)
+
+        nn.init.kaiming_normal_(self.conv2.weight, mode='fan_out', nonlinearity='relu')
+        #nn.init.zeros_(self.conv2.bias)
+
+        #nn.init.normal_(self.fc.weight, std=0.01)
+        #nn.init.normal_(self.fc.bias, std=0.01)
 
     def forward(self, x):
-        treats_list = []
-        vision_list = []
-
         batch_size = x.shape[0]
 
-        for timestep in range(5):
-            current = x[:, timestep]  # [batch, channel, height, width]
-            h = F.relu(self.conv1(current))
-            h = F.relu(self.conv2(h))
-            h = h.flatten(1)
-            h = self.fc(h)
+        # From [batch, timestep, channel, height, width] to [batch * timestep, channel, height, width]
+        x_reshaped = x.reshape(-1, *x.shape[2:])
+        x_reshaped = self.input_bn(x_reshaped)
+        #attn = torch.sigmoid(self.attention(x_reshaped))
+        #x_reshaped = x_reshaped * attn
 
-            treats = h[:, :12].view(batch_size, 2, 6)  # [batch, 2, 6]
-            vision = h[:, 12]  # [batch]
+        h = F.relu(self.conv1(x_reshaped))
+        h = F.relu(self.conv2(h))
+        h = self.dropout(h)
 
-            treats = F.softmax(treats, dim=-1)
-            vision = torch.sigmoid(vision)
+        h_main = h[:, :-1]
+        h_presence = h[:, -1:]
 
-            treats_list.append(treats)
-            vision_list.append(vision)
+        h_presence = h_presence.reshape(batch_size, -1)
+        presence = torch.sigmoid(5 * self.fc_presence(h_presence.reshape(batch_size, -1)))
 
-        treats = torch.stack(treats_list, dim=1)  # [batch, timestep, 2, 6]
-        vision = torch.stack(vision_list, dim=1)  # [batch, timestep]
+        h = h_main.flatten(1)
+        h = F.relu(self.fc(h))
+        h = F.relu(self.fc2(h))
 
-        presence = torch.sigmoid(self.fc_presence(x.reshape(batch_size, -1)))
+        treats = h[:, :12].view(-1, 2, 6)  # [batch * timestep, 2, 6]
+        vision = h[:, 12]  # [batch * timestep]
+
+        treats = F.softmax(treats, dim=-1)
+        vision = torch.sigmoid(vision)
+
+        treats = treats.view(batch_size, 5, 2, 6)  # [batch, timestep, 2, 6]
+        vision = vision.view(batch_size, 5)  # [batch, timestep]
 
         return {
             'treats_l': treats[:, :, 0],
@@ -170,8 +189,8 @@ class NormalizedBeliefNetwork(nn.Module):
         super().__init__()
         self.input_norm = nn.BatchNorm1d(35)
         self.fc1 = nn.Linear(35, 32)
-        self.fc2 = nn.Linear(32, 48)
-        self.fc3 = nn.Linear(48, 6)
+        self.fc2 = nn.Linear(32, 16)
+        self.fc3 = nn.Linear(16, 6)
 
     def forward(self, treats, vision):
         batch_size = treats.shape[0]
@@ -222,14 +241,6 @@ class BeliefModule(BaseModule):
                     valid_observations.max(dim=1)[0] + (1 - vision).sum(dim=1)[0] * self.uncertainty - 0.5))
         no_treat_belief = (1 - ever_see_treat).unsqueeze(-1)
 
-        if self.uncertainty > 0 and False:
-            print('vision', vision[0])
-            print("time_weighted_uncertain:", time_weighted_uncertain[0])
-            print("contribution from uncertain:",
-                  (self.uncertainty * 100 * torch.ones_like(positions) * time_weighted_uncertain.unsqueeze(-1))[0])
-            print("weighted_positions before normalization:", weighted_positions[0])
-            print("position_beliefs after normalization:", position_beliefs[0])
-
         belief = torch.cat([position_beliefs, no_treat_belief], dim=1)
         return belief / belief.sum(dim=1, keepdim=True)
 
@@ -243,10 +254,11 @@ class BeliefModule(BaseModule):
 
 
 class CombinerNetwork(nn.Module):
-    def __init__(self, belief_dim=6, hidden_dim=32):
+    def __init__(self, belief_dim=6, hidden_dim=16):
         super().__init__()
 
         self.belief_encoder = nn.Sequential(
+            nn.BatchNorm1d(belief_dim),
             nn.Linear(belief_dim, hidden_dim),
             nn.ReLU(),
             nn.Linear(hidden_dim, hidden_dim)
@@ -260,20 +272,42 @@ class CombinerNetwork(nn.Module):
 
     def forward(self, beliefs):
         batch_size = beliefs.shape[0]
-        num_beliefs = beliefs.shape[1]
 
-        if num_beliefs == 1:
+        if beliefs.shape[1] == 1:
             return beliefs.squeeze(1)
 
-        beliefs_flat = beliefs.view(-1, beliefs.shape[-1])  # (batch_size * num_beliefs * 2, belief_dim)
-        encoded = self.belief_encoder(beliefs_flat)
-        encoded = encoded.view(batch_size, num_beliefs, 2, -1)  # (batch_size, num_beliefs, 2, hidden_dim)
+        belief_l = beliefs[..., 0, :]  # [batch_size, num_beliefs, belief_dim]
+        belief_s = beliefs[..., 1, :]
 
-        pooled = encoded.mean(dim=1)  # (batch_size, 2, hidden_dim)
+        encoded_l = self.belief_encoder(belief_l)  # [batch_size, num_beliefs, hidden_dim]
+        encoded_s = self.belief_encoder(belief_s)
 
-        combined = self.combiner(pooled)  # (batch_size, 2, belief_dim)
+        pooled_l = encoded_l.mean(dim=1)  # [batch_size, hidden_dim]
+        pooled_s = encoded_s.mean(dim=1)
 
-        return F.softmax(combined, dim=-1)
+        combined_l = self.combiner(pooled_l)  # [batch_size, belief_dim]
+        combined_s = self.combiner(pooled_s)
+
+        #combined_l = F.softmax(combined_l, dim=-1)  # [batch_size, belief_dim]
+        #combined_s = F.softmax(combined_s, dim=-1)
+
+        position_probs_l = combined_l[:, :-1]  # [batch_size, 5]
+        position_probs_s = combined_s[:, :-1]  # [batch_size, 5]
+
+        overlap = position_probs_l * position_probs_s
+        overlap_sum = overlap.sum(dim=-1, keepdim=True)  # [batch_size, 1]
+        penalty = 1 - overlap_sum
+
+        position_probs_l = position_probs_l * penalty
+        position_probs_s = position_probs_s * penalty
+
+        final_l = torch.cat([position_probs_l, combined_l[:, -1:]], dim=-1)
+        final_s = torch.cat([position_probs_s, combined_s[:, -1:]], dim=-1)
+
+        final_l = final_l / final_l.sum(dim=-1, keepdim=True)
+        final_s = final_s / final_s.sum(dim=-1, keepdim=True)
+
+        return torch.stack([final_l, final_s], dim=1)
 
 
 class CombinerModule(BaseModule):
@@ -316,9 +350,10 @@ class DecisionModule(BaseModule):
     def _create_neural_network(self) -> nn.Module:
         input_size = 12 if not self.is_subordinate else 12 + 5
         return nn.Sequential(
-            nn.Linear(input_size, 32),
+            nn.BatchNorm1d(input_size),
+            nn.Linear(input_size, 16),
             nn.ReLU(),
-            nn.Linear(32, 5),
+            nn.Linear(16, 5),
             nn.Softmax(dim=-1)
         )
 

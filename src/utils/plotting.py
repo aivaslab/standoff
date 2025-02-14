@@ -5,6 +5,7 @@ import re
 import numpy as np
 import torch
 import umap
+from cycler import cycler
 from matplotlib import pyplot as plt, gridspec
 from scipy.stats import pearsonr, stats
 from stable_baselines3.common.results_plotter import load_results, ts2xy
@@ -2046,7 +2047,7 @@ def save_key_param_figures(save_dir, key_param_stats, oracle_stats, key_param, k
             split_by_type = True
 
             if param == 'test_regime':
-                for type in ['loc', 'box', 'size'] if split_by_type else ['']:
+                for type in ['loc',]:# 'box', 'size'] if split_by_type else ['']:
                     for use_zero_op in [True, False]:
                         if use_zero_op:
                             desired_order = ['Tt0', 'Tf0', 'Tn0', 'Ft0', 'Ff0', 'Fn0', 'Nt0', 'Nf0', 'Nn0', 'Tt1', 'Tf1',
@@ -2055,6 +2056,7 @@ def save_key_param_figures(save_dir, key_param_stats, oracle_stats, key_param, k
                             desired_order = ['Tt1', 'Tf1', 'Tn1', 'Ft1', 'Ff1', 'Fn1', 'Nt1', 'Nf1', 'Nn1']
                         # todo: don't even make these if there's only 1 repetition
                         for use_std in [True, False]:
+
                             df["accuracy mean"] = pd.to_numeric(df["accuracy mean"], errors='coerce')
                             if use_std:
                                 df["accuracy std"] = pd.to_numeric(df["accuracy std"], errors='coerce')
@@ -2065,11 +2067,21 @@ def save_key_param_figures(save_dir, key_param_stats, oracle_stats, key_param, k
                                 all_stds.extend(df["accuracy std"].values.tolist())
                                 pivot_df = df_filtered.pivot(index=key_param, columns=param, values="Accuracy mean (Accuracy std)")
                                 mean_values_df = pivot_df.applymap(lambda x: float(x.split(' ')[0]))
+                                pivot_df = pivot_df.reindex(columns=desired_order)
+                                mean_values_df = mean_values_df.reindex(columns=desired_order)
+                                #rename_dict = {x: x.replace('a-mix-n-', '').replace('-loc-s2', '') for x in pivot_df.index.tolist()}
+                                #pivot_df = pivot_df.rename(index=rename_dict)
+                                #mean_values_df = mean_values_df.rename(index=rename_dict)
 
                             else:
                                 pivot_df = df_filtered.pivot(index=key_param, columns=param, values="accuracy mean")
                                 mean_values_df = pivot_df
                                 pivot_df = pivot_df.applymap(lambda x: f"{x:.2f}")
+                                pivot_df = pivot_df.reindex(columns=desired_order)
+                                mean_values_df = mean_values_df.reindex(columns=desired_order)
+                                #rename_dict = {x: x.replace('a-mix-n-', '').replace('-loc-s2', '') for x in pivot_df.index.tolist()}
+                                #pivot_df = pivot_df.rename(index=rename_dict)
+                                #mean_values_df = mean_values_df.rename(index=rename_dict)
 
                             fig = plt.figure(figsize=(8, 13 - 6 * split_by_type))
                             heatmap_ax = fig.add_axes([0.0, 0.11, 1.0, 0.9])
@@ -2470,7 +2482,9 @@ def plot_learning_curves(save_dir, lp_list):
             plt.savefig(os.path.join(save_dir, f'{tail}-umap.png'))'''
 
     print('plotting learning curves')
-    for type in ['loc', 'box', 'size']:
+    for type in ['loc',]:# 'box', 'size']:
+        colors = plt.cm.tab20(np.linspace(0, 1, 20))  # Using tab20 which has 20 distinct colors
+        plt.rcParams['axes.prop_cycle'] = cycler(color=colors)
         plt.figure(figsize=(10, 6))
         name_to_color = {}
         name_to_data = {}
@@ -2480,31 +2494,53 @@ def plot_learning_curves(save_dir, lp_list):
                 if os.path.exists(ll):
                     head, tail = os.path.split(ll)
                     name = os.path.basename(head)
+
                     if type in name:
                         df = pd.read_csv(ll)
                         if name not in name_to_data:
                             name_to_data[name] = []
-                        name_to_data[name].append((df['Batch'], df['Accuracy']))
+                        name_to_data[name].append((df['Batch'], df['Accuracy'].to_numpy()))
 
         for i, (name, data_list) in enumerate(name_to_data.items()):
-            color = f'C{i}'
+            color = colors[i % len(colors)]
             name_to_color[name] = color
-            for batch, accuracy in data_list:
-                plt.plot(batch, accuracy, color=color)
 
-        for name, color in name_to_color.items():
-            plt.plot([], [], color=color, label=name)
+            max_length = max(len(batch) for batch, _ in data_list)
+            aligned_data = []
+
+            for batch, accuracy in data_list:
+                if len(batch) < max_length:
+                    x_new = np.linspace(batch[0], batch[-1], max_length)
+                    accuracy_interp = np.interp(x_new, batch, accuracy)
+                    aligned_data.append(accuracy_interp)
+                else:
+                    aligned_data.append(accuracy)
+
+            aligned_data = np.array(aligned_data)
+            mean_accuracy = np.mean(aligned_data, axis=0)
+            std_accuracy = np.std(aligned_data, axis=0)
+
+            x_start = min(batch[0] for batch, _ in data_list)
+            x_end = max(batch[len(batch) - 1] for batch, _ in data_list)
+            x_axis = np.linspace(x_start, x_end, max_length)
+
+            plt.plot(x_axis, mean_accuracy, color=color, label=name)
+            plt.fill_between(x_axis,
+                             mean_accuracy - std_accuracy,
+                             mean_accuracy + std_accuracy,
+                             color=color,
+                             alpha=0.2)
 
         plt.xlabel('Batch')
         plt.ylabel('Accuracy')
         plt.ylim([0, 1.0])
-        plt.title('Validation Accuracy')
+        plt.title(f'Validation Accuracy - {type}')
         plt.legend()
         plt.savefig(os.path.join(save_dir, f'loss-{type}2.png'))
         plt.close()
 
     print('plotting rt learning curves')
-    grouped_paths = {}
+    '''grouped_paths = {}
     for l in lp_list:
         for l2 in l[1:]:
             head, tail = os.path.split(l2)
@@ -2528,7 +2564,7 @@ def plot_learning_curves(save_dir, lp_list):
         plt.title(f'Validation Loss for {os.path.basename(head)}')
         plt.legend()
         plt.savefig(os.path.join(head, f'loss-{os.path.basename(head)}.png'))
-        plt.close()
+        plt.close()'''
 
 
 def save_fixed_double_param_figures(save_dir, top_n_ranges, df, avg_loss, last_epoch_df):

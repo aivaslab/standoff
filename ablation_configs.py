@@ -9,7 +9,7 @@ BASE_CONFIG = {
     'final_output': False,
     'shared_belief': False,
     'shared_decision': False,
-    'sigmoid_temp': 90.0,
+    'sigmoid_temp': 1.0,
     'combiner': False,
     'num_beliefs': 1,
     'vision_prob': 1.0
@@ -30,6 +30,7 @@ BASE_NEURAL_CONFIGS = {
     'a-neural-shared': {k: True for k in BASE_CONFIG},
     'a-mix-n-perception': {'perception': True, 'shared_belief': True, 'shared_decision': True},
     'a-mix-n-belief-shared': {'my_belief': True, 'op_belief': True, 'shared_belief': True, 'shared_decision': True},
+    'a-mix-n-belief-split': {'my_belief': True, 'op_belief': True, 'shared_belief': False, 'shared_decision': True},
     'a-mix-n-belief-combiner-shared': {'my_belief': True, 'op_belief': True, 'shared_belief': True, 'shared_decision': True, 'combiner': True},
     'a-mix-n-belief-combiner-split': {'my_belief': True, 'op_belief': True, 'shared_belief': False, 'shared_decision': True, 'combiner': True},
     'a-mix-n-belief-op': {'op_belief': True, 'shared_decision': True},
