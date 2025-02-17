@@ -3,13 +3,11 @@ BASE_CONFIG = {
     'perception': False,
     'my_belief': False,
     'op_belief': False,
-    'my_greedy_decision': False,
-    'op_greedy_decision': False,
-    'sub_decision': False,
-    'final_output': False,
+    'my_decision': False,
+    'op_decision': False,
     'shared_belief': False,
     'shared_decision': False,
-    'sigmoid_temp': 1.0,
+    'sigmoid_temp': 90.0,
     'combiner': False,
     'num_beliefs': 1,
     'vision_prob': 1.0
@@ -36,10 +34,9 @@ BASE_NEURAL_CONFIGS = {
     'a-mix-n-belief-op': {'op_belief': True, 'shared_decision': True},
     'a-mix-n-belief-my': {'my_belief': True, 'shared_decision': True},
     'a-mix-n-combiner': {'combiner': True, 'shared_decision': True},
-    'a-mix-n-decision-shared': {'my_greedy_decision': True, 'op_greedy_decision': True, 'shared_belief': True, 'shared_decision': True},
-    'a-mix-n-decision-op': {'op_greedy_decision': True, 'shared_belief': True},
-    'a-mix-n-decision-my': {'my_greedy_decision': True, 'shared_belief': True},
-    'a-mix-n-output': {'final_output': True, 'shared_belief': True, 'shared_decision': True}
+    'a-mix-n-decision-shared': {'my_decision': True, 'op_decision': True, 'shared_belief': True, 'shared_decision': True},
+    'a-mix-n-decision-op': {'op_decision': True, 'shared_belief': True},
+    'a-mix-n-decision-my': {'my_decision': True, 'shared_belief': True},
 }
 
 NEURAL_CONFIGS = {}

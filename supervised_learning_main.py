@@ -172,10 +172,8 @@ class SigmoidTempScheduler:
         self.model.perception.sigmoid_temp = current_temp
         self.model.my_belief.sigmoid_temp = current_temp
         self.model.op_belief.sigmoid_temp = current_temp
-        self.model.my_greedy_decision.sigmoid_temp = current_temp
-        self.model.op_greedy_decision.sigmoid_temp = current_temp
-        self.model.sub_decision.sigmoid_temp = current_temp
-        self.model.final_output.sigmoid_temp = current_temp
+        self.model.my_decision.sigmoid_temp = current_temp
+        self.model.op_decision.sigmoid_temp = current_temp
         print('current temp:', current_temp)
 
     def get_temp(self):
@@ -937,14 +935,12 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
     #scheduler = ExponentialLR(optimizer, gamma=0.92)
     scheduler = OneCycleLR(
         optimizer,
-        max_lr=2e-4,
+        max_lr=5e-4,
         total_steps=total_steps,
-        pct_start=0.3,
-        div_factor=5,  # Initial LR
-        final_div_factor=2,  # Final LR
+        pct_start=0.4,
+        div_factor=5,
+        final_div_factor=2,
     )
-    #
-
 
     if False:  # if loading previous model, only for progressions
         last_digit = int(save_path[-1])
@@ -993,7 +989,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
         optimizer.step()
         #t.update(1)
 
-        if (batch + 1) % epoch_length == 0:
+        if (batch) % epoch_length == 0:
             scheduler.step()
             sigmoid_scheduler.step()
             #print(scheduler.get_lr())

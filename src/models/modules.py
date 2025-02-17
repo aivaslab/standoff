@@ -342,13 +342,12 @@ class CombinerModule(BaseModule):
 # Method: Argmax of the large treat belief unless it is 5, else argmax of small treat belief unless it is 5, else 2
 
 class DecisionModule(BaseModule):
-    def __init__(self, is_subordinate: bool = False, use_neural: bool = True, random_prob: float = 0.0,
+    def __init__(self, use_neural: bool = True, random_prob: float = 0.0,
                  sigmoid_temp: float = 20.0):
-        self.is_subordinate = is_subordinate
         super().__init__(use_neural, random_prob, sigmoid_temp)
 
     def _create_neural_network(self) -> nn.Module:
-        input_size = 12 if not self.is_subordinate else 12 + 5
+        input_size = 18
         return nn.Sequential(
             nn.BatchNorm1d(input_size),
             nn.Linear(input_size, 16),
@@ -357,99 +356,57 @@ class DecisionModule(BaseModule):
             nn.Softmax(dim=-1)
         )
 
-    def _neural_forward(self, belief_vector: torch.Tensor, dominant_decision: torch.Tensor = None) -> torch.Tensor:
+    def _neural_forward(self, belief_vector: torch.Tensor, dominant_decision: torch.Tensor = None, dominant_present: torch.Tensor = None) -> torch.Tensor:
         batch_size = belief_vector.shape[0]
-        if self.is_subordinate:
-            x = torch.cat([belief_vector.reshape(batch_size, -1), dominant_decision], dim=-1)
-        else:
-            x = belief_vector.reshape(batch_size, -1)
+
+        #print(belief_vector.shape, dominant_decision.shape, dominant_present.shape)
+
+        x = torch.cat([belief_vector.reshape(batch_size, -1), dominant_decision, dominant_present], dim=-1)
+
         return self.neural_network(x)
 
-    '''def forward(self, belief_vector: torch.Tensor, dominant_decision: torch.Tensor = None) -> torch.Tensor:
-        batch_size = belief_vector.shape[0]
-        if self.use_neural:
-            if self.is_subordinate:
-                x = torch.cat([belief_vector.view(batch_size, -1), dominant_decision], dim=-1)
-            else:
-                x = belief_vector.reshape(batch_size, -1)
-            return self.neural_network(x)
-        return self._hardcoded_forward(belief_vector, dominant_decision)'''
 
-    def _hardcoded_forward(self, belief_vector: torch.Tensor, dominant_decision: torch.Tensor = None) -> torch.Tensor:
+    def _hardcoded_forward(self, belief_vector: torch.Tensor, dominant_decision: torch.Tensor = None, dominant_present: torch.Tensor = None) -> torch.Tensor:
         batch_size = belief_vector.shape[0]
         device = belief_vector.device
 
-        if not self.is_subordinate:
-            default_choice = torch.zeros(batch_size, 5, device=device)
-            default_choice[:, 2] = 1.0
+        default_choice = torch.zeros(batch_size, 5, device=device)
+        default_choice[:, 2] = 1.0
 
-            large_no_treat = torch.sigmoid(
-                self.sigmoid_temp * (belief_vector[:, 0, 5] - belief_vector[:, 0, :5].max(dim=1)[0]))
-            small_no_treat = torch.sigmoid(
-                self.sigmoid_temp * (belief_vector[:, 1, 5] - belief_vector[:, 1, :5].max(dim=1)[0]))
+        #large_no_treat = torch.sigmoid(self.sigmoid_temp * (belief_vector[:, 0, 5] - belief_vector[:, 0, :5].max(dim=1)[0]))
+        #small_no_treat = torch.sigmoid(self.sigmoid_temp * (belief_vector[:, 1, 5] - belief_vector[:, 1, :5].max(dim=1)[0]))
 
-            large_choice = F.softmax(belief_vector[:, 0, :5] * self.sigmoid_temp, dim=1)
-            small_choice = F.softmax(belief_vector[:, 1, :5] * self.sigmoid_temp, dim=1)
+        #large_treat_prob = belief_vector[:, 0, :5].sum(dim=1)  # Probability of any large treat
+        large_no_treat = belief_vector[:, 0, 5]
+        small_no_treat = belief_vector[:, 1, 5]
 
-            both_no_treat = large_no_treat * small_no_treat
-            large_exists = 1 - large_no_treat
-            small_exists = 1 - small_no_treat
+        #large_choice = F.softmax(belief_vector[:, 0, :5], dim=1)
+        #small_choice = F.softmax(belief_vector[:, 1, :5], dim=1)
 
-            return both_no_treat.unsqueeze(1) * default_choice + large_exists.unsqueeze(1) * large_choice + (
-                        1 - large_exists).unsqueeze(1) * small_exists.unsqueeze(1) * small_choice
-        else:
-            large_choice = F.softmax(belief_vector[:, 0, :5] * self.sigmoid_temp, dim=1)
-            small_choice = F.softmax(belief_vector[:, 1, :5] * self.sigmoid_temp, dim=1)
-            conflict = torch.sum(large_choice * dominant_decision, dim=1, keepdim=True)
-            conflict = torch.sigmoid(self.sigmoid_temp * (conflict - 0.5))
-            return (1 - conflict) * large_choice + conflict * small_choice
+        large_choice = belief_vector[:, 0, :5]
+        small_choice = belief_vector[:, 1, :5]
 
-    def _random_forward(self, belief_vector: torch.Tensor, dominant_decision: torch.Tensor = None) -> torch.Tensor:
-        batch_size = belief_vector.shape[0]
-        device = belief_vector.device
+        both_no_treat = large_no_treat * small_no_treat
+        large_exists = 1 - large_no_treat
+        small_exists = 1 - small_no_treat
 
-        decisions = torch.rand(batch_size, 5, device=device)
-        decisions = F.softmax(decisions, dim=-1)
-
-        return decisions
-
-
-# Final output module
-# Inputs: Opponent presence, Greedy decision (sub), Sub decision
-# Outputs: The correct label
-# Greedy decision if no opponent, sub decision if opponent
-
-class FinalOutputModule(BaseModule):
-    def __init__(self, use_neural: bool = True, random_prob: float = 0.0, sigmoid_temp: float = 20.0):
-        super().__init__(use_neural, random_prob, sigmoid_temp)
-
-    def _create_neural_network(self) -> nn.Module:
-        return nn.Sequential(
-            nn.Linear(11, 16),
-            nn.ReLU(),
-            nn.Linear(16, 5),
-            nn.Softmax(dim=-1)
+        greedy_decision = (
+                both_no_treat.unsqueeze(1) * default_choice +
+                large_exists.unsqueeze(1) * large_choice +
+                large_no_treat.unsqueeze(1) * small_exists.unsqueeze(1) * small_choice
         )
 
-    def _neural_forward(self, opponent_presence: torch.Tensor, greedy_decision: torch.Tensor,
-                        sub_decision: torch.Tensor) -> torch.Tensor:
-        x = torch.cat([opponent_presence, greedy_decision, sub_decision], dim=1)
-        return self.neural_network(x)
+        conflict = torch.sum(large_choice * dominant_decision, dim=1, keepdim=True)
+        conflict = torch.sigmoid((conflict - 0.5))
+        subordinate_decision = (1 - conflict) * large_choice + conflict * small_choice
 
-    def _hardcoded_forward(self, opponent_presence: torch.Tensor, greedy_decision: torch.Tensor,
-                           sub_decision: torch.Tensor) -> torch.Tensor:
-        # opponent_presence = torch.sigmoid(self.sigmoid_temp * opponent_presence - 0.5)
-        return opponent_presence * sub_decision + (1 - opponent_presence) * greedy_decision
+        return dominant_present * subordinate_decision + (1 - dominant_present) * greedy_decision
 
-    def _random_forward(self, opponent_presence: torch.Tensor, greedy_decision: torch.Tensor,
-                        sub_decision: torch.Tensor) -> torch.Tensor:
-        batch_size = opponent_presence.shape[0]
-        device = opponent_presence.device
+    def _random_forward(self, belief_vector: torch.Tensor, dominant_decision: torch.Tensor = None, dominant_present: torch.Tensor = None) -> torch.Tensor:
+        decisions = torch.rand(belief_vector.shape[0], 5, device=belief_vector.device)
+        decisions = F.softmax(decisions, dim=-1)
+        return decisions
 
-        final_decisions = torch.rand(batch_size, 5, device=device)
-        final_decisions = F.softmax(final_decisions, dim=-1)
-
-        return final_decisions
 
 
 class AblationArchitecture(nn.Module):
@@ -461,6 +418,9 @@ class AblationArchitecture(nn.Module):
         self.num_visions = module_configs.get('num_beliefs', 1)
 
         sigmoid_temp = module_configs.get('sigmoid_temp', 50.0)
+
+        self.null_decision = torch.zeros(self.kwargs['batch_size'], 5,)
+        self.null_presence = torch.zeros(self.kwargs['batch_size'], 1,)
 
         print('temperature:', sigmoid_temp)
 
@@ -493,31 +453,18 @@ class AblationArchitecture(nn.Module):
         ) if not module_configs['shared_belief'] else self.my_belief)
 
 
-        self.my_greedy_decision = DecisionModule(
-            is_subordinate=False,
-            use_neural=module_configs['my_greedy_decision'],
-            random_prob=random_probs['my_greedy_decision'],
-            sigmoid_temp=sigmoid_temp
-        )
-        self.op_greedy_decision = (DecisionModule(
-            is_subordinate=False,
-            use_neural=module_configs['op_greedy_decision'],
-            random_prob=random_probs['op_greedy_decision'],
-            sigmoid_temp=sigmoid_temp
-        ) if not module_configs['shared_decision'] else self.my_greedy_decision)
-
-        self.sub_decision = DecisionModule(
-            is_subordinate=True,
-            use_neural=module_configs['sub_decision'],
-            random_prob=random_probs['sub_decision'],
+        self.my_decision = DecisionModule(
+            use_neural=module_configs['my_decision'],
+            random_prob=random_probs['my_decision'],
             sigmoid_temp=sigmoid_temp
         )
 
-        self.final_output = FinalOutputModule(
-            use_neural=module_configs['final_output'],
-            random_prob=random_probs['final_output'],
+        self.op_decision = (DecisionModule(
+            use_neural=module_configs['op_decision'],
+            random_prob=random_probs['op_decision'],
             sigmoid_temp=sigmoid_temp
-        )
+        ) if not module_configs['shared_decision'] else self.my_decision)
+
 
     def compare_tensors(self, name: str, new_tensor: torch.Tensor, old_tensor: torch.Tensor, threshold: float = 0.1,
                         **inputs):
@@ -587,10 +534,12 @@ class AblationArchitecture(nn.Module):
         treats_l = perception_output['treats_l'].float()
         treats_s = perception_output['treats_s'].float()
 
-        # Confirmed that perception is not different.
-
         opponent_vision = perception_output['opponent_vision'].float()
         opponent_presence = perception_output['opponent_presence'].float()
+
+        op_belief_l = self.op_belief.forward(treats_l, opponent_vision)
+        op_belief_s = self.op_belief.forward(treats_s, opponent_vision)
+        op_beliefs = torch.stack([op_belief_l, op_belief_s], dim=1)
 
         beliefs_list = []
         for i in range(self.num_visions):
@@ -599,24 +548,13 @@ class AblationArchitecture(nn.Module):
             belief_l = self.my_belief.forward(treats_l * masked_vision.unsqueeze(-1), masked_vision)
             belief_s = self.my_belief.forward(treats_s * masked_vision.unsqueeze(-1), masked_vision)
 
-            # print(belief_l.shape)
-
             beliefs = torch.stack([belief_l, belief_s], dim=1)  # [batch, 2, 6]
             beliefs_list.append(beliefs)
-            if i == 0:
-                op_belief_l = self.op_belief.forward(treats_l, opponent_vision)
-                op_belief_s = self.op_belief.forward(treats_s, opponent_vision)
-                op_beliefs = torch.stack([op_belief_l, op_belief_s], dim=1)
 
         beliefs_tensor = torch.stack(beliefs_list, dim=1)
 
         my_belief_vector = self.combiner.forward(beliefs_tensor)
+        op_decision = self.op_decision.forward(op_beliefs, self.null_decision[:batch_size].to(device), self.null_presence[:batch_size].to(device))
+        my_decision = self.my_decision.forward(my_belief_vector, op_decision, opponent_presence)
 
-        my_greedy_decision = self.my_greedy_decision.forward(my_belief_vector)
-        op_greedy_decision = self.op_greedy_decision.forward(op_beliefs)
-
-        sub_decision = self.sub_decision.forward(my_belief_vector, op_greedy_decision)
-        final_decision = self.final_output.forward(opponent_presence, my_greedy_decision, sub_decision)
-
-
-        return final_decision
+        return my_decision
