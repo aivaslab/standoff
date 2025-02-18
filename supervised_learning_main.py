@@ -169,7 +169,9 @@ class SigmoidTempScheduler:
         current_temp = self.get_temp()
 
         # Update all module temps
-        self.model.perception.sigmoid_temp = current_temp
+        self.model.treat_perception.sigmoid_temp = current_temp
+        self.model.vision_perception.sigmoid_temp = current_temp
+        self.model.presence_perception.sigmoid_temp = current_temp
         self.model.my_belief.sigmoid_temp = current_temp
         self.model.op_belief.sigmoid_temp = current_temp
         self.model.my_decision.sigmoid_temp = current_temp
@@ -929,17 +931,17 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
     oracle_criterion = nn.MSELoss()
     #optimizer = torch.optim.Adam(model.parameters(), lr=5e-3)
     #optimizer = torch.optim.SGD(model.parameters(), lr=1e-6)
-    print(lr)
-    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4, betas=(0.9, 0.999))
-    sigmoid_scheduler = SigmoidTempScheduler(model, start_temp=1.0, end_temp=90.0, total_steps=total_steps)
+
+    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-2, betas=(0.9, 0.999))
+    sigmoid_scheduler = SigmoidTempScheduler(model, start_temp=0.1, end_temp=90.0, total_steps=total_steps)
     #scheduler = ExponentialLR(optimizer, gamma=0.92)
     scheduler = OneCycleLR(
         optimizer,
-        max_lr=5e-4,
+        max_lr=2e-2,
         total_steps=total_steps,
-        pct_start=0.4,
+        pct_start=0.2,
         div_factor=5,
-        final_div_factor=2,
+        final_div_factor=5,
     )
 
     if False:  # if loading previous model, only for progressions
@@ -1024,7 +1026,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
                 'Loss': [test_loss],
                 'Accuracy': [accuracy]
             })
-            print(accuracy, scheduler.get_lr())
+            print(accuracy)
             epoch_losses_df = pd.concat([epoch_losses_df, new_row], ignore_index=True)
             model.train()
 
