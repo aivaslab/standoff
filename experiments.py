@@ -230,8 +230,8 @@ def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, sk
         if comparison:
             do_comparison(combined_path_list, last_path_list, key_param_list, key_param, exp_name, params, prior_metrics, lp_list)
 
-    if 25 in todo:
-        print('Running experiment 25: ablate')
+    if 32 in todo:
+        print('Running experiment 31: ablate')
 
         combined_path_list = []
         last_path_list = []
@@ -291,6 +291,9 @@ def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, sk
         if comparison:
             do_comparison(combined_path_list, last_path_list, key_param_list, key_param, exp_name, params, prior_metrics, lp_list)
 
+    else:
+        print('no experiment')
+
 
 def run_single_experiment(args_tuple):
     model_type, (label, label_name), args = args_tuple
@@ -298,9 +301,9 @@ def run_single_experiment(args_tuple):
     print(f"Process: {multiprocessing.current_process().name}")
 
 
-    experiments([25],
-                repetitions=1,
-                batches=20000,
+    experiments([32],
+                repetitions=3,
+                batches=2000,
                 skip_train=not args.t,
                 skip_eval=not args.e,
                 skip_calc=not args.c,
@@ -328,17 +331,56 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     #model_types = [ 'cnn', 'smlp', 'clstm']
-    model_types = ['a-mix-n-belief-my',
+    model_types = [ 'a-hardcoded', 'a-mix-n-belief-my',
                    'a-mix-n-belief-my-v75-b1', 'a-mix-n-belief-my-v75-b3', 'a-mix-n-belief-my-v75-b5',
-                   'a-mix-n-belief-my-v50-b1', 'a-mix-n-belief-my-v50-b3', 'a-mix-n-belief-my-v50-b5'] #
+                   'a-mix-n-belief-my-v50-b1', 'a-mix-n-belief-my-v50-b3', 'a-mix-n-belief-my-v50-b5',
+                   'a-mix-n-belief-shared',
+                   'a-mix-n-belief-shared-v75-b1', 'a-mix-n-belief-shared-v75-b3', 'a-mix-n-belief-shared-v75-b5',
+                   'a-mix-n-belief-shared-v50-b1', 'a-mix-n-belief-shared-v50-b3', 'a-mix-n-belief-shared-v50-b5',
+                   'a-mix-n-belief-combiner-shared',
+                   'a-mix-n-belief-combiner-shared-v75-b1', 'a-mix-n-belief-combiner-shared-v75-b3', 'a-mix-n-belief-combiner-shared-v75-b5',
+                   'a-mix-n-belief-combiner-shared-v50-b1', 'a-mix-n-belief-combiner-shared-v50-b3', 'a-mix-n-belief-combiner-shared-v50-b5']
 
-    model_types = ['a-mix-n-belief-shared',
-                          'a-mix-n-belief-shared-v75-b1', 'a-mix-n-belief-shared-v75-b3', 'a-mix-n-belief-shared-v75-b5',
-                          'a-mix-n-belief-shared-v50-b1', 'a-mix-n-belief-shared-v50-b3', 'a-mix-n-belief-shared-v50-b5']
+    model_types = ['a-mix-n-belief-my',
+                   'a-mix-n-belief-my-v50-b1', 'a-mix-n-belief-my-v50-b5',
+                   'a-mix-n-belief-shared',
+                   'a-mix-n-belief-shared-v50-b1', 'a-mix-n-belief-shared-v50-b5',
+                   'a-mix-n-belief-combiner-shared',
+                   'a-mix-n-belief-combiner-shared-v50-b1', 'a-mix-n-belief-combiner-shared-v50-b5']
 
-    model_types = ['a-mix-n-belief-combiner-shared',
-                          'a-mix-n-belief-combiner-shared-v75-b1', 'a-mix-n-belief-combiner-shared-v75-b3', 'a-mix-n-belief-combiner-shared-v75-b5',
-                          'a-mix-n-belief-combiner-shared-v50-b1', 'a-mix-n-belief-combiner-shared-v50-b3', 'a-mix-n-belief-combiner-shared-v50-b5']
+    model_types += ['a-mix-n-belief-op',
+                   'a-mix-n-belief-op-v50-b1',  'a-mix-n-belief-op-v50-b5',
+                   'a-mix-n-belief-split','a-mix-n-belief-split-v50-b1', 'a-mix-n-belief-split-v50-b5',
+                   'a-mix-n-belief-combiner-split',
+                   'a-mix-n-belief-combiner-split-v50-b1', 'a-mix-n-belief-combiner-split-v50-b5']
+
+    model_types_many = ['a-mix-n-belief-my', 'a-mix-n-belief-my-v50-b5',
+                   'a-mix-n-belief-shared', 'a-mix-n-belief-shared-v50-b5',
+                   'a-mix-n-belief-combiner-shared', 'a-mix-n-belief-combiner-shared-v50-b5',
+                   'a-mix-n-belief-op', 'a-mix-n-belief-op-v50-b5',
+                   'a-mix-n-belief-split', 'a-mix-n-belief-split-v50-b5',
+                   'a-mix-n-belief-combiner-split', 'a-mix-n-belief-combiner-split-v50-b5',
+                   'a-neural-split', 'a-neural-split-v50-b5',
+                   'a-neural-shared', 'a-neural-shared-v50-b5',]
+
+    model_types = ['a-mix-n-belief-my-v50-b5',
+                   'a-mix-n-belief-shared-v50-b5',
+                   'a-mix-n-belief-combiner-shared-v50-b5',
+                   'a-mix-n-belief-op-v50-b5',
+                   'a-mix-n-belief-split-v50-b5',
+                   'a-mix-n-belief-combiner-split-v50-b5',
+                   'a-neural-split-v50-b5',
+                   'a-neural-shared-v50-b5',]
+
+    model_types = model_types_many
+
+    #model_types = ['a-mix-n-belief-my-v50-b5']
+    #model_types = ['a-mix-n-belief-combiner-shared',]
+    #model_types = ['a-hardcoded']
+    model_types = ['a-mix-n-perception']
+
+    #model_types = ['a-mix-n-combiner']
+    print(len(model_types))
 
     #model_types = ['a-hardcoded',] #['a-mixed-n-belief-my', 'a-mixed-n-belief-op', 'a-mixed-n-decision-my', 'a-mixed-n-decision-op']
     labels = [('correct-loc', 'loc')]
@@ -346,13 +388,13 @@ if __name__ == '__main__':
     if (not args.p) and (not args.g):
         experiment_args = [(model_type, label, args) for model_type, label in product(model_types, labels)]
 
-        with multiprocessing.Pool() as pool:
+        with multiprocessing.Pool(processes=6) as pool:
             pool.map(run_single_experiment, experiment_args)
     else:
-        print('running the else one')
-        experiments([25] if not args.g else [0],
-                repetitions=1,
-                batches=20000,
+        print('running single')
+        experiments([32] if not args.g else [0],
+                repetitions=3,
+                batches=2000,
                 skip_train=not args.t,
                 skip_eval=not args.e,
                 skip_calc=not args.c,
@@ -365,3 +407,6 @@ if __name__ == '__main__':
                 model_types=model_types)
 
     print("finished")
+
+
+# i both multiplied by weights and also
