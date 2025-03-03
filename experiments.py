@@ -230,8 +230,8 @@ def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, sk
         if comparison:
             do_comparison(combined_path_list, last_path_list, key_param_list, key_param, exp_name, params, prior_metrics, lp_list)
 
-    if 32 in todo:
-        print('Running experiment 31: ablate')
+    if 1 in todo:
+        print('Running experiment 1: ablate')
 
         combined_path_list = []
         last_path_list = []
@@ -255,7 +255,7 @@ def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, sk
             model_types = neural_models
             label_tuples = [('correct-loc', 'loc')]
 
-        real_regimes = {'s2': fregimes['s2']}
+        real_regimes = {'s2': fregimes['s2'], 's3': fregimes['s3']}
 
         for label, label_name in label_tuples:
             for model_type in model_types:
@@ -301,7 +301,7 @@ def run_single_experiment(args_tuple):
     print(f"Process: {multiprocessing.current_process().name}")
 
 
-    experiments([32],
+    experiments([1],
                 repetitions=3,
                 batches=2000,
                 skip_train=not args.t,
@@ -354,16 +354,25 @@ if __name__ == '__main__':
                    'a-mix-n-belief-combiner-split',
                    'a-mix-n-belief-combiner-split-v50-b1', 'a-mix-n-belief-combiner-split-v50-b5']
 
-    model_types_many = ['a-mix-n-belief-my', 'a-mix-n-belief-my-v50-b5',
-                   'a-mix-n-belief-shared', 'a-mix-n-belief-shared-v50-b5',
-                   'a-mix-n-belief-combiner-shared', 'a-mix-n-belief-combiner-shared-v50-b5',
-                   'a-mix-n-belief-op', 'a-mix-n-belief-op-v50-b5',
-                   'a-mix-n-belief-split', 'a-mix-n-belief-split-v50-b5',
-                   'a-mix-n-belief-combiner-split', 'a-mix-n-belief-combiner-split-v50-b5',
-                   'a-neural-split', 'a-neural-split-v50-b5',
-                   'a-neural-shared', 'a-neural-shared-v50-b5',]
+    experiment_1_models = ['a-mix-n-perception',
+                    'a-mix-n-belief-op',
+                    'a-mix-n-belief-my',
+                    'a-mix-n-belief-split',
+                    'a-mix-n-decision-op',
+                    'a-mix-n-decision-my',
+                    'a-mix-n-decision-split',
+                    'a-mix-n-self',
+                    'a-mix-n-other',
+                    'a-neural-split',]
 
-    model_types = ['a-mix-n-belief-my-v50-b5',
+    experiment_2_models = [
+                   'a-mix-n-belief-shared',  
+                   'a-mix-n-decision-shared',
+                   'a-neural-both-shared',
+                   'a-neural-belief-shared',
+                   'a-neural-decision-shared',]
+
+    experiment_3_models = ['a-mix-n-belief-my-v50-b5',
                    'a-mix-n-belief-shared-v50-b5',
                    'a-mix-n-belief-combiner-shared-v50-b5',
                    'a-mix-n-belief-op-v50-b5',
@@ -372,12 +381,11 @@ if __name__ == '__main__':
                    'a-neural-split-v50-b5',
                    'a-neural-shared-v50-b5',]
 
-    model_types = model_types_many
+    model_types = experiment_1_models
 
     #model_types = ['a-mix-n-belief-my-v50-b5']
     #model_types = ['a-mix-n-belief-combiner-shared',]
     #model_types = ['a-hardcoded']
-    model_types = ['a-mix-n-perception']
 
     #model_types = ['a-mix-n-combiner']
     print(len(model_types))
@@ -392,7 +400,7 @@ if __name__ == '__main__':
             pool.map(run_single_experiment, experiment_args)
     else:
         print('running single')
-        experiments([32] if not args.g else [0],
+        experiments([1] if not args.g else [0],
                 repetitions=3,
                 batches=2000,
                 skip_train=not args.t,

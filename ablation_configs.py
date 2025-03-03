@@ -25,6 +25,8 @@ TEMP_CONFIGS = {
 BASE_NEURAL_CONFIGS = {
     'a-hardcoded': {},
     'a-neural-split': {k: True for k in BASE_CONFIG if k not in ['shared_belief', 'shared_decision']},
+    'a-neural-belief-shared': {k: True for k in BASE_CONFIG if k not in ['shared_decision']},
+    'a-neural-decision-shared': {k: True for k in BASE_CONFIG if k not in ['shared_belief']},
     'a-neural-shared': {k: True for k in BASE_CONFIG},
     'a-mix-n-perception': {'perception': True, 'shared_belief': True, 'shared_decision': True},
     'a-mix-n-belief-shared': {'my_belief': True, 'op_belief': True, 'shared_belief': True, 'shared_decision': True},
@@ -34,9 +36,12 @@ BASE_NEURAL_CONFIGS = {
     'a-mix-n-belief-op': {'op_belief': True, 'shared_decision': True},
     'a-mix-n-belief-my': {'my_belief': True, 'shared_decision': True},
     'a-mix-n-combiner': {'combiner': True, 'shared_decision': True},
+    'a-mix-n-decision-split': {'my_decision': True, 'op_decision': True, 'shared_belief': False, 'shared_decision': False},
     'a-mix-n-decision-shared': {'my_decision': True, 'op_decision': True, 'shared_belief': True, 'shared_decision': True},
     'a-mix-n-decision-op': {'op_decision': True, 'shared_belief': True},
     'a-mix-n-decision-my': {'my_decision': True, 'shared_belief': True},
+    'a-mix-n-self': {'my_decision': True, 'my_belief': True},
+    'a-mix-n-other': {'op_decision': True, 'op_belief': True},
 }
 
 NEURAL_CONFIGS = {}
@@ -48,7 +53,8 @@ for base_name, base_config in BASE_NEURAL_CONFIGS.items():
             NEURAL_CONFIGS[name] = {
                 **base_config,
                 'vision_prob': vision_prob,
-                'num_beliefs': num_beliefs
+                'num_beliefs': num_beliefs,
+                'sigmoid_temp': 90,
             }
 
 #print(NEURAL_CONFIGS.keys())

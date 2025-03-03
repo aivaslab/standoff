@@ -1132,9 +1132,9 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
             model.train()
 
             print(f"Accuracy: {accuracy:.4f}, Loss: {test_loss:.4f}")
-            print("Module MSE values:")
-            for module, mse_val in module_mse_values.items():
-                print(f"  {module}: {np.mean(mse_val):.4f}")
+            #print("Module MSE values:")
+            #for module, mse_val in module_mse_values.items():
+            #    print(f"  {module}: {np.mean(mse_val):.4f}")
 
             if save_models and batch == batches - 1:
                 os.makedirs(save_path, exist_ok=True)
@@ -1913,7 +1913,7 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
                 all_loss_paths = glob.glob(loss_file_pattern)
 
                 best_repetition = -1
-                best_loss = -1
+                best_loss = 1000
                 for loss_path in all_loss_paths:
                     rep_str = os.path.basename(loss_path).replace('losses-', '').replace('.csv', '')
                     rep_num = int(rep_str)
@@ -1924,7 +1924,7 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
                             best_loss = final_loss
                             best_repetition = rep_num
 
-                print(f"best repetition: {best_repetition} with loss: {best_accuracy}")
+                print(f"best repetition: {best_repetition} with loss: {best_loss}")
                 for epoch in [epochs - 1]:
                     print('evaluating', epoch, model_name)
                     for this_path in [save_path]:#, retrain_path]: #retrain path removed

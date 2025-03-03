@@ -569,8 +569,8 @@ class AblationArchitecture(nn.Module):
         op_belief_s = self.op_belief.forward(treats_s * opponent_vision.unsqueeze(-1), opponent_vision)
         op_beliefs = torch.stack([op_belief_l, op_belief_s], dim=1)
 
-        op_belief_vector = self.combiner.forward(op_beliefs.unsqueeze(1))
-        #op_belief_vector = op_beliefs
+        #op_belief_vector = self.combiner.forward(op_beliefs.unsqueeze(1))
+        op_belief_vector = op_beliefs
 
         beliefs_list = []
         vision_sum_list = []
@@ -588,8 +588,8 @@ class AblationArchitecture(nn.Module):
         beliefs_tensor = torch.stack(beliefs_list, dim=1)
         #vision_sums = torch.stack(vision_sum_list, dim=1).unsqueeze(-1)
 
-        my_belief_vector = self.combiner.forward(beliefs_tensor)
-        #my_belief_vector = beliefs_tensor.squeeze(1)
+        #my_belief_vector = self.combiner.forward(beliefs_tensor)
+        my_belief_vector = beliefs_tensor.squeeze(1)
 
         op_decision = self.op_decision.forward(op_belief_vector, self.null_decision[:batch_size].to(device), self.null_presence[:batch_size].to(device))
         my_decision = self.my_decision.forward(my_belief_vector, op_decision, opponent_presence)
