@@ -293,11 +293,12 @@ def load_model_data_eval_retrain(test_sets, load_path, target_label, last_timest
     if 'hardcoded' not in model_type and '-r-' not in model_type:
         model_kwargs, state_dict = load_model_eval(model_save_path, repetition, use_prior, desired_epoch=desired_epoch)#f'{repetition}-model_epoch{epoch_number}.pt'))
         batch_size = model_kwargs['batch_size']
+        batch_size = 1024
         model = load_model(model_type, model_kwargs, device)
         model.load_state_dict(state_dict)
     else:
         model_kwargs = {}
-        batch_size = 128
+        batch_size = 1024
         model_kwargs['batch_size'] = batch_size
         model = load_model(model_type, model_kwargs, device)
 
@@ -305,12 +306,18 @@ def load_model_data_eval_retrain(test_sets, load_path, target_label, last_timest
         oracle_labels = []
 
     prior_metrics_data = {}
+    test_regime_data = []
 
     test_loaders = []
     data, labels, params, oracles, act_labels = [], [], [], [], []
     for val_set_name in test_sets:
+        regime_name = val_set_name[3:]
         dir = os.path.join(load_path, val_set_name)
-        data.append(np.load(os.path.join(dir, 'obs.npz'), mmap_mode=mmap_mode)['arr_0'])
+        current_data = np.load(os.path.join(dir, 'obs.npz'), mmap_mode=mmap_mode)['arr_0']
+        data.append(current_data)
+        test_regime_array = np.array([regime_name] * len(current_data), dtype=object)
+        test_regime_data.append(test_regime_array)
+
         labels_raw = np.load(os.path.join(dir, 'label-' + target_label + '.npz'), mmap_mode='r')['arr_0']  # todo: try labelcheck
         print('loaded eval labels', val_set_name, target_label, labels_raw.shape)
         if target_label == 'shouldGetBig':
@@ -356,6 +363,7 @@ def load_model_data_eval_retrain(test_sets, load_path, target_label, last_timest
                 act_label_data_dict[act_label_name] = flattened_label
             act_labels.append(act_label_data_dict)
 
+    prior_metrics_data['test_regime'] = test_regime_data
     for metric, arrays in prior_metrics_data.items():
         prior_metrics_data[metric] = np.concatenate(arrays, axis=0)
 
@@ -444,7 +452,7 @@ def analyze_batch_awareness(model, inputs, vision_prob, num_samples=1):
 
 def evaluate_model(test_sets, target_label, load_path='supervised/', model_load_path='', oracle_labels=[], repetition=0,
                    epoch_number=0, prior_metrics=[], num_activation_batches=-1, oracle_is_target=False, act_label_names=[], save_labels=False,
-                   oracle_early=False, last_timestep=True, model_type=None, seed=0, test_percent=0.2, use_prior=False):
+                   oracle_early=False, last_timestep=True, model_type=None, seed=0, test_percent=0.2, use_prior=False, train_sets=None):
     test_loaders, special_criterion, oracle_criterion, model, device, \
     data, labels, params, oracles, act_labels, batch_size, prior_metrics_data, \
     model_kwargs = load_model_data_eval_retrain(test_sets, load_path,
@@ -457,6 +465,8 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_load_
                                                 desired_epoch=epoch_number)
     param_losses_list = []
 
+    print('eval sets', test_sets)
+
     hook = SaveActivations()
     activation_data = {
         'inputs': [],
@@ -466,6 +476,7 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_load_
     }
     register_hooks(model, hook)
     model.eval()
+    model.batch_size = 1024
 
     print('num_activation_batches', num_activation_batches)
     overall_correct = 0
@@ -490,6 +501,7 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_load_
     # i have commented out oracle related things
     # this includes oracle_is_target check
     for idx, _val_loader in enumerate(test_loaders):
+
         with torch.inference_mode():
 
             tq = tqdm.trange(len(_val_loader))
@@ -518,9 +530,6 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_load_
                             accuracy = (predicted == max_labels).float().mean().item()
 
                             accuracy_results1[uncertainty][vision_prob].append(accuracy)
-
-
-
                             #batch_awareness = analyze_batch_awareness(model, inputs, vision_prob)
 
                             '''
@@ -591,9 +600,7 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_load_
                     #activation_data['oracles'].append(oracles.cpu().numpy().reshape(real_batch_size, -1))
 
                     for name, act_label in act_labels_dict.items():
-                        activation_data.setdefault(f"act_{name}", []).append(
-                            act_label.cpu().reshape(real_batch_size, -1).numpy()
-                        )
+                        activation_data.setdefault(f"act_{name}", []).append(act_label.cpu().reshape(real_batch_size, -1).numpy())
 
 
                 batch_param_losses = []
@@ -631,6 +638,7 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_load_
                         'label': max_label.item(),
                         'loss': loss.item(),
                         'accuracy': correct.item(),
+                        #'is_train_regime': metrics['test_regime'][k] in train_sets, #replaced with groups in calculate_statistics
                         #'small_food_selected': small.item(),
                         #'big_food_selected': big.item(),
                         #'neither_food_selected': neither.item(),
@@ -1246,6 +1254,35 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=True, skip_2x1=False
 
     check_labels = ['p-s-0', 'target', 'delay', 'b-loc', 'p-b-0', 'p-b-1', 'p-s-1', 'shouldAvoidSmall', 'shouldGetBig', 'vision', 'loc']
 
+    sub_regime_keys = [
+        "Nn", "Fn", "Nf", "Tn", "Nt", "Ff", "Tf", "Ft", "Tt"
+    ]
+
+    
+
+    direct = [x + '1' for x in sub_regime_keys]
+    progression_groups = {}
+    progression_groups['s1'] = [x + '0' for x in sub_regime_keys]
+    progression_groups['s2'] = ['Tt1']
+    progression_groups['s21'] = ['Nn1a', 'Nt1a'] 
+    progression_groups['s3'] = [x for x in direct if x != 'Tt1' and x not in ['Nn1a', 'Nt1a']] + ['Nn1b', 'Nt1b']
+
+    group_mapping = {}
+    for group_name, regimes_list in progression_groups.items():
+        for regime in regimes_list:
+            group_mapping[regime] = group_name
+
+    print("All test_regime values:", last_epoch_df['test_regime'].unique())
+    print("Mapping keys:", list(group_mapping.keys()))
+    
+
+    last_epoch_df['test_group'] = last_epoch_df['test_regime'].apply(
+        lambda x: group_mapping.get(x, '?')
+    )
+
+    params.append('test_group')
+
+
     print('calculating statistics...')
     for col in last_epoch_df.columns:
         if col in check_labels:
@@ -1359,6 +1396,7 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=True, skip_2x1=False
                     #print('SSSSSSSSSS', unique_vals) #unique vals of regime has only 6 of them
                     for key_val in unique_vals[key_param]:
                         subset = last_epoch_df[last_epoch_df[key_param] == key_val]
+
                         grouped = subset.groupby(['repetition', param])[acc_type]
                         repetition_means = grouped.mean()
                         overall_means = repetition_means.groupby(level=param).mean()
@@ -1371,6 +1409,8 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=True, skip_2x1=False
                         z_value = 1.96  # For a 95% CI
                         standard_errors = (z_value * np.sqrt(repetition_means * (1 - repetition_means) / counts)).groupby(level=param).mean()
 
+                        print(key_val, param, 'ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ')
+
                         if key_val not in save_dict:
                             save_dict[key_val] = {}
                         save_dict[key_val][param] = {
@@ -1382,8 +1422,31 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=True, skip_2x1=False
                         }
                         # dict order is key_val > param > mean/std > param_val
 
+                        print('test group', key_val)
+                        print("Unique test_regime values:", subset['test_regime'].unique())
+
+                        for group_name in ['s1', 's2', 's21', 's3']:
+                            subset2 = subset[subset['test_group'] == group_name]
+                            print(group_name, len(subset2))
+                            if len(subset) > 0:
+                                grouped = subset2.groupby(['repetition', param])[acc_type]
+                                repetition_means = grouped.mean()
+
+                                if key_val not in save_dict:
+                                    save_dict[key_val] = {}
+                                save_dict[key_val][group_name] = {
+                                    'mean': repetition_means.groupby(level=param).mean().to_dict(),
+                                    'std': repetition_means.groupby(level=param).std().to_dict(),
+                                    'q1': grouped.quantile(0.25).groupby(level=param).mean().to_dict(),
+                                    'q3': grouped.quantile(0.75).groupby(level=param).mean().to_dict(),
+                                    'ci': (z_value * np.sqrt(repetition_means * (1 - repetition_means) / grouped.size())).groupby(level=param).mean().to_dict(),
+                                }
+
         if record_delta_pi:
             delta_pi_stats(unique_vals, key_param, last_epoch_df, delta_operator_summary, df_summary)
+
+    #print(key_param_stats['a-mix-r-perception-100-loc-s2'].keys())
+    #exit()
 
     return avg_loss, variances, ranges_1, ranges_2, range_dict, range_dict3, stats, key_param_stats, oracle_key_param_stats, df_summary, delta_operator_summary
 

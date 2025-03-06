@@ -1,5 +1,8 @@
 
 BASE_CONFIG = {
+    'perception_treat': False,
+    'perception_vision': False,
+    'perception_presence': False,
     'perception': False,
     'my_belief': False,
     'op_belief': False,
@@ -23,12 +26,15 @@ TEMP_CONFIGS = {
 
 
 BASE_NEURAL_CONFIGS = {
-    'a-hardcoded': {},
+    'a-hardcoded': {'shared_decision': True},
     'a-neural-split': {k: True for k in BASE_CONFIG if k not in ['shared_belief', 'shared_decision']},
     'a-neural-belief-shared': {k: True for k in BASE_CONFIG if k not in ['shared_decision']},
     'a-neural-decision-shared': {k: True for k in BASE_CONFIG if k not in ['shared_belief']},
     'a-neural-shared': {k: True for k in BASE_CONFIG},
-    'a-mix-n-perception': {'perception': True, 'shared_belief': True, 'shared_decision': True},
+    'a-mix-n-perception-treat': {'perception_treat': True, 'shared_belief': True, 'shared_decision': True},
+    'a-mix-n-perception-vision': {'perception_vision': True, 'shared_belief': True, 'shared_decision': True},
+    'a-mix-n-perception-presence': {'perception_presence': True, 'shared_belief': True, 'shared_decision': True},
+    'a-mix-n-both-shared': {'my_belief': True, 'op_belief': True, 'shared_belief': True, 'shared_decision': True},
     'a-mix-n-belief-shared': {'my_belief': True, 'op_belief': True, 'shared_belief': True, 'shared_decision': True},
     'a-mix-n-belief-split': {'my_belief': True, 'op_belief': True, 'shared_belief': False, 'shared_decision': True},
     'a-mix-n-belief-combiner-shared': {'my_belief': True, 'op_belief': True, 'shared_belief': True, 'shared_decision': True, 'combiner': True},
@@ -57,17 +63,18 @@ for base_name, base_config in BASE_NEURAL_CONFIGS.items():
                 'sigmoid_temp': 90,
             }
 
-#print(NEURAL_CONFIGS.keys())
 
 RANDOM_VARIANTS = {}
 for model_name, config in NEURAL_CONFIGS.items():
     # add random variants
-    if 'mixed' in model_name and 'shared' not in model_name:
+    if 'mix' in model_name and 'shared' not in model_name and '0' not in model_name and '5' not in model_name:
         neural_key = next(k for k, v in config.items() if v is True and k not in ['shared_belief', 'shared_decision'])
         base_config = {k: v for k, v in config.items() if k in ['shared_belief', 'shared_decision']}
+        base_config[neural_key] = False
         for prob in [100, 50]:
             variant_name = model_name.replace('mix-n-', 'mix-r-') + f"-{prob}"
             RANDOM_VARIANTS[variant_name] = (base_config, {neural_key: prob/100})
+
 
 MODEL_SPECS = {name: (config, {}) for name, config in {**NEURAL_CONFIGS, **TEMP_CONFIGS}.items()}
 MODEL_SPECS.update(RANDOM_VARIANTS)

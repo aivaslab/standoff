@@ -125,6 +125,7 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
         configs = conf.standoff
         events = conf.stages[configName]['events']
         params = configs[conf.stages[configName]['params']]
+        print(configName, configs, events, params)
 
         _subject_is_dominant = [False] if role_type == '' else [True] if role_type == 'D' else [True, False]
         _subject_valence = [1] if pref_type == '' else [2] if pref_type == 'd' else [1, 2]
@@ -143,8 +144,10 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
         for label in all_labels:
             data_labels[label] = []
         data_params = []
+        has_swaps = []
         posterior_metrics = set(posterior_metrics)
 
+        
         for subject_is_dominant in _subject_is_dominant:
             for subject_valence in _subject_valence:
                 params['subject_is_dominant'] = subject_is_dominant
@@ -190,17 +193,19 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
 
                 counts = {'total': 0, 'big': 0, 'small': 0}
 
+                contains_swaps = False
+
                 while True:
                     env.deterministic_seed = env.current_param_group_pos
 
                     obs = env.reset()
                     if env.current_param_group != prev_param_group:
                         eName = env.current_event_list_name
+                        contains_swaps = "w0" not in eName
                         tq.update(1)
                     prev_param_group = env.current_param_group
                     this_ob = np.zeros((1 + frames, *obs['p_0'].shape))
                     pos = 0
-
 
                     temp_labels = {label: [] for label in check_labels}
                     one_labels = {label: [] for label in onehot_labels}
@@ -218,8 +223,10 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
                             one_labels[label].append(data)
                             #print(info['p_0'][label])
 
-
                         if pos == frames or env.has_released:
+                            # Record whether this datapoint has swaps
+                            has_swaps.append(contains_swaps)
+                            
                             data_obs.append(serialize_data(this_ob.astype(np.uint8)))
                             data_params.append(eName)
                             for label in check_labels:
@@ -227,12 +234,6 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
                             for label in onehot_labels:
                                 data_labels[label].append(np.stack(one_labels[label]))
 
-
-
-                            #data_labels['informedness'].append(informedness)
-                            #if informedness != info['p_0']['informedness'] and params["num_puppets"] > 0:
-                            #    print('true inf:', informedness, 'step inf:', info['p_0']['informedness'], info['p_0']['loc'], info['p_0']['b-loc'], eName, 'v',
-                            #          temp_labels['vision'], 'bait', temp_labels['bait-treat'], 'swap', temp_labels['swap-treat'])
                             data_labels['opponents'].append(params["num_puppets"])
                             data_labels['id'].append(unique_id)
                             unique_id += 1
@@ -256,7 +257,7 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
                                 if done['p_0']:
                                     all_path_infos = all_path_infos.append(info['p_0'], ignore_index=True)
                                     break
-                        del _env, a
+                            del _env, a
 
                     if env.current_param_group == total_groups - 1 and env.current_param_group_pos == env.target_param_group_count - 1:
                         # normally the while loop won't break because reset uses a modulus
@@ -264,15 +265,39 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
 
                 print('regime', data_name, 'counts', counts)
 
-        #print('len obs', data_name, params["num_puppets"], len(data_obs))
+        has_swaps = np.array(has_swaps)
+        
         this_path = os.path.join(path, data_name)
         os.makedirs(this_path, exist_ok=True)
-
         np.savez_compressed(os.path.join(this_path, 'obs'), np.array(data_obs))
         np.savez_compressed(os.path.join(this_path, 'params'), np.array(data_params))
         for label in all_labels:
             if len(data_labels[label]) > 0:
                 np.savez_compressed(os.path.join(this_path, 'label-' + label), np.array(data_labels[label]))
+        
+        with_swaps_path = os.path.join(path, data_name + "b")
+        os.makedirs(with_swaps_path, exist_ok=True)
+        
+        with_swaps_indices = np.where(has_swaps)[0]
+        if len(with_swaps_indices) > 0:
+            np.savez_compressed(os.path.join(with_swaps_path, 'obs'), np.array([data_obs[i] for i in with_swaps_indices]))
+            np.savez_compressed(os.path.join(with_swaps_path, 'params'), np.array([data_params[i] for i in with_swaps_indices]))
+            for label in all_labels:
+                if len(data_labels[label]) > 0:
+                    np.savez_compressed(os.path.join(with_swaps_path, 'label-' + label), 
+                                      np.array([data_labels[label][i] for i in with_swaps_indices]))
+        
+        without_swaps_path = os.path.join(path, data_name + "a")
+        os.makedirs(without_swaps_path, exist_ok=True)
+        
+        without_swaps_indices = np.where(~has_swaps)[0]
+        if len(without_swaps_indices) > 0:
+            np.savez_compressed(os.path.join(without_swaps_path, 'obs'), np.array([data_obs[i] for i in without_swaps_indices]))
+            np.savez_compressed(os.path.join(without_swaps_path, 'params'), np.array([data_params[i] for i in without_swaps_indices]))
+            for label in all_labels:
+                if len(data_labels[label]) > 0:
+                    np.savez_compressed(os.path.join(without_swaps_path, 'label-' + label), 
+                                      np.array([data_labels[label][i] for i in without_swaps_indices]))
 
 def serialize_data(datapoint):
     return pickle.dumps(datapoint)

@@ -437,29 +437,6 @@ def plot_tsne(data, labels, index, color):
 
 
 def save_delta_figures(dir, df_summary, df_x):
-    '''for var in ['dpred', 'dpred_correct', 'dpred_accurate']:
-        df_list = []
-        for key_val, sub_df in df_summary.items():
-            for _, row in sub_df.iterrows():
-                informedness = row['Informedness']
-                mean, std = row[var].strip().split(' ')
-                mean = float(mean)
-                std = float(std.strip('()'))
-                df_list.append([key_val, informedness, mean, std, row[var]])
-
-        df = pd.DataFrame(df_list, columns=["key_val", "Informedness", "mean", "std"])
-        pivot_df = df.pivot(index="key_val", columns="Informedness", values="mean")
-
-        plt.figure(figsize=(10, 8))
-        ax = sns.heatmap(pivot_df, vmin=0, vmax=1, annot=pivot_df, fmt='.2f', cmap='crest', linewidths=0.5, linecolor='white')
-        plt.title(f"Heatmap of " + var)
-
-        plt.tight_layout()
-
-        os.makedirs(dir, exist_ok=True)
-        plot_save_path = os.path.join(dir, var + '_heatmap.png')
-        plt.savefig(plot_save_path)
-        plt.close()'''
 
     # subfigs of accuracy across operators
     all_cols = ['t', 'f', 'tt', 'tf', 'ft', 'ff']
@@ -2045,6 +2022,38 @@ def save_key_param_figures(save_dir, key_param_stats, oracle_stats, key_param, k
             # produce typical heatmaps for accuracy
             big_mode = True
             split_by_type = True
+
+            if param == 'test_group':
+                pivot_df = df.pivot(index=key_param, columns=param, values="accuracy mean")
+                mean_values_df = pivot_df
+                mean_values_df = mean_values_df.apply(pd.to_numeric, errors='coerce')
+
+                print('FFFFFFFFFFFFFFFFFFFF', mean_values_df)
+                
+                desired_order = ['s1', 's2', 's21', 's3']
+                
+                pivot_df = pivot_df.reindex(columns=desired_order)
+                mean_values_df = mean_values_df.reindex(columns=desired_order)
+                
+                fig = plt.figure(figsize=(8, 13))
+                heatmap_ax = fig.add_axes([0.0, 0.11, 1.0, 0.9])
+                cbar_ax = fig.add_axes([0.0, 0.03, 1.0, 0.02])
+                
+                quadmesh = sns.heatmap(mean_values_df, annot=pivot_df, 
+                                      fmt='', cmap='RdBu', linewidths=0.5, linecolor='white', 
+                                      vmin=0, vmax=1, cbar=False, ax=heatmap_ax)
+                
+                quadmesh.set_yticklabels(quadmesh.get_yticklabels(), rotation=0)
+                quadmesh.set_xlabel("Test Group", fontsize=10)
+                quadmesh.set_ylabel("Training Dataset", fontsize=10)
+                
+                plt.colorbar(quadmesh.collections[0], cax=cbar_ax, orientation='horizontal', cmap='RdBu')
+                plt.tight_layout()
+                
+                plot_save_path = os.path.join(save_dir, f'{label}_{param}_heatmap.png')
+                print('saving fig to', plot_save_path)
+                plt.savefig(plot_save_path, bbox_inches='tight')
+                plt.close()
 
             if param == 'test_regime':
                 for type in ['loc',]:# 'box', 'size'] if split_by_type else ['']:

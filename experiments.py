@@ -20,14 +20,14 @@ from supervised_learning_main import run_supervised_session
 
 def init_regimes():
     sub_regime_keys = [
-        "Nn", "Fn", "Nf", "Tn", "Nt", "Ff", "Tf", "Ft", "Tt"
-    ]
-    all_regimes = ['sl-' + x + '0' for x in sub_regime_keys] + ['sl-' + x + '1' for x in sub_regime_keys]
-    mixed_regimes = {k: ['sl-' + x + '0' for x in sub_regime_keys] + ['sl-' + k + '1'] for k in sub_regime_keys}
+        "Fn", "Nf", "Tn", "Ff", "Tf", "Ft", "Tt"
+    ] # removed Nn and Nt
+    all_regimes = ['sl-' + x + '0' for x in sub_regime_keys] + ['sl-' + x + '1' for x in sub_regime_keys] + ['sl-Nn1a', 'sl-Nn1b', 'sl-Nt1a', 'sl-Nt1b', 'sl-Nn0', 'sl-Nt0']
+    mixed_regimes = {k: ['sl-' + x + '0' for x in sub_regime_keys] + ['sl-Nn1a', 'sl-Nn1b', 'sl-Nt1a', 'sl-Nt1b', 'sl-Nn0', 'sl-Nt0'] + ['sl-' + k + '1'] for k in sub_regime_keys} 
 
     regimes = {}
     regimes['direct'] = ['sl-' + x + '1' for x in sub_regime_keys]
-    regimes['noOpponent'] = ['sl-' + x + '0' for x in sub_regime_keys]
+    regimes['noOpponent'] = ['sl-' + x + '0' for x in sub_regime_keys] + ['sl-Nn0', 'sl-Nt0']
     regimes['everything'] = all_regimes
     hregime = {}
     hregime['homogeneous'] = ['sl-Tt0', 'sl-Ff0', 'sl-Nn0', 'sl-Tt1', 'sl-Ff1', 'sl-Nn1']
@@ -37,8 +37,9 @@ def init_regimes():
 
     fregimes = {}
     fregimes['s1'] = regimes['noOpponent']
-    fregimes['s3'] = regimes['everything']
-    fregimes['s2'] = mixed_regimes['Tt']
+    fregimes['s2'] = ['sl-' + x + '0' for x in sub_regime_keys] + ['sl-Tt1'] + ['sl-Nn0', 'sl-Nt0']
+    fregimes['s21'] = ['sl-' + x + '0' for x in sub_regime_keys] + ['sl-Tt1'] + ['sl-Nn0', 'sl-Nt0'] + ['sl-Nn1a'] + ['sl-Nt1a'] #a has no swaps, b has swaps
+    fregimes['s3'] = all_regimes
     # fregimes['homogeneous'] = hregime['homogeneous']
 
     single_regimes = {k[3:]: [k] for k in all_regimes}
@@ -255,7 +256,9 @@ def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, sk
             model_types = neural_models
             label_tuples = [('correct-loc', 'loc')]
 
-        real_regimes = {'s2': fregimes['s2'], 's3': fregimes['s3']}
+        real_regimes = {'s2': fregimes['s2']}
+
+        print('eval regimes:', fregimes['s3'])
 
         for label, label_name in label_tuples:
             for model_type in model_types:
@@ -354,7 +357,9 @@ if __name__ == '__main__':
                    'a-mix-n-belief-combiner-split',
                    'a-mix-n-belief-combiner-split-v50-b1', 'a-mix-n-belief-combiner-split-v50-b5']
 
-    experiment_1_models = ['a-mix-n-perception',
+    experiment_1_models = ['a-mix-n-perception-treat',
+                    'a-mix-n-perception-vision',
+                    'a-mix-n-perception-presence',
                     'a-mix-n-belief-op',
                     'a-mix-n-belief-my',
                     'a-mix-n-belief-split',
@@ -365,10 +370,19 @@ if __name__ == '__main__':
                     'a-mix-n-other',
                     'a-neural-split',]
 
+    experiment_1r_models = ['a-mix-r-perception-treat-100',
+                    'a-mix-r-perception-vision-100',
+                    'a-mix-r-perception-presence-100',
+                    'a-mix-r-belief-op-100',
+                    'a-mix-r-belief-my-100',
+                    'a-mix-r-decision-op-100',
+                    'a-mix-r-decision-my-100',]
+
     experiment_2_models = [
-                   'a-mix-n-belief-shared',  
+                   'a-mix-n-belief-shared',
                    'a-mix-n-decision-shared',
-                   'a-neural-both-shared',
+                   'a-mix-n-both-shared',
+                   'a-neural-shared',
                    'a-neural-belief-shared',
                    'a-neural-decision-shared',]
 
@@ -381,11 +395,11 @@ if __name__ == '__main__':
                    'a-neural-split-v50-b5',
                    'a-neural-shared-v50-b5',]
 
-    model_types = experiment_1_models
+    model_types = experiment_1r_models
 
     #model_types = ['a-mix-n-belief-my-v50-b5']
     #model_types = ['a-mix-n-belief-combiner-shared',]
-    #model_types = ['a-hardcoded']
+    model_types = ['a-mix-r-perception-100']
 
     #model_types = ['a-mix-n-combiner']
     print(len(model_types))

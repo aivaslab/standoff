@@ -13,6 +13,7 @@ class BaseModule(nn.Module, ABC):
         self.neural_network = self._create_neural_network() if use_neural else None
         self.random_prob = random_prob
         self.sigmoid_temp = sigmoid_temp
+        print(str(self), self.sigmoid_temp)
 
         # print('random prob', self.random_prob)
         if use_neural and self.neural_network is not None:
@@ -36,6 +37,7 @@ class BaseModule(nn.Module, ABC):
         pass
 
     def _neural_forward(self, *args, **kwargs):
+        print('ffff')
         return self.neural_network(*args, **kwargs)
         pass
 
@@ -47,7 +49,8 @@ class BaseModule(nn.Module, ABC):
             return self._neural_forward(*args, **kwargs)
 
         ## NOTE WE ARE SKIPPING RANDOM!!!!
-        return self._hardcoded_forward(*args, **kwargs)
+        self.sigmoid_temp = 90.0 # this is stupid but sometimes they are
+        #return self._hardcoded_forward(*args, **kwargs)
 
         batch_size = args[0].shape[0]
         device = args[0].device
@@ -253,7 +256,7 @@ class BeliefModule(BaseModule):
         batch_size = visible_treats.shape[0]
         device = visible_treats.device
 
-        beliefs = torch.rand(batch_size, 2, 6, device=device)
+        beliefs = torch.rand(batch_size, 6, device=device)
 
         return F.softmax(beliefs, dim=-1)
 
@@ -440,27 +443,27 @@ class AblationArchitecture(nn.Module):
             random_probs = {k: 0.0 for k in module_configs.keys()}
 
         self.treat_perception = TreatPerceptionModule(
-            use_neural=module_configs['perception'],
-            random_prob=random_probs['perception'],
+            use_neural=module_configs['perception_treat'],
+            random_prob=random_probs['perception_treat'],
             sigmoid_temp=sigmoid_temp
         )
 
         self.vision_perception = VisionPerceptionModule(
-            use_neural=module_configs['perception'],
-            random_prob=random_probs['perception'],
+            use_neural=module_configs['perception_vision'],
+            random_prob=random_probs['perception_vision'],
             sigmoid_temp=sigmoid_temp
         )
 
         self.presence_perception = PresencePerceptionModule(
-            use_neural=module_configs['perception'],
-            random_prob=random_probs['perception'],
+            use_neural=module_configs['perception_presence'],
+            random_prob=random_probs['perception_presence'],
             sigmoid_temp=sigmoid_temp
         )
 
         self.my_belief = BeliefModule(
             use_neural=module_configs['my_belief'],
             random_prob=random_probs['my_belief'],
-            sigmoid_temp=sigmoid_temp, uncertainty=0.3
+            sigmoid_temp=sigmoid_temp, uncertainty=0.3 if not module_configs['shared_belief'] else 0.0
         )
 
         self.combiner = CombinerModule(

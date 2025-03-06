@@ -126,10 +126,10 @@ def load_dataframes(combined_path_list, value_names, key_param):
 
             for chunk in chunks:
                 chunk.replace(replace_dict, inplace=True)
-                chunk['test_regime'] = chunk.apply(
+                '''chunk['test_regime'] = chunk.apply(
                     lambda row: informedness_to_str(string_to_list(row['i-informedness'])) + str(row['opponents']),
                     axis=1
-                )
+                )'''
                 chunk = chunk.assign(**{key_param: value_name, 'repetition': repetition, 'retrain': retrain, 'prior': prior, 'epoch': epoch})
                 df_list.append(chunk)
 
