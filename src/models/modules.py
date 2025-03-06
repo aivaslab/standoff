@@ -37,7 +37,6 @@ class BaseModule(nn.Module, ABC):
         pass
 
     def _neural_forward(self, *args, **kwargs):
-        print('ffff')
         return self.neural_network(*args, **kwargs)
         pass
 
@@ -50,7 +49,7 @@ class BaseModule(nn.Module, ABC):
 
         ## NOTE WE ARE SKIPPING RANDOM!!!!
         self.sigmoid_temp = 90.0 # this is stupid but sometimes they are
-        #return self._hardcoded_forward(*args, **kwargs)
+        return self._hardcoded_forward(*args, **kwargs)
 
         batch_size = args[0].shape[0]
         device = args[0].device

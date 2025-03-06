@@ -256,7 +256,7 @@ def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, sk
             model_types = neural_models
             label_tuples = [('correct-loc', 'loc')]
 
-        real_regimes = {'s2': fregimes['s2']}
+        real_regimes = {'s2': fregimes['s2'], 's21': fregimes['s21'], 's3': fregimes['s3'], 's1': fregimes['s1']}
 
         print('eval regimes:', fregimes['s3'])
 
@@ -305,8 +305,8 @@ def run_single_experiment(args_tuple):
 
 
     experiments([1],
-                repetitions=3,
-                batches=2000,
+                repetitions=10,
+                batches=2500,
                 skip_train=not args.t,
                 skip_eval=not args.e,
                 skip_calc=not args.c,
@@ -395,11 +395,11 @@ if __name__ == '__main__':
                    'a-neural-split-v50-b5',
                    'a-neural-shared-v50-b5',]
 
-    model_types = experiment_1r_models
+    model_types = experiment_1_models
 
     #model_types = ['a-mix-n-belief-my-v50-b5']
     #model_types = ['a-mix-n-belief-combiner-shared',]
-    model_types = ['a-mix-r-perception-100']
+    #model_types = ['a-mix-r-perception-100']
 
     #model_types = ['a-mix-n-combiner']
     print(len(model_types))
@@ -410,13 +410,13 @@ if __name__ == '__main__':
     if (not args.p) and (not args.g):
         experiment_args = [(model_type, label, args) for model_type, label in product(model_types, labels)]
 
-        with multiprocessing.Pool(processes=6) as pool:
+        with multiprocessing.Pool(processes=8) as pool:
             pool.map(run_single_experiment, experiment_args)
     else:
         print('running single')
         experiments([1] if not args.g else [0],
-                repetitions=3,
-                batches=2000,
+                repetitions=10,
+                batches=2500,
                 skip_train=not args.t,
                 skip_eval=not args.e,
                 skip_calc=not args.c,
