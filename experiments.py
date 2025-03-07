@@ -16,6 +16,7 @@ from src.experiments_utils import run_hparam_search, do_comparison
 from src.pz_envs import ScenarioConfigs
 from src.supervised_learning import gen_data
 from supervised_learning_main import run_supervised_session
+from tqdm.auto import tqdm
 
 
 def init_regimes():
@@ -180,58 +181,7 @@ def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, sk
         print('Running hyperparameter search on all regimes, pref_types, role_types')
         run_hparam_search(trials=100, repetitions=3, log_file='hparam_file.txt', train_sets=regimes['direct'], epochs=20)
 
-    if 2 in todo:
-        print('Running experiment 1: base, different models and answers')
-
-        combined_path_list = []
-        last_path_list = []
-        lp_list = []
-        key_param = 'regime'
-        key_param_list = []
-        session_params['oracle_is_target'] = False
-
-        if current_model_type != None:
-            model_types = [current_model_type]
-            label_tuples = [(current_label, current_label_name)]
-        else:
-            model_types = ['smlp', 'cnn', 'clstm']
-            label_tuples = [('correct-loc', 'loc')]
-
-        for label, label_name in label_tuples: #[('correct-loc', 'loc'), ('correct-box', 'box'), ('shouldGetBig', 'size')]:
-            for model_type in model_types:#['smlp', 'cnn', 'clstm', ]:
-                for regime in list(fregimes.keys()):
-                    kpname = f'{model_type}-{label_name}-{regime}'
-                    print(model_type + '-' + label_name, 'regime:', regime, 'train_sets:', fregimes[regime])
-                    combined_paths, last_epoch_paths, lp = run_supervised_session(
-                        save_path=os.path.join('supervised', exp_name, kpname),
-                        train_sets=fregimes[regime],
-                        eval_sets=fregimes['s3'],
-                        oracle_labels=[None],
-                        key_param=key_param,
-                        key_param_value=kpname,
-                        label=label,
-                        model_type=model_type,
-                        do_retrain_model=retrain,
-                        **session_params
-                    )
-                    conditions = [
-                        (lambda x: 'prior' not in x and 'retrain' not in x, ''),
-                        #(lambda x: 'prior' in x and 'retrain' not in x, '-prior'),
-                        #(lambda x: 'prior' not in x and 'retrain' in x, '-retrain')
-                    ]
-
-                    print('paths found', combined_paths, last_epoch_paths)
-
-                    for condition, suffix in conditions:
-                        last_path_list.append([x for x in last_epoch_paths if condition(x)])
-                        combined_path_list.append([x for x in combined_paths if condition(x)])
-                        key_param_list.append(kpname + suffix)
-                    lp_list.append(lp)
-
-        if comparison:
-            do_comparison(combined_path_list, last_path_list, key_param_list, key_param, exp_name, params, prior_metrics, lp_list)
-
-    if 1 in todo:
+    if True:
         print('Running experiment 1: ablate')
 
         combined_path_list = []
@@ -256,7 +206,7 @@ def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, sk
             model_types = neural_models
             label_tuples = [('correct-loc', 'loc')]
 
-        real_regimes = {'s2': fregimes['s2'], 's21': fregimes['s21'], 's3': fregimes['s3'], 's1': fregimes['s1']}
+        real_regimes = {'s2': fregimes['s2']}
 
         print('eval regimes:', fregimes['s3'])
 
@@ -304,9 +254,9 @@ def run_single_experiment(args_tuple):
     print(f"Process: {multiprocessing.current_process().name}")
 
 
-    experiments([1],
+    experiments([11],
                 repetitions=10,
-                batches=2500,
+                batches=4000,
                 skip_train=not args.t,
                 skip_eval=not args.e,
                 skip_calc=not args.c,
@@ -319,6 +269,18 @@ def run_single_experiment(args_tuple):
                 current_label=label,
                 current_label_name=label_name,
                 comparison=args.p)
+
+def tqdm_pool_map(pool, func, args, total=None):
+    total = total or len(args)
+    pbar = tqdm(total=total, desc="Experiments")
+    
+    def update(*args, **kwargs):
+        pbar.update()
+        return func(*args, **kwargs)
+    
+    results = pool.map(update, args)
+    pbar.close()
+    return results
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Run experiments with various options.")
@@ -370,13 +332,16 @@ if __name__ == '__main__':
                     'a-mix-n-other',
                     'a-neural-split',]
 
-    experiment_1r_models = ['a-mix-r-perception-treat-100',
+    experiment_1r_models = [
+                    'a-hardcoded',
+                    'a-mix-r-perception-treat-100',
                     'a-mix-r-perception-vision-100',
                     'a-mix-r-perception-presence-100',
                     'a-mix-r-belief-op-100',
                     'a-mix-r-belief-my-100',
                     'a-mix-r-decision-op-100',
-                    'a-mix-r-decision-my-100',]
+                    'a-mix-r-decision-my-100',
+                    ]
 
     experiment_2_models = [
                    'a-mix-n-belief-shared',
@@ -386,16 +351,18 @@ if __name__ == '__main__':
                    'a-neural-belief-shared',
                    'a-neural-decision-shared',]
 
-    experiment_3_models = ['a-mix-n-belief-my-v50-b5',
-                   'a-mix-n-belief-shared-v50-b5',
-                   'a-mix-n-belief-combiner-shared-v50-b5',
-                   'a-mix-n-belief-op-v50-b5',
+    experiment_3_models = [
+                   #'a-hardcoded-v50-b5', # remember to eval this!
+                   'a-mix-n-combiner-v50-b5',
                    'a-mix-n-belief-split-v50-b5',
-                   'a-mix-n-belief-combiner-split-v50-b5',
-                   'a-neural-split-v50-b5',
+                   'a-mix-n-belief-shared-v50-b5',
+                   'a-mix-n-decision-split-v50-b5',
+                   'a-mix-n-decision-shared-v50-b5',
+                   'a-mix-n-belief-comb-decision-split-v50-b5',
+                   'a-mix-n-belief-comb-decision-shared-v50-b5',
                    'a-neural-shared-v50-b5',]
 
-    model_types = experiment_1_models
+    model_types = experiment_1r_models
 
     #model_types = ['a-mix-n-belief-my-v50-b5']
     #model_types = ['a-mix-n-belief-combiner-shared',]
@@ -410,13 +377,19 @@ if __name__ == '__main__':
     if (not args.p) and (not args.g):
         experiment_args = [(model_type, label, args) for model_type, label in product(model_types, labels)]
 
+        total_tasks = len(experiment_args)
+        
         with multiprocessing.Pool(processes=8) as pool:
-            pool.map(run_single_experiment, experiment_args)
+            list(tqdm(
+                pool.imap(run_single_experiment, experiment_args),
+                total=total_tasks,
+                desc="Running experiments"
+            ))
     else:
         print('running single')
-        experiments([1] if not args.g else [0],
+        experiments([11] if not args.g else [0],
                 repetitions=10,
-                batches=2500,
+                batches=4000,
                 skip_train=not args.t,
                 skip_eval=not args.e,
                 skip_calc=not args.c,

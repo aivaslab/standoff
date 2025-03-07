@@ -13,7 +13,7 @@ class BaseModule(nn.Module, ABC):
         self.neural_network = self._create_neural_network() if use_neural else None
         self.random_prob = random_prob
         self.sigmoid_temp = sigmoid_temp
-        print(str(self), self.sigmoid_temp)
+        #print(str(self), self.sigmoid_temp)
 
         # print('random prob', self.random_prob)
         if use_neural and self.neural_network is not None:
@@ -49,11 +49,11 @@ class BaseModule(nn.Module, ABC):
 
         ## NOTE WE ARE SKIPPING RANDOM!!!!
         self.sigmoid_temp = 90.0 # this is stupid but sometimes they are
-        return self._hardcoded_forward(*args, **kwargs)
+        #return self._hardcoded_forward(*args, **kwargs)
 
         batch_size = args[0].shape[0]
         device = args[0].device
-        use_random = torch.rand(batch_size, device=device) < self.random_prob
+        use_random = torch.rand(batch_size, device=device) <= self.random_prob
 
         hardcoded = self._hardcoded_forward(*args, **kwargs)
         rand_output = self._random_forward(*args, **kwargs)
@@ -122,9 +122,28 @@ class TreatPerceptionModule(BaseModule):
 
     def _random_forward(self, perceptual_field: torch.Tensor) -> torch.Tensor:
         batch_size = perceptual_field.shape[0]
+        num_timesteps = perceptual_field.shape[1]
         device = perceptual_field.device
-        treats_visible = torch.rand(batch_size, 5, 2, 6, device=device)
-        return F.softmax(treats_visible, dim=-1)
+        
+        treats = torch.zeros(batch_size, num_timesteps, 2, 6, device=device)
+        
+        random_positions_t1 = torch.randint(0, 6, (batch_size, num_timesteps, 1), device=device)
+        random_positions_t2 = torch.randint(0, 6, (batch_size, num_timesteps, 1), device=device)
+        
+        treats.view(batch_size, num_timesteps, 2*6).scatter_(
+            2, 
+            torch.cat([
+                random_positions_t1 + 0*6, 
+                random_positions_t2 + 1*6 
+            ], dim=2),
+            1.0
+        )
+        
+        # Reshape back
+        treats = treats.view(batch_size, num_timesteps, 2, 6)
+        
+        return treats
+        
 
 class VisionPerceptionNetwork(nn.Module):
     def __init__(self):
@@ -154,7 +173,7 @@ class VisionPerceptionModule(BaseModule):
     def _random_forward(self, perceptual_field: torch.Tensor) -> torch.Tensor:
         batch_size = perceptual_field.shape[0]
         device = perceptual_field.device
-        return torch.rand(batch_size, 5, device=device)
+        return torch.randint(0, 2, (batch_size, 5), device=device).float() #torch.rand(batch_size, 5, device=device)
 
 
 class PresencePerceptionNetwork(nn.Module):
@@ -186,7 +205,7 @@ class PresencePerceptionModule(BaseModule):
     def _random_forward(self, perceptual_field: torch.Tensor) -> torch.Tensor:
         batch_size = perceptual_field.shape[0]
         device = perceptual_field.device
-        return torch.rand(batch_size, 1, device=device)
+        return torch.randint(0, 2, (batch_size, 1), device=device).float() #torch.rand(batch_size, 1, device=device)
 
 
 # Belief module
@@ -255,7 +274,9 @@ class BeliefModule(BaseModule):
         batch_size = visible_treats.shape[0]
         device = visible_treats.device
 
-        beliefs = torch.rand(batch_size, 6, device=device)
+        beliefs = torch.zeros(batch_size, 6, device=device)
+        random_indices = torch.randint(0, 6, (batch_size,), device=device)
+        beliefs.scatter_(1, random_indices.unsqueeze(1), 1.0)
 
         return F.softmax(beliefs, dim=-1)
 
@@ -416,8 +437,11 @@ class DecisionModule(BaseModule):
         return dominant_present * subordinate_decision + (1 - dominant_present) * greedy_decision
 
     def _random_forward(self, belief_vector: torch.Tensor, dominant_decision: torch.Tensor = None, dominant_present: torch.Tensor = None) -> torch.Tensor:
-        decisions = torch.rand(belief_vector.shape[0], 5, device=belief_vector.device)
-        decisions = F.softmax(decisions, dim=-1)
+        #decisions = torch.rand(belief_vector.shape[0], 5, device=belief_vector.device)
+        #decisions = F.softmax(decisions, dim=-1)
+        decisions = torch.zeros(batch_size, 5, device=device)
+        random_indices = torch.randint(0, 5, (batch_size,), device=device)
+        decisions.scatter_(1, random_indices.unsqueeze(1), 1.0)
         return decisions
 
 
@@ -436,7 +460,9 @@ class AblationArchitecture(nn.Module):
         self.register_buffer('null_decision', torch.zeros(self.kwargs['batch_size'], 5))
         self.register_buffer('null_presence', torch.zeros(self.kwargs['batch_size'], 1))
 
-        print('temperature:', sigmoid_temp, module_configs)
+        #print('temperature:', sigmoid_temp, module_configs)
+        print('module_configs', module_configs)
+        print('random_probs', random_probs)
 
         if random_probs is None:
             random_probs = {k: 0.0 for k in module_configs.keys()}
@@ -465,11 +491,17 @@ class AblationArchitecture(nn.Module):
             sigmoid_temp=sigmoid_temp, uncertainty=0.3 if not module_configs['shared_belief'] else 0.0
         )
 
-        self.combiner = CombinerModule(
+        self.my_combiner = CombinerModule(
             use_neural=module_configs['combiner'],
             random_prob=random_probs['combiner'],
             sigmoid_temp=sigmoid_temp
         )
+
+        self.op_combiner = (CombinerModule(
+            use_neural=module_configs['combiner'],
+            random_prob=random_probs['combiner'],
+            sigmoid_temp=sigmoid_temp
+        ) if not module_configs['shared_combiner'] else self.my_combiner)
 
         self.op_belief = (BeliefModule(
             use_neural=module_configs['op_belief'],
@@ -571,7 +603,7 @@ class AblationArchitecture(nn.Module):
         op_belief_s = self.op_belief.forward(treats_s * opponent_vision.unsqueeze(-1), opponent_vision)
         op_beliefs = torch.stack([op_belief_l, op_belief_s], dim=1)
 
-        #op_belief_vector = self.combiner.forward(op_beliefs.unsqueeze(1))
+        #op_belief_vector = self.op_combiner.forward(op_beliefs.unsqueeze(1))
         op_belief_vector = op_beliefs
 
         beliefs_list = []
@@ -590,7 +622,7 @@ class AblationArchitecture(nn.Module):
         beliefs_tensor = torch.stack(beliefs_list, dim=1)
         #vision_sums = torch.stack(vision_sum_list, dim=1).unsqueeze(-1)
 
-        #my_belief_vector = self.combiner.forward(beliefs_tensor)
+        #my_belief_vector = self.my_combiner.forward(beliefs_tensor)
         my_belief_vector = beliefs_tensor.squeeze(1)
 
         op_decision = self.op_decision.forward(op_belief_vector, self.null_decision[:batch_size].to(device), self.null_presence[:batch_size].to(device))

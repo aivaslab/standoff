@@ -206,7 +206,7 @@ class SigmoidTempScheduler:
         self.model.op_decision.sigmoid_temp = current_temp
         self.model.vision_prob = current_prob
         self.current_step = min(self.current_step + 1, self.total_steps)
-        print('current temp/prob:', current_temp, current_prob)
+        #print('current temp/prob:', current_temp, current_prob)
 
     def get_temp(self):
         progress = min(1.0, self.rate * self.current_step / self.total_steps)
@@ -233,7 +233,7 @@ def load_model(model_type, model_kwargs, device):
     config.update(model_config)
     random_probs.update(model_random)
 
-    print('random probs:', random_probs)
+    #print('random probs:', random_probs)
     return AblationArchitecture(config, random_probs, model_kwargs['batch_size']).to(device)
 
 
@@ -478,7 +478,7 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_load_
     model.eval()
     model.batch_size = 1024
 
-    print('num_activation_batches', num_activation_batches)
+    #print('num_activation_batches', num_activation_batches)
     overall_correct = 0
     overall_total = 0
     np.set_printoptions(threshold=sys.maxsize)
@@ -938,7 +938,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
             else:
                 labels.append(labels_raw.reshape(-1, 25))
         else:
-            print(labels_raw.shape, labels_raw[0])
+            #print(labels_raw.shape, labels_raw[0])
             labels.append(labels_raw.reshape(-1, 25))
             
         params.append(np.load(os.path.join(dir, 'params.npz'), mmap_mode='r')['arr_0'])
@@ -979,7 +979,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
     del data, labels, params, module_data_combined
 
     if record_loss:
-        print('recording loss')
+        #print('recording loss')
         train_size = int(0.9 * len(train_dataset))
         print('epochs:', train_size // batch_size)
         test_size = len(train_dataset) - train_size
@@ -1139,7 +1139,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
             epoch_losses_df = pd.concat([epoch_losses_df, new_row], ignore_index=True)
             model.train()
 
-            print(f"Accuracy: {accuracy:.4f}, Loss: {test_loss:.4f}")
+            #print(f"Accuracy: {accuracy:.4f}, Loss: {test_loss:.4f}")
             #print("Module MSE values:")
             #for module, mse_val in module_mse_values.items():
             #    print(f"  {module}: {np.mean(mse_val):.4f}")
@@ -1409,7 +1409,7 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=True, skip_2x1=False
                         z_value = 1.96  # For a 95% CI
                         standard_errors = (z_value * np.sqrt(repetition_means * (1 - repetition_means) / counts)).groupby(level=param).mean()
 
-                        print(key_val, param, 'ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ')
+                        #print(key_val, param, 'ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ')
 
                         if key_val not in save_dict:
                             save_dict[key_val] = {}
@@ -1422,12 +1422,12 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=True, skip_2x1=False
                         }
                         # dict order is key_val > param > mean/std > param_val
 
-                        print('test group', key_val)
-                        print("Unique test_regime values:", subset['test_regime'].unique())
+                        #print('test group', key_val)
+                        #print("Unique test_regime values:", subset['test_regime'].unique())
 
                         for group_name in ['s1', 's2', 's21', 's3']:
                             subset2 = subset[subset['test_group'] == group_name]
-                            print(group_name, len(subset2))
+                            #print(group_name, len(subset2))
                             if len(subset) > 0:
                                 grouped = subset2.groupby(['repetition', param])[acc_type]
                                 repetition_means = grouped.mean()
@@ -1855,12 +1855,13 @@ def write_metrics_to_file(filepath, df, ranges, params, stats, key_param=None, d
                 # aggregate the mean but only where test-regime is not in the train regime set...
                 test_regimes = group['test_regime']
                 sub_regime_keys = [
-                    "Nn", "Fn", "Nf", "Tn", "Nt", "Ff", "Tf", "Ft", "Tt"
+                    "Fn", "Nf", "Tn", "Ff", "Tf", "Ft", "Tt"
                 ]
                 train_map = {
-                    's3': [x + '0' for x in sub_regime_keys] + [x + '1' for x in sub_regime_keys],
-                    's2': [x + '0' for x in sub_regime_keys] + ['Tt1'],
-                    's1': [x + '0' for x in sub_regime_keys],
+                    's3': [x + '0' for x in sub_regime_keys] + [x + '1' for x in sub_regime_keys] + ['Nn1a', 'Nt1a', 'Nn1b', 'Nt1b',],
+                    's2': [x + '0' for x in sub_regime_keys] + ['Tt1', 'Nn0', 'Nt0'],
+                    's1': [x + '0' for x in sub_regime_keys] + ['Nn0', 'Nt0'],
+                    's21': [x + '0' for x in sub_regime_keys] + ['Tt1', 'Nn1a', 'Nt1a'],
                     'homogeneous': ['Tt0', 'Ff0', 'Nn0', 'Tt1', 'Ff1', 'Nn1']
                 }
 
@@ -1975,40 +1976,46 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
                 loss_file_pattern = os.path.join(save_path, 'losses-*.csv')
                 all_loss_paths = glob.glob(loss_file_pattern)
 
-                best_repetition = -1
-                best_loss = 1000
+                top_repetitions = []
+
                 for loss_path in all_loss_paths:
                     rep_str = os.path.basename(loss_path).replace('losses-', '').replace('.csv', '')
                     rep_num = int(rep_str)
                     df = pd.read_csv(loss_path)
                     if not df.empty:
                         final_loss = df['Loss'].iloc[-1]
-                        if final_loss < best_loss:
-                            best_loss = final_loss
-                            best_repetition = rep_num
+                        top_repetitions.append((rep_num, final_loss))
 
-                print(f"best repetition: {best_repetition} with loss: {best_loss}")
-                for epoch in [epochs - 1]:
-                    print('evaluating', epoch, model_name)
-                    for this_path in [save_path]:#, retrain_path]: #retrain path removed
-                        for eval_prior in [False]:#[False, True] if this_path == save_path else [False]:
-                            df_paths = evaluate_model(eval_sets, label, load_path=load_path,
-                                                  model_type=model_type,
-                                                  model_load_path=this_path,
-                                                  oracle_labels=oracle_labels,
-                                                  repetition=best_repetition,
-                                                  epoch_number=epoch,
-                                                  prior_metrics=prior_metrics,
-                                                  oracle_is_target=oracle_is_target,
-                                                  act_label_names=act_label_names,
-                                                  oracle_early=oracle_early,
-                                                  last_timestep=last_timestep,
-                                                  use_prior=eval_prior,
-                                                  num_activation_batches=0)
-                            if df_paths is not None:
-                                dfs_paths.extend(df_paths)
-                                if epoch == epochs - 1 or eval_prior:
-                                    last_epoch_df_paths.extend(df_paths)
+                top_repetitions.sort(key=lambda x: x[1])
+                best_three = top_repetitions[:min(3, len(top_repetitions))]
+                best_repetition_numbers = [rep for rep, loss in best_three]
+
+                if "-r-" in model_type or 'hard' in model_type:
+                    best_repetition_numbers = [0]
+
+                print(f"best repetitions: {best_three}")
+                for repetition in best_repetition_numbers:
+                    for epoch in [epochs - 1]:
+                        print('evaluating', epoch, model_name)
+                        for this_path in [save_path]:#, retrain_path]: #retrain path removed
+                            for eval_prior in [False]:#[False, True] if this_path == save_path else [False]:
+                                df_paths = evaluate_model(eval_sets, label, load_path=load_path,
+                                                      model_type=model_type,
+                                                      model_load_path=this_path,
+                                                      oracle_labels=oracle_labels,
+                                                      repetition=repetition,
+                                                      epoch_number=epoch,
+                                                      prior_metrics=prior_metrics,
+                                                      oracle_is_target=oracle_is_target,
+                                                      act_label_names=act_label_names,
+                                                      oracle_early=oracle_early,
+                                                      last_timestep=last_timestep,
+                                                      use_prior=eval_prior,
+                                                      num_activation_batches=0)
+                                if df_paths is not None:
+                                    dfs_paths.extend(df_paths)
+                                    if epoch == epochs - 1 or eval_prior:
+                                        last_epoch_df_paths.extend(df_paths)
 
                 
                 #loss_paths.append(os.path.join(retrain_path, f'losses-{repetition}.csv'))

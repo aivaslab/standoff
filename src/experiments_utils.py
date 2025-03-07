@@ -162,14 +162,15 @@ def is_novel_task(row):
     train_regime = row['regime'].split('-')[-1]
 
     sub_regime_keys = [
-        "Nn", "Fn", "Nf", "Tn", "Nt", "Ff", "Tf", "Ft", "Tt"
-    ]
+                    "Fn", "Nf", "Tn", "Ff", "Tf", "Ft", "Tt"
+                ]
     train_map = {
-        's3': [x + '0' for x in sub_regime_keys] + [x + '1' for x in sub_regime_keys],
-        's2': [x + '0' for x in sub_regime_keys] + ['Tt1'],
-        's1': [x + '0' for x in sub_regime_keys],
-        'homogeneous': ['Tt0', 'Ff0', 'Nn0', 'Tt1', 'Ff1', 'Nn1']
-    }
+                    's3': [x + '0' for x in sub_regime_keys] + [x + '1' for x in sub_regime_keys] + ['Nn1a', 'Nt1a', 'Nn1b', 'Nt1b',],
+                    's2': [x + '0' for x in sub_regime_keys] + ['Tt1', 'Nn0', 'Nt0'],
+                    's1': [x + '0' for x in sub_regime_keys] + ['Nn0', 'Nt0'],
+                    's21': [x + '0' for x in sub_regime_keys] + ['Tt1', 'Nn1a', 'Nt1a'],
+                    'homogeneous': ['Tt0', 'Ff0', 'Nn0', 'Tt1', 'Ff1', 'Nn1']
+                }
     
 
     return not row['test_regime'] in train_map[train_regime]
@@ -403,7 +404,7 @@ def do_comparison(combined_path_list, last_path_list, key_param_list, key_param,
     combined_path = os.path.join('supervised', exp_name, 'c')
     os.makedirs(combined_path, exist_ok=True)
 
-    plot_learning_curves(combined_path, lp_list)
+    #plot_learning_curves(combined_path, lp_list)
 
     print('loading IFRs')
     folder_paths = set()

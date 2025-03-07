@@ -10,6 +10,7 @@ BASE_CONFIG = {
     'op_decision': False,
     'shared_belief': False,
     'shared_decision': False,
+    'shared_combiner': False,
     'sigmoid_temp': 90.0,
     'combiner': False,
     'num_beliefs': 1,
@@ -35,10 +36,13 @@ BASE_NEURAL_CONFIGS = {
     'a-mix-n-perception-vision': {'perception_vision': True, 'shared_belief': True, 'shared_decision': True},
     'a-mix-n-perception-presence': {'perception_presence': True, 'shared_belief': True, 'shared_decision': True},
     'a-mix-n-both-shared': {'my_belief': True, 'op_belief': True, 'shared_belief': True, 'shared_decision': True},
+    'a-mix-n-both-split': {'my_belief': True, 'op_belief': True, 'shared_belief': False, 'shared_decision': False},
     'a-mix-n-belief-shared': {'my_belief': True, 'op_belief': True, 'shared_belief': True, 'shared_decision': True},
     'a-mix-n-belief-split': {'my_belief': True, 'op_belief': True, 'shared_belief': False, 'shared_decision': True},
-    'a-mix-n-belief-combiner-shared': {'my_belief': True, 'op_belief': True, 'shared_belief': True, 'shared_decision': True, 'combiner': True},
-    'a-mix-n-belief-combiner-split': {'my_belief': True, 'op_belief': True, 'shared_belief': False, 'shared_decision': True, 'combiner': True},
+    'a-mix-n-belief-combiner-shared': {'my_belief': True, 'op_belief': True, 'shared_belief': True, 'shared_decision': True, 'combiner': True, 'shared_combiner': True},
+    'a-mix-n-belief-combiner-split': {'my_belief': True, 'op_belief': True, 'shared_belief': False, 'shared_decision': False, 'combiner': True, 'shared_combiner': False},
+    'a-mix-n-belief-comb-decision-shared': {'my_belief': True, 'op_belief': True, 'shared_belief': True, 'shared_decision': True, 'combiner': True, 'decision': True, 'shared_combiner': True},
+    'a-mix-n-belief-comb-decision-split': {'my_belief': True, 'op_belief': True, 'shared_belief': False, 'shared_decision': False, 'combiner': True, 'decision': True, 'shared_combiner': False},
     'a-mix-n-belief-op': {'op_belief': True, 'shared_decision': True},
     'a-mix-n-belief-my': {'my_belief': True, 'shared_decision': True},
     'a-mix-n-combiner': {'combiner': True, 'shared_decision': True},
@@ -69,7 +73,7 @@ for model_name, config in NEURAL_CONFIGS.items():
     # add random variants
     if 'mix' in model_name and 'shared' not in model_name and '0' not in model_name and '5' not in model_name:
         neural_key = next(k for k, v in config.items() if v is True and k not in ['shared_belief', 'shared_decision'])
-        base_config = {k: v for k, v in config.items() if k in ['shared_belief', 'shared_decision']}
+        base_config = {k: False for k, _ in config.items() if k in ['shared_belief', 'shared_decision']} # no sharing in random modules!!!!!
         base_config[neural_key] = False
         for prob in [100, 50]:
             variant_name = model_name.replace('mix-n-', 'mix-r-') + f"-{prob}"
