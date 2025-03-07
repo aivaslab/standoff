@@ -74,8 +74,16 @@ def load_and_plot_heatmap(table_path, save_dir, param='test_group', label='accur
         return 999  
     
     df['order'] = df['display_name'].apply(get_model_order)
+
+    test_group_mapping = {
+        's1': 'S1',
+        's2': 'S2-S1',
+        's21': 'S2b-S2',
+        's3': 'S3-S2b'
+        }
+    df['test_group'] = df['test_group'].map(lambda x: test_group_mapping.get(x, x))
     
-    desired_order = ['s1', 's2', 's21', 's3'] if param == 'test_group' else sorted(df[param].unique())
+    desired_order = ['S1', 'S2-S1', 'S2b-S2', 'S3-S2b'] if param == 'test_group' else sorted(df[param].unique())
     train_sets = sorted(df['train_set'].unique())
     
     fig = plt.figure(figsize=(len(desired_order) * 1.5, len(train_sets) * 4))
@@ -109,9 +117,9 @@ def load_and_plot_heatmap(table_path, save_dir, param='test_group', label='accur
                    fmt='', cmap='RdBu', linewidths=0.5, linecolor='white', 
                    vmin=0, vmax=1, cbar=False, ax=ax)
         
-        ax.set_ylabel(f"{train_set}", fontsize=14)
+        ax.set_ylabel("")#f"{train_set}", fontsize=14
         if i == len(train_sets) - 1:
-            ax.set_xlabel("Test Group", fontsize=12)
+            ax.set_xlabel("Test Set", fontsize=12)
         else:
             ax.set_xlabel("")
         #ax.set_ylabel("Model Type", fontsize=12)

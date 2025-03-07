@@ -206,7 +206,7 @@ def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, sk
             model_types = neural_models
             label_tuples = [('correct-loc', 'loc')]
 
-        real_regimes = {'s2': fregimes['s2']}
+        real_regimes = {'s21': fregimes['s21']}
 
         print('eval regimes:', fregimes['s3'])
 
@@ -254,7 +254,7 @@ def run_single_experiment(args_tuple):
     print(f"Process: {multiprocessing.current_process().name}")
 
 
-    experiments([11],
+    experiments([2],
                 repetitions=10,
                 batches=4000,
                 skip_train=not args.t,
@@ -319,11 +319,12 @@ if __name__ == '__main__':
                    'a-mix-n-belief-combiner-split',
                    'a-mix-n-belief-combiner-split-v50-b1', 'a-mix-n-belief-combiner-split-v50-b5']
 
-    experiment_1_models = ['a-mix-n-perception-treat',
+    experiment_1_models = [
+                    #'a-mix-n-perception-treat',
                     'a-mix-n-perception-vision',
                     'a-mix-n-perception-presence',
                     'a-mix-n-belief-op',
-                    'a-mix-n-belief-my',
+                    #'a-mix-n-belief-my',
                     'a-mix-n-belief-split',
                     'a-mix-n-decision-op',
                     'a-mix-n-decision-my',
@@ -362,7 +363,7 @@ if __name__ == '__main__':
                    'a-mix-n-belief-comb-decision-shared-v50-b5',
                    'a-neural-shared-v50-b5',]
 
-    model_types = experiment_1r_models
+    model_types = experiment_2_models
 
     #model_types = ['a-mix-n-belief-my-v50-b5']
     #model_types = ['a-mix-n-belief-combiner-shared',]
@@ -379,7 +380,7 @@ if __name__ == '__main__':
 
         total_tasks = len(experiment_args)
         
-        with multiprocessing.Pool(processes=8) as pool:
+        with multiprocessing.Pool(processes=5) as pool:
             list(tqdm(
                 pool.imap(run_single_experiment, experiment_args),
                 total=total_tasks,
@@ -387,7 +388,7 @@ if __name__ == '__main__':
             ))
     else:
         print('running single')
-        experiments([11] if not args.g else [0],
+        experiments([2] if not args.g else [0],
                 repetitions=10,
                 batches=4000,
                 skip_train=not args.t,

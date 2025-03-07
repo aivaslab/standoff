@@ -182,7 +182,7 @@ def create_scheduler(model, total_steps, global_lr=1e-3, pct_start=0.2, div_fact
     return optimizer, scheduler
 
 class SigmoidTempScheduler:
-    def __init__(self, model, start_temp=1.0, end_temp=100.0, total_steps=10000, vision_prob_start=1.0, vision_prob_end=1, rate=1.0):
+    def __init__(self, model, start_temp=1.0, end_temp=100.0, total_steps=10000, vision_prob_start=0.9, vision_prob_end=1, rate=4.0):
         self.model = model
         self.start_temp = start_temp
         self.end_temp = end_temp
@@ -1004,9 +1004,11 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
     oracle_criterion = nn.MSELoss(reduction='mean')
     #optimizer = torch.optim.Adam(model.parameters(), lr=5e-3)
     #optimizer = torch.optim.SGD(model.parameters(), lr=1e-6)
+    #model.vision_prob = 0.8
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=1e-2, betas=(0.95, 0.999))
-    sigmoid_scheduler = SigmoidTempScheduler(model, start_temp=90.0, end_temp=90.0, total_steps=total_steps, vision_prob_end=model.vision_prob_base, rate=1.0)
+    sigmoid_scheduler = SigmoidTempScheduler(model, start_temp=90.0, end_temp=90.0, total_steps=total_steps, 
+        vision_prob_start=model.vision_prob, vision_prob_end=model.vision_prob_base, rate=5.0)
     #scheduler = ExponentialLR(optimizer, gamma=0.92)
     scheduler = OneCycleLR(
         optimizer,
@@ -1016,7 +1018,6 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
         div_factor=1,
         final_div_factor=5,
     )
-    model.vision_prob = 1.0
 
     if False:  # if loading previous model, only for progressions
         last_digit = int(save_path[-1])
@@ -1139,7 +1140,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
             epoch_losses_df = pd.concat([epoch_losses_df, new_row], ignore_index=True)
             model.train()
 
-            #print(f"Accuracy: {accuracy:.4f}, Loss: {test_loss:.4f}")
+            print(f"Accuracy: {accuracy:.4f}, Loss: {test_loss:.4f}, Vision:", model.vision_prob, 'Sigmoid:', model.treat_perception.sigmoid_temp)
             #print("Module MSE values:")
             #for module, mse_val in module_mse_values.items():
             #    print(f"  {module}: {np.mean(mse_val):.4f}")

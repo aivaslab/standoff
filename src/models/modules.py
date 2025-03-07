@@ -49,7 +49,7 @@ class BaseModule(nn.Module, ABC):
 
         ## NOTE WE ARE SKIPPING RANDOM!!!!
         self.sigmoid_temp = 90.0 # this is stupid but sometimes they are
-        #return self._hardcoded_forward(*args, **kwargs)
+        return self._hardcoded_forward(*args, **kwargs)
 
         batch_size = args[0].shape[0]
         device = args[0].device
@@ -82,7 +82,7 @@ class TreatPerceptionNetwork(nn.Module):
     def __init__(self):
         super().__init__()
         self.treat_detector = nn.Sequential(
-            nn.Linear(7 * 7, 6),
+            nn.Linear(7 * 1, 6),
             #nn.Sigmoid()
         )
 
@@ -91,10 +91,10 @@ class TreatPerceptionNetwork(nn.Module):
         batch_size = x.shape[0]
         num_timesteps = x.shape[1]
 
-        treat1_input = x[:, :, 2].reshape(batch_size * num_timesteps, 7 * 7)
+        treat1_input = x[:, :, 2, :, 3].reshape(batch_size * num_timesteps, 7 * 1)
         treat1 = self.treat_detector(treat1_input).view(batch_size, num_timesteps, 6)
 
-        treat2_input = x[:, :, 3].reshape(batch_size * num_timesteps, 7 * 7)
+        treat2_input = x[:, :, 3, :, 3].reshape(batch_size * num_timesteps, 7 * 1)
         treat2 = self.treat_detector(treat2_input).view(batch_size, num_timesteps, 6)
         
         treats = torch.stack([treat1, treat2], dim=2)
@@ -149,14 +149,15 @@ class VisionPerceptionNetwork(nn.Module):
     def __init__(self):
         super().__init__()
         self.vision_detector = nn.Sequential(
-            nn.Linear(7 * 7, 1)  # Just looking at one 7x7 grid to output vision state
+            nn.Linear(1, 1),  # Just looking at one 7x7 grid to output vision state
+            #nn.ReLU()
         )
 
     def forward(self, x):
         batch_size, timesteps = x.shape[:2]
-        x = x[:, :, 4, ]  # Get vision channel
-        x = x.reshape(batch_size * timesteps, 7 * 7)  # Flatten spatial dimensions
-        x = torch.sigmoid(self.vision_detector(x))
+        x = x[:, :, 4, 3, 2]  # Get vision channel
+        x = x.reshape(batch_size * timesteps, 1)  # Flatten spatial dimensions
+        x = torch.sigmoid(25*self.vision_detector(x))
         return x.view(batch_size, timesteps)
 
 class VisionPerceptionModule(BaseModule):
@@ -180,15 +181,15 @@ class PresencePerceptionNetwork(nn.Module):
     def __init__(self):
         super().__init__()
         self.presence_detector = nn.Sequential(
-            nn.Linear(7 * 7, 1),  # Just looking at one 7x7 grid to output presence
-            nn.Sigmoid()
+            nn.Linear(1, 1),  # Just looking at one 7x7 grid to output presence
+            #nn.ReLU()
         )
 
     def forward(self, x):
         batch_size = x.shape[0]
-        x = x[:, 0, 0]  # Get channel 0 at first timestep
-        x = x.reshape(batch_size, 7 * 7)  # Flatten spatial dimensions
-        x = self.presence_detector(x)
+        x = x[:, 0, 0, 3, 0]  # Get channel 0 at first timestep
+        x = x.reshape(batch_size, 1)  # Flatten spatial dimensions
+        x = torch.sigmoid(5*self.presence_detector(x))
         return x
 
 class PresencePerceptionModule(BaseModule):
@@ -230,7 +231,8 @@ class NormalizedBeliefNetwork(nn.Module):
         x = self.fc2(x)
         #x = F.relu(self.fc3(x))
         x = x.view(batch_size, 6)
-        x = F.softmax(x, dim=-1)
+        #x = F.softmax(x, dim=-1)
+        x = torch.sigmoid(x)
         return x
 
 
@@ -278,7 +280,7 @@ class BeliefModule(BaseModule):
         random_indices = torch.randint(0, 6, (batch_size,), device=device)
         beliefs.scatter_(1, random_indices.unsqueeze(1), 1.0)
 
-        return F.softmax(beliefs, dim=-1)
+        return beliefs #F.softmax(beliefs, dim=-1)
 
 
 class CombinerNetwork(nn.Module):
@@ -439,6 +441,8 @@ class DecisionModule(BaseModule):
     def _random_forward(self, belief_vector: torch.Tensor, dominant_decision: torch.Tensor = None, dominant_present: torch.Tensor = None) -> torch.Tensor:
         #decisions = torch.rand(belief_vector.shape[0], 5, device=belief_vector.device)
         #decisions = F.softmax(decisions, dim=-1)
+        batch_size = belief_vector.shape[0]
+        device = belief_vector.device
         decisions = torch.zeros(batch_size, 5, device=device)
         random_indices = torch.randint(0, 5, (batch_size,), device=device)
         decisions.scatter_(1, random_indices.unsqueeze(1), 1.0)
@@ -454,6 +458,9 @@ class AblationArchitecture(nn.Module):
         self.vision_prob_base = module_configs.get('vision_prob', 1.0)
         self.vision_prob = self.vision_prob_base
         self.num_visions = module_configs.get('num_beliefs', 1)
+        self.detach_belief = module_configs['shared_belief'] and module_configs['my_belief']
+        self.detach_decision = module_configs['shared_decision'] and module_configs['my_decision']
+        self.detach_combiner = module_configs['shared_combiner'] and module_configs['combiner']
 
         sigmoid_temp = module_configs.get('sigmoid_temp', 50.0)
 
@@ -599,17 +606,28 @@ class AblationArchitecture(nn.Module):
         #print("HC presence shape:", opponent_presence.shape)
         #print("HC presence example:", opponent_presence[0])
 
-        op_belief_l = self.op_belief.forward(treats_l * opponent_vision.unsqueeze(-1), opponent_vision)
-        op_belief_s = self.op_belief.forward(treats_s * opponent_vision.unsqueeze(-1), opponent_vision)
+        self.op_belief.uncertainty = 0.0
+
+        if self.detach_belief:
+            op_belief_l = self.op_belief.forward(treats_l.detach(), opponent_vision)
+            op_belief_s = self.op_belief.forward(treats_s.detach(), opponent_vision)
+            op_belief_l = op_belief_l.detach()
+            op_belief_s = op_belief_s.detach()
+        else:
+            op_belief_l = self.op_belief.forward(treats_l * opponent_vision.unsqueeze(-1), opponent_vision)
+            op_belief_s = self.op_belief.forward(treats_s * opponent_vision.unsqueeze(-1), opponent_vision)
         op_beliefs = torch.stack([op_belief_l, op_belief_s], dim=1)
 
         #op_belief_vector = self.op_combiner.forward(op_beliefs.unsqueeze(1))
+        #if self.detach_combiner:
+        #    op_belief_vector = op_belief_vector.detach()
         op_belief_vector = op_beliefs
 
         beliefs_list = []
         vision_sum_list = []
         masked_visions = torch.rand(batch_size, self.num_visions, 5, device=device) <= self.vision_prob
         masked_visions = masked_visions.float()
+        self.my_belief.uncertainty = 0.3
         for i in range(self.num_visions):
             masked_vision = masked_visions[:, i]
             #vision_sum = (masked_vision*time_weights).sum(dim=-1)  # [batch_size]
@@ -626,6 +644,8 @@ class AblationArchitecture(nn.Module):
         my_belief_vector = beliefs_tensor.squeeze(1)
 
         op_decision = self.op_decision.forward(op_belief_vector, self.null_decision[:batch_size].to(device), self.null_presence[:batch_size].to(device))
+        if self.detach_decision:
+            op_decision = op_decision.detach()
         my_decision = self.my_decision.forward(my_belief_vector, op_decision, opponent_presence)
 
         return {
