@@ -22,24 +22,27 @@ from tqdm.auto import tqdm
 def get_model_types(num, use_eval):
 
     experiment_2_models = [
-                    'a-mix-n-perception-treat',
-                    'a-mix-n-perception-vision',
-                    'a-mix-n-perception-presence',
+                    'a-mix-n-treat-my',
+                    'a-mix-n-treat-op',
+                    'a-mix-n-treat-split',
+                    'a-mix-n-vision-op',
+                    'a-mix-n-presence-op',
                     'a-mix-n-belief-op',
                     'a-mix-n-belief-my',
                     'a-mix-n-belief-split',
                     'a-mix-n-decision-op',
                     'a-mix-n-decision-my',
                     'a-mix-n-decision-split',
-                    'a-mix-n-self',
-                    'a-mix-n-other',
+                    'a-mix-n-all-my',
+                    'a-mix-n-all-op',
                     'a-neural-split',]
 
     experiment_1_models = [
                     'a-hardcoded',
-                    'a-mix-r-perception-treat-100',
-                    'a-mix-r-perception-vision-100',
-                    'a-mix-r-perception-presence-100',
+                    'a-mix-r-treat-my-100'
+                    'a-mix-r-treat-op-100',
+                    'a-mix-r-vision-op-100',
+                    'a-mix-r-presence-op-100',
                     'a-mix-r-belief-op-100',
                     'a-mix-r-belief-my-100',
                     'a-mix-r-decision-op-100',
@@ -47,35 +50,47 @@ def get_model_types(num, use_eval):
                     ]
 
     experiment_3_models = [
+                   'a-mix-n-treat-shared',
                    'a-mix-n-belief-shared',
                    'a-mix-n-decision-shared',
-                   'a-mix-n-both-shared',
+                   'a-mix-n-all-shared',
                    'a-neural-shared',
                    'a-neural-belief-shared',
-                   'a-neural-decision-shared',]
+                   'a-neural-decision-shared',
+                   'a-neural-treats-shared',]
+
+    experiment_3b_models = [
+                   'a-mix-n-treat-detach',
+                   'a-mix-n-belief-detach',
+                   'a-mix-n-decision-detach',
+                   'a-mix-n-all-detach',
+                   'a-neural-detach',
+                   'a-neural-belief-detach',
+                   'a-neural-decision-detach',
+                   'a-neural-treats-detact',]
 
     experiment_4_models = [
                    #'a-hardcoded-v50-b5', # remember to eval this!
-                   'a-mix-n-combiner-v50-b5',
-                   'a-mix-n-belief-split-v50-b5',
-                   'a-mix-n-belief-shared-v50-b5',
-                   'a-mix-n-decision-split-v50-b5',
-                   'a-mix-n-decision-shared-v50-b5',
-                   'a-mix-n-belief-comb-decision-split-v50-b5',
-                   'a-mix-n-belief-comb-decision-shared-v50-b5',
-                   'a-neural-shared-v50-b5',]
+                   'a-mix-n-combiner-v75-b5',
+                   'a-mix-n-belief-split-v75-b5',
+                   'a-mix-n-belief-shared-v75-b5',
+                   'a-mix-n-decision-split-v75-b5',
+                   'a-mix-n-decision-shared-v75-b5',
+                   'a-mix-n-belief-comb-decision-split-v75-b5',
+                   'a-mix-n-belief-comb-decision-shared-v75-b5',
+                   'a-neural-shared-v75-b5',]
 
-    if not skip_eval:
-        experiment_3_models.append('a-hardcoded-v50-b5')
+    if use_eval:
+        experiment_4_models.append('a-hardcoded-v75-b5')
 
     if num == 1:
-        return experiment_1r_models
-    elif num == 2:
         return experiment_1_models
-    elif num == 3: 
+    elif num == 2:
         return experiment_2_models
-    elif num == 4: 
+    elif num == 3: 
         return experiment_3_models
+    elif num == 4: 
+        return experiment_4_models
 
 
 def init_regimes():
@@ -157,33 +172,6 @@ def init_regimes():
     for name in ["loc", "b-loc", "i-b-loc", "b-loc-diff", "i-b-loc-diff"]:
         labels += ["big-" + name, "small-" + name]#, , "any-" + name,] "scalar-" + name,'''
 
-    neural_models = [
-        'a-mix-n-perception',
-        'a-mix-n-belief-op',
-        'a-mix-n-belief-my',
-        'a-mix-n-decision-op',
-        'a-mix-n-decision-my',
-        'a-mix-n-output',
-        'a-mix-n-belief-shared',
-        'a-mix-n-decision-shared',
-        'a-neural-split',
-        'a-neural-shared',
-    ]
-    non_neural_models = [
-        # 'a-hardcoded',
-        'a-mix-r-perception-100',
-        'a-mix-r-perception-50',
-        'a-mix-r-belief-op-100',
-        'a-mix-r-belief-op-50',
-        'a-mix-r-belief-my-100',
-        'a-mix-r-belief-my-50',
-        'a-mix-r-decision-op-100',
-        'a-mix-r-decision-op-50',
-        'a-mix-r-decision-my-100',
-        'a-mix-r-decision-my-50',
-        'a-mix-r-output-100',
-        'a-mix-r-output-50'
-    ]
 
     params = ['visible_baits', 'swaps', 'visible_swaps', 'first_swap_is_both',
               'second_swap_to_first_loc', 'delay_2nd_bait', 'first_bait_size',
@@ -193,7 +181,7 @@ def init_regimes():
     params = ['test_regime']
     prior_metrics = [ 'correct-loc', 'incorrect-loc',  'informedness', 'opponents']  # 'shouldGetBig', 'shouldAvoidSmall', 'p-b-0', 'p-b-1', 'p-s-0', 'p-s-1', 'delay',
 
-    return regimes, hregime, sregime, fregimes, leave_one_out_regimes, pref_types, role_types, labels, neural_models, non_neural_models, params, prior_metrics
+    return regimes, hregime, sregime, fregimes, leave_one_out_regimes, pref_types, role_types, labels, params, prior_metrics
 
 def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, skip_calc=False, batch_size=64, desired_evals=5,
                 skip_eval=False, skip_activations=False, last_timestep=True, retrain=False, current_model_type=None, current_label=None, current_label_name=None,
@@ -203,7 +191,7 @@ def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, sk
     sensitive to different parameters? """
     save_every = max(1, epochs // desired_evals)
 
-    regimes, hregime, sregime, fregimes, leave_one_out_regimes, pref_types, role_types, labels, neural_models, non_neural_models, params, prior_metrics = init_regimes()
+    regimes, hregime, sregime, fregimes, leave_one_out_regimes, pref_types, role_types, labels, params, prior_metrics = init_regimes()
 
     model_type = "loc" # or box
 
@@ -364,12 +352,8 @@ if __name__ == '__main__':
 
     model_types = experiment_models
 
-    #model_types = ['a-mix-n-belief-my-v50-b5']
-    #model_types = ['a-mix-n-belief-combiner-shared',]
-    #model_types = ['a-mix-r-perception-100']
-
-    #model_types = ['a-mix-n-combiner']
-    print(len(model_types))
+    #model_types = ['a-hardcoded']
+    print('number of model types:', len(model_types))
 
     #model_types = ['a-hardcoded',] #['a-mixed-n-belief-my', 'a-mixed-n-belief-op', 'a-mixed-n-decision-my', 'a-mixed-n-decision-op']
     labels = [('correct-loc', 'loc')]
@@ -379,7 +363,7 @@ if __name__ == '__main__':
 
         total_tasks = len(experiment_args)
         
-        with multiprocessing.Pool(processes=3) as pool:
+        with multiprocessing.Pool(processes=6) as pool:
             list(tqdm(
                 pool.imap(run_single_experiment, experiment_args),
                 total=total_tasks,

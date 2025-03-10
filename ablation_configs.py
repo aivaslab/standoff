@@ -1,20 +1,23 @@
 
 BASE_CONFIG = {
-    'perception_treat': False,
-    'perception_vision': False,
-    'perception_presence': False,
-    'perception': False,
+    'my_treat': False,
+    'op_treat': False,
+    'vision': False,
+    'presence': False,
     'my_belief': False,
     'op_belief': False,
     'my_decision': False,
     'op_decision': False,
+    'shared_treat': False,
     'shared_belief': False,
     'shared_decision': False,
     'shared_combiner': False,
     'sigmoid_temp': 90.0,
     'combiner': False,
+    'use_combiner': False,
     'num_beliefs': 1,
-    'vision_prob': 1.0
+    'vision_prob': 1.0,
+    'mix_neurons': False,
 }
 
 BASE_RANDOM = {k: BASE_CONFIG[k] for k in BASE_CONFIG if k not in ['shared_belief', 'shared_decision']}
@@ -28,31 +31,50 @@ TEMP_CONFIGS = {
 
 BASE_NEURAL_CONFIGS = {
     'a-hardcoded': {'shared_decision': True},
-    'a-neural-split': {k: True for k in BASE_CONFIG if k not in ['shared_belief', 'shared_decision']},
-    'a-neural-belief-shared': {k: True for k in BASE_CONFIG if k not in ['shared_decision']},
-    'a-neural-decision-shared': {k: True for k in BASE_CONFIG if k not in ['shared_belief']},
+
+    'a-neural-split': {k: True for k in BASE_CONFIG if k not in ['shared_belief', 'shared_decision', 'shared_treat']},
+    'a-neural-belief-shared': {k: True for k in BASE_CONFIG if k not in ['shared_decision', 'shared_treat']},
+    'a-neural-decision-shared': {k: True for k in BASE_CONFIG if k not in ['shared_belief', 'shared_treat']},
+    'a-neural-treat-shared': {k: True for k in BASE_CONFIG if k not in ['shared_belief', 'shared_decision']},
     'a-neural-shared': {k: True for k in BASE_CONFIG},
-    'a-mix-n-perception-treat': {'perception_treat': True, 'shared_belief': True, 'shared_decision': True},
-    'a-mix-n-perception-vision': {'perception_vision': True, 'shared_belief': True, 'shared_decision': True},
-    'a-mix-n-perception-presence': {'perception_presence': True, 'shared_belief': True, 'shared_decision': True},
-    'a-mix-n-both-shared': {'my_belief': True, 'op_belief': True, 'shared_belief': True, 'shared_decision': True},
-    'a-mix-n-both-split': {'my_belief': True, 'op_belief': True, 'shared_belief': False, 'shared_decision': False},
-    'a-mix-n-belief-shared': {'my_belief': True, 'op_belief': True, 'shared_belief': True, 'shared_decision': True},
-    'a-mix-n-belief-split': {'my_belief': True, 'op_belief': True, 'shared_belief': False, 'shared_decision': True},
-    'a-mix-n-belief-combiner-shared': {'my_belief': True, 'op_belief': True, 'shared_belief': True, 'shared_decision': True, 'combiner': True, 'shared_combiner': True},
-    'a-mix-n-belief-combiner-split': {'my_belief': True, 'op_belief': True, 'shared_belief': False, 'shared_decision': False, 'combiner': True, 'shared_combiner': False},
-    'a-mix-n-belief-comb-decision-shared': {'my_belief': True, 'op_belief': True, 'shared_belief': True, 'shared_decision': True, 'combiner': True, 'decision': True, 'shared_combiner': True},
-    'a-mix-n-belief-comb-decision-split': {'my_belief': True, 'op_belief': True, 'shared_belief': False, 'shared_decision': False, 'combiner': True, 'decision': True, 'shared_combiner': False},
+    'a-neural-detach': {k: True for k in BASE_CONFIG},
+
+    'a-mix-n-vision-op': {'vision': True, 'shared_belief': True, 'shared_decision': True},
+    'a-mix-n-presence-op': {'presence': True, 'shared_belief': True, 'shared_decision': True},
+
+    'a-mix-n-treat-my': {'my_treat': True, 'shared_belief': True, 'shared_decision': True},
+    'a-mix-n-treat-op': {'op_treat': True, 'shared_belief': True, 'shared_decision': True},
+    'a-mix-n-treat-split': {'my_treat': True, 'op_treat': True, 'shared_belief': True, 'shared_decision': True},
+    'a-mix-n-treat-shared': {'my_treat': True, 'op_treat': True, 'shared_belief': True, 'shared_decision': True, 'shared_treat': True},
+    'a-mix-n-treat-detach': {'my_treat': True, 'op_treat': True, 'shared_belief': True, 'shared_decision': True, 'shared_treat': True, 'detach': True},
+
     'a-mix-n-belief-op': {'op_belief': True, 'shared_decision': True},
     'a-mix-n-belief-my': {'my_belief': True, 'shared_decision': True},
+    'a-mix-n-belief-split': {'my_belief': True, 'op_belief': True, 'shared_decision': True},
+    'a-mix-n-belief-shared': {'my_belief': True, 'op_belief': True, 'shared_belief': True, 'shared_decision': True},
+    'a-mix-n-belief-detach': {'my_belief': True, 'op_belief': True, 'shared_belief': True, 'shared_decision': True, 'detach': True},
+
     'a-mix-n-combiner': {'combiner': True, 'shared_decision': True},
-    'a-mix-n-decision-split': {'my_decision': True, 'op_decision': True, 'shared_belief': False, 'shared_decision': False},
-    'a-mix-n-decision-shared': {'my_decision': True, 'op_decision': True, 'shared_belief': True, 'shared_decision': True},
+
     'a-mix-n-decision-op': {'op_decision': True, 'shared_belief': True},
     'a-mix-n-decision-my': {'my_decision': True, 'shared_belief': True},
-    'a-mix-n-self': {'my_decision': True, 'my_belief': True},
-    'a-mix-n-other': {'op_decision': True, 'op_belief': True},
+    'a-mix-n-decision-split': {'my_decision': True, 'op_decision': True, 'shared_belief': True,},
+    'a-mix-n-decision-shared': {'my_decision': True, 'op_decision': True, 'shared_belief': True, 'shared_decision': True},
+    'a-mix-n-decision-detach': {'my_decision': True, 'op_decision': True, 'shared_belief': True, 'shared_decision': True, 'detach': True},
+
+    'a-mix-n-all-all-my': {'my_decision': True, 'my_belief': True, 'my_treat': True},
+    'a-mix-n-all-all-op': {'op_decision': True, 'op_belief': True, 'op_treat': True},
+    'a-mix-n-all-shared': {'my_treat': True, 'op_treat': True, 'my_belief': True, 'op_belief': True, 'shared_belief': True, 'shared_decision': True},
+    'a-mix-n-all-detach': {'my_treat': True, 'op_treat': True, 'my_belief': True, 'op_belief': True, 'shared_belief': True, 'shared_decision': True, 'detach': True},
+    'a-mix-n-all-split': {'my_treat': True, 'op_treat': True, 'my_belief': True, 'op_belief': True, 'shared_belief': False, 'shared_decision': False},
+
+    #'a-mix-n-belief-combiner-shared': {'my_belief': True, 'op_belief': True, 'shared_belief': True, 'shared_decision': True, 'combiner': True, 'shared_combiner': True},
+    #'a-mix-n-belief-combiner-split': {'my_belief': True, 'op_belief': True, 'shared_belief': False, 'shared_decision': False, 'combiner': True, 'shared_combiner': False},
+    #'a-mix-n-belief-comb-decision-shared': {'my_belief': True, 'op_belief': True, 'shared_belief': True, 'shared_decision': True, 'combiner': True, 'decision': True, 'shared_combiner': True},
+    #'a-mix-n-belief-comb-decision-split': {'my_belief': True, 'op_belief': True, 'shared_belief': False, 'shared_decision': False, 'combiner': True, 'decision': True, 'shared_combiner': False},
 }
+
+BASE_NEURAL_CONFIGS['a-neural-detach']['detach'] = True
 
 NEURAL_CONFIGS = {}
 for base_name, base_config in BASE_NEURAL_CONFIGS.items():
@@ -65,6 +87,7 @@ for base_name, base_config in BASE_NEURAL_CONFIGS.items():
                 'vision_prob': vision_prob,
                 'num_beliefs': num_beliefs,
                 'sigmoid_temp': 90,
+                'use_combiner': False if num_beliefs == 1 else True
             }
 
 

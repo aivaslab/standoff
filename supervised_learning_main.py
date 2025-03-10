@@ -905,11 +905,11 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
     module_labels = {
         #'treat_perception': ['loc-large', 'loc-small'],  
         #'vision_perception': 'vision',
-        'presence_perception': 'opponents',
-        'my_combiner': ['loc-large', 'loc-small'],  
-        'op_combiner': ['b-loc-large', 'b-loc-small'],  
+        #'presence_perception': 'opponents',
+        #'my_combiner': ['loc-large', 'loc-small'],  
+        #'op_combiner': ['b-loc-large', 'b-loc-small'],  
         'my_decision': 'correct-loc',
-        'op_decision': 'target-loc'
+        #'op_decision': 'target-loc'
     }
     module_label_data = {module: [] for module in module_labels.keys()} 
     batch_size = model_kwargs['batch_size']

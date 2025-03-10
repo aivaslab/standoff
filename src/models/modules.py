@@ -458,9 +458,10 @@ class AblationArchitecture(nn.Module):
         self.vision_prob_base = module_configs.get('vision_prob', 1.0)
         self.vision_prob = self.vision_prob_base
         self.num_visions = module_configs.get('num_beliefs', 1)
-        self.detach_belief = module_configs['shared_belief'] and module_configs['my_belief']
-        self.detach_decision = module_configs['shared_decision'] and module_configs['my_decision']
-        self.detach_combiner = module_configs['shared_combiner'] and module_configs['combiner']
+        self.detach_belief = module_configs['shared_belief'] and module_configs['my_belief'] and module_configs['detach']
+        self.detach_decision = module_configs['shared_decision'] and module_configs['my_decision'] and module_configs['detach']
+        self.detach_combiner = module_configs['shared_combiner'] and module_configs['combiner'] and module_configs['detach']
+        self.use_combiner = module_configs['use_combiner']
 
         sigmoid_temp = module_configs.get('sigmoid_temp', 50.0)
 
@@ -474,21 +475,27 @@ class AblationArchitecture(nn.Module):
         if random_probs is None:
             random_probs = {k: 0.0 for k in module_configs.keys()}
 
-        self.treat_perception = TreatPerceptionModule(
-            use_neural=module_configs['perception_treat'],
-            random_prob=random_probs['perception_treat'],
+        self.treat_perception_my = TreatPerceptionModule(
+            use_neural=module_configs['my_treat'],
+            random_prob=random_probs['my_treat'],
             sigmoid_temp=sigmoid_temp
         )
 
+        self.treat_perception_op = (TreatPerceptionModule(
+            use_neural=module_configs['op_treat'],
+            random_prob=random_probs['op_treat'],
+            sigmoid_temp=sigmoid_temp
+        ) if not module_configs['shared_treat'] else self.treat_perception_my)
+
         self.vision_perception = VisionPerceptionModule(
-            use_neural=module_configs['perception_vision'],
-            random_prob=random_probs['perception_vision'],
+            use_neural=module_configs['vision'],
+            random_prob=random_probs['vision'],
             sigmoid_temp=sigmoid_temp
         )
 
         self.presence_perception = PresencePerceptionModule(
-            use_neural=module_configs['perception_presence'],
-            random_prob=random_probs['perception_presence'],
+            use_neural=module_configs['presence'],
+            random_prob=random_probs['presence'],
             sigmoid_temp=sigmoid_temp
         )
 
@@ -591,37 +598,34 @@ class AblationArchitecture(nn.Module):
 
     def forward(self, perceptual_field: torch.Tensor, additional_input: torch.Tensor) -> torch.Tensor:
         device = perceptual_field.device
+        batch_size = perceptual_field.shape[0]
 
-        treats = self.treat_perception(perceptual_field)
-        #print(s_loss)
+        treats = self.treat_perception_my(perceptual_field)
         treats_l = treats[:,:,0].float()
         treats_s = treats[:,:,1].float()
-        batch_size = perceptual_field.shape[0]
-        opponent_vision = self.vision_perception(perceptual_field).float()
-        #time_weights = torch.exp(torch.arange(5, device=device) * 1.5)
-        #op_vision_sum = (opponent_vision*time_weights).sum(dim=-1).unsqueeze(1).unsqueeze(1)
-        #print(op_vision_sum.shape)
 
+        treats_op = self.treat_perception_op(perceptual_field)
+        treats_l_op = treats_op[:,:,0].float()
+        treats_s_op = treats_op[:,:,1].float()
+
+        opponent_vision = self.vision_perception(perceptual_field).float()
         opponent_presence = self.presence_perception(perceptual_field).float()
-        #print("HC presence shape:", opponent_presence.shape)
-        #print("HC presence example:", opponent_presence[0])
 
         self.op_belief.uncertainty = 0.0
 
         if self.detach_belief:
-            op_belief_l = self.op_belief.forward(treats_l.detach(), opponent_vision)
-            op_belief_s = self.op_belief.forward(treats_s.detach(), opponent_vision)
+            op_belief_l = self.op_belief.forward(treats_l_op.detach(), opponent_vision)
+            op_belief_s = self.op_belief.forward(treats_s_op.detach(), opponent_vision)
             op_belief_l = op_belief_l.detach()
             op_belief_s = op_belief_s.detach()
         else:
-            op_belief_l = self.op_belief.forward(treats_l * opponent_vision.unsqueeze(-1), opponent_vision)
-            op_belief_s = self.op_belief.forward(treats_s * opponent_vision.unsqueeze(-1), opponent_vision)
+            op_belief_l = self.op_belief.forward(treats_l_op * opponent_vision.unsqueeze(-1), opponent_vision)
+            op_belief_s = self.op_belief.forward(treats_s_op * opponent_vision.unsqueeze(-1), opponent_vision)
         op_beliefs = torch.stack([op_belief_l, op_belief_s], dim=1)
 
-        #op_belief_vector = self.op_combiner.forward(op_beliefs.unsqueeze(1))
-        #if self.detach_combiner:
-        #    op_belief_vector = op_belief_vector.detach()
-        op_belief_vector = op_beliefs
+        op_belief_vector = self.op_combiner.forward(op_beliefs.unsqueeze(1)) if self.use_combiner else op_beliefs
+        if self.detach_combiner:
+            op_belief_vector = op_belief_vector.detach()
 
         beliefs_list = []
         vision_sum_list = []
@@ -630,18 +634,14 @@ class AblationArchitecture(nn.Module):
         self.my_belief.uncertainty = 0.3
         for i in range(self.num_visions):
             masked_vision = masked_visions[:, i]
-            #vision_sum = (masked_vision*time_weights).sum(dim=-1)  # [batch_size]
-            #vision_sum_list.append(vision_sum)
             belief_l = self.my_belief.forward(treats_l * masked_vision.unsqueeze(-1), masked_vision)
             belief_s = self.my_belief.forward(treats_s * masked_vision.unsqueeze(-1), masked_vision)
 
             beliefs = torch.stack([belief_l, belief_s], dim=1)  # [batch, 2, 6]
             beliefs_list.append(beliefs)
         beliefs_tensor = torch.stack(beliefs_list, dim=1)
-        #vision_sums = torch.stack(vision_sum_list, dim=1).unsqueeze(-1)
 
-        #my_belief_vector = self.my_combiner.forward(beliefs_tensor)
-        my_belief_vector = beliefs_tensor.squeeze(1)
+        my_belief_vector = self.my_combiner.forward(beliefs_tensor) if self.use_combiner else beliefs_tensor.squeeze(1) 
 
         op_decision = self.op_decision.forward(op_belief_vector, self.null_decision[:batch_size].to(device), self.null_presence[:batch_size].to(device))
         if self.detach_decision:
@@ -649,11 +649,11 @@ class AblationArchitecture(nn.Module):
         my_decision = self.my_decision.forward(my_belief_vector, op_decision, opponent_presence)
 
         return {
-            'treat_perception': treats,
-            'vision_perception': opponent_vision,
-            'presence_perception': opponent_presence,
-            'my_combiner': my_belief_vector,
-            'op_combiner': op_belief_vector,
+            #'treat_perception': treats,
+            #'vision_perception': opponent_vision,
+            #'presence_perception': opponent_presence,
+            #'my_combiner': my_belief_vector,
+            #'op_combiner': op_belief_vector,
             'my_decision': my_decision,
-            'op_decision': op_decision
+            #'op_decision': op_decision
             }
