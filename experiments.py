@@ -19,6 +19,65 @@ from supervised_learning_main import run_supervised_session
 from tqdm.auto import tqdm
 
 
+def get_model_types(num, use_eval):
+
+    experiment_2_models = [
+                    'a-mix-n-perception-treat',
+                    'a-mix-n-perception-vision',
+                    'a-mix-n-perception-presence',
+                    'a-mix-n-belief-op',
+                    'a-mix-n-belief-my',
+                    'a-mix-n-belief-split',
+                    'a-mix-n-decision-op',
+                    'a-mix-n-decision-my',
+                    'a-mix-n-decision-split',
+                    'a-mix-n-self',
+                    'a-mix-n-other',
+                    'a-neural-split',]
+
+    experiment_1_models = [
+                    'a-hardcoded',
+                    'a-mix-r-perception-treat-100',
+                    'a-mix-r-perception-vision-100',
+                    'a-mix-r-perception-presence-100',
+                    'a-mix-r-belief-op-100',
+                    'a-mix-r-belief-my-100',
+                    'a-mix-r-decision-op-100',
+                    'a-mix-r-decision-my-100',
+                    ]
+
+    experiment_3_models = [
+                   'a-mix-n-belief-shared',
+                   'a-mix-n-decision-shared',
+                   'a-mix-n-both-shared',
+                   'a-neural-shared',
+                   'a-neural-belief-shared',
+                   'a-neural-decision-shared',]
+
+    experiment_4_models = [
+                   #'a-hardcoded-v50-b5', # remember to eval this!
+                   'a-mix-n-combiner-v50-b5',
+                   'a-mix-n-belief-split-v50-b5',
+                   'a-mix-n-belief-shared-v50-b5',
+                   'a-mix-n-decision-split-v50-b5',
+                   'a-mix-n-decision-shared-v50-b5',
+                   'a-mix-n-belief-comb-decision-split-v50-b5',
+                   'a-mix-n-belief-comb-decision-shared-v50-b5',
+                   'a-neural-shared-v50-b5',]
+
+    if not skip_eval:
+        experiment_3_models.append('a-hardcoded-v50-b5')
+
+    if num == 1:
+        return experiment_1r_models
+    elif num == 2:
+        return experiment_1_models
+    elif num == 3: 
+        return experiment_2_models
+    elif num == 4: 
+        return experiment_3_models
+
+
 def init_regimes():
     sub_regime_keys = [
         "Fn", "Nf", "Tn", "Ff", "Tf", "Ft", "Tt"
@@ -181,68 +240,73 @@ def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, sk
         print('Running hyperparameter search on all regimes, pref_types, role_types')
         run_hparam_search(trials=100, repetitions=3, log_file='hparam_file.txt', train_sets=regimes['direct'], epochs=20)
 
-    if True:
-        print('Running experiment 1: ablate')
 
-        combined_path_list = []
-        last_path_list = []
-        lp_list = []
-        key_param = 'regime'
-        key_param_list = []
-        session_params['oracle_is_target'] = False
+    
 
-        print(current_model_type, model_types)
+    print('Running experiment')
 
-        if current_model_type != None:
-            model_types = [current_model_type]
-            label_tuples = [(current_label, current_label_name)]
-        elif model_types is not None:
-            label_tuples = [('correct-loc', 'loc')]
-            if model_types == 'neural':
-                model_types = neural_models
-            if model_types == 'random':
-                model_types = non_neural_models
-        else:
+    combined_path_list = []
+    last_path_list = []
+    lp_list = []
+    key_param = 'regime'
+    key_param_list = []
+    session_params['oracle_is_target'] = False
+
+    print(current_model_type, model_types)
+
+    if current_model_type != None:
+        model_types = [current_model_type]
+        label_tuples = [(current_label, current_label_name)]
+    elif model_types is not None:
+        label_tuples = [('correct-loc', 'loc')]
+        if model_types == 'neural':
             model_types = neural_models
-            label_tuples = [('correct-loc', 'loc')]
+        if model_types == 'random':
+            model_types = non_neural_models
+    else:
+        model_types = neural_models
+        label_tuples = [('correct-loc', 'loc')]
 
-        real_regimes = {'s21': fregimes['s21']}
+    if 2 in todo:
+        real_regimes = {'s21': fregimes['s21'], 's1': fregimes['s1'], 's2': fregimes['s2'], 's3': fregimes['s3']}
+    else:
+        real_regimes = {'s21': fregimes['s21'], 's2': fregimes['s2']}
 
-        print('eval regimes:', fregimes['s3'])
+    print('eval regimes:', fregimes['s3'])
 
-        for label, label_name in label_tuples:
-            for model_type in model_types:
-                for regime in list(real_regimes.keys()):
-                    kpname = f'{model_type}-{label_name}-{regime}'
-                    print(model_type + '-' + label_name, 'regime:', regime, 'train_sets:', real_regimes[regime])
-                    combined_paths, last_epoch_paths, lp = run_supervised_session(
-                        save_path=os.path.join('supervised', exp_name, kpname),
-                        train_sets=real_regimes[regime],
-                        eval_sets=fregimes['s3'],
-                        oracle_labels=[None],
-                        key_param=key_param,
-                        key_param_value=kpname,
-                        label=label,
-                        model_type=model_type,
-                        do_retrain_model=retrain,
-                        **session_params
-                    )
-                    conditions = [
-                        (lambda x: 'prior' not in x and 'retrain' not in x, ''),
-                        #(lambda x: 'prior' in x and 'retrain' not in x, '-prior'),
-                        #(lambda x: 'prior' not in x and 'retrain' in x, '-retrain')
-                    ]
+    for label, label_name in label_tuples:
+        for model_type in model_types:
+            for regime in list(real_regimes.keys()):
+                kpname = f'{model_type}-{label_name}-{regime}'
+                print(model_type + '-' + label_name, 'regime:', regime, 'train_sets:', real_regimes[regime])
+                combined_paths, last_epoch_paths, lp = run_supervised_session(
+                    save_path=os.path.join('supervised', exp_name, kpname),
+                    train_sets=real_regimes[regime],
+                    eval_sets=fregimes['s3'],
+                    oracle_labels=[None],
+                    key_param=key_param,
+                    key_param_value=kpname,
+                    label=label,
+                    model_type=model_type,
+                    do_retrain_model=retrain,
+                    **session_params
+                )
+                conditions = [
+                    (lambda x: 'prior' not in x and 'retrain' not in x, ''),
+                    #(lambda x: 'prior' in x and 'retrain' not in x, '-prior'),
+                    #(lambda x: 'prior' not in x and 'retrain' in x, '-retrain')
+                ]
 
-                    print('paths found', combined_paths, last_epoch_paths)
+                print('paths found', combined_paths, last_epoch_paths)
 
-                    for condition, suffix in conditions:
-                        last_path_list.append([x for x in last_epoch_paths if condition(x)])
-                        combined_path_list.append([x for x in combined_paths if condition(x)])
-                        key_param_list.append(kpname + suffix)
-                    lp_list.append(lp)
+                for condition, suffix in conditions:
+                    last_path_list.append([x for x in last_epoch_paths if condition(x)])
+                    combined_path_list.append([x for x in combined_paths if condition(x)])
+                    key_param_list.append(kpname + suffix)
+                lp_list.append(lp)
 
-        if comparison:
-            do_comparison(combined_path_list, last_path_list, key_param_list, key_param, exp_name, params, prior_metrics, lp_list)
+    if comparison:
+        do_comparison(combined_path_list, last_path_list, key_param_list, key_param, exp_name, params, prior_metrics, lp_list)
 
     else:
         print('no experiment')
@@ -254,7 +318,7 @@ def run_single_experiment(args_tuple):
     print(f"Process: {multiprocessing.current_process().name}")
 
 
-    experiments([2],
+    experiments([args.exp_num],
                 repetitions=10,
                 batches=4000,
                 skip_train=not args.t,
@@ -285,6 +349,7 @@ def tqdm_pool_map(pool, func, args, total=None):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Run experiments with various options.")
 
+    parser.add_argument('exp_num', type=int, help='which experiment number, 1-4')
     parser.add_argument('-t', action='store_true', help='training')
     parser.add_argument('-e', action='store_true', help='evaluation')
     parser.add_argument('-c', action='store_true', help='calculation')
@@ -295,75 +360,9 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    #model_types = [ 'cnn', 'smlp', 'clstm']
-    model_types = [ 'a-hardcoded', 'a-mix-n-belief-my',
-                   'a-mix-n-belief-my-v75-b1', 'a-mix-n-belief-my-v75-b3', 'a-mix-n-belief-my-v75-b5',
-                   'a-mix-n-belief-my-v50-b1', 'a-mix-n-belief-my-v50-b3', 'a-mix-n-belief-my-v50-b5',
-                   'a-mix-n-belief-shared',
-                   'a-mix-n-belief-shared-v75-b1', 'a-mix-n-belief-shared-v75-b3', 'a-mix-n-belief-shared-v75-b5',
-                   'a-mix-n-belief-shared-v50-b1', 'a-mix-n-belief-shared-v50-b3', 'a-mix-n-belief-shared-v50-b5',
-                   'a-mix-n-belief-combiner-shared',
-                   'a-mix-n-belief-combiner-shared-v75-b1', 'a-mix-n-belief-combiner-shared-v75-b3', 'a-mix-n-belief-combiner-shared-v75-b5',
-                   'a-mix-n-belief-combiner-shared-v50-b1', 'a-mix-n-belief-combiner-shared-v50-b3', 'a-mix-n-belief-combiner-shared-v50-b5']
+    experiment_models = get_model_types(args.exp_num, args.e)
 
-    model_types = ['a-mix-n-belief-my',
-                   'a-mix-n-belief-my-v50-b1', 'a-mix-n-belief-my-v50-b5',
-                   'a-mix-n-belief-shared',
-                   'a-mix-n-belief-shared-v50-b1', 'a-mix-n-belief-shared-v50-b5',
-                   'a-mix-n-belief-combiner-shared',
-                   'a-mix-n-belief-combiner-shared-v50-b1', 'a-mix-n-belief-combiner-shared-v50-b5']
-
-    model_types += ['a-mix-n-belief-op',
-                   'a-mix-n-belief-op-v50-b1',  'a-mix-n-belief-op-v50-b5',
-                   'a-mix-n-belief-split','a-mix-n-belief-split-v50-b1', 'a-mix-n-belief-split-v50-b5',
-                   'a-mix-n-belief-combiner-split',
-                   'a-mix-n-belief-combiner-split-v50-b1', 'a-mix-n-belief-combiner-split-v50-b5']
-
-    experiment_1_models = [
-                    #'a-mix-n-perception-treat',
-                    'a-mix-n-perception-vision',
-                    'a-mix-n-perception-presence',
-                    'a-mix-n-belief-op',
-                    #'a-mix-n-belief-my',
-                    'a-mix-n-belief-split',
-                    'a-mix-n-decision-op',
-                    'a-mix-n-decision-my',
-                    'a-mix-n-decision-split',
-                    'a-mix-n-self',
-                    'a-mix-n-other',
-                    'a-neural-split',]
-
-    experiment_1r_models = [
-                    'a-hardcoded',
-                    'a-mix-r-perception-treat-100',
-                    'a-mix-r-perception-vision-100',
-                    'a-mix-r-perception-presence-100',
-                    'a-mix-r-belief-op-100',
-                    'a-mix-r-belief-my-100',
-                    'a-mix-r-decision-op-100',
-                    'a-mix-r-decision-my-100',
-                    ]
-
-    experiment_2_models = [
-                   'a-mix-n-belief-shared',
-                   'a-mix-n-decision-shared',
-                   'a-mix-n-both-shared',
-                   'a-neural-shared',
-                   'a-neural-belief-shared',
-                   'a-neural-decision-shared',]
-
-    experiment_3_models = [
-                   #'a-hardcoded-v50-b5', # remember to eval this!
-                   'a-mix-n-combiner-v50-b5',
-                   'a-mix-n-belief-split-v50-b5',
-                   'a-mix-n-belief-shared-v50-b5',
-                   'a-mix-n-decision-split-v50-b5',
-                   'a-mix-n-decision-shared-v50-b5',
-                   'a-mix-n-belief-comb-decision-split-v50-b5',
-                   'a-mix-n-belief-comb-decision-shared-v50-b5',
-                   'a-neural-shared-v50-b5',]
-
-    model_types = experiment_2_models
+    model_types = experiment_models
 
     #model_types = ['a-mix-n-belief-my-v50-b5']
     #model_types = ['a-mix-n-belief-combiner-shared',]
@@ -380,7 +379,7 @@ if __name__ == '__main__':
 
         total_tasks = len(experiment_args)
         
-        with multiprocessing.Pool(processes=5) as pool:
+        with multiprocessing.Pool(processes=3) as pool:
             list(tqdm(
                 pool.imap(run_single_experiment, experiment_args),
                 total=total_tasks,
@@ -388,7 +387,7 @@ if __name__ == '__main__':
             ))
     else:
         print('running single')
-        experiments([2] if not args.g else [0],
+        experiments([args.exp_num] if not args.g else [0],
                 repetitions=10,
                 batches=4000,
                 skip_train=not args.t,

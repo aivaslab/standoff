@@ -1004,7 +1004,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
     oracle_criterion = nn.MSELoss(reduction='mean')
     #optimizer = torch.optim.Adam(model.parameters(), lr=5e-3)
     #optimizer = torch.optim.SGD(model.parameters(), lr=1e-6)
-    #model.vision_prob = 0.8
+    model.vision_prob = 1.0
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=1e-2, betas=(0.95, 0.999))
     sigmoid_scheduler = SigmoidTempScheduler(model, start_temp=90.0, end_temp=90.0, total_steps=total_steps, 
