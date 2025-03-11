@@ -1013,11 +1013,11 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
     #scheduler = ExponentialLR(optimizer, gamma=0.92)
     scheduler = OneCycleLR(
         optimizer,
-        max_lr=1e-2,
+        max_lr=2e-2,
         total_steps=total_steps,
         pct_start=0.2,
         div_factor=1,
-        final_div_factor=5,
+        final_div_factor=10,
     )
 
     if False:  # if loading previous model, only for progressions
@@ -1141,6 +1141,8 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
             epoch_losses_df = pd.concat([epoch_losses_df, new_row], ignore_index=True)
             model.train()
 
+            final_accuracy = accuracy
+
             print(f"Accuracy: {accuracy:.4f}, Loss: {test_loss:.4f}, Vision:", model.vision_prob, 'Sigmoid:', model.treat_perception_my.sigmoid_temp)
             #print("Module MSE values:")
             #for module, mse_val in module_mse_values.items():
@@ -1153,6 +1155,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
 
     if record_loss:
         epoch_losses_df.to_csv(os.path.join(save_path, f'losses-{repetition}.csv'), index=False)
+    return final_accuracy
 
 
 @lru_cache(maxsize=None)
@@ -1953,13 +1956,20 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
             if do_retrain_model:
                 retrain_path = save_path + '-retrain'
                 os.makedirs(retrain_path, exist_ok=True)
+
+            good_for_early_stop = 0
             for repetition in range(repetitions):
                 if not skip_train:
-                    train_model(train_sets, label, load_path=load_path, model_type=model_type,
+                    final_acc = train_model(train_sets, label, load_path=load_path, model_type=model_type,
                                 save_path=save_path, epochs=epochs, batches=batches, model_kwargs=model_kwargs,
                                 oracle_labels=oracle_labels, repetition=repetition, save_every=save_every,
                                 oracle_is_target=oracle_is_target, last_timestep=last_timestep)
+                    if final_acc > 0.99:
+                        good_for_early_stop += 1
+
                 loss_paths.append(os.path.join(save_path, f'losses-{repetition}.csv'))
+                if good_for_early_stop > 4:
+                    break
                 if do_retrain_model:
                     epoch = epochs - 1
                     print('retraining', epoch)

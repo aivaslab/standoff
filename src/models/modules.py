@@ -48,7 +48,7 @@ class BaseModule(nn.Module, ABC):
             return self._neural_forward(*args, **kwargs)
 
         ## NOTE WE ARE SKIPPING RANDOM!!!!
-        self.sigmoid_temp = 90.0 # this is stupid but sometimes they are
+        self.sigmoid_temp = 80.0 # this is stupid but sometimes they are
         return self._hardcoded_forward(*args, **kwargs)
 
         batch_size = args[0].shape[0]
@@ -221,8 +221,8 @@ class NormalizedBeliefNetwork(nn.Module):
     def __init__(self):
         super().__init__()
         #self.input_norm = nn.BatchNorm1d(35)
-        self.fc1 = nn.Linear(35, 16)
-        self.fc2 = nn.Linear(16, 6)
+        self.fc1 = nn.Linear(35, 32)
+        self.fc2 = nn.Linear(32, 6)
         #self.fc3 = nn.Linear(16, 6)
 
     def forward(self, treats, vision):
