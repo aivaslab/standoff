@@ -62,8 +62,8 @@ BASE_NEURAL_CONFIGS = {
     'a-mix-n-decision-shared': {'my_decision': True, 'op_decision': True, 'shared_belief': True, 'shared_decision': True},
     'a-mix-n-decision-detach': {'my_decision': True, 'op_decision': True, 'shared_belief': True, 'shared_decision': True, 'detach': True},
 
-    'a-mix-n-all-all-my': {'my_decision': True, 'my_belief': True, 'my_treat': True},
-    'a-mix-n-all-all-op': {'op_decision': True, 'op_belief': True, 'op_treat': True},
+    'a-mix-n-all-my': {'my_decision': True, 'my_belief': True, 'my_treat': True},
+    'a-mix-n-all-op': {'op_decision': True, 'op_belief': True, 'op_treat': True},
     'a-mix-n-all-shared': {'my_treat': True, 'op_treat': True, 'my_belief': True, 'op_belief': True, 'shared_belief': True, 'shared_decision': True},
     'a-mix-n-all-detach': {'my_treat': True, 'op_treat': True, 'my_belief': True, 'op_belief': True, 'shared_belief': True, 'shared_decision': True, 'detach': True},
     'a-mix-n-all-split': {'my_treat': True, 'op_treat': True, 'my_belief': True, 'op_belief': True, 'shared_belief': False, 'shared_decision': False},

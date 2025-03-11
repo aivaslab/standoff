@@ -257,6 +257,14 @@ def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, sk
 
     if 2 in todo:
         real_regimes = {'s21': fregimes['s21'], 's1': fregimes['s1'], 's2': fregimes['s2'], 's3': fregimes['s3']}
+    elif 30 in todo:
+        real_regimes = {'s3': fregimes['s3']}
+    elif 20 in todo:
+        real_regimes = {'s2': fregimes['s2']}
+    elif 21 in todo:
+        real_regimes = {'s21': fregimes['s21']}
+    elif 10 in todo:
+        real_regimes = {'s1': fregimes['s1']}
     else:
         real_regimes = {'s21': fregimes['s21'], 's2': fregimes['s2']}
 
@@ -352,10 +360,10 @@ if __name__ == '__main__':
 
     model_types = experiment_models
 
-    #model_types = ['a-hardcoded']
+    #model_types = ['a-mix-n-vision-op']
+    model_types = ['a-mix-n-belief-my',] #['a-mixed-n-belief-my', 'a-mixed-n-belief-op', 'a-mixed-n-decision-my', 'a-mixed-n-decision-op']
     print('number of model types:', len(model_types))
 
-    #model_types = ['a-hardcoded',] #['a-mixed-n-belief-my', 'a-mixed-n-belief-op', 'a-mixed-n-decision-my', 'a-mixed-n-decision-op']
     labels = [('correct-loc', 'loc')]
 
     if (not args.p) and (not args.g):
@@ -363,7 +371,7 @@ if __name__ == '__main__':
 
         total_tasks = len(experiment_args)
         
-        with multiprocessing.Pool(processes=6) as pool:
+        with multiprocessing.Pool(processes=4) as pool:
             list(tqdm(
                 pool.imap(run_single_experiment, experiment_args),
                 total=total_tasks,

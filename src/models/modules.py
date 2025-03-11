@@ -82,8 +82,8 @@ class TreatPerceptionNetwork(nn.Module):
     def __init__(self):
         super().__init__()
         self.treat_detector = nn.Sequential(
-            nn.Linear(7 * 1, 6),
-            #nn.Sigmoid()
+            nn.Linear(7 * 5, 5 * 6),
+            #nn.ReLU()
         )
 
 
@@ -91,11 +91,11 @@ class TreatPerceptionNetwork(nn.Module):
         batch_size = x.shape[0]
         num_timesteps = x.shape[1]
 
-        treat1_input = x[:, :, 2, :, 3].reshape(batch_size * num_timesteps, 7 * 1)
-        treat1 = self.treat_detector(treat1_input).view(batch_size, num_timesteps, 6)
+        treat1_input = x[:, :, 2, :, 3].reshape(batch_size, 7 * 5)
+        treat1 = self.treat_detector(treat1_input).view(batch_size, 5, 6)
 
-        treat2_input = x[:, :, 3, :, 3].reshape(batch_size * num_timesteps, 7 * 1)
-        treat2 = self.treat_detector(treat2_input).view(batch_size, num_timesteps, 6)
+        treat2_input = x[:, :, 3, :, 3].reshape(batch_size, 7 * 5)
+        treat2 = self.treat_detector(treat2_input).view(batch_size, 5, 6)
         
         treats = torch.stack([treat1, treat2], dim=2)
         treats = F.softmax(treats, dim=-1)
@@ -234,8 +234,8 @@ class NormalizedBeliefNetwork(nn.Module):
         x = self.fc2(x)
         #x = F.relu(self.fc3(x))
         x = x.view(batch_size, 6)
-        #x = F.softmax(x, dim=-1)
-        x = torch.sigmoid(x)
+        x = F.softmax(x, dim=-1)
+        #x = torch.sigmoid(x)
         return x
 
 
@@ -614,7 +614,7 @@ class AblationArchitecture(nn.Module):
         opponent_vision = self.vision_perception(perceptual_field).float()
         opponent_presence = self.presence_perception(perceptual_field).float()
 
-        self.op_belief.uncertainty = 0.02
+        self.op_belief.uncertainty = 0
 
         if self.detach_belief:
             op_belief_l = self.op_belief.forward(treats_l_op.detach(), opponent_vision)
