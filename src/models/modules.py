@@ -149,15 +149,18 @@ class VisionPerceptionNetwork(nn.Module):
     def __init__(self):
         super().__init__()
         self.vision_detector = nn.Sequential(
-            nn.Linear(1, 1),  # Just looking at one 7x7 grid to output vision state
-            #nn.ReLU()
+            nn.Linear(5, 32),  # Just looking at one 7x7 grid to output vision state
+            nn.ReLU(),
+            nn.Linear(32, 12),
+            nn.ReLU(),
+            nn.Linear(12, 5)
         )
 
     def forward(self, x):
         batch_size, timesteps = x.shape[:2]
-        x = x[:, :, 4, 3, 2]  # Get vision channel
-        x = x.reshape(batch_size * timesteps, 1)  # Flatten spatial dimensions
-        x = torch.sigmoid(25*self.vision_detector(x))
+        x = x[:, 0:6, 4, 3, 2]  # Get vision channel
+        x = x.reshape(batch_size, 5)  # Flatten spatial dimensions
+        x = torch.sigmoid(1*self.vision_detector(x))
         return x.view(batch_size, timesteps)
 
 class VisionPerceptionModule(BaseModule):
@@ -502,7 +505,7 @@ class AblationArchitecture(nn.Module):
         self.my_belief = BeliefModule(
             use_neural=module_configs['my_belief'],
             random_prob=random_probs['my_belief'],
-            sigmoid_temp=sigmoid_temp, uncertainty=0.3 if not module_configs['shared_belief'] else 0.0
+            sigmoid_temp=sigmoid_temp, uncertainty=0.3 if not module_configs['shared_belief'] else 0.1
         )
 
         self.my_combiner = CombinerModule(
@@ -611,7 +614,7 @@ class AblationArchitecture(nn.Module):
         opponent_vision = self.vision_perception(perceptual_field).float()
         opponent_presence = self.presence_perception(perceptual_field).float()
 
-        self.op_belief.uncertainty = 0.0
+        self.op_belief.uncertainty = 0.02
 
         if self.detach_belief:
             op_belief_l = self.op_belief.forward(treats_l_op.detach(), opponent_vision)
@@ -619,8 +622,8 @@ class AblationArchitecture(nn.Module):
             op_belief_l = op_belief_l.detach()
             op_belief_s = op_belief_s.detach()
         else:
-            op_belief_l = self.op_belief.forward(treats_l_op * opponent_vision.unsqueeze(-1), opponent_vision)
-            op_belief_s = self.op_belief.forward(treats_s_op * opponent_vision.unsqueeze(-1), opponent_vision)
+            op_belief_l = self.op_belief.forward(treats_l_op, opponent_vision)
+            op_belief_s = self.op_belief.forward(treats_s_op, opponent_vision)
         op_beliefs = torch.stack([op_belief_l, op_belief_s], dim=1)
 
         op_belief_vector = self.op_combiner.forward(op_beliefs.unsqueeze(1)) if self.use_combiner else op_beliefs

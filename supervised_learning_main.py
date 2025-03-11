@@ -197,7 +197,8 @@ class SigmoidTempScheduler:
         current_temp, current_prob = self.get_temp()
 
         # Update all module temps
-        self.model.treat_perception.sigmoid_temp = current_temp
+        self.model.treat_perception_my.sigmoid_temp = current_temp
+        self.model.treat_perception_op.sigmoid_temp = current_temp
         self.model.vision_perception.sigmoid_temp = current_temp
         self.model.presence_perception.sigmoid_temp = current_temp
         self.model.my_belief.sigmoid_temp = current_temp
@@ -1140,7 +1141,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
             epoch_losses_df = pd.concat([epoch_losses_df, new_row], ignore_index=True)
             model.train()
 
-            print(f"Accuracy: {accuracy:.4f}, Loss: {test_loss:.4f}, Vision:", model.vision_prob, 'Sigmoid:', model.treat_perception.sigmoid_temp)
+            print(f"Accuracy: {accuracy:.4f}, Loss: {test_loss:.4f}, Vision:", model.vision_prob, 'Sigmoid:', model.treat_perception_my.sigmoid_temp)
             #print("Module MSE values:")
             #for module, mse_val in module_mse_values.items():
             #    print(f"  {module}: {np.mean(mse_val):.4f}")
