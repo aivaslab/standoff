@@ -35,6 +35,7 @@ def get_model_types(num, use_eval):
                     'a-mix-n-decision-split',
                     'a-mix-n-all-my',
                     'a-mix-n-all-op',
+                    'a-mix-n-all-split',
                     'a-neural-split',]
 
     experiment_1_models = [
@@ -57,7 +58,7 @@ def get_model_types(num, use_eval):
                    'a-neural-shared',
                    'a-neural-belief-shared',
                    'a-neural-decision-shared',
-                   'a-neural-treats-shared',]
+                   'a-neural-treat-shared',]
 
     experiment_3b_models = [
                    'a-mix-n-treat-detach',
@@ -67,7 +68,7 @@ def get_model_types(num, use_eval):
                    'a-neural-detach',
                    'a-neural-belief-detach',
                    'a-neural-decision-detach',
-                   'a-neural-treats-detact',]
+                   'a-neural-treat-detact',]
 
     experiment_4_models = [
                    #'a-hardcoded-v50-b5', # remember to eval this!
