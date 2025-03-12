@@ -461,6 +461,7 @@ class AblationArchitecture(nn.Module):
         self.vision_prob_base = module_configs.get('vision_prob', 1.0)
         self.vision_prob = self.vision_prob_base
         self.num_visions = module_configs.get('num_beliefs', 1)
+        self.detach_treat = module_configs['shared_treat'] and module_configs['my_treat'] and module_configs['detach']
         self.detach_belief = module_configs['shared_belief'] and module_configs['my_belief'] and module_configs['detach']
         self.detach_decision = module_configs['shared_decision'] and module_configs['my_decision'] and module_configs['detach']
         self.detach_combiner = module_configs['shared_combiner'] and module_configs['combiner'] and module_configs['detach']
@@ -603,13 +604,12 @@ class AblationArchitecture(nn.Module):
         device = perceptual_field.device
         batch_size = perceptual_field.shape[0]
 
-        treats = self.treat_perception_my(perceptual_field)
-        treats_l = treats[:,:,0].float()
-        treats_s = treats[:,:,1].float()
-
         treats_op = self.treat_perception_op(perceptual_field)
         treats_l_op = treats_op[:,:,0].float()
         treats_s_op = treats_op[:,:,1].float()
+        if self.detach_treat:
+            treats_l_op = treats_l_op.detach()
+            treats_s_op = treats_s_op.detach()
 
         opponent_vision = self.vision_perception(perceptual_field).float()
         opponent_presence = self.presence_perception(perceptual_field).float()
@@ -617,8 +617,8 @@ class AblationArchitecture(nn.Module):
         self.op_belief.uncertainty = 0
 
         if self.detach_belief:
-            op_belief_l = self.op_belief.forward(treats_l_op.detach(), opponent_vision)
-            op_belief_s = self.op_belief.forward(treats_s_op.detach(), opponent_vision)
+            op_belief_l = self.op_belief.forward(treats_l_op, opponent_vision)
+            op_belief_s = self.op_belief.forward(treats_s_op, opponent_vision)
             op_belief_l = op_belief_l.detach()
             op_belief_s = op_belief_s.detach()
         else:
@@ -630,15 +630,21 @@ class AblationArchitecture(nn.Module):
         if self.detach_combiner:
             op_belief_vector = op_belief_vector.detach()
 
-        beliefs_list = []
-        vision_sum_list = []
+
+        self.my_belief.uncertainty = 0.3
         masked_visions = torch.rand(batch_size, self.num_visions, 5, device=device) <= self.vision_prob
         masked_visions = masked_visions.float()
-        self.my_belief.uncertainty = 0.3
+
+        beliefs_list = []
         for i in range(self.num_visions):
             masked_vision = masked_visions[:, i]
-            belief_l = self.my_belief.forward(treats_l * masked_vision.unsqueeze(-1), masked_vision)
-            belief_s = self.my_belief.forward(treats_s * masked_vision.unsqueeze(-1), masked_vision)
+            # perceptual field is batch, timestep, channel, length, width
+            masked_perceptual_field = perceptual_field * masked_vision.unsqueeze(-1).unsqueeze(-1).unsqueeze(-1)
+            treats = self.treat_perception_my(masked_perceptual_field)
+            treats_l = treats[:,:,0].float()
+            treats_s = treats[:,:,1].float()
+            belief_l = self.my_belief.forward(treats_l , masked_vision)
+            belief_s = self.my_belief.forward(treats_s , masked_vision)
 
             beliefs = torch.stack([belief_l, belief_s], dim=1)  # [batch, 2, 6]
             beliefs_list.append(beliefs)
