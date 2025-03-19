@@ -149,11 +149,9 @@ class VisionPerceptionNetwork(nn.Module):
     def __init__(self):
         super().__init__()
         self.vision_detector = nn.Sequential(
-            nn.Linear(5, 32),  # Just looking at one 7x7 grid to output vision state
+            nn.Linear(5, 32),
             nn.ReLU(),
-            nn.Linear(32, 12),
-            nn.ReLU(),
-            nn.Linear(12, 5)
+            nn.Linear(32, 5),
         )
 
     def forward(self, x):
@@ -491,17 +489,29 @@ class AblationArchitecture(nn.Module):
             sigmoid_temp=sigmoid_temp
         ) if not module_configs['shared_treat'] else self.treat_perception_my)
 
-        self.vision_perception = VisionPerceptionModule(
-            use_neural=module_configs['vision'],
-            random_prob=random_probs['vision'],
+        self.vision_perception_my = VisionPerceptionModule(
+            use_neural=module_configs['vision_my'],
+            random_prob=random_probs['vision_my'],
             sigmoid_temp=sigmoid_temp
         )
 
-        self.presence_perception = PresencePerceptionModule(
-            use_neural=module_configs['presence'],
-            random_prob=random_probs['presence'],
+        self.vision_perception_op = (VisionPerceptionModule(
+            use_neural=module_configs['vision_op'],
+            random_prob=random_probs['vision_op'],
+            sigmoid_temp=sigmoid_temp
+        )  if not module_configs['shared_treat'] else self.vision_perception_my)
+
+        self.presence_perception_my = PresencePerceptionModule(
+            use_neural=module_configs['presence_my'],
+            random_prob=random_probs['presence_my'],
             sigmoid_temp=sigmoid_temp
         )
+
+        self.presence_perception_op = (PresencePerceptionModule(
+            use_neural=module_configs['presence_op'],
+            random_prob=random_probs['presence_op'],
+            sigmoid_temp=sigmoid_temp
+        ) if not module_configs['shared_treat'] else self.presence_perception_my)
 
         self.my_belief = BeliefModule(
             use_neural=module_configs['my_belief'],
@@ -607,44 +617,45 @@ class AblationArchitecture(nn.Module):
         treats_op = self.treat_perception_op(perceptual_field)
         treats_l_op = treats_op[:,:,0].float()
         treats_s_op = treats_op[:,:,1].float()
+
+        opponent_vision = self.vision_perception_op(perceptual_field).float()
+        opponent_presence = self.presence_perception_op(perceptual_field).float()
+
         if self.detach_treat:
             treats_l_op = treats_l_op.detach()
             treats_s_op = treats_s_op.detach()
+            opponent_vision = opponent_vision.detach()
+            opponent_presence = opponent_presence.detach()
 
-        opponent_vision = self.vision_perception(perceptual_field).float()
-        opponent_presence = self.presence_perception(perceptual_field).float()
 
         self.op_belief.uncertainty = 0
+        op_belief_l = self.op_belief.forward(treats_l_op, opponent_vision)
+        op_belief_s = self.op_belief.forward(treats_s_op, opponent_vision)
 
         if self.detach_belief:
-            op_belief_l = self.op_belief.forward(treats_l_op, opponent_vision)
-            op_belief_s = self.op_belief.forward(treats_s_op, opponent_vision)
             op_belief_l = op_belief_l.detach()
             op_belief_s = op_belief_s.detach()
-        else:
-            op_belief_l = self.op_belief.forward(treats_l_op, opponent_vision)
-            op_belief_s = self.op_belief.forward(treats_s_op, opponent_vision)
         op_beliefs = torch.stack([op_belief_l, op_belief_s], dim=1)
 
         op_belief_vector = self.op_combiner.forward(op_beliefs.unsqueeze(1)) if self.use_combiner else op_beliefs
         if self.detach_combiner:
             op_belief_vector = op_belief_vector.detach()
 
-
-        self.my_belief.uncertainty = 0.3
         masked_visions = torch.rand(batch_size, self.num_visions, 5, device=device) <= self.vision_prob
         masked_visions = masked_visions.float()
 
+        self.my_belief.uncertainty = 0.3
         beliefs_list = []
         for i in range(self.num_visions):
             masked_vision = masked_visions[:, i]
             # perceptual field is batch, timestep, channel, length, width
             masked_perceptual_field = perceptual_field * masked_vision.unsqueeze(-1).unsqueeze(-1).unsqueeze(-1)
+            my_vision = self.vision_perception_my(masked_perceptual_field).float()
             treats = self.treat_perception_my(masked_perceptual_field)
             treats_l = treats[:,:,0].float()
             treats_s = treats[:,:,1].float()
-            belief_l = self.my_belief.forward(treats_l , masked_vision)
-            belief_s = self.my_belief.forward(treats_s , masked_vision)
+            belief_l = self.my_belief.forward(treats_l, my_vision) # or masked_vision, since we know the thing?
+            belief_s = self.my_belief.forward(treats_s, my_vision)
 
             beliefs = torch.stack([belief_l, belief_s], dim=1)  # [batch, 2, 6]
             beliefs_list.append(beliefs)
@@ -652,17 +663,18 @@ class AblationArchitecture(nn.Module):
 
         my_belief_vector = self.my_combiner.forward(beliefs_tensor) if self.use_combiner else beliefs_tensor.squeeze(1) 
 
-        op_decision = self.op_decision.forward(op_belief_vector, self.null_decision[:batch_size].to(device), self.null_presence[:batch_size].to(device))
+        my_presence = self.presence_perception_my(perceptual_field).float()
+        op_decision = self.op_decision.forward(op_belief_vector, self.null_decision[:batch_size].to(device), my_presence) #self.null_presence[:batch_size].to(device)
         if self.detach_decision:
             op_decision = op_decision.detach()
         my_decision = self.my_decision.forward(my_belief_vector, op_decision, opponent_presence)
 
         return {
-            #'treat_perception': treats,
-            #'vision_perception': opponent_vision,
-            #'presence_perception': opponent_presence,
-            #'my_combiner': my_belief_vector,
-            #'op_combiner': op_belief_vector,
+            'treat_perception': treats,
+            'vision_perception': opponent_vision,
+            'presence_perception': opponent_presence,
+            'my_combiner': my_belief_vector,
+            'op_combiner': op_belief_vector,
             'my_decision': my_decision,
-            #'op_decision': op_decision
+            'op_decision': op_decision
             }

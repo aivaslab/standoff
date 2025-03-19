@@ -2,8 +2,10 @@
 BASE_CONFIG = {
     'my_treat': False,
     'op_treat': False,
-    'vision': False,
-    'presence': False,
+    'vision_my': False,
+    'vision_op': False,
+    'presence_my': False,
+    'presence_op': False,
     'my_belief': False,
     'op_belief': False,
     'my_decision': False,
@@ -39,14 +41,20 @@ BASE_NEURAL_CONFIGS = {
     'a-neural-shared': {k: True for k in BASE_CONFIG},
     'a-neural-detach': {k: True for k in BASE_CONFIG},
 
-    'a-mix-n-vision-op': {'vision': True, 'shared_belief': True, 'shared_decision': True},
-    'a-mix-n-presence-op': {'presence': True, 'shared_belief': True, 'shared_decision': True},
+    'a-mix-n-vision-op': {'vision_op': True, 'shared_belief': True, 'shared_decision': True},
+    'a-mix-n-presence-op': {'presence_op': True, 'shared_belief': True, 'shared_decision': True},
 
     'a-mix-n-treat-my': {'my_treat': True, 'shared_belief': True, 'shared_decision': True},
     'a-mix-n-treat-op': {'op_treat': True, 'shared_belief': True, 'shared_decision': True},
     'a-mix-n-treat-split': {'my_treat': True, 'op_treat': True, 'shared_belief': True, 'shared_decision': True},
     'a-mix-n-treat-shared': {'my_treat': True, 'op_treat': True, 'shared_belief': True, 'shared_decision': True, 'shared_treat': True, 'detach': False},
     'a-mix-n-treat-detach': {'my_treat': True, 'op_treat': True, 'shared_belief': True, 'shared_decision': True, 'shared_treat': True, 'detach': True},
+
+    'a-mix-n-perception-my': {'my_treat': True, 'vision_my': True, 'presence_my': True, 'shared_belief': True, 'shared_decision': True},
+    'a-mix-n-perception-op': {'op_treat': True,  'vision_op': True, 'presence_op': True, 'shared_belief': True, 'shared_decision': True},
+    'a-mix-n-perception-split': {'my_treat': True, 'vision_my': True, 'presence_my': True, 'vision_op': True, 'presence_op': True,'op_treat': True, 'shared_belief': True, 'shared_decision': True},
+    'a-mix-n-perception-shared': {'my_treat': True, 'vision_my': True, 'presence_my': True, 'vision_op': True, 'presence_op': True,'op_treat': True, 'shared_belief': True, 'shared_decision': True, 'shared_treat': True, 'detach': False},
+    'a-mix-n-perception-detach': {'my_treat': True, 'vision_my': True, 'presence_my': True, 'vision_op': True, 'presence_op': True,'op_treat': True, 'shared_belief': True, 'shared_decision': True, 'shared_treat': True, 'detach': True},
 
     'a-mix-n-belief-op': {'op_belief': True, 'shared_decision': True},
     'a-mix-n-belief-my': {'my_belief': True, 'shared_decision': True},
@@ -55,6 +63,8 @@ BASE_NEURAL_CONFIGS = {
     'a-mix-n-belief-detach': {'my_belief': True, 'op_belief': True, 'shared_belief': True, 'shared_decision': True, 'detach': True},
 
     'a-mix-n-combiner': {'combiner': True, 'shared_decision': True},
+    'a-mix-n-combiner-shared': {'combiner': True, 'shared_decision': True, 'shared_combiner': True, 'detach': False},
+    'a-mix-n-combiner-detach': {'combiner': True, 'shared_decision': True, 'shared_combiner': True, 'detach': True},
 
     'a-mix-n-decision-op': {'op_decision': True, 'shared_belief': True},
     'a-mix-n-decision-my': {'my_decision': True, 'shared_belief': True},

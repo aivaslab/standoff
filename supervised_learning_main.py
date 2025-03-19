@@ -199,8 +199,10 @@ class SigmoidTempScheduler:
         # Update all module temps
         self.model.treat_perception_my.sigmoid_temp = current_temp
         self.model.treat_perception_op.sigmoid_temp = current_temp
-        self.model.vision_perception.sigmoid_temp = current_temp
-        self.model.presence_perception.sigmoid_temp = current_temp
+        self.model.vision_perception_my.sigmoid_temp = current_temp
+        self.model.vision_perception_op.sigmoid_temp = current_temp
+        self.model.presence_perception_my.sigmoid_temp = current_temp
+        self.model.presence_perception_op.sigmoid_temp = current_temp
         self.model.my_belief.sigmoid_temp = current_temp
         self.model.op_belief.sigmoid_temp = current_temp
         self.model.my_decision.sigmoid_temp = current_temp
@@ -496,6 +498,9 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_load_
         #accuracy_results1 = {prob: [] for prob in vision_probs}
 
         #accuracy_results2 = {prob: [] for prob in vision_probs}
+
+    model.num_visions = 1
+    model.vision_prob = 1
 
 
 
@@ -1005,7 +1010,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
     oracle_criterion = nn.MSELoss(reduction='mean')
     #optimizer = torch.optim.Adam(model.parameters(), lr=5e-3)
     #optimizer = torch.optim.SGD(model.parameters(), lr=1e-6)
-    model.vision_prob = 1.0
+    #model.vision_prob = 0.75
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=1e-2, betas=(0.95, 0.999))
     sigmoid_scheduler = SigmoidTempScheduler(model, start_temp=90.0, end_temp=90.0, total_steps=total_steps, 
@@ -1013,11 +1018,11 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
     #scheduler = ExponentialLR(optimizer, gamma=0.92)
     scheduler = OneCycleLR(
         optimizer,
-        max_lr=2e-2,
+        max_lr=1e-2,
         total_steps=total_steps,
-        pct_start=0.2,
+        pct_start=0.3,
         div_factor=1,
-        final_div_factor=10,
+        final_div_factor=5,
     )
 
     if False:  # if loading previous model, only for progressions
@@ -1078,6 +1083,10 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
                 module_mse_values = {module: [] for module in module_labels.keys()}
                 module_ranges = {}
                 first_batch_processed = False
+                prev_num_visions = model.num_visions
+                prev_vision_prob = model.vision_prob
+                model.num_beliefs = 1
+                model.vision_prob = 1
                 for inputs, target_labels, _, oracle_inputs, _ in test_loader:
                     inputs = inputs.to(device)
                     target_labels = target_labels.float().to(device)[:,:-1]
@@ -1123,6 +1132,8 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
 
                     all_preds.append(outputs['my_decision'].argmax(dim=1))
                     all_targets.append(torch.argmax(target_labels, dim=1))
+                model.num_visions = prev_num_visions
+                model.vision_prob = prev_vision_prob
 
             test_loss = sum(test_losses) / len(test_losses)
             all_preds = torch.cat(all_preds)
@@ -1432,7 +1443,7 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=True, skip_2x1=False
 
                         for group_name in ['s1', 's2', 's21', 's3']:
                             subset2 = subset[subset['test_group'] == group_name]
-                            #print(group_name, len(subset2))
+                            print('ddddd', key_val, key_param, group_name, len(subset2))
                             if len(subset) > 0:
                                 grouped = subset2.groupby(['repetition', param])[acc_type]
                                 repetition_means = grouped.mean()

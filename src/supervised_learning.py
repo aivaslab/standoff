@@ -201,7 +201,9 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
                     obs = env.reset()
                     if env.current_param_group != prev_param_group:
                         eName = env.current_event_list_name
-                        contains_swaps = "w0" not in eName
+                        contains_swaps = "v0" not in eName
+                        if not contains_swaps:
+                            print('group', eName)
                         tq.update(1)
                     prev_param_group = env.current_param_group
                     this_ob = np.zeros((1 + frames, *obs['p_0'].shape))
@@ -280,24 +282,24 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
         
         with_swaps_indices = np.where(has_swaps)[0]
         if len(with_swaps_indices) > 0:
+            print('with', data_name, len(with_swaps_indices))
             np.savez_compressed(os.path.join(with_swaps_path, 'obs'), np.array([data_obs[i] for i in with_swaps_indices]))
             np.savez_compressed(os.path.join(with_swaps_path, 'params'), np.array([data_params[i] for i in with_swaps_indices]))
             for label in all_labels:
                 if len(data_labels[label]) > 0:
-                    np.savez_compressed(os.path.join(with_swaps_path, 'label-' + label), 
-                                      np.array([data_labels[label][i] for i in with_swaps_indices]))
+                    np.savez_compressed(os.path.join(with_swaps_path, 'label-' + label), np.array([data_labels[label][i] for i in with_swaps_indices]))
         
         without_swaps_path = os.path.join(path, data_name + "a")
         os.makedirs(without_swaps_path, exist_ok=True)
         
         without_swaps_indices = np.where(~has_swaps)[0]
         if len(without_swaps_indices) > 0:
+            print('without', data_name, len(without_swaps_indices))
             np.savez_compressed(os.path.join(without_swaps_path, 'obs'), np.array([data_obs[i] for i in without_swaps_indices]))
             np.savez_compressed(os.path.join(without_swaps_path, 'params'), np.array([data_params[i] for i in without_swaps_indices]))
             for label in all_labels:
                 if len(data_labels[label]) > 0:
-                    np.savez_compressed(os.path.join(without_swaps_path, 'label-' + label), 
-                                      np.array([data_labels[label][i] for i in without_swaps_indices]))
+                    np.savez_compressed(os.path.join(without_swaps_path, 'label-' + label), np.array([data_labels[label][i] for i in without_swaps_indices]))
 
 def serialize_data(datapoint):
     return pickle.dumps(datapoint)
