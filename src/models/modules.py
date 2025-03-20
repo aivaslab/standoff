@@ -51,7 +51,7 @@ class BaseModule(nn.Module, ABC):
         self.sigmoid_temp = 80.0 # this is stupid but sometimes they are
         return self._hardcoded_forward(*args, **kwargs)
 
-        batch_size = args[0].shape[0]
+        '''batch_size = args[0].shape[0]
         device = args[0].device
         use_random = torch.rand(batch_size, device=device) <= self.random_prob
 
@@ -70,7 +70,7 @@ class BaseModule(nn.Module, ABC):
         else:
             return torch.where(use_random.view(batch_size, *([1] * (hardcoded.dim() - 1))),
                                rand_output,
-                               hardcoded)
+                               hardcoded)'''
 
 
 # Perception module
@@ -373,7 +373,6 @@ class CombinerModule(BaseModule):
 
         #weights = vision_sums / vision_sums.sum(dim=1, keepdim=True).clamp(min=1e-10)
         weights = weights.unsqueeze(-1)
-        #print(beliefs.shape, weights.shape)
         #weights = 1-entropy  # (batch_size, num_visions, 2)
 
         weighted_beliefs = beliefs*weights  # (batch_size, num_visions, 2, 6)
@@ -470,7 +469,6 @@ class AblationArchitecture(nn.Module):
         self.register_buffer('null_decision', torch.zeros(self.kwargs['batch_size'], 5))
         self.register_buffer('null_presence', torch.zeros(self.kwargs['batch_size'], 1))
 
-        #print('temperature:', sigmoid_temp, module_configs)
         print('module_configs', module_configs)
         print('random_probs', random_probs)
 

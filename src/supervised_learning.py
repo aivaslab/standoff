@@ -268,6 +268,8 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
                 print('regime', data_name, 'counts', counts)
 
         has_swaps = np.array(has_swaps)
+
+        print(data_name)
         
         this_path = os.path.join(path, data_name)
         os.makedirs(this_path, exist_ok=True)
@@ -275,6 +277,7 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
         np.savez_compressed(os.path.join(this_path, 'params'), np.array(data_params))
         for label in all_labels:
             if len(data_labels[label]) > 0:
+                print(len(data_labels[label]))
                 np.savez_compressed(os.path.join(this_path, 'label-' + label), np.array(data_labels[label]))
         
         with_swaps_path = os.path.join(path, data_name + "b")
@@ -287,6 +290,7 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
             np.savez_compressed(os.path.join(with_swaps_path, 'params'), np.array([data_params[i] for i in with_swaps_indices]))
             for label in all_labels:
                 if len(data_labels[label]) > 0:
+                    print(len(np.array([data_labels[label][i] for i in with_swaps_indices])))
                     np.savez_compressed(os.path.join(with_swaps_path, 'label-' + label), np.array([data_labels[label][i] for i in with_swaps_indices]))
         
         without_swaps_path = os.path.join(path, data_name + "a")
@@ -299,6 +303,7 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
             np.savez_compressed(os.path.join(without_swaps_path, 'params'), np.array([data_params[i] for i in without_swaps_indices]))
             for label in all_labels:
                 if len(data_labels[label]) > 0:
+                    print(len(np.array([data_labels[label][i] for i in without_swaps_indices])))
                     np.savez_compressed(os.path.join(without_swaps_path, 'label-' + label), np.array([data_labels[label][i] for i in without_swaps_indices]))
 
 def serialize_data(datapoint):

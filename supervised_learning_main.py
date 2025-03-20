@@ -933,9 +933,9 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
         oracle_labels = []
     data, labels, params, module_data_combined = [], [], [], []
     module_labels = {
-        'treat_perception': ['loc-large', 'loc-small'],  
+        #'treat_perception': ['loc-large', 'loc-small'],  
         #'vision_perception': 'vision',
-        'presence_perception': 'opponents',
+        #'presence_perception': 'opponents',
         'my_belief': ['loc-large', 'loc-small'],  
         'op_belief': ['b-loc-large', 'b-loc-small'],  
         'my_decision': 'correct-loc',
@@ -1026,7 +1026,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
 
     device = torch.device('cuda' if use_cuda else 'cpu')
     total_steps = 10
-    eval_steps = 4
+    epoch_steps = 4
 
     model = load_model(model_type, model_kwargs, device)
 
@@ -1059,7 +1059,8 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
             loaded_model_kwargs, loaded_model_state_dict = loaded_model_info
             model.load_state_dict(loaded_model_state_dict)
 
-    epoch_length = batches // eval_steps
+    epoch_length = batches // total_steps
+    epoch_length_val = batches // epoch_steps
 
     t = tqdm.trange(batches)
     iter_loader = iter(train_loader)
@@ -1090,13 +1091,13 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
         optimizer.step()
         #t.update(1)
 
-        if (batch+1) % total_steps == 0:
+        if (batch+1) % epoch_length == 0:
             if batch > 1:
                 scheduler.step()
                 sigmoid_scheduler.step()
                 t.update(epoch_length)
 
-        if record_loss and (((batch) % epoch_length == 0) or (batch == batches - 1)):
+        if record_loss and (((batch) % epoch_length_val == 0) or (batch == batches - 1)):
             total_loss += loss.item()
             model.eval()
             test_losses = []

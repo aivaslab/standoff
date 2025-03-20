@@ -62,7 +62,7 @@ BASE_NEURAL_CONFIGS = {
     'a-mix-n-belief-shared': {'my_belief': True, 'op_belief': True, 'shared_belief': True, 'shared_decision': True, 'detach': False},
     'a-mix-n-belief-detach': {'my_belief': True, 'op_belief': True, 'shared_belief': True, 'shared_decision': True, 'detach': True},
 
-    'a-mix-n-combiner': {'combiner': True, 'shared_decision': True},
+    'a-mix-n-combiner-split': {'combiner': True, 'shared_decision': True},
     'a-mix-n-combiner-shared': {'combiner': True, 'shared_decision': True, 'shared_combiner': True, 'detach': False},
     'a-mix-n-combiner-detach': {'combiner': True, 'shared_decision': True, 'shared_combiner': True, 'detach': True},
 
