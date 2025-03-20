@@ -15,6 +15,7 @@ import numpy as np
 from functools import lru_cache
 
 from matplotlib import pyplot as plt
+from scipy.optimize import linear_sum_assignment
 
 from ablation_configs import *
 
@@ -41,6 +42,29 @@ import traceback
 import torch.multiprocessing as mp
 
 mp.set_start_method('spawn', force=True)
+
+
+class HungarianMSELoss(nn.Module):
+    def __init__(self):
+        super(HungarianMSELoss, self).__init__()
+    
+    def forward(self, predictions, targets):
+        batch_size, num_classes = predictions.shape
+        device = predictions.device
+        batch_losses = []
+        for b in range(batch_size):
+            pred = predictions[b].detach().cpu().numpy()
+            tgt = targets[b].detach().cpu().numpy()
+            cost_matrix = np.zeros((num_classes, num_classes))
+            for i in range(num_classes):
+                for j in range(num_classes):
+                    cost_matrix[i, j] = (pred[i] - tgt[j])**2
+            row_ind, col_ind = linear_sum_assignment(cost_matrix)
+            reordered_targets = torch.zeros(num_classes, device=device)
+            for i, j in zip(row_ind, col_ind):
+                reordered_targets[i] = targets[b, j]
+            batch_losses.append(torch.mean((predictions[b] - reordered_targets)**2))
+        return torch.mean(torch.stack(batch_losses))
 
 
 def decode_event_name(name):
@@ -291,7 +315,7 @@ def load_model_data_eval_retrain(test_sets, load_path, target_label, last_timest
     mmap_mode = None
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     special_criterion = nn.CrossEntropyLoss(reduction='none')
-    oracle_criterion = nn.MSELoss(reduction='none')
+    oracle_criterion = HungarianMSELoss()#nn.MSELoss(reduction='none')
 
     if 'hardcoded' not in model_type and '-r-' not in model_type:
         model_kwargs, state_dict = load_model_eval(model_save_path, repetition, use_prior, desired_epoch=desired_epoch)#f'{repetition}-model_epoch{epoch_number}.pt'))
@@ -909,13 +933,13 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
         oracle_labels = []
     data, labels, params, module_data_combined = [], [], [], []
     module_labels = {
-        #'treat_perception': ['loc-large', 'loc-small'],  
+        'treat_perception': ['loc-large', 'loc-small'],  
         #'vision_perception': 'vision',
-        #'presence_perception': 'opponents',
-        #'my_combiner': ['loc-large', 'loc-small'],  
-        #'op_combiner': ['b-loc-large', 'b-loc-small'],  
+        'presence_perception': 'opponents',
+        'my_belief': ['loc-large', 'loc-small'],  
+        'op_belief': ['b-loc-large', 'b-loc-small'],  
         'my_decision': 'correct-loc',
-        #'op_decision': 'target-loc'
+        'op_decision': 'target-loc'
     }
     module_label_data = {module: [] for module in module_labels.keys()} 
     batch_size = model_kwargs['batch_size']
@@ -1002,19 +1026,19 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
 
     device = torch.device('cuda' if use_cuda else 'cpu')
     total_steps = 10
+    eval_steps = 4
 
     model = load_model(model_type, model_kwargs, device)
 
     #criterion = torchvision.ops.sigmoid_focal_loss
     criterion = nn.CrossEntropyLoss()
-    oracle_criterion = nn.MSELoss(reduction='mean')
+    oracle_criterion = HungarianMSELoss()#nn.MSELoss(reduction='mean')
     #optimizer = torch.optim.Adam(model.parameters(), lr=5e-3)
     #optimizer = torch.optim.SGD(model.parameters(), lr=1e-6)
     #model.vision_prob = 0.75
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=1e-2, betas=(0.95, 0.999))
-    sigmoid_scheduler = SigmoidTempScheduler(model, start_temp=90.0, end_temp=90.0, total_steps=total_steps, 
-        vision_prob_start=model.vision_prob, vision_prob_end=model.vision_prob_base, rate=5.0)
+    sigmoid_scheduler = SigmoidTempScheduler(model, start_temp=90.0, end_temp=90.0, total_steps=total_steps, vision_prob_start=model.vision_prob, vision_prob_end=model.vision_prob_base, rate=5.0)
     #scheduler = ExponentialLR(optimizer, gamma=0.92)
     scheduler = OneCycleLR(
         optimizer,
@@ -1035,7 +1059,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
             loaded_model_kwargs, loaded_model_state_dict = loaded_model_info
             model.load_state_dict(loaded_model_state_dict)
 
-    epoch_length = batches // total_steps
+    epoch_length = batches // eval_steps
 
     t = tqdm.trange(batches)
     iter_loader = iter(train_loader)
@@ -1066,7 +1090,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
         optimizer.step()
         #t.update(1)
 
-        if (batch+1) % epoch_length == 0:
+        if (batch+1) % total_steps == 0:
             if batch > 1:
                 scheduler.step()
                 sigmoid_scheduler.step()
@@ -1108,6 +1132,8 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
                             module_ranges[module_name] = (pos, pos + flattened_output_size)
                             pos += flattened_output_size
                         first_batch_processed = True
+
+                    start_time = time.time()
 
                     for module_name in module_labels.keys():
                         start_idx, end_idx = module_ranges[module_name]
@@ -1975,7 +2001,7 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
                                 save_path=save_path, epochs=epochs, batches=batches, model_kwargs=model_kwargs,
                                 oracle_labels=oracle_labels, repetition=repetition, save_every=save_every,
                                 oracle_is_target=oracle_is_target, last_timestep=last_timestep)
-                    if final_acc > 0.99:
+                    if final_acc > 0.995:
                         good_for_early_stop += 1
 
                 loss_paths.append(os.path.join(save_path, f'losses-{repetition}.csv'))
