@@ -82,7 +82,7 @@ class TreatPerceptionNetwork(nn.Module):
     def __init__(self):
         super().__init__()
         self.treat_detector = nn.Sequential(
-            nn.Linear(7 * 5, 5 * 6),
+            nn.Linear(5 * 5, 5 * 6),
             #nn.ReLU()
         )
 
@@ -91,10 +91,10 @@ class TreatPerceptionNetwork(nn.Module):
         batch_size = x.shape[0]
         num_timesteps = x.shape[1]
 
-        treat1_input = x[:, :, 2, :, 3].reshape(batch_size, 7 * 5)
+        treat1_input = x[:, :, 2, 1:6, 3].reshape(batch_size, 5 * 5)
         treat1 = self.treat_detector(treat1_input).view(batch_size, 5, 6)
 
-        treat2_input = x[:, :, 3, :, 3].reshape(batch_size, 7 * 5)
+        treat2_input = x[:, :, 3, 1:6, 3].reshape(batch_size, 5 * 5)
         treat2 = self.treat_detector(treat2_input).view(batch_size, 5, 6)
         
         treats = torch.stack([treat1, treat2], dim=2)
@@ -148,16 +148,14 @@ class VisionPerceptionNetwork(nn.Module):
     def __init__(self):
         super().__init__()
         self.vision_detector = nn.Sequential(
-            nn.Linear(5, 32),
-            nn.ReLU(),
-            nn.Linear(32, 5),
+            nn.Linear(5, 5),
         )
 
     def forward(self, x, is_p1=0):
         batch_size, timesteps = x.shape[:2]
-        x = x[:, 0:6, 4, 3, 2+3*is_p1]  # Get vision spot
-        x = x.reshape(batch_size, 5)  # Flatten spatial dimensions
-        x = torch.sigmoid(1*self.vision_detector(x))
+        x = x[:, :, 4, 3, 2+3*is_p1]  # Get vision spot
+        x = x.reshape(batch_size, 5)  
+        x = torch.sigmoid_(self.vision_detector(x))
         return x.view(batch_size, timesteps)
 
 class VisionPerceptionModule(BaseModule):
@@ -169,7 +167,7 @@ class VisionPerceptionModule(BaseModule):
 
     def _hardcoded_forward(self, perceptual_field: torch.Tensor, is_p1=0) -> torch.Tensor:
         # channel 4 position (3,2) indicates vision
-        return torch.sigmoid(20 * (torch.abs(perceptual_field[:, :, 4, 3, 2+3*is_p1] - 1.0) - 0.5))
+        return torch.sigmoid_(20 * (torch.abs(perceptual_field[:, :, 4, 3, 2+3*is_p1] - 1.0) - 0.5))
 
     def _random_forward(self, perceptual_field: torch.Tensor, is_p1) -> torch.Tensor:
         batch_size = perceptual_field.shape[0]
@@ -189,7 +187,7 @@ class PresencePerceptionNetwork(nn.Module):
         batch_size = x.shape[0]
         x = x[:, 0, 0, 3, 0+6*is_p1]  # Get channel 0 at first timestep
         x = x.reshape(batch_size, 1)  # Flatten spatial dimensions
-        x = torch.sigmoid(5*self.presence_detector(x))
+        x = torch.sigmoid_(5*self.presence_detector(x))
         return x
 
 class PresencePerceptionModule(BaseModule):
@@ -246,30 +244,22 @@ class BeliefModule(BaseModule):
 
     def _create_neural_network(self) -> nn.Module:
         return NormalizedBeliefNetwork()
+        
 
     def _hardcoded_forward(self, visible_treats: torch.Tensor, vision: torch.Tensor) -> torch.Tensor:
-        device = visible_treats.device
+        time_weights = self.time_weights.to(visible_treats.device)
+        uncertainty = self.uncertainty
+        sigmoid_temp = self.sigmoid_temp
 
         treats = visible_treats[:, :]
         positions = treats[..., :5]
-
-        has_treat = positions.max(dim=-1)[0]  # [batch, 5]
+        has_treat = positions.max(dim=-1)[0]
         valid_observations = has_treat * vision
-
-        time_weights = self.time_weights.to(device)
         time_weighted_valid_obs = time_weights * valid_observations
-        time_weighted_uncertain = time_weights * (1 - vision)
-        # there are 3 types of timesteps: seen with treats, seen without, and unseen
-
-        weighted_positions = time_weighted_valid_obs.unsqueeze(-1) * positions + self.uncertainty * torch.ones_like(positions) * time_weighted_uncertain.unsqueeze(-1)
-
-        # so we have weighted positions, including 0.2 for all unseen ones
-        # now, if any position was unseen before the end, it should be reduced, or uncertainty should be ADDED to all others.
-
+        time_weighted_uncertain = time_weights * (1.0 - vision)
+        weighted_positions = time_weighted_valid_obs.unsqueeze(-1) * positions + uncertainty * torch.ones_like(positions, dtype=torch.float32) * time_weighted_uncertain.unsqueeze(-1)
         position_beliefs = weighted_positions.sum(dim=1) / ((time_weighted_valid_obs + time_weighted_uncertain).sum(dim=1, keepdim=True) + 1e-10)
-
-        never_see_treat = 1 - torch.sigmoid(self.sigmoid_temp * (valid_observations.max(dim=1)[0] + (1 - vision).sum(dim=1)[0] * self.uncertainty - 0.5))
-
+        never_see_treat = 1 - torch.sigmoid(sigmoid_temp * (valid_observations.max(dim=1)[0] + (1.0 - vision).sum(dim=1)[0] * uncertainty - 0.5))
         belief = torch.cat([position_beliefs, never_see_treat.unsqueeze(-1)], dim=1)
         return belief / belief.sum(dim=1, keepdim=True)
 
@@ -613,11 +603,10 @@ class AblationArchitecture(nn.Module):
         batch_size = perceptual_field.shape[0]
 
         treats_op = self.treat_perception_op(perceptual_field)
-        treats_l_op = treats_op[:,:,0].float()
-        treats_s_op = treats_op[:,:,1].float()
+        treats_l_op, treats_s_op = treats_op[:,:,0:2].unbind(2)
 
-        opponent_vision = self.vision_perception_op(perceptual_field, 0).float()
-        opponent_presence = self.presence_perception_op(perceptual_field, 0).float()
+        opponent_vision = self.vision_perception_op(perceptual_field, 0)
+        opponent_presence = self.presence_perception_op(perceptual_field, 0)
 
         if self.detach_treat:
             treats_l_op = treats_l_op.detach()
@@ -639,21 +628,20 @@ class AblationArchitecture(nn.Module):
         if self.detach_combiner:
             op_belief_vector = op_belief_vector.detach()
 
-        masked_visions = torch.rand(batch_size, self.num_visions, 5, device=device) <= self.vision_prob
-        masked_visions = masked_visions.float()
+        masked_visions = torch.sigmoid_(1000 * (self.vision_prob - torch.rand(batch_size, self.num_visions, 5, device=device) + 0.01))
+        #masked_visions = (torch.rand(batch_size, self.num_visions, 5, device=device) <= self.num_visions).float()
+
 
         self.my_belief.uncertainty = 0.3
         beliefs_list = []
         for i in range(self.num_visions):
             masked_vision = masked_visions[:, i]
             # perceptual field is batch, timestep, channel, length, width
-            masked_perceptual_field = perceptual_field * masked_vision.unsqueeze(-1).unsqueeze(-1).unsqueeze(-1)
-            my_vision = self.vision_perception_my(masked_perceptual_field, 1).float() if self.vision_prob < 1 else masked_vision
+            masked_perceptual_field = perceptual_field * masked_vision.view(batch_size, 5, 1, 1, 1)
+            my_vision = self.vision_perception_my(masked_perceptual_field, 1) if self.vision_prob < 1 else masked_vision
             treats = self.treat_perception_my(masked_perceptual_field)
-            treats_l = treats[:,:,0].float()
-            treats_s = treats[:,:,1].float()
-            belief_l = self.my_belief.forward(treats_l, my_vision) # or masked_vision, since we know the thing?
-            belief_s = self.my_belief.forward(treats_s, my_vision)
+            belief_l = self.my_belief.forward(treats[:,:,0], my_vision) # or masked_vision, since we know the thing?
+            belief_s = self.my_belief.forward(treats[:,:,1], my_vision)
 
             beliefs = torch.stack([belief_l, belief_s], dim=1)  # [batch, 2, 6]
             beliefs_list.append(beliefs)
@@ -668,11 +656,11 @@ class AblationArchitecture(nn.Module):
         my_decision = self.my_decision.forward(my_belief_vector, op_decision, opponent_presence)
 
         return {
-            'treat_perception': treats,
-            'vision_perception': opponent_vision,
-            'presence_perception': opponent_presence,
-            'my_belief': my_belief_vector,
-            'op_belief': op_belief_vector,
+            #'treat_perception': treats,
+            #'vision_perception': opponent_vision,
+            #'presence_perception': opponent_presence,
+            #'my_belief': my_belief_vector,
+            #'op_belief': op_belief_vector,
             'my_decision': my_decision,
-            'op_decision': op_decision
+            #'op_decision': op_decision
             }

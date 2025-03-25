@@ -337,13 +337,13 @@ class MultiGrid:
     @classmethod
     def empty_tile(cls, tile_size, subdivs):
         alpha = max(0, min(20, tile_size - 10))
-        img = np.full((tile_size, tile_size, 3), alpha, dtype=np.uint8)
-        img[1:, :-1] = 0
+        img = np.full((tile_size, tile_size, 3), 255, dtype=np.uint8)
+        #img[1:, :-1] = 255
         return img
 
     @classmethod
     def render_object(cls, obj, tile_size, subdivs):
-        img = np.zeros((tile_size * subdivs, tile_size * subdivs, 3), dtype=np.uint8)
+        img = np.full((tile_size * subdivs, tile_size * subdivs, 3), 255, dtype=np.uint8)
         obj.render(img)
         # if 'Agent' not in obj.type and len(obj.agents) > 0:
         #     obj.agents[0].render(img)

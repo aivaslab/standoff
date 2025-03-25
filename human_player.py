@@ -2,7 +2,6 @@ import os
 
 import numpy as np
 
-from src.models.modules import AblationArchitecture
 from src.rendering import InteractivePlayerWindow
 from src.agents import GridAgentInterface
 from src.pz_envs import env_from_config
@@ -38,7 +37,7 @@ class HumanPlayer:
         self.episode_count += 1
 
 
-TILE_SIZE = 14
+TILE_SIZE = 32
 
 env_config = {
     "env_class": "MiniStandoffEnv",
@@ -57,7 +56,7 @@ player_interface_config = {
     "view_tile_size": TILE_SIZE,
     "observation_style": "image",
     "see_through_walls": False,
-    "color": "yellow",
+    "color": "cyan",
     "view_type": 0,
     "move_type": 0
 }
@@ -76,7 +75,7 @@ configs = conf.standoff
 
 # configName = 'all'
 # reset_configs = {**configs["defaults"],  **configs[configName]}
-configName = 'sl-Nf1'
+configName = 'sl-Ft1'
 events = conf.stages[configName]['events']
 reset_configs = configs[conf.stages[configName]['params']]
 params = configs[conf.stages[configName]['params']]
@@ -141,7 +140,7 @@ configs = {
     'sub_decision': use_neural,
     'final_output': use_neural
 }
-test_model = AblationArchitecture(configs)
+#test_model = AblationArchitecture(configs)
 
 for i in range(100):
     obs = env.reset()
@@ -155,7 +154,7 @@ for i in range(100):
         # print(np.round(obs['player_0']*10).sum(axis=0).astype(int))
         img = Image.fromarray(obs['p_0'], 'RGB')
         #ImageDraw.Draw(img).text((0, 0), "Step " + str(env.step_count) + '\n' + env.current_event_list_name, (255, 255, 255))
-        ImageDraw.Draw(img).text((0, 0), "Step " + str(env.step_count) , (255, 255, 255))
+        #ImageDraw.Draw(img).text((0, 0), "Step " + str(env.step_count) , (255, 255, 255))
         player_action = human.action_step(np.array(img))
         agent_actions = {'p_0': player_action}
         next_obs, rew, done, info = env.step(agent_actions)

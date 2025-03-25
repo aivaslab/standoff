@@ -5,6 +5,7 @@ import itertools
 import math
 import pickle
 import re
+#from torch.autograd import profiler
 
 
 import sys
@@ -928,7 +929,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
                 oracle_is_target=False, batches=5000, last_timestep=True,
                 seed=0, test_percent=0.2):
     use_cuda = torch.cuda.is_available()
-    print(torch.cuda.is_available())
+    #print(torch.cuda.is_available())
     if len(oracle_labels) == 0 or oracle_labels[0] == None:
         oracle_labels = []
     data, labels, params, module_data_combined = [], [], [], []
@@ -936,10 +937,10 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
         #'treat_perception': ['loc-large', 'loc-small'],  
         #'vision_perception': 'vision',
         #'presence_perception': 'opponents',
-        'my_belief': ['loc-large', 'loc-small'],  
-        'op_belief': ['b-loc-large', 'b-loc-small'],  
+        #'my_belief': ['loc-large', 'loc-small'],  
+        #'op_belief': ['b-loc-large', 'b-loc-small'],  
         'my_decision': 'correct-loc',
-        'op_decision': 'target-loc'
+        #'op_decision': 'target-loc'
     }
     module_label_data = {module: [] for module in module_labels.keys()} 
     batch_size = model_kwargs['batch_size']
@@ -947,7 +948,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
     lr = model_kwargs['lr']
     batch_size = model_kwargs['batch_size']
 
-    print('lr:', lr, 'bs:', batch_size)
+    #print('lr:', lr, 'bs:', batch_size)
     
 
     for data_name in train_sets:
@@ -1035,10 +1036,10 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
     oracle_criterion = HungarianMSELoss()#nn.MSELoss(reduction='mean')
     #optimizer = torch.optim.Adam(model.parameters(), lr=5e-3)
     #optimizer = torch.optim.SGD(model.parameters(), lr=1e-6)
-    #model.vision_prob = 0.75
+    model.vision_prob = 1.0
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=1e-2, betas=(0.95, 0.999))
-    sigmoid_scheduler = SigmoidTempScheduler(model, start_temp=90.0, end_temp=90.0, total_steps=total_steps, vision_prob_start=model.vision_prob, vision_prob_end=model.vision_prob_base, rate=5.0)
+    sigmoid_scheduler = SigmoidTempScheduler(model, start_temp=90.0, end_temp=90.0, total_steps=total_steps, vision_prob_start=model.vision_prob, vision_prob_end=model.vision_prob_base, rate=2.0)
     #scheduler = ExponentialLR(optimizer, gamma=0.92)
     scheduler = OneCycleLR(
         optimizer,
@@ -1046,7 +1047,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
         total_steps=total_steps,
         pct_start=0.3,
         div_factor=1,
-        final_div_factor=5,
+        final_div_factor=1,
     )
 
     if False:  # if loading previous model, only for progressions
@@ -1080,7 +1081,9 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
         inputs, target_labels, oracles = inputs.to(device), target_labels.float().to(device), oracles.to(device)
         target_labels = target_labels[:,:-1]
         #with torch.autograd.profiler.profile(use_cuda=True) as prof:
+        #with profiler.profile(use_cuda=True) as prof:
         outputs = model(inputs, None)
+        #print(prof.table())
         #print(prof.key_averages().table(sort_by="cuda_time_total"))
         #print('xxxxxxx', outputs)
         #loss = criterion(outputs['my_decision'], target_labels, reduction="mean") # used for Focal
@@ -1134,7 +1137,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
                             pos += flattened_output_size
                         first_batch_processed = True
 
-                    start_time = time.time()
+                    #start_time = time.time()
 
                     for module_name in module_labels.keys():
                         start_idx, end_idx = module_ranges[module_name]
@@ -1181,7 +1184,10 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
 
             final_accuracy = accuracy
 
-            print(f"Accuracy: {accuracy:.4f}, Loss: {test_loss:.4f}, Vision:", model.vision_prob, 'Sigmoid:', model.treat_perception_my.sigmoid_temp)
+            print(f"Acc: {accuracy:.4f}, L: {test_loss:.4f}, Vis:",
+                model.vision_prob, 
+                'Sigmoid:', model.treat_perception_my.sigmoid_temp, 
+                'Path:', os.path.basename(save_path), repetition)
             #print("Module MSE values:")
             #for module, mse_val in module_mse_values.items():
             #    print(f"  {module}: {np.mean(mse_val):.4f}")
@@ -1998,12 +2004,21 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
             good_for_early_stop = 0
             for repetition in range(repetitions):
                 if not skip_train:
-                    final_acc = train_model(train_sets, label, load_path=load_path, model_type=model_type,
-                                save_path=save_path, epochs=epochs, batches=batches, model_kwargs=model_kwargs,
-                                oracle_labels=oracle_labels, repetition=repetition, save_every=save_every,
-                                oracle_is_target=oracle_is_target, last_timestep=last_timestep)
-                    if final_acc > 0.995:
-                        good_for_early_stop += 1
+                    loss_file_path = os.path.join(save_path, f'losses-{repetition}.csv')
+                    should_train = True
+                    if os.path.exists(loss_file_path):
+                        df = pd.read_csv(loss_file_path)
+                        final_acc = df['Accuracy'].iloc[-1]
+                        if final_acc >= 0.996:
+                            should_train = False
+                            good_for_early_stop += 1
+                    if should_train:
+                        final_acc = train_model(train_sets, label, load_path=load_path, model_type=model_type,
+                                    save_path=save_path, epochs=epochs, batches=batches, model_kwargs=model_kwargs,
+                                    oracle_labels=oracle_labels, repetition=repetition, save_every=save_every,
+                                    oracle_is_target=oracle_is_target, last_timestep=last_timestep)
+                        if final_acc > 0.996:
+                            good_for_early_stop += 1
 
                 loss_paths.append(os.path.join(save_path, f'losses-{repetition}.csv'))
                 if good_for_early_stop > 4:
@@ -2047,25 +2062,28 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
                 for repetition in best_repetition_numbers:
                     for epoch in [epochs - 1]:
                         print('evaluating', epoch, model_name)
-                        for this_path in [save_path]:#, retrain_path]: #retrain path removed
-                            for eval_prior in [False]:#[False, True] if this_path == save_path else [False]:
-                                df_paths = evaluate_model(eval_sets, label, load_path=load_path,
-                                                      model_type=model_type,
-                                                      model_load_path=this_path,
-                                                      oracle_labels=oracle_labels,
-                                                      repetition=repetition,
-                                                      epoch_number=epoch,
-                                                      prior_metrics=prior_metrics,
-                                                      oracle_is_target=oracle_is_target,
-                                                      act_label_names=act_label_names,
-                                                      oracle_early=oracle_early,
-                                                      last_timestep=last_timestep,
-                                                      use_prior=eval_prior,
-                                                      num_activation_batches=0)
-                                if df_paths is not None:
-                                    dfs_paths.extend(df_paths)
-                                    if epoch == epochs - 1 or eval_prior:
-                                        last_epoch_df_paths.extend(df_paths)
+                        try:
+                            for this_path in [save_path]:#, retrain_path]: #retrain path removed
+                                for eval_prior in [False]:#[False, True] if this_path == save_path else [False]:
+                                    df_paths = evaluate_model(eval_sets, label, load_path=load_path,
+                                                          model_type=model_type,
+                                                          model_load_path=this_path,
+                                                          oracle_labels=oracle_labels,
+                                                          repetition=repetition,
+                                                          epoch_number=epoch,
+                                                          prior_metrics=prior_metrics,
+                                                          oracle_is_target=oracle_is_target,
+                                                          act_label_names=act_label_names,
+                                                          oracle_early=oracle_early,
+                                                          last_timestep=last_timestep,
+                                                          use_prior=eval_prior,
+                                                          num_activation_batches=0)
+                                    if df_paths is not None:
+                                        dfs_paths.extend(df_paths)
+                                        if epoch == epochs - 1 or eval_prior:
+                                            last_epoch_df_paths.extend(df_paths)
+                        except:
+                            pass
 
                 
                 #loss_paths.append(os.path.join(retrain_path, f'losses-{repetition}.csv'))
@@ -2132,7 +2150,62 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
         process_activations(save_path, [epochs - 1], [x for x in range(repetitions)], use_inputs=False) #use 0 in epochs for prior
         process_activations(save_path + '-retrain', [epochs - 1], [x for x in range(repetitions)], use_inputs=False)
 
-    return dfs_paths, last_epoch_df_paths, loss_paths
+    loss_file_pattern = os.path.join(save_path, 'losses-*.csv')
+    all_loss_paths = glob.glob(loss_file_pattern)
+    
+    top_repetitions = []
+    for loss_path in all_loss_paths:
+        try:
+            rep_str = os.path.basename(loss_path).replace('losses-', '').replace('.csv', '')
+            rep_num = int(rep_str)
+            df = pd.read_csv(loss_path)
+            if not df.empty:
+                final_loss = df['Loss'].iloc[-1]
+                final_accuracy = df['Accuracy'].iloc[-1] if 'Accuracy' in df.columns else 0
+                top_repetitions.append((rep_num, final_loss, loss_path))
+        except Exception as e:
+            print(f"Error reading {loss_path}: {e}")
+            continue
+
+    top_n = 3
+    
+    top_repetitions.sort(key=lambda x: (x[1]))
+    best_n = top_repetitions[:min(top_n, len(top_repetitions))]
+    best_repetition_numbers = [rep for rep, _, _, in best_n]
+    
+    print(f"Best {top_n} repetitions based on validation performance:")
+    for i, (rep, loss, _) in enumerate(best_n):
+        print(f"  #{i+1}: Rep {rep}, Loss: {loss:.4f}")
+    
+    filtered_dfs_paths = []
+    filtered_last_epoch_df_paths = []
+    filtered_loss_paths = []
+    
+    for path in dfs_paths:
+        parts = path.split('_')
+        if len(parts) >= 2:
+            rep_part = parts[-1].replace('.csv', '').replace('.gz', '')
+            rep_num = int(rep_part)
+            if rep_num in best_repetition_numbers:
+                filtered_dfs_paths.append(path)
+    
+    for path in last_epoch_df_paths:
+        parts = path.split('_')
+        if len(parts) >= 2:
+            rep_part = parts[-1].replace('.csv', '').replace('.gz', '')
+            rep_num = int(rep_part)
+            if rep_num in best_repetition_numbers:
+                filtered_last_epoch_df_paths.append(path)
+    
+    for path in loss_paths:
+        rep_str = os.path.basename(path).replace('losses-', '').replace('.csv', '')
+        rep_num = int(rep_str)
+        if rep_num in best_repetition_numbers:
+            filtered_loss_paths.append(path)
+
+    #exit()
+
+    return filtered_dfs_paths, filtered_last_epoch_df_paths, filtered_loss_paths
 
 
 def convert_to_int(value):
