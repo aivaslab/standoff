@@ -5,6 +5,8 @@ from abc import ABC
 import torch.nn.functional as F
 from typing import Dict
 
+# new version
+
 
 class BaseModule(nn.Module, ABC):
     def __init__(self, use_neural: bool = True, random_prob: float = 0.0, sigmoid_temp: float = 50.0):
@@ -48,7 +50,7 @@ class BaseModule(nn.Module, ABC):
             return self._neural_forward(*args, **kwargs)
 
         ## NOTE WE ARE SKIPPING RANDOM!!!!
-        self.sigmoid_temp = 80.0 # this is stupid but sometimes they are
+        self.sigmoid_temp = 90.0 # this is stupid but sometimes they are
         return self._hardcoded_forward(*args, **kwargs)
 
         '''batch_size = args[0].shape[0]
@@ -78,6 +80,28 @@ class BaseModule(nn.Module, ABC):
 # Outputs: Visible treats (2x6 length vectors at each of 5 timesteps, normalized (position 5 is nothing)), opponent vision (scalar at each timestep), opponent presence (scalar overall) [56 total bits]
 # Method: Find where treats are 1, where vision is shown, where opponent is.
 
+class TreatPerceptionNetworkOld(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.treat_detector = nn.Sequential(
+            nn.Linear(5 * 1, 6),
+        )
+
+    def forward(self, x):
+        batch_size = x.shape[0]
+        num_timesteps = x.shape[1]
+
+        treat1_input = x[:, :, 2, 1:6, 3].reshape(batch_size * num_timesteps, 5 * 1)
+        treat1 = self.treat_detector(treat1_input).view(batch_size, num_timesteps, 6)
+
+        treat2_input = x[:, :, 3, 1:6, 3].reshape(batch_size * num_timesteps, 5 * 1)
+        treat2 = self.treat_detector(treat2_input).view(batch_size, num_timesteps, 6)
+        
+        treats = torch.stack([treat1, treat2], dim=2)
+        treats = F.softmax(treats, dim=-1)
+
+        return treats
+
 class TreatPerceptionNetwork(nn.Module):
     def __init__(self):
         super().__init__()
@@ -85,7 +109,6 @@ class TreatPerceptionNetwork(nn.Module):
             nn.Linear(5 * 5, 5 * 6),
             #nn.ReLU()
         )
-
 
     def forward(self, x):
         batch_size = x.shape[0]
@@ -107,7 +130,7 @@ class TreatPerceptionModule(BaseModule):
         super().__init__(use_neural, random_prob, sigmoid_temp)
 
     def _create_neural_network(self) -> nn.Module:
-        return TreatPerceptionNetwork()
+        return TreatPerceptionNetworkOld()
 
     def _hardcoded_forward(self, perceptual_field: torch.Tensor) -> torch.Tensor:
         # channel 2 is treat1, channel 3 is treat2, at x=3 and y=1-6
@@ -218,8 +241,8 @@ class NormalizedBeliefNetwork(nn.Module):
     def __init__(self):
         super().__init__()
         #self.input_norm = nn.BatchNorm1d(35)
-        self.fc1 = nn.Linear(35, 32)
-        self.fc2 = nn.Linear(32, 6)
+        self.fc1 = nn.Linear(35, 16)
+        self.fc2 = nn.Linear(16, 6)
         #self.fc3 = nn.Linear(16, 6)
 
     def forward(self, treats, vision):
@@ -504,7 +527,7 @@ class AblationArchitecture(nn.Module):
         self.my_belief = BeliefModule(
             use_neural=module_configs['my_belief'],
             random_prob=random_probs['my_belief'],
-            sigmoid_temp=sigmoid_temp, uncertainty=0.3 if not module_configs['shared_belief'] else 0.1
+            sigmoid_temp=sigmoid_temp, uncertainty=0.3 if not module_configs['shared_belief'] else 0.3
         )
 
         self.my_combiner = CombinerModule(
@@ -605,8 +628,8 @@ class AblationArchitecture(nn.Module):
         treats_op = self.treat_perception_op(perceptual_field)
         treats_l_op, treats_s_op = treats_op[:,:,0:2].unbind(2)
 
-        opponent_vision = self.vision_perception_op(perceptual_field, 0)
-        opponent_presence = self.presence_perception_op(perceptual_field, 0)
+        opponent_vision = self.vision_perception_op(perceptual_field, is_p1=0)
+        opponent_presence = self.presence_perception_op(perceptual_field, is_p1=0)
 
         if self.detach_treat:
             treats_l_op = treats_l_op.detach()
@@ -616,8 +639,8 @@ class AblationArchitecture(nn.Module):
 
 
         self.op_belief.uncertainty = 0
-        op_belief_l = self.op_belief.forward(treats_l_op, opponent_vision)
-        op_belief_s = self.op_belief.forward(treats_s_op, opponent_vision)
+        op_belief_l = self.op_belief.forward(treats_l_op * opponent_vision.unsqueeze(-1), opponent_vision)
+        op_belief_s = self.op_belief.forward(treats_s_op * opponent_vision.unsqueeze(-1), opponent_vision)
 
         if self.detach_belief:
             op_belief_l = op_belief_l.detach()
@@ -628,8 +651,8 @@ class AblationArchitecture(nn.Module):
         if self.detach_combiner:
             op_belief_vector = op_belief_vector.detach()
 
-        masked_visions = torch.sigmoid_(1000 * (self.vision_prob - torch.rand(batch_size, self.num_visions, 5, device=device) + 0.01))
-        #masked_visions = (torch.rand(batch_size, self.num_visions, 5, device=device) <= self.num_visions).float()
+        #masked_visions = torch.sigmoid_(1000 * (self.vision_prob - torch.rand(batch_size, self.num_visions, 5, device=device) + 0.01))
+        masked_visions = (torch.rand(batch_size, self.num_visions, 5, device=device) <= self.vision_prob).float()
 
 
         self.my_belief.uncertainty = 0.3
@@ -638,10 +661,10 @@ class AblationArchitecture(nn.Module):
             masked_vision = masked_visions[:, i]
             # perceptual field is batch, timestep, channel, length, width
             masked_perceptual_field = perceptual_field * masked_vision.view(batch_size, 5, 1, 1, 1)
-            my_vision = self.vision_perception_my(masked_perceptual_field, 1) if self.vision_prob < 1 else masked_vision
+            my_vision = self.vision_perception_my(masked_perceptual_field, is_p1=1) if self.vision_prob < 1 else masked_vision
             treats = self.treat_perception_my(masked_perceptual_field)
-            belief_l = self.my_belief.forward(treats[:,:,0], my_vision) # or masked_vision, since we know the thing?
-            belief_s = self.my_belief.forward(treats[:,:,1], my_vision)
+            belief_l = self.my_belief.forward(treats[:,:,0] * my_vision.unsqueeze(-1), my_vision) # or masked_vision, since we know the thing?
+            belief_s = self.my_belief.forward(treats[:,:,1] * my_vision.unsqueeze(-1), my_vision)
 
             beliefs = torch.stack([belief_l, belief_s], dim=1)  # [batch, 2, 6]
             beliefs_list.append(beliefs)
@@ -656,11 +679,11 @@ class AblationArchitecture(nn.Module):
         my_decision = self.my_decision.forward(my_belief_vector, op_decision, opponent_presence)
 
         return {
-            #'treat_perception': treats,
-            #'vision_perception': opponent_vision,
-            #'presence_perception': opponent_presence,
-            #'my_belief': my_belief_vector,
-            #'op_belief': op_belief_vector,
+            'treat_perception': treats,
+            'vision_perception': opponent_vision,
+            'presence_perception': opponent_presence,
+            'my_belief': my_belief_vector,
+            'op_belief': op_belief_vector,
             'my_decision': my_decision,
-            #'op_decision': op_decision
+            'op_decision': op_decision
             }

@@ -506,6 +506,12 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_load_
     model.eval()
     model.batch_size = 1024
 
+    print('ddddddddddddddddddddddddddddd')
+
+    hardcoded_model = load_model('a-hardcoded', model_kwargs, device)
+
+    print('eeeeeeeeeeeeeeeeeeee')
+
     #print('num_activation_batches', num_activation_batches)
     overall_correct = 0
     overall_total = 0
@@ -517,7 +523,7 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_load_
     if True:
         print('evaluating vision changes')
         vision_probs = np.arange(0, 1.05, 0.1)
-        uncertainties = [0, 0.1, 0.3, 0.5, 1]
+        uncertainties = [0.3]
         accuracy_results1 = {u: {prob: [] for prob in vision_probs} for u in uncertainties}
         #awareness_results = {prob: [] for prob in vision_probs}
         #accuracy_results1 = {prob: [] for prob in vision_probs}
@@ -526,8 +532,6 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_load_
 
     model.num_visions = 1
     model.vision_prob = 1
-
-
 
     # i have commented out oracle related things
     # this includes oracle_is_target check
@@ -548,7 +552,69 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_load_
                 #masked_vision = (torch.rand(inputs.size(0), 5, device=inputs.device) <= vision_prob).float()
                 #masked_input = inputs * masked_vision.unsqueeze(-1).unsqueeze(-1).unsqueeze(-1)
                 #model.my_belief.uncertainty = 0.3
-                outputs = model(inputs, None)['my_decision']
+                outputs = model(inputs, None)
+                hc_outputs = hardcoded_model(inputs, None)
+
+                keys_to_compare = [
+                    'treat_perception', 
+                    'vision_perception', 
+                    'presence_perception', 
+                    'my_belief', 
+                    'op_belief', 
+                    'my_decision', 
+                    'op_decision'
+                ]
+                
+                '''differences = {}
+                all_same = True
+                threshold = 0.35
+                decimals = 3  # For rounding values
+
+                # Get batch size (assuming all outputs have the same batch size)
+                batch_size = outputs[keys_to_compare[0]].shape[0]
+
+                # Track which batch items have differences
+                different_items = set()
+
+                # First pass: determine which batch items have differences
+                for key in keys_to_compare:
+                    difference = outputs[key] - hc_outputs[key]
+                    
+                    # Flatten all dimensions except the first (batch dimension)
+                    flattened_diff = difference.view(difference.shape[0], -1)
+                    
+                    # Find which batch items have differences above threshold
+                    batch_has_diff = torch.any(torch.abs(flattened_diff) > threshold, dim=1)
+                    diff_batch_indices = torch.where(batch_has_diff)[0].tolist()
+                    
+                    # Add to our set of different items
+                    different_items.update(diff_batch_indices)
+
+                print(f"\nFound differences in {len(different_items)} of {batch_size} batch items")
+
+                # Second pass: print all differences for each batch item
+                for batch_idx in sorted(different_items):
+                    print(f"\nBatch item {batch_idx} differences:")
+                    
+                    # Check each key for this batch item
+                    for key in keys_to_compare:
+                        difference = outputs[key][batch_idx] - hc_outputs[key][batch_idx]
+                        max_diff = torch.max(torch.abs(difference)).item()
+                        
+                        
+                        print(f"  '{key}':")
+                        
+                        # Round values for cleaner display
+                        model_val = torch.round(outputs[key][batch_idx] * (10**decimals)) / (10**decimals)
+                        hc_val = torch.round(hc_outputs[key][batch_idx] * (10**decimals)) / (10**decimals)
+
+                        model_val = [f"{x:.3f}" for x in outputs[key][batch_idx].cpu().flatten().tolist()]
+                        hc_val = [f"{x:.3f}" for x in hc_outputs[key][batch_idx].cpu().flatten().tolist()]
+                        
+                        print(f"    Model: {model_val}")
+                        print(f"    Hardcoded: {hc_val}")'''
+
+                outputs = outputs['my_decision']
                 if do_vision_stuff:
                     for uncertainty in uncertainties:
                         for vision_prob in vision_probs:
@@ -2007,7 +2073,8 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
                     loss_file_path = os.path.join(save_path, f'losses-{repetition}.csv')
                     should_train = True
                     if os.path.exists(loss_file_path):
-                        df = pd.read_csv(loss_file_path)
+                        df = pd.read_csv(loss_file_path, index_col=None)
+                        print(df.columns, os.path.abspath(loss_file_path), df)
                         final_acc = df['Accuracy'].iloc[-1]
                         if final_acc >= 0.996:
                             should_train = False
@@ -2082,8 +2149,8 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
                                         dfs_paths.extend(df_paths)
                                         if epoch == epochs - 1 or eval_prior:
                                             last_epoch_df_paths.extend(df_paths)
-                        except:
-                            pass
+                        except Exception as e:
+                            print(f"Error {e}")
 
                 
                 #loss_paths.append(os.path.join(retrain_path, f'losses-{repetition}.csv'))
