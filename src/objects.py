@@ -12,15 +12,15 @@ from gym_minigrid.rendering import (
 # Map of color names to RGB values
 COLORS = {
     "red": np.array([255, 0, 0]),
-    "orange": np.array([230, 105, 0]),
-    "green": np.array([0, 225, 15]),
+    "orange": np.array([255, 165, 0]),
+    "green": np.array([0, 255, 0]),
     "blue": np.array([0, 0, 255]),
     "cyan": np.array([0, 139, 139]),
     "purple": np.array([112, 39, 195]),
     "yellow": np.array([255, 255, 0]),
     "olive": np.array([128, 128, 0]),
     "grey": np.array([100, 100, 100]),
-    "worst": np.array([0, 0, 0]),#np.array([74, 65, 42]),  # https://en.wikipedia.org/wiki/Pantone_448_C
+    "worst": np.array([74, 65, 42]),  # https://en.wikipedia.org/wiki/Pantone_448_C
     "pink": np.array([255, 0, 189]),
     "white": np.array([255, 255, 255]),
     "prestige": np.array([255, 255, 255]),
@@ -466,9 +466,9 @@ class Block(WorldObj):
             fill_coords(img, point_in_line(0.85, 0.15, 0.15, 0.85, r=0.04), (0, 0, 0))
         else:
             # transparent, uses assigned color
-            #fill_coords(img, point_in_line(0.15, 0.15, 0.85, 0.85, r=0.04), c)
-            #fill_coords(img, point_in_line(0.85, 0.15, 0.15, 0.85, r=0.04), c)
-            fill_coords(img, point_in_rect(0.15, 0.85, 0.15, 0.85), c)
+            fill_coords(img, point_in_line(0.15, 0.15, 0.85, 0.85, r=0.04), c)
+            fill_coords(img, point_in_line(0.85, 0.15, 0.15, 0.85, r=0.04), c)
+            #fill_coords(img, point_in_rect(0.15, 0.85, 0.15, 0.85), c)
 
 
 class Curtain(WorldObj):
@@ -652,11 +652,12 @@ class Box(WorldObj):
         c = COLORS[self.color]
 
         # Outline
+        #fill_coords(img, point_in_rect(0.12, 0.88, 0.12, 0.88), c)
         fill_coords(img, point_in_rect(0.12, 0.88, 0.12, 0.88), c)
-        #fill_coords(img, point_in_rect(0.18, 0.82, 0.18, 0.82), (0, 0, 0))
+        fill_coords(img, point_in_rect(0.18, 0.82, 0.18, 0.82), (0, 0, 0))
 
         # Horizontal slit
-        #fill_coords(img, point_in_rect(0.16, 0.84, 0.47, 0.53), c)
+        fill_coords(img, point_in_rect(0.16, 0.84, 0.47, 0.53), c)
 
         if self.contains and self.show_contains:
             self.contains.render(img)

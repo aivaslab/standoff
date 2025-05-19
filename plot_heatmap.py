@@ -65,7 +65,7 @@ def load_and_plot_heatmap(table_path, save_dir, param='test_group', label='accur
     desired_order = ['Solo', 'Informed', 'ToM-Simple', 'ToM-Complex'] if param == 'test_group' else sorted(df[param].unique())
     train_sets = sorted(df['train_set'].unique())
     
-    fig = plt.figure(figsize=(len(desired_order) * 1.5, len(train_sets) * 5))
+    fig = plt.figure(figsize=(len(desired_order) * 1.5, len(train_sets) * 6.7))
     gs = GridSpec(len(train_sets), 1, figure=fig, hspace=0.1)
     
     for i, train_set in enumerate(train_sets):
@@ -100,10 +100,10 @@ def load_and_plot_heatmap(table_path, save_dir, param='test_group', label='accur
         
         ax.set_ylabel(f"", fontsize=14)#{train_set}
         if i == len(train_sets) - 1:
-            ax.set_xlabel("Test Set", fontsize=12)
+            ax.set_xlabel("test set", fontsize=12)
         else:
-            ax.set_xlabel("")
-        ax.set_ylabel(f"{train_set}", fontsize=12)
+            ax.set_xlabel("Test Set")
+        ax.set_ylabel(f"Randomized Module", fontsize=12)
     
     plt.tight_layout()
     
@@ -112,7 +112,7 @@ def load_and_plot_heatmap(table_path, save_dir, param='test_group', label='accur
     plt.savefig(plot_save_path, bbox_inches='tight', dpi=150)
     plt.close()
 
-    fig = plt.figure(figsize=(len(desired_order) * 1.5, len(train_sets) * 4))
+    fig = plt.figure(figsize=(len(desired_order) * 1.5, len(train_sets) * 6.7))
     gs = GridSpec(len(train_sets), 1, figure=fig, hspace=0.2)
 
     familiar_columns = {
@@ -121,7 +121,7 @@ def load_and_plot_heatmap(table_path, save_dir, param='test_group', label='accur
         2: 3,
     }
 
-    for i, train_set in enumerate(train_sets[:-1]):
+    for i, train_set in enumerate(train_sets):
         train_df = df[df['train_set'] == train_set].sort_values('order')
         
         ordered_models = []
@@ -439,8 +439,8 @@ def create_comparison_bar_graph(table_path, save_dir):
     return save_path
 
 if __name__ == "__main__":
-    table_path = "C:\\Users\\Rufus\\Documents\\github\\standoff\\supervised\\exp_13-L\\c\\key_param\\test_group_accuracy_table.csv"
-    save_dir = "C:\\Users\\Rufus\\Documents\\github\\standoff\\supervised\\exp_13-L\\c"
+    table_path = "C:\\Users\\Rufus\\Documents\\github\\standoff\\supervised\\exp_12-L\\c\\key_param\\test_group_accuracy_table.csv"
+    save_dir = "C:\\Users\\Rufus\\Documents\\github\\standoff\\supervised\\exp_12-L\\c"
     plot_path = load_and_plot_heatmap(table_path, save_dir)
     create_comparison_bar_graph(table_path, save_dir)
     print(f"Heatmap saved to: {plot_path}")

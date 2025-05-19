@@ -160,8 +160,6 @@ class TreatPerceptionModule(BaseModule):
             ], dim=2),
             1.0
         )
-        
-        # Reshape back
         treats = treats.view(batch_size, num_timesteps, 2, 6)
         
         return treats
@@ -236,6 +234,39 @@ class PresencePerceptionModule(BaseModule):
 # Inputs: Visible Treats 6x5, Vision 1x5 (1s if subject)
 # Outputs: Belief vector at last timestep (2x6, normalized)
 # Method: Start at the last timestep, and step backwards until we find the last visible instance of each treat
+
+
+class RNNBeliefNetwork(nn.Module):
+    def __init__(self, hidden_size=16, output_size=6):
+        super().__init__()
+        # Input size = 6 (treats) + 1 (vision) = 7 per timestep
+        self.rnn = nn.RNN(input_size=7, hidden_size=hidden_size, batch_first=True)
+        self.output_fc = nn.Linear(hidden_size, output_size)
+        self.hidden_size = hidden_size
+        print('using rnn beliefs')
+        
+    def forward(self, treats, vision):
+        batch_size = treats.shape[0]
+        
+        vision = vision.reshape(batch_size, 5, 1)
+    
+        #treats = treats.permute(0, 2, 1)
+
+        #print(vision.shape, treats.shape)
+        
+        combined_input = torch.cat([treats, vision], dim=2)  # Shape: [batch_size, 5, 7]
+        
+        h0 = torch.zeros(1, batch_size, self.hidden_size, device=treats.device)
+        
+        _, hn = self.rnn(combined_input, h0)
+        
+        final_hidden = hn.squeeze(0)
+        
+        output = self.output_fc(final_hidden)
+        output = F.softmax(output, dim=-1)
+        
+        return output
+
 
 class NormalizedBeliefNetwork(nn.Module):
     def __init__(self):
@@ -681,6 +712,7 @@ class AblationArchitecture(nn.Module):
         return {
             'treat_perception': treats,
             'vision_perception': opponent_vision,
+            'vision_perception_my': opponent_vision,
             'presence_perception': opponent_presence,
             'my_belief': my_belief_vector,
             'op_belief': op_belief_vector,

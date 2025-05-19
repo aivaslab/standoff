@@ -11,12 +11,12 @@ import h5py
 import pandas as pd
 import tqdm
 
+from src.calculate_statistics import calculate_statistics
+
 from src.pz_envs import ScenarioConfigs
 from src.supervised_learning import gen_data
-from src.utils.plotting import create_combined_histogram, plot_progression, save_key_param_figures, plot_learning_curves, make_splom, make_ifrscores, make_scatter, make_corr_things, make_splom_aux, plot_strategy_bar, \
-    create_faceted_heatmap, plot_bar_graphs, plot_bar_graphs_special, plot_bar_graphs_new, plot_dependency_bar_graphs, plot_dependency_bar_graphs_new, plot_dependency_bar_graphs_flipped
-from supervised_learning_main import run_supervised_session, calculate_statistics, write_metrics_to_file, save_figures, \
-    train_model
+from src.utils.plotting import create_combined_histogram, plot_progression, save_key_param_figures, plot_learning_curves, make_splom, make_ifrscores, make_scatter, make_corr_things, make_splom_aux, plot_strategy_bar, create_faceted_heatmap, plot_bar_graphs, plot_bar_graphs_special, plot_bar_graphs_new, plot_dependency_bar_graphs, plot_dependency_bar_graphs_new, plot_dependency_bar_graphs_flipped
+from supervised_learning_main import run_supervised_session, write_metrics_to_file, save_figures
 import numpy as np
 import random
 

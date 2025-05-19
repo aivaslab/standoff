@@ -73,6 +73,24 @@ def get_model_types(num, use_eval):
                     'a-mix-n-all-shared-v50-b5',
                     'a-mix-n-all-detach-v50-b5',
                     ]
+    experiment_122_models = [
+                    'a-mix-n-perception-split',
+                    'a-mix-n-perception-shared',
+                    'a-mix-n-perception-detach',
+                    'a-mix-n-treat-split',
+                    'a-mix-n-treat-shared',
+                    'a-mix-n-treat-detach',
+                    'a-mix-n-all-split',
+                    'a-mix-n-all-shared',
+                    'a-mix-n-all-detach',
+
+                    'a-mix-n-perception-shared-v50-b5',
+                    'a-mix-n-perception-detach-v50-b5',
+                    'a-mix-n-treat-shared-v50-b5',
+                    'a-mix-n-treat-detach-v50-b5',
+                    'a-mix-n-all-shared-v50-b5',
+                    'a-mix-n-all-detach-v50-b5',
+                    ]
 
     # real exp2
     experiment_13_models = [
@@ -88,6 +106,14 @@ def get_model_types(num, use_eval):
                     'a-mix-n-belief-my',
                     'a-mix-n-decision-op',
                     'a-mix-n-decision-my',
+                    'a-mix-n-all-my',
+                    'a-mix-n-all-op',]
+
+    experiment_133_models = [
+                    'a-mix-n-treat-my',
+                    'a-mix-n-treat-op',
+                    'a-mix-n-perception-my',
+                    'a-mix-n-perception-op',
                     'a-mix-n-all-my',
                     'a-mix-n-all-op',]
 
@@ -167,6 +193,10 @@ def get_model_types(num, use_eval):
         return experiment_12_models
     elif num == 13: 
         return experiment_13_models
+    elif num == 133: 
+        return experiment_133_models
+    elif num == 122: 
+        return experiment_122_models
 
 
 def init_regimes():
@@ -331,7 +361,7 @@ def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, sk
         model_types = neural_models
         label_tuples = [('correct-loc', 'loc')]
 
-    if 2 in todo or 13 in todo:
+    if 2 in todo or 13 in todo or 133 in todo:
         real_regimes = {'s21': fregimes['s21'], 's1': fregimes['s1'], 's2': fregimes['s2'], 's3': fregimes['s3']}
     elif 30 in todo:
         real_regimes = {'s3': fregimes['s3']}
@@ -391,7 +421,7 @@ def run_single_experiment(args_tuple):
 
 
     experiments([args.exp_num],
-                repetitions=12,
+                repetitions=3,
                 batches=4000,
                 skip_train=not args.t,
                 skip_eval=not args.e,
@@ -436,8 +466,11 @@ if __name__ == '__main__':
 
     model_types = get_model_types(exp_num, args.e)
 
-    #model_types = ['a-mix-n-all-shared-v50-b5',]
+    #model_types = ['a-mix-n-treat-split', 'a-mix-n-perception-detach', 'a-mix-n-decision-shared-v50-b5', ]
     #model_types = ['a-mix-n-treat-split',] #['a-mixed-n-belief-my', 'a-mixed-n-belief-op', 'a-mixed-n-decision-my', 'a-mixed-n-decision-op']
+
+    #model_types = ['a-mix-n-perception-op', 'a-mix-n-vision-op', 'a-mix-n-treat-op', 'a-mix-n-belief-op',]
+    model_types = ['a-mix-n-belief-op',]
     print('number of model types:', len(model_types))
 
     labels = [('correct-loc', 'loc')]
@@ -447,7 +480,7 @@ if __name__ == '__main__':
 
         total_tasks = len(experiment_args)
         
-        with multiprocessing.Pool(processes=6) as pool:
+        with multiprocessing.Pool(processes=4) as pool:
             list(tqdm(
                 pool.imap(run_single_experiment, experiment_args),
                 total=total_tasks,
@@ -456,8 +489,8 @@ if __name__ == '__main__':
     else:
         print('running single')
         experiments([args.exp_num] if not args.g else [0],
-                repetitions=10,
-                batches=4000,
+                repetitions=1,
+                batches=2500,
                 skip_train=not args.t,
                 skip_eval=not args.e,
                 skip_calc=not args.c,

@@ -56,7 +56,7 @@ player_interface_config = {
     "view_tile_size": TILE_SIZE,
     "observation_style": "image",
     "see_through_walls": False,
-    "color": "cyan",
+    "color": "yellow",
     "view_type": 0,
     "move_type": 0
 }
@@ -150,7 +150,7 @@ for i in range(100):
 
     # print(np.round(obs['player_0'] * 10).sum(axis=0).astype(int))
     while True:
-        env.render(mode="human", show_agent_views=True, tile_size=TILE_SIZE)
+        env.render(mode="human", show_agent_views=False, tile_size=TILE_SIZE)
         # print(np.round(obs['player_0']*10).sum(axis=0).astype(int))
         img = Image.fromarray(obs['p_0'], 'RGB')
         #ImageDraw.Draw(img).text((0, 0), "Step " + str(env.step_count) + '\n' + env.current_event_list_name, (255, 255, 255))
