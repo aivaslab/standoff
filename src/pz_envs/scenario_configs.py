@@ -34,10 +34,10 @@ def count_non_ob_re(data):
 
 def add_bait(events, bait_num, bait_size, uninformed_bait, visible_baits, swap_index='e'):
     if bait_num == uninformed_bait or visible_baits == 0:
-        events.extend([['ob'], ['b', str(bait_size), swap_index], ['re']])
+        events.extend([['ob'], ['b', bait_size, swap_index], ['re']])
         return len(events) - 2
     else:
-        events.append(['b', str(bait_size), swap_index])
+        events.append(['b', bait_size, swap_index])
         return len(events) - 1
 
 
@@ -76,22 +76,16 @@ def remove_unnecessary_sequences(events):
 
 
 def count_permutations(event_list):
-    permutations = []
+    factors = []
     num_locations = 5
     for event in event_list:
         if len(event) == 3 and event[2] == 'e':
-            if event[0] == 'b':
-                permutations.append(num_locations)
-                num_locations -= 1
-            elif event[0] == 'sw':
-                permutations.append(num_locations)
-                # this line added sept 30 to prevent swaps from appending to empty boxes, allowing for 2nd swap to 1st loc by coincidence
-                num_locations -= 1
+            factors.append(num_locations)
         else:
-            if event[0] == 'b':  # baits to specific locations still remove empty buckets
-                num_locations -= 1
-            permutations.append(1)
-    return permutations
+            factors.append(1)
+        if event[0] == 'b':  
+            num_locations -= 1
+    return factors
 
 
 def identify_counterfactuals(events, fsb=False, ss1=False, dsb=False, debug=False):
@@ -113,7 +107,7 @@ def identify_counterfactuals(events, fsb=False, ss1=False, dsb=False, debug=Fals
             vision = True
         elif event[0] == 'b':
             treat_sizes[k] = event[1]
-            if event[1] == '1':
+            if event[1] == 1:
                 if vision:
                     knowledge['eb'] = True
                     knowledge['lb'] = True
@@ -122,7 +116,7 @@ def identify_counterfactuals(events, fsb=False, ss1=False, dsb=False, debug=Fals
                         if knowledge['es'] and not knowledge['ls']:
                             knowledge['es'] = False
 
-            elif event[1] == '0':
+            elif event[1] == 0:
                 if vision:
                     knowledge['es'] = True
                     knowledge['ls'] = True
@@ -137,52 +131,52 @@ def identify_counterfactuals(events, fsb=False, ss1=False, dsb=False, debug=Fals
         elif event[0] == 'sw':
             if vision:
                 size = treat_sizes[event[1]] if not fsb_2nd_swap else treat_sizes[firstswap]
-                if size == '1':
+                if size == 1:
                     knowledge['eb'] = True
                     knowledge['lb'] = True
                     knowledge['cflb'] = False
-                    treat_sizes[k] = '1' #this event's size
+                    treat_sizes[k] = 1 #this event's size
                     if knowledge['es'] and not knowledge['ls'] and (fsb_2nd_swap or dsb_swap_after_hidden_swap):
                         knowledge['es'] = False
-                elif size == '0':
+                elif size == 0:
                     knowledge['es'] = True
                     knowledge['ls'] = True
                     knowledge['cfls'] = False
-                    treat_sizes[k] = '0' #this event's size
+                    treat_sizes[k] = 0 #this event's size
                     if knowledge['eb'] and not knowledge['lb'] and (fsb_2nd_swap or dsb_swap_after_hidden_swap):
                         knowledge['eb'] = False
                 if event[2] != 'e': #if fsb or 2st1l event
                     size2 = treat_sizes[event[2]] if not fsb_2nd_swap else treat_sizes[event[1]]
-                    if size2 == '1':
+                    if size2 == 1:
                         knowledge['eb'] = True
                         knowledge['lb'] = True
                         knowledge['cflb'] = False
-                    elif size2 == '0':
+                    elif size2 == 0:
                         knowledge['es'] = True
                         knowledge['ls'] = True
                         knowledge['cfls'] = False
             else:
                 size = treat_sizes[event[1]] if not fsb_2nd_swap else treat_sizes[firstswap]
-                if size == '1':
+                if size == 1:
                     if knowledge['lb']:
                         knowledge['cflb'] = True
                     knowledge['lb'] = False
-                    treat_sizes[k] = '1'
-                elif size == '0':
+                    treat_sizes[k] = 1
+                elif size == 0:
                     if knowledge['ls']:
                         knowledge['cfls'] = True
                     knowledge['ls'] = False
-                    treat_sizes[k] = '0'
+                    treat_sizes[k] = 0
                 if event[2] != 'e':
                     size2 = treat_sizes[event[2]] if not fsb_2nd_swap else treat_sizes[event[1]]
                     if resetting_ss1_2nd_swap:
                         knowledge['lb'], knowledge['ls'] = reset_knowledge
                         knowledge['eb'], knowledge['es'] = reset_knowledge
-                    elif size2 == '1':
+                    elif size2 == 1:
                         if knowledge['lb']:
                             knowledge['cflb'] = True
                         knowledge['lb'] = False
-                    elif size2 == '0':
+                    elif size2 == 0:
                         if knowledge['ls']:
                             knowledge['cfls'] = True
                         knowledge['ls'] = False

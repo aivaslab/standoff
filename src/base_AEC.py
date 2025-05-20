@@ -1164,6 +1164,39 @@ class para_MultiGridEnv(ParallelEnv):
         for agent in self.puppets:
             self.puppet_pathing(agent)
 
+        for agent in self.puppets:
+            if agent == 'p_0':  
+                continue
+            can_see_any = any(self.can_see[agent + str(box)] for box in range(self.boxes))
+            
+            for treat_type, locations in [('big', self.big_food_locations), ('small', self.small_food_locations)]:
+                if not locations:
+                    continue
+                    
+                current_loc = locations[-1]
+                agent_belief_loc = self.agent_goal.get(agent, -1)
+                
+                if agent_belief_loc != current_loc and not self.can_see[agent + str(current_loc)]:
+                    self.wrong_treat[agent][treat_type] = True
+                
+                if self.can_see[agent + str(current_loc)]:
+                    self.wrong_treat[agent][treat_type] = False
+
+        for agent in self.puppets:
+            gettier_big = False
+            gettier_small = False
+            
+            if len(self.big_food_locations) > 0 and self.big_food_locations[-1] != -1:
+                if self.agent_goal.get(agent) == self.big_food_locations[-1] and self.wrong_treat[agent]['big']:
+                    gettier_big = True
+                    
+            if len(self.small_food_locations) > 0 and self.small_food_locations[-1] != -1:
+                if self.agent_goal.get(agent) == self.small_food_locations[-1] and self.wrong_treat[agent]['small']:
+                    gettier_small = True
+            
+            self.infos['p_0']['gettier_big'] = gettier_big
+            self.infos['p_0']['gettier_small'] = gettier_small
+
         if self.record_oracle_labels and ((self.step_count <= self.end_at_frame or self.end_at_frame == -1) or self.has_released):
             tolerance = 6
             y = self.height // 2
@@ -1183,6 +1216,7 @@ class para_MultiGridEnv(ParallelEnv):
             one_hot_goal_imaginary_box[self.box_locations[self.agent_goal['i']]] = 1
 
             info = self.infos['p_0']
+
 
             info["target-loc"] = one_hot_goal
             info["i-target-loc"] = list(map(int, one_hot_goal_imaginary))
@@ -1365,7 +1399,9 @@ class para_MultiGridEnv(ParallelEnv):
         robservations = {agent: self.observations[agent] for agent in self.agents}
         rrewards = {agent: self.rewards[agent] for agent in self.agents}
         rdones = {agent: self.dones[agent] for agent in self.agents}
+
         rinfos = {agent: self.infos[agent] for agent in self.agents}
+
 
         return robservations, rrewards, rdones, rinfos
 

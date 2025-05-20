@@ -130,7 +130,7 @@ class TreatPerceptionModule(BaseModule):
         super().__init__(use_neural, random_prob, sigmoid_temp)
 
     def _create_neural_network(self) -> nn.Module:
-        return TreatPerceptionNetworkOld()
+        return TreatPerceptionNetwork()
 
     def _hardcoded_forward(self, perceptual_field: torch.Tensor) -> torch.Tensor:
         # channel 2 is treat1, channel 3 is treat2, at x=3 and y=1-6

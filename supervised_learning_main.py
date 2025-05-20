@@ -191,6 +191,7 @@ def load_model(model_type, model_kwargs, device, multi=False):
     #print('random probs:', random_probs)
     print("load model")
     if multi:
+        print('multi')
         return MultiAgentArchitecture(config, random_probs, model_kwargs['batch_size']).to(device)
     return AblationArchitecture(config, random_probs, model_kwargs['batch_size']).to(device)
 

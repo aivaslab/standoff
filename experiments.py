@@ -14,7 +14,7 @@ warnings.filterwarnings("ignore", category=UserWarning)
 
 from src.experiments_utils import run_hparam_search, do_comparison
 from src.pz_envs import ScenarioConfigs
-from src.supervised_learning import gen_data
+from src.gen_data import gen_data
 from supervised_learning_main import run_supervised_session
 from tqdm.auto import tqdm
 
@@ -470,7 +470,7 @@ if __name__ == '__main__':
     #model_types = ['a-mix-n-treat-split',] #['a-mixed-n-belief-my', 'a-mixed-n-belief-op', 'a-mixed-n-decision-my', 'a-mixed-n-decision-op']
 
     #model_types = ['a-mix-n-perception-op', 'a-mix-n-vision-op', 'a-mix-n-treat-op', 'a-mix-n-belief-op',]
-    model_types = ['a-mix-n-belief-op',]
+    model_types = ['a-mix-n-belief-split',]
     print('number of model types:', len(model_types))
 
     labels = [('correct-loc', 'loc')]

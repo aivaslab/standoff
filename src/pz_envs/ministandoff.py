@@ -16,7 +16,7 @@ def get_rewards(obj):
     return r, sr
 
 def index_permutations(permutations, seed):
-    result = [-1] * len(permutations)
+    result = [0] * len(permutations)
     for i in range(len(permutations)-1, -1, -1):
         seed, r = divmod(seed, permutations[i])
         result[i] = r
@@ -122,6 +122,7 @@ class MiniStandoffEnv(para_MultiGridEnv):
         self.supervised_model = supervised_model  # used for generating special supervised labels
         self.last_supervised_labels = None
         self.has_released = False
+        self.was_ever_misinformed = {}
 
         self.param_groups = [
             {'eLists': self.conf.all_event_lists, 'params': self.conf.standoff['defaults'], 'perms': self.conf.all_event_permutations, 'delays': self.conf.all_event_delays},
@@ -135,6 +136,7 @@ class MiniStandoffEnv(para_MultiGridEnv):
         boxes = self.params["boxes"]
         self.saw_last_update = [True for _ in range(boxes)]
 
+        self.wrong_treat = {agent: {treat_type: False for treat_type in ['big', 'small']} for agent in self.agents_and_puppets() + ['i']}
 
         # we add 'i' as an imaginary agent
         for agent in self.agents_and_puppets() + ['i']:
@@ -309,13 +311,14 @@ class MiniStandoffEnv(para_MultiGridEnv):
                             self.infos['p_0'][f'p-b-{baits_so_far}'] = event[x]
                         elif event_type == "sw":
                             self.infos['p_0'][f'p-s-{swaps_so_far}'] = event[x] # gets the popped value
+                            empty_buckets.append(int(event[1]))
                             if event[x] == 5:
                                 print('5 found e', event)
 
                         # if we are swapping to an empty bucket, and the prev bucket was not empty, make it empty
                         if event[0] == 'sw' and x == 2:
                             if int(event[1]) not in empty_buckets:
-                                #empty_buckets.append(int(event[1]))
+                                empty_buckets.append(int(event[1]))
                                 # this line commented out on sept 30 to prevent coincidental 2nd swap to 1st loc
                                 pass
 
@@ -465,6 +468,8 @@ class MiniStandoffEnv(para_MultiGridEnv):
                 self.infos['p_0']['incorrect-loc'] = -1
                 self.infos['p_0']['minibatch'] = self.minibatch
                 self.infos['p_0']['timestep'] = self.total_step_count
+                self.infos['p_0']['gettier_big'] = False
+                self.infos['p_0']['gettier_small'] = False
         elif name == 'b':
             x = event[2] + 1
             loc = int(event[2])
@@ -567,6 +572,7 @@ class MiniStandoffEnv(para_MultiGridEnv):
                 self.objs_to_hide.append(obj2)
         elif name == "rel":
             self.infos['p_0']['last-vision-span'] = [int(x >= self.vision_span_start) for x in range(5)]
+
             if self.record_info:
                 self.infos['p_0']['eventVisibility'] = ''.join(
                     ['1' if x else '0' for x in self.visible_event_list])
@@ -665,8 +671,12 @@ class MiniStandoffEnv(para_MultiGridEnv):
                 # we cannot track shouldAvoidBig etc here because the treat location might change
 
             #print(self.step_count, self.infos['p_0']["exist"], self.infos['p_0']["b-exist"], self.infos['p_0']["target"], self.infos['p_0']["vision"], self.infos['p_0']["loc"], self.infos['p_0']["b-loc"])
+
+        
+
         if self.record_info:
             # if agent's goal of player_1 matches big treat location, then shouldAvoidBig is True
+
             info = self.infos['p_0']
             if len(self.puppets):
                 info['puppet_goal'] = self.agent_goal[self.puppets[-1]]

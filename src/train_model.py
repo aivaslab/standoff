@@ -217,6 +217,8 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
         #with torch.autograd.profiler.profile(use_cuda=True) as prof:
         #with profiler.profile(use_cuda=True) as prof:
         outputs = model(inputs, None)
+
+        #print(inputs.shape, str(model))
         #print(prof.table())
         #print(prof.key_averages().table(sort_by="cuda_time_total"))
         #print('xxxxxxx', outputs)
@@ -269,7 +271,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
         if (batch+1) % epoch_length == 0:
             if batch > 1:
                 scheduler.step()
-                sigmoid_scheduler.step()
+                #sigmoid_scheduler.step()
                 t.update(epoch_length)
 
         if record_loss and (((batch) % epoch_length_val == 0) or (batch == batches - 1)):
