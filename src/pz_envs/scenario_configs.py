@@ -240,10 +240,8 @@ class ScenarioConfigs:
 
             # baits and swaps special
             "first_swap_is_both": lambda params: [True, False] if params['swaps'] > 0 else [False],
-            "delay_2nd_bait": lambda params: [True, False] if params['swaps'] > 0 and params[
-                'first_swap_is_both'] is False else [False],
-            "second_swap_to_first_loc": lambda params: [True, False] if params['swaps'] == 2 and params[
-                'delay_2nd_bait'] is False else [False],
+            "delay_2nd_bait": lambda params: [True, False] if params['swaps'] > 0 and params['first_swap_is_both'] is False else [False],
+            "second_swap_to_first_loc": lambda params: [True, False] if params['swaps'] == 2 and params['delay_2nd_bait'] is False else [False],
 
             # opponent and preferences
             "num_opponents": [0, 1],
@@ -256,8 +254,7 @@ class ScenarioConfigs:
 
             # baits and swaps ordering (randomized during all training)
             "first_bait_size": [0, 1],  # i
-            "first_swap_index": lambda params: [0, 1] if params['swaps'] > 0 and params['delay_2nd_bait'] is False and
-                                                         params['first_swap_is_both'] is False else [0],
+            "first_swap_index": lambda params: [0, 1] if params['swaps'] > 0 and params['delay_2nd_bait'] is False and params['first_swap_is_both'] is False else [0],
             "uninformed_bait": lambda params: [0, 1] if params['visible_baits'] == 1 else [-1],
             "uninformed_swap": lambda params: [0, 1] if params['swaps'] == 2 and params['visible_swaps'] == 1 else [-1],
         }

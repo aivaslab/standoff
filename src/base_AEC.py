@@ -1174,9 +1174,15 @@ class para_MultiGridEnv(ParallelEnv):
                     continue
                     
                 current_loc = locations[-1]
-                agent_belief_loc = self.agent_goal.get(agent, -1)
+
+                agent_belief_loc = -1
+                target_reward = self.bigReward if treat_type == 'big' else self.smallReward
+                for box in range(self.boxes):
+                    if abs(self.last_seen_reward[agent + str(box)] - target_reward) < 16:
+                        agent_belief_loc = box
+                        break
                 
-                if agent_belief_loc != current_loc and not self.can_see[agent + str(current_loc)]:
+                if agent_belief_loc != -1 and agent_belief_loc != current_loc and not self.can_see[agent + str(current_loc)]:
                     self.wrong_treat[agent][treat_type] = True
                 
                 if self.can_see[agent + str(current_loc)]:
@@ -1202,11 +1208,13 @@ class para_MultiGridEnv(ParallelEnv):
 
             for agent in self.puppets + ['i']:
                 if len(self.big_food_locations) > 0 and self.big_food_locations[-1] != -1:
-                    if self.agent_goal.get(agent) == self.big_food_locations[-1] and self.wrong_treat[agent]['big']:
+                    believes_correct_location = abs(self.last_seen_reward[agent + str(current_loc)] - self.bigReward) < 16
+                    if believes_correct_location and self.wrong_treat[agent]['big']:
                         self.infos['p_0']['gettier_big'] = True
                         
                 if len(self.small_food_locations) > 0 and self.small_food_locations[-1] != -1:
-                    if self.agent_goal.get(agent) == self.small_food_locations[-1] and self.wrong_treat[agent]['small']:
+                    believes_correct_location = abs(self.last_seen_reward[agent + str(current_loc)] - self.smallReward) < 16
+                    if believes_correct_location and self.wrong_treat[agent]['small']:
                         self.infos['p_0']['gettier_small'] = True
                 
             info = self.infos['p_0']

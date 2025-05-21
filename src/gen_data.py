@@ -26,6 +26,77 @@ import torch.nn.functional as F
 import torch
 from src.supervised_learning import one_hot, serialize_data, identify_mismatches
 
+def save_dataset(base_path, indices, data_obs, data_params, data_labels, all_labels):
+    if not indices or len(indices) == 0:
+        return
+    
+    os.makedirs(base_path, exist_ok=True)
+    np.savez_compressed(os.path.join(base_path, 'obs'), np.array([data_obs[i] for i in indices]))
+    np.savez_compressed(os.path.join(base_path, 'params'), np.array([data_params[i] for i in indices]))
+    for label in all_labels:
+        if len(data_labels[label]) > 0:
+            np.savez_compressed(os.path.join(base_path, 'label-' + label), np.array([data_labels[label][i] for i in indices]))
+
+def modify_informedness_string(informedness_str, replacements):
+    new_str = list(informedness_str)
+    
+    if isinstance(replacements[0], int):
+        pos, char = replacements
+        if pos < len(new_str):
+            new_str[pos] = char
+    else:
+        for pos, char in replacements:
+            if pos < len(new_str):
+                new_str[pos] = char
+                
+    return ''.join(new_str)
+
+def save_all_datasets(path, config_name, data_obs, data_params, data_labels, all_labels, has_swaps):
+    prefix_end = 3
+    suffix_start = len(config_name) - 1
+    
+    prefix = config_name[:prefix_end]
+    informedness_str = config_name[prefix_end:suffix_start]
+    suffix = config_name[suffix_start:]
+    
+    gettier_big_indices = [i for i, vals in enumerate(data_labels['gettier_big']) if np.any(vals)]
+    gettier_small_indices = [i for i, vals in enumerate(data_labels['gettier_small']) if np.any(vals)]
+    both_gettier_indices = [i for i in gettier_big_indices if i in gettier_small_indices]
+    only_big_indices = [i for i in gettier_big_indices if i not in gettier_small_indices]
+    only_small_indices = [i for i in gettier_small_indices if i not in gettier_big_indices]
+    
+    all_gettier_indices = set(gettier_big_indices + gettier_small_indices)
+    non_gettier_indices = [i for i in range(len(data_obs)) if i not in all_gettier_indices]
+    
+    conditions = [
+        (None, non_gettier_indices),
+        ((0, 'G'), only_big_indices),
+        ((1, 'g'), only_small_indices),
+        (((0, 'G'), (1, 'g')), both_gettier_indices)
+    ]
+    
+    for replacements, indices in conditions:
+        if not indices:
+            continue
+        
+        if replacements is None:
+            modified_config = config_name
+        else:
+            new_informedness = modify_informedness_string(informedness_str, replacements)
+            modified_config = prefix + new_informedness + suffix
+        
+        main_path = os.path.join(path, modified_config)
+        save_dataset(main_path, indices, data_obs, data_params, data_labels, all_labels)
+        
+        with_swaps_indices = [i for i in indices if has_swaps[i]]
+        without_swaps_indices = [i for i in indices if not has_swaps[i]]
+        
+        swaps_path = os.path.join(path, modified_config + "b")
+        save_dataset(swaps_path, with_swaps_indices, data_obs, data_params, data_labels, all_labels)
+        
+        no_swaps_path = os.path.join(path, modified_config + "a")
+        save_dataset(no_swaps_path, without_swaps_indices, data_obs, data_params, data_labels, all_labels)
+
 
 def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_extra_data=False, prior_metrics=[], conf=None):
     '''
@@ -209,6 +280,9 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
                             for label in onehot_labels:
                                 data_labels[label].append(np.stack(one_labels[label]))
 
+                            data_labels['gettier_big'].append(np.array([info['p_0']['gettier_big']]))
+                            data_labels['gettier_small'].append(np.array([info['p_0']['gettier_small']]))
+
                             data_labels['opponents'].append(params["num_puppets"])
                             data_labels['id'].append(unique_id)
                             unique_id += 1
@@ -250,37 +324,4 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
 
         print(data_name, total_count, g_count_big, g_count_small)
 
-        this_path = os.path.join(path, data_name)
-        os.makedirs(this_path, exist_ok=True)
-        np.savez_compressed(os.path.join(this_path, 'obs'), np.array(data_obs))
-        np.savez_compressed(os.path.join(this_path, 'params'), np.array(data_params))
-        for label in all_labels:
-            if len(data_labels[label]) > 0:
-                #print(len(data_labels[label]))
-                np.savez_compressed(os.path.join(this_path, 'label-' + label), np.array(data_labels[label]))
-        
-        with_swaps_path = os.path.join(path, data_name + "b")
-        os.makedirs(with_swaps_path, exist_ok=True)
-        
-        with_swaps_indices = np.where(has_swaps)[0]
-        if len(with_swaps_indices) > 0:
-            #print('with', data_name, len(with_swaps_indices))
-            np.savez_compressed(os.path.join(with_swaps_path, 'obs'), np.array([data_obs[i] for i in with_swaps_indices]))
-            np.savez_compressed(os.path.join(with_swaps_path, 'params'), np.array([data_params[i] for i in with_swaps_indices]))
-            for label in all_labels:
-                if len(data_labels[label]) > 0:
-                    #print(len(np.array([data_labels[label][i] for i in with_swaps_indices])))
-                    np.savez_compressed(os.path.join(with_swaps_path, 'label-' + label), np.array([data_labels[label][i] for i in with_swaps_indices]))
-        
-        without_swaps_path = os.path.join(path, data_name + "a")
-        os.makedirs(without_swaps_path, exist_ok=True)
-        
-        without_swaps_indices = np.where(~has_swaps)[0]
-        if len(without_swaps_indices) > 0:
-            #print('without', data_name, len(without_swaps_indices))
-            np.savez_compressed(os.path.join(without_swaps_path, 'obs'), np.array([data_obs[i] for i in without_swaps_indices]))
-            np.savez_compressed(os.path.join(without_swaps_path, 'params'), np.array([data_params[i] for i in without_swaps_indices]))
-            for label in all_labels:
-                if len(data_labels[label]) > 0:
-                    #print(len(np.array([data_labels[label][i] for i in without_swaps_indices])))
-                    np.savez_compressed(os.path.join(without_swaps_path, 'label-' + label), np.array([data_labels[label][i] for i in without_swaps_indices]))
+        save_all_datasets(path, data_name, data_obs, data_params, data_labels, all_labels, has_swaps)

@@ -201,10 +201,10 @@ def get_model_types(num, use_eval):
 
 def init_regimes():
     sub_regime_keys = [
-        "Fn", "Nf", "Tn", "Ff", "Tf", "Ft", "Tt"
+        "Fn", "Nf", "Tn", "Ff", "Tf", "Ft", "Tt", "Gg", "Gn", "Gf", "Gt", "Tg", "Fg", "Ng"
     ] # removed Nn and Nt
-    all_regimes = ['sl-' + x + '0' for x in sub_regime_keys] + ['sl-' + x + '1' for x in sub_regime_keys] + ['sl-Nn1a', 'sl-Nn1b', 'sl-Nt1a', 'sl-Nt1b', 'sl-Nn0', 'sl-Nt0'] #['sl-Nn1a', 'sl-Nn1b', 'sl-Nt1a', 'sl-Nt1b', 'sl-Nn0', 'sl-Nt0'] 
-    mixed_regimes = {k: ['sl-' + x + '0' for x in sub_regime_keys] + ['sl-Nn1a', 'sl-Nn1b', 'sl-Nt1a', 'sl-Nt1b', 'sl-Nn0', 'sl-Nt0'] + ['sl-' + k + '1'] for k in sub_regime_keys} 
+    all_regimes = ['sl-' + x + '0' for x in sub_regime_keys] + ['sl-' + x + '1' for x in sub_regime_keys] + ['sl-Nn1', 'sl-Nt1a', 'sl-Nt1b', 'sl-Nn0', 'sl-Nt0'] #['sl-Nn1a', 'sl-Nn1b', 'sl-Nt1a', 'sl-Nt1b', 'sl-Nn0', 'sl-Nt0'] 
+    mixed_regimes = {k: ['sl-' + x + '0' for x in sub_regime_keys] + ['sl-Nn1', 'sl-Nt1a', 'sl-Nt1b', 'sl-Nn0', 'sl-Nt0'] + ['sl-' + k + '1'] for k in sub_regime_keys} 
 
     regimes = {}
     regimes['direct'] = ['sl-' + x + '1' for x in sub_regime_keys]
