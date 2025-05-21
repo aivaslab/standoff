@@ -311,14 +311,13 @@ class MiniStandoffEnv(para_MultiGridEnv):
                             self.infos['p_0'][f'p-b-{baits_so_far}'] = event[x]
                         elif event_type == "sw":
                             self.infos['p_0'][f'p-s-{swaps_so_far}'] = event[x] # gets the popped value
-                            empty_buckets.append(int(event[1]))
                             if event[x] == 5:
                                 print('5 found e', event)
 
                         # if we are swapping to an empty bucket, and the prev bucket was not empty, make it empty
                         if event[0] == 'sw' and x == 2:
                             if int(event[1]) not in empty_buckets:
-                                empty_buckets.append(int(event[1]))
+                                #empty_buckets.append(int(event[1]))
                                 # this line commented out on sept 30 to prevent coincidental 2nd swap to 1st loc
                                 pass
 
@@ -531,6 +530,7 @@ class MiniStandoffEnv(para_MultiGridEnv):
                     self.vision_span_start = self.step_count
             for box in range(self.boxes):
                 self.can_see[arg + str(box)] = False if "ob" in name else True
+                self.can_see['i' + str(box)] = False if "ob" in name else True
         elif name == "sw":
             #print(event[1], event[2], 'should be floats!')
             e1 = int(event[1])

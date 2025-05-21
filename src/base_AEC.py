@@ -1164,7 +1164,7 @@ class para_MultiGridEnv(ParallelEnv):
         for agent in self.puppets:
             self.puppet_pathing(agent)
 
-        for agent in self.puppets:
+        for agent in self.puppets + ['i']:
             if agent == 'p_0':  
                 continue
             can_see_any = any(self.can_see[agent + str(box)] for box in range(self.boxes))
@@ -1182,20 +1182,6 @@ class para_MultiGridEnv(ParallelEnv):
                 if self.can_see[agent + str(current_loc)]:
                     self.wrong_treat[agent][treat_type] = False
 
-        for agent in self.puppets:
-            gettier_big = False
-            gettier_small = False
-            
-            if len(self.big_food_locations) > 0 and self.big_food_locations[-1] != -1:
-                if self.agent_goal.get(agent) == self.big_food_locations[-1] and self.wrong_treat[agent]['big']:
-                    gettier_big = True
-                    
-            if len(self.small_food_locations) > 0 and self.small_food_locations[-1] != -1:
-                if self.agent_goal.get(agent) == self.small_food_locations[-1] and self.wrong_treat[agent]['small']:
-                    gettier_small = True
-            
-            self.infos['p_0']['gettier_big'] = gettier_big
-            self.infos['p_0']['gettier_small'] = gettier_small
 
         if self.record_oracle_labels and ((self.step_count <= self.end_at_frame or self.end_at_frame == -1) or self.has_released):
             tolerance = 6
@@ -1211,12 +1197,19 @@ class para_MultiGridEnv(ParallelEnv):
                 one_hot_goal[self.agent_goal[target_agent]] = 1
                 one_hot_goal_box[self.box_locations[self.agent_goal[target_agent]]] = 1
 
-
             one_hot_goal_imaginary[self.agent_goal['i']] = 1
             one_hot_goal_imaginary_box[self.box_locations[self.agent_goal['i']]] = 1
 
+            for agent in self.puppets + ['i']:
+                if len(self.big_food_locations) > 0 and self.big_food_locations[-1] != -1:
+                    if self.agent_goal.get(agent) == self.big_food_locations[-1] and self.wrong_treat[agent]['big']:
+                        self.infos['p_0']['gettier_big'] = True
+                        
+                if len(self.small_food_locations) > 0 and self.small_food_locations[-1] != -1:
+                    if self.agent_goal.get(agent) == self.small_food_locations[-1] and self.wrong_treat[agent]['small']:
+                        self.infos['p_0']['gettier_small'] = True
+                
             info = self.infos['p_0']
-
 
             info["target-loc"] = one_hot_goal
             info["i-target-loc"] = list(map(int, one_hot_goal_imaginary))

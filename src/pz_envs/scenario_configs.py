@@ -76,16 +76,22 @@ def remove_unnecessary_sequences(events):
 
 
 def count_permutations(event_list):
-    factors = []
+    permutations = []
     num_locations = 5
     for event in event_list:
         if len(event) == 3 and event[2] == 'e':
-            factors.append(num_locations)
+            if event[0] == 'b':
+                permutations.append(num_locations)
+                num_locations -= 1
+            elif event[0] == 'sw':
+                permutations.append(num_locations)
+                # this line added sept 30 to prevent swaps from appending to empty boxes, allowing for 2nd swap to 1st loc by coincidence
+                num_locations -= 1
         else:
-            factors.append(1)
-        if event[0] == 'b':  
-            num_locations -= 1
-    return factors
+            if event[0] == 'b':  # baits to specific locations still remove empty buckets
+                num_locations -= 1
+            permutations.append(1)
+    return permutations
 
 
 def identify_counterfactuals(events, fsb=False, ss1=False, dsb=False, debug=False):
