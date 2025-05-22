@@ -159,6 +159,8 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
         configs = conf.standoff
         events = conf.stages[configName]['events']
         params = configs[conf.stages[configName]['params']]
+        if params['num_puppets'] == 0:
+            continue
         #print(configName, configs, events, params)
 
         _subject_is_dominant = [False] if role_type == '' else [True] if role_type == 'D' else [True, False]
@@ -167,7 +169,7 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
 
         data_name = f'{configName}'
         informedness = data_name[3:-1]
-        mapping = {'T': 2, 'F': 1, 'N': 0, 't': 2, 'f': 1, 'n': 0, '0': 0, '1': 1}
+        mapping = {'T': 2, 'F': 1, 'N': 0, 't': 2, 'f': 1, 'n': 0, '0': 0, '1': 1, 'G': 3, 'g': 3}
         # we just get opponents directly from num_puppets later
         informedness = [mapping[char] for char in informedness]
 

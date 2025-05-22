@@ -1161,9 +1161,7 @@ class para_MultiGridEnv(ParallelEnv):
 
         # self._accumulate_rewards() #not defined
 
-        for agent in self.puppets:
-            self.puppet_pathing(agent)
-
+        
         for agent in self.puppets + ['i']:
             if agent == 'p_0':  
                 continue
@@ -1189,6 +1187,9 @@ class para_MultiGridEnv(ParallelEnv):
                     self.wrong_treat[agent][treat_type] = False
 
 
+        for agent in self.puppets:
+            self.puppet_pathing(agent)
+
         if self.record_oracle_labels and ((self.step_count <= self.end_at_frame or self.end_at_frame == -1) or self.has_released):
             tolerance = 6
             y = self.height // 2
@@ -1206,16 +1207,17 @@ class para_MultiGridEnv(ParallelEnv):
             one_hot_goal_imaginary[self.agent_goal['i']] = 1
             one_hot_goal_imaginary_box[self.box_locations[self.agent_goal['i']]] = 1
 
-            for agent in self.puppets + ['i']:
-                if len(self.big_food_locations) > 0 and self.big_food_locations[-1] != -1:
-                    believes_correct_location = abs(self.last_seen_reward[agent + str(current_loc)] - self.bigReward) < 16
-                    if believes_correct_location and self.wrong_treat[agent]['big']:
-                        self.infos['p_0']['gettier_big'] = True
-                        
-                if len(self.small_food_locations) > 0 and self.small_food_locations[-1] != -1:
-                    believes_correct_location = abs(self.last_seen_reward[agent + str(current_loc)] - self.smallReward) < 16
-                    if believes_correct_location and self.wrong_treat[agent]['small']:
-                        self.infos['p_0']['gettier_small'] = True
+            if self.has_released:
+                for size_label, target_reward, locs in [('small', self.smallReward, self.small_food_locations), ('big', self.bigReward, self.big_food_locations)]:
+                    current_loc = locs[-1]
+                    believed = self.last_seen_reward[agent + str(current_loc)]
+                    actually_there = self.grid.get(current_loc + 1, y)
+                    actual_reward = (actually_there.get_reward() if actually_there else 0)
+                    #print(actual_reward)
+
+                    believes_correct = abs(believed - target_reward) < 16
+                    is_gettier = believes_correct and self.wrong_treat[agent][size_label]
+                    self.infos[agent][f'gettier_{size_label}'] = is_gettier
                 
             info = self.infos['p_0']
 

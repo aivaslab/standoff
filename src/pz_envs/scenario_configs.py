@@ -95,10 +95,11 @@ def count_permutations(event_list):
 
 
 def identify_counterfactuals(events, fsb=False, ss1=False, dsb=False, debug=False):
-    knowledge = {'eb': False, 'es': False, 'lb': False, 'ls': False, 'cflb': False, 'cfls': False}
+    # e: exist, l: location, cf: counterfactual, g: gettier
+    knowledge = {'eb': False, 'es': False, 'lb': False, 'ls': False, 'cflb': False, 'cfls': False, 'gs': False, 'gb': False}
     vision = True
     treat_sizes = [-1 for _ in range(len(events))]
-    reset_knowledge = [0, 0]
+    reset_knowledge = [False, False]
 
     fsb_2nd_swap = False
     resetting_ss1_2nd_swap = False
@@ -139,13 +140,17 @@ def identify_counterfactuals(events, fsb=False, ss1=False, dsb=False, debug=Fals
                 size = treat_sizes[event[1]] if not fsb_2nd_swap else treat_sizes[firstswap]
                 if size == 1:
                     knowledge['eb'] = True
+                    knowledge['gb'] = False
                     knowledge['lb'] = True
                     knowledge['cflb'] = False
                     treat_sizes[k] = 1 #this event's size
+
+                    # if we know other exists but we don't know where, this could be overwriting
                     if knowledge['es'] and not knowledge['ls'] and (fsb_2nd_swap or dsb_swap_after_hidden_swap):
                         knowledge['es'] = False
                 elif size == 0:
                     knowledge['es'] = True
+                    knowledge['gs'] = False
                     knowledge['ls'] = True
                     knowledge['cfls'] = False
                     treat_sizes[k] = 0 #this event's size
@@ -175,9 +180,18 @@ def identify_counterfactuals(events, fsb=False, ss1=False, dsb=False, debug=Fals
                     treat_sizes[k] = 0
                 if event[2] != 'e':
                     size2 = treat_sizes[event[2]] if not fsb_2nd_swap else treat_sizes[event[1]]
+                    if fsb_2nd_swap:
+                        if knowledge['lb']:
+                            knowledge['gb'] = True
+                        if knowledge['ls']:
+                            knowledge['gs'] = True
                     if resetting_ss1_2nd_swap:
                         knowledge['lb'], knowledge['ls'] = reset_knowledge
                         knowledge['eb'], knowledge['es'] = reset_knowledge
+                        if size == 0:
+                            knowledge['gb'] = reset_knowledge[0]
+                        else:
+                            knowledge['gs'] = reset_knowledge[1]
                     elif size2 == 1:
                         if knowledge['lb']:
                             knowledge['cflb'] = True
@@ -194,18 +208,23 @@ def identify_counterfactuals(events, fsb=False, ss1=False, dsb=False, debug=Fals
             if dsb and not vision:
                 dsb_swap_after_hidden_swap = True
 
-    return knowledge['eb'], knowledge['es'], knowledge['lb'], knowledge['ls']#, knowledge['cflb'], knowledge['cfls']
+    return knowledge['eb'], knowledge['es'], knowledge['lb'], knowledge['ls'], knowledge['gb'], knowledge['gs']#, knowledge['cflb'], knowledge['cfls']
 
 def tuple_to_key(knowledge_tuple):
-    eb, es, lb, ls = knowledge_tuple
-    if eb and not lb:
+    eb, es, lb, ls, gb, gs = knowledge_tuple
+    
+    if gb:
+        b_letter = 'G'
+    elif eb and not lb:
         b_letter = 'F'
     elif eb and lb:
         b_letter = 'T'
     else:
         b_letter = 'N'
 
-    if es and not ls:
+    if gs:
+        s_letter = 'g'
+    elif es and not ls:
         s_letter = 'f'
     elif es and ls:
         s_letter = 't'
@@ -337,7 +356,7 @@ class ScenarioConfigs:
             # print(name, events)
 
         counter, self.name_from_knowledge = count_knowledge_combinations(self.all_event_lists, self.event_list_knowledge)
-        print(counter)
+        print('knowledge count', counter)
 
         #print('total lists', len(all_event_lists), 'informed lists', len(informed_event_lists), 'uninformed lists', len(uninformed_event_lists))
 
@@ -375,27 +394,6 @@ class ScenarioConfigs:
                 new_key = 'sl-' + knowledge_key + stage_key
                 self.stages[new_key] = {'events': self.name_from_knowledge[knowledge_key], **stage_info}
 
-        '''lack_to_generalized = {
-            "moved": "0.2.2",
-            "partiallyUninformed": "1.0.0",
-            "replaced": "1.1.0d",
-            "informedControl": "2.0.0",
-            "removedUninformed": "2.1.0",
-            "swapped": "2.1.0a",
-            "removedInformed": "2.1.1",
-            "misinformed": "2.2.0c",
-            "misinformed2": "2.2.0ac",
-        }
-    
-        matching_names = {}
-        for key, value in lack_to_generalized.items():
-            matching_names[key] = []
-            for name in all_event_lists.keys():
-                if name.startswith(value + "-"):
-                    matching_names[key].append(name)
-    
-        for key, value in matching_names.items():
-            print(f"For {key}, found matches: {value}")'''
 
         self.standoff = {
             "defaults": {
