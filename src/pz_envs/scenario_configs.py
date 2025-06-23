@@ -213,18 +213,14 @@ def identify_counterfactuals(events, fsb=False, ss1=False, dsb=False, debug=Fals
 def tuple_to_key(knowledge_tuple):
     eb, es, lb, ls, gb, gs = knowledge_tuple
     
-    if gb:
-        b_letter = 'G'
-    elif eb and not lb:
+    if eb and not lb:
         b_letter = 'F'
     elif eb and lb:
         b_letter = 'T'
     else:
         b_letter = 'N'
 
-    if gs:
-        s_letter = 'g'
-    elif es and not ls:
+    if es and not ls:
         s_letter = 'f'
     elif es and ls:
         s_letter = 't'

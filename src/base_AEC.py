@@ -320,13 +320,15 @@ class MultiGrid:
                 )
             else:
                 if obj.type == 'Box' and obj.show_contains is True and obj.contains is not None:
+                    hide_state = getattr(obj, 'hide', False)
                     img = cls.cache_render_fun(
-                        (tile_size, obj.__class__.__name__ + str(obj.contains.reward), *obj.encode()),
+                        (tile_size, obj.__class__.__name__ + str(obj.contains.reward) + str(hide_state), *obj.encode()),
                         cls.render_object, obj, tile_size, subdivs
                     )
                 else:
+                    hide_state = getattr(obj, 'hide', False)
                     img = cls.cache_render_fun(
-                        (tile_size, obj.__class__.__name__ + str(obj.size), *obj.encode()),
+                        (tile_size, obj.__class__.__name__ + str(obj.size), hide_state, *obj.encode()),
                         cls.render_object, obj, tile_size, subdivs
                     )
             if hasattr(obj, 'render_post'):
@@ -893,10 +895,30 @@ class para_MultiGridEnv(ParallelEnv):
         self.swap_history = []
         self.treat_baited = [False for _ in range(2)]
         self.treat_swapped = [False for _ in range(2)]
+
+        
+        for obj in self.objs_to_hide:
+            pos = obj.pos
+            obj.hide = True
+            box = self.grid.get(pos[0], pos[1])  
+            box.hide = True
+            #self.put_obj(obj, pos[0], pos[1], update_vis=False)
+            #obj.hide = True
+            '''if self.use_box_colors:
+                col = self.box_color_order[pos[0] - 1]
+                self.put_obj(
+                    Box(color=self.color_list[col], state=col, contains=obj, reward=obj.reward, show_contains=self.persistent_treat_images),
+                    pos[0], pos[1],
+                    update_vis=False)
+            else:
+                self.put_obj(
+                    Box("orange", contains=obj, reward=obj.reward, show_contains=self.persistent_treat_images), pos[0], pos[1], update_vis=False)'''
+        
         # activate timed events
         if str(self.step_count) in self.timers.keys():
             for event in self.timers[str(self.step_count)]:
                 self.timer_active(event[0], event[1])
+
 
         # If a user passes in actions with no agents, then just return empty observations, etc.
         if not actions:
@@ -1156,13 +1178,14 @@ class para_MultiGridEnv(ParallelEnv):
                     agent.reward(dr)
 
         # Adds .rewards to ._cumulative_rewards
-        self._cumulative_rewards = {agent: self._cumulative_rewards[agent] + self.rewards[agent] for agent in
-                                    self.agents}
+        self._cumulative_rewards = {agent: self._cumulative_rewards[agent] + self.rewards[agent] for agent in self.agents}
 
         # self._accumulate_rewards() #not defined
 
-        
-        for agent in self.puppets + ['i']:
+        for agent in self.puppets:
+            self.puppet_pathing(agent)
+
+        for agent in ['i']:
             if agent == 'p_0':  
                 continue
             can_see_any = any(self.can_see[agent + str(box)] for box in range(self.boxes))
@@ -1180,15 +1203,11 @@ class para_MultiGridEnv(ParallelEnv):
                         agent_belief_loc = box
                         break
                 
-                if agent_belief_loc != -1 and agent_belief_loc != current_loc and not self.can_see[agent + str(current_loc)]:
-                    self.wrong_treat[agent][treat_type] = True
+                if agent_belief_loc != -1 and agent_belief_loc != current_loc and not can_see_any:
+                    self.treat_was_wrong[agent][treat_type] = True
                 
                 if self.can_see[agent + str(current_loc)]:
-                    self.wrong_treat[agent][treat_type] = False
-
-
-        for agent in self.puppets:
-            self.puppet_pathing(agent)
+                    self.treat_was_wrong[agent][treat_type] = False
 
         if self.record_oracle_labels and ((self.step_count <= self.end_at_frame or self.end_at_frame == -1) or self.has_released):
             tolerance = 6
@@ -1210,14 +1229,19 @@ class para_MultiGridEnv(ParallelEnv):
             if self.has_released:
                 for size_label, target_reward, locs in [('small', self.smallReward, self.small_food_locations), ('big', self.bigReward, self.big_food_locations)]:
                     current_loc = locs[-1]
-                    believed = self.last_seen_reward[agent + str(current_loc)]
+                    believed = self.last_seen_reward['i' + str(current_loc)]
                     actually_there = self.grid.get(current_loc + 1, y)
-                    actual_reward = (actually_there.get_reward() if actually_there else 0)
+                    actual_reward = (actually_there.get_reward())
                     #print(actual_reward)
 
-                    believes_correct = abs(believed - target_reward) < 16
-                    is_gettier = believes_correct and self.wrong_treat[agent][size_label]
-                    self.infos[agent][f'gettier_{size_label}'] = is_gettier
+                    agent_belief_loc = -1
+                    for box in range(self.boxes):
+                        if abs(self.last_seen_reward['i' + str(box)] - target_reward) < 33:
+                            agent_belief_loc = box
+                            break
+
+                    believes_correct = (agent_belief_loc == current_loc)
+                    self.infos['p_0'][f'gettier_{size_label}'] = self.treat_was_wrong['i'][size_label] and believes_correct
                 
             info = self.infos['p_0']
 
@@ -1245,8 +1269,6 @@ class para_MultiGridEnv(ParallelEnv):
 
             info["target-box"] = one_hot_goal_box
             info["i-target-box"] = one_hot_goal_imaginary_box
-
-            # todo: test each of these
 
             if not self.currently_visible:
                 for i in range(self.boxes):
@@ -1405,6 +1427,7 @@ class para_MultiGridEnv(ParallelEnv):
 
         rinfos = {agent: self.infos[agent] for agent in self.agents}
 
+        
 
         return robservations, rrewards, rdones, rinfos
 
@@ -1569,18 +1592,14 @@ class para_MultiGridEnv(ParallelEnv):
         # grid_obj: whatever object is already at pos.
         grid_obj = self.grid.get(*pos)
 
-        # If the target position is empty, then the object can always be placed.
         if grid_obj is None:
             self.grid.set(*pos, obj)
             obj.set_position(pos)
             return True
 
-        # Otherwise only agents can be placed, and only if the target position can_overlap.
         if not (grid_obj.can_overlap() and obj.is_agent):
             return False
 
-        # If ghost mode is off and there's already an agent at the target cell, the agent can't
-        #   be placed there.
         if (not self.ghost_mode) and (grid_obj.is_agent or (len(grid_obj.agents) > 0)):
             return False
 
@@ -1607,10 +1626,6 @@ class para_MultiGridEnv(ParallelEnv):
             raise RecursionError("Rejection sampling failed in place_obj.")
 
         return pos
-
-    def place_agents(self, top=None, size=None, rand_dir=True, max_tries=1000):
-        # warnings.warn("Placing agents with the function place_agents is deprecated.")
-        pass
 
     def render(
             self,

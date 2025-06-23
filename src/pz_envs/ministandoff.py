@@ -136,7 +136,7 @@ class MiniStandoffEnv(para_MultiGridEnv):
         boxes = self.params["boxes"]
         self.saw_last_update = [True for _ in range(boxes)]
 
-        self.wrong_treat = {agent: {treat_type: False for treat_type in ['big', 'small']} for agent in self.agents_and_puppets() + ['i']}
+        self.treat_was_wrong = {agent: {treat_type: False for treat_type in ['big', 'small']} for agent in self.agents_and_puppets() + ['i']}
 
         # we add 'i' as an imaginary agent
         for agent in self.agents_and_puppets() + ['i']:
@@ -162,6 +162,10 @@ class MiniStandoffEnv(para_MultiGridEnv):
                   perms=[],
                   delays=[]
                   ):
+
+        #print(f"current_param_group_pos: {self.current_param_group_pos}")
+        #print(f"delays: {delays}")
+        #print(f"Final events after processing: {events}")
 
         startRoom = 1
         self.boxes = boxes
@@ -350,9 +354,6 @@ class MiniStandoffEnv(para_MultiGridEnv):
 
                     #print('result', event, empty_buckets)
 
-
-
-
                 if event_type == "b":
                     event_args[k] = bait_args[int(event[1])]  # get the size of the treat
                     # remove empty bucket for cases where event[x] wasn't e
@@ -433,21 +434,7 @@ class MiniStandoffEnv(para_MultiGridEnv):
         if self.subject_is_dominant:
             y -= 1
 
-        if self.hidden and len(self.objs_to_hide) > 0:
-            for obj in self.objs_to_hide:
-                pos = obj.pos
-                if self.use_box_colors:
-                    col = self.box_color_order[pos[0] - 1]
-                    self.put_obj(
-                        Box(color=self.color_list[col], state=col, contains=obj, reward=obj.reward,
-                            show_contains=self.persistent_treat_images),
-                        pos[0], pos[1],
-                        update_vis=False)
-                else:
-                    self.put_obj(
-                        Box("orange", contains=obj, reward=obj.reward, show_contains=self.persistent_treat_images),
-                        pos[0], pos[1],
-                        update_vis=False)
+        
         if name == 'init':
             for box in range(self.boxes):
                 x = box + 1
@@ -476,7 +463,7 @@ class MiniStandoffEnv(para_MultiGridEnv):
                 sub_obs_reward = arg
             else:
                 sub_obs_reward = 100 if arg == self.smallReward else 33
-            obj = Goal(reward=arg, size=arg * 0.01, color='green', hide=self.hidden, sub_obs_reward=sub_obs_reward)
+            obj = Goal(reward=arg, size=arg * 0.01, color='green', hide=False, sub_obs_reward=sub_obs_reward)
             if not self.has_baited:
                 self.has_baited = True
                 if self.record_info:
@@ -531,6 +518,13 @@ class MiniStandoffEnv(para_MultiGridEnv):
             for box in range(self.boxes):
                 self.can_see[arg + str(box)] = False if "ob" in name else True
                 self.can_see['i' + str(box)] = False if "ob" in name else True
+
+                x = box + 1
+                tile = self.grid.get(x, y)
+                if tile is not None and tile.type == "Goal":
+                    # mark for hiding at the next timer step
+                    self.objs_to_hide.append(tile)
+                    self.box_updated_this_timestep[box] = True
         elif name == "sw":
             #print(event[1], event[2], 'should be floats!')
             e1 = int(event[1])
@@ -563,8 +557,8 @@ class MiniStandoffEnv(para_MultiGridEnv):
                 self.del_obj(e1 + 1, y)
                 self.del_obj(e2 + 1, y)
 
-                obj1 = Goal(reward=r2, size=r2 * 0.01, color='green', hide=self.hidden, sub_obs_reward=sr2)
-                obj2 = Goal(reward=r1, size=r1 * 0.01, color='green', hide=self.hidden, sub_obs_reward=sr1)
+                obj1 = Goal(reward=r2, size=r2 * 0.01, color='green', hide=False, sub_obs_reward=sr2)
+                obj2 = Goal(reward=r1, size=r1 * 0.01, color='green', hide=False, sub_obs_reward=sr1)
                 self.treat_swapped = [self.smallReward in [r1, r2], self.bigReward in [r1, r2]]
                 self.put_obj(obj1, e1 + 1, y)
                 self.put_obj(obj2, e2 + 1, y)
@@ -586,10 +580,8 @@ class MiniStandoffEnv(para_MultiGridEnv):
                 self.dones['p_0'] = True
             self.has_released = True
 
-        # create visible event list info
         self.visible_event_list.append(self.currently_visible)
 
-        # track where the big and small foods have been
         for loc in range(self.boxes):
             x = loc + 1
             obj = self.grid.get(x, y)
@@ -616,31 +608,10 @@ class MiniStandoffEnv(para_MultiGridEnv):
                                     temp = self.last_seen_reward[b1]
                                     self.last_seen_reward[b1] = self.last_seen_reward[b2]
                                     self.last_seen_reward[b2] = temp
-                                '''for key, value in self.last_seen_reward.items():
-                                    if value == tile.reward and not did_swap:
-                                        # set to the other tile of this swap...
-                                        did_swap = True
-                                        b1 = agent + str(int(event[1]))
-                                        b2 = agent + str(int(event[2]))
-                                        #tile2 = self.grid.get(int(event[2]) + 1, y)
 
-                                        # we don't swap last seen rewards here because it's a visible swap and those might be missing
-                                        #self.last_seen_reward[b1] = tile2.get_reward() if hasattr(tile2, 'get_reward') else 0
-                                        #self.last_seen_reward[b2] = tile.get_reward() if hasattr(tile, 'get_reward') else 0
-                                        temp = self.last_seen_reward[b1]
-                                        self.last_seen_reward[b1] = self.last_seen_reward[b2]
-                                        self.last_seen_reward[b2] = temp
-                                        #print('swapped tiles', self.last_seen_reward)'''
                             if hasattr(tile, 'get_reward'):
                                 self.last_seen_reward[agent + str(box)] = tile.get_reward()
-                            #print(self.last_seen_reward)
 
-                            # print('rew update', agent, box, tile.reward)
-                        '''elif not tile and self.last_seen_reward[agent + str(box)] != 0:
-                            self.last_seen_reward[agent + str(box)] = 0
-                            if self.agent_goal[agent] == box: # our goal is this box, which was swapped with something, and it wasn't a real treat
-                                self.agent_goal[agent] = 2
-                                self.best_reward[agent] = -100'''
 
             self.new_target = False
             for box in range(self.boxes):

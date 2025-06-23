@@ -315,7 +315,34 @@ class Goal(WorldObj):
         return "GG"
 
     def render(self, img):
-        fill_coords(img, point_in_circle(0.5, 0.5, self.size * 0.31), COLORS[self.color])
+
+        if self.hide:
+            c = COLORS["orange"]
+
+            # Outline
+            #fill_coords(img, point_in_rect(0.12, 0.88, 0.12, 0.88), c)
+            fill_coords(img, point_in_rect(0.12, 0.88, 0.12, 0.88), c)
+            fill_coords(img, point_in_rect(0.18, 0.82, 0.18, 0.82), (0, 0, 0))
+
+            # Horizontal slit
+            fill_coords(img, point_in_rect(0.16, 0.84, 0.47, 0.53), c)
+            print('hide',)
+            #exit()
+        else:
+            fill_coords(img, point_in_circle(0.5, 0.5, self.size * 0.31), COLORS[self.color])
+
+    def encode(self, str_class=False):
+        if self.hide:
+            if bool(str_class):
+                enc_class = "Box"
+            else:
+                if "Box" not in self.recursive_subclasses():
+                    self.recursive_subclasses().append("Box")
+                enc_class = self.recursive_subclasses().index("Box")
+            enc_color = "orange" if isinstance("orange", int) else COLOR_TO_IDX["orange"]
+            return enc_class, enc_color, 0
+        else:
+            return super().encode(str_class)
 
 
 class SubGoal(WorldObj):
@@ -659,5 +686,5 @@ class Box(WorldObj):
         # Horizontal slit
         fill_coords(img, point_in_rect(0.16, 0.84, 0.47, 0.53), c)
 
-        if self.contains and self.show_contains:
-            self.contains.render(img)
+        #if self.contains and self.show_contains:
+        #    self.contains.render(img)
