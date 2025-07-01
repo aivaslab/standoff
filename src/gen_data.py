@@ -159,8 +159,8 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
         configs = conf.standoff
         events = conf.stages[configName]['events']
         params = configs[conf.stages[configName]['params']]
-        if params['num_puppets'] == 0:
-            continue
+        #if params['num_puppets'] == 0:
+        #    continue
         #print(configName, configs, events, params)
 
         _subject_is_dominant = [False] if role_type == '' else [True] if role_type == 'D' else [True, False]
@@ -252,11 +252,7 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
                         this_ob[pos, :, :, :] = obs['p_0']
 
                         #print(info['p_0'].keys())
-
-
                         #print(onehot_labels)
-
-
 
                         for label in check_labels:
                             temp_labels[label].append(info['p_0'][label])
@@ -289,14 +285,9 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
                             data_labels['id'].append(unique_id)
                             unique_id += 1
                             #print(informedness, params["num_puppets"], info['p_0']['shouldGetBig'], info['p_0']['shouldGetSmall'])
-
-
                             #print(env.gettier_big)
                             
-
                             identify_mismatches(info, env, informedness, params, data_name, configName, eName, info['p_0']['loc'], info['p_0']['b-loc'], counts)
-
-
 
                             break
 

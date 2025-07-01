@@ -599,12 +599,12 @@ def write_metrics_to_file(filepath, df, ranges, params, stats, key_param=None, d
                     'homogeneous': ['Tt0', 'Ff0', 'Nn0', 'Tt1', 'Ff1', 'Nn1']
                 }
 
-                group['is_novel_task'] = ~test_regimes.isin(train_map[train_regime]) if 'hard' not in key else False
+                group['is_novel_task'] = True#~test_regimes.isin(train_map[train_regime]) if 'hard' not in key else False
                 mean_novel_accuracy = group.loc[group['is_novel_task'], 'accuracy'].mean()
                 std_novel_accuracy = group.loc[group['is_novel_task'], 'accuracy'].std()
                 f.write(f"Novel acc {key_param}: {key}: {mean_novel_accuracy} ({std_novel_accuracy})\n")
 
-                group['isnt_novel_task'] = test_regimes.isin(train_map[train_regime]) if 'hard' not in key else True
+                group['isnt_novel_task'] = True#test_regimes.isin(train_map[train_regime]) if 'hard' not in key else True
                 mean_xnovel_accuracy = group.loc[group['isnt_novel_task'], 'accuracy'].mean()
                 std_xnovel_accuracy = group.loc[group['isnt_novel_task'], 'accuracy'].std()
                 f.write(f"Old acc {key_param}: {key}: {mean_xnovel_accuracy} ({std_xnovel_accuracy})\n")
@@ -658,7 +658,7 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
                            prior_metrics=[], key_param=None, key_param_value=None, save_every=1, skip_calc=True,
                            oracle_early=False, skip_eval=False, oracle_is_target=True, skip_figures=True,
                            act_label_names=[], skip_activations=True, batches=5000, label='correct-loc',
-                           last_timestep=True, model_type=None, do_retrain_model=True):
+                           last_timestep=True, model_type=None, do_retrain_model=True, train_sets_dict=None):
     '''
     Runs a session of supervised learning. Different steps, such as whether we train+save models, evaluate models, or run statistics on evaluations, are optional.
 
@@ -674,7 +674,7 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
     test = 0
     while test < num_random_tests:
         try:
-            model_kwargs = {"batch_size": 1024, "oracle_early": oracle_early, "hidden_size": 32, "num_layers": 3, "kernels": 16, "kernel_size1": 3, "kernel_size2": 5, "stride1": 1, "pool_kernel_size": 3, "pool_stride": 1, "padding1": 1, "padding2": 1, "use_pool": False, "use_conv2": False, "kernels2": 16, "batch_size": 256, "lr": 0.0003, "oracle_len": 0, "output_len": 5, "channels": 5}
+            model_kwargs = {"batch_size": 1024, "oracle_early": oracle_early, "hidden_size": 32, "num_layers": 3, "kernels": 16, "kernel_size1": 3, "kernel_size2": 5, "stride1": 1, "pool_kernel_size": 3, "pool_stride": 1, "padding1": 1, "padding2": 1, "use_pool": False, "use_conv2": False, "kernels2": 16, "lr": 0.0003, "oracle_len": 0, "output_len": 5, "channels": 5}
 
             model_name = "".join([str(x) + "," for x in model_kwargs.values()])
 
@@ -702,7 +702,7 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
                         final_acc = train_model(train_sets, label, load_path=load_path, model_type=model_type,
                                     save_path=save_path, epochs=epochs, batches=batches, model_kwargs=model_kwargs,
                                     oracle_labels=oracle_labels, repetition=repetition, save_every=save_every,
-                                    oracle_is_target=oracle_is_target, last_timestep=last_timestep)
+                                    oracle_is_target=oracle_is_target, last_timestep=last_timestep, train_sets_dict=train_sets_dict)
                         if final_acc > 0.996:
                             good_for_early_stop += 1
 
@@ -739,7 +739,7 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
                         top_repetitions.append((rep_num, final_loss))
 
                 top_repetitions.sort(key=lambda x: x[1])
-                best_three = top_repetitions[:min(3, len(top_repetitions))]
+                best_three = top_repetitions[:min(3000, len(top_repetitions))]
                 best_repetition_numbers = [rep for rep, loss in best_three]
 
                 if "-r-" in model_type or 'hard' in model_type:
@@ -854,7 +854,7 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
             print(f"Error reading {loss_path}: {e}")
             continue
 
-    top_n = 3
+    top_n = 3000
     
     top_repetitions.sort(key=lambda x: (x[1]))
     best_n = top_repetitions[:min(top_n, len(top_repetitions))]

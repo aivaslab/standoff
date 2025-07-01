@@ -154,25 +154,27 @@ def special_heatmap(df_path_list2, df_path_list, key_param='regime', key_param_l
     print('done special')
 
 def is_novel_task(row):
-    
+    return False
     if 'hard' in row['regime']:
         return False
         
-    train_regime = row['regime'].split('-')[-1]
+    train_regime = row['regime'].split('-')[3:]
 
     sub_regime_keys = [
-                    "Fn", "Nf", "Tn", "Ff", "Tf", "Ft", "Tt"
-                ]
+        "Fn", "Nf", "Tn", "Ff", "Tf", "Ft", "Tt", "Gg", "Gn", "Ng"
+    ]
     train_map = {
                     's3': [x + '0' for x in sub_regime_keys] + [x + '1' for x in sub_regime_keys] + ['Nn1a', 'Nt1a', 'Nn1b', 'Nt1b',],
-                    's2': [x + '0' for x in sub_regime_keys] + ['Tt1', 'Nn0', 'Nt0'],
+                    's2': [x + '0' for x in sub_regime_keys] + ['Tt1', 'Nn0', 'Nt0', 'Gg1'],
+                    's2-r': [x + '0' for x in sub_regime_keys] + ['Tt1', 'Nn0', 'Nt0'],
                     's1': [x + '0' for x in sub_regime_keys] + ['Nn0', 'Nt0'],
-                    's21': [x + '0' for x in sub_regime_keys] + ['Tt1', 'Nn1a', 'Nt1a'],
+                    's21': [x + '0' for x in sub_regime_keys] + ['Tt1', 'Nn1a', 'Nt1a', 'Gg1', 'Gn1', 'Ng1'],
+                    's21-r': [x + '0' for x in sub_regime_keys] + ['Tt1', 'Nn1a', 'Nt1a'],
                     'homogeneous': ['Tt0', 'Ff0', 'Nn0', 'Tt1', 'Ff1', 'Nn1']
                 }
     
 
-    return not row['test_regime'] in train_map[train_regime]
+    return not any(regime in train_map[train_regime] for regime in row['test_regime'])
 
 
 def load_h5_data(h5_path, regime, retrain, prior):

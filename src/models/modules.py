@@ -73,6 +73,7 @@ class BaseModule(nn.Module, ABC):
             return torch.where(use_random.view(batch_size, *([1] * (hardcoded.dim() - 1))),
                                rand_output,
                                hardcoded)'''
+    
 
 
 # Perception module
@@ -516,6 +517,8 @@ class AblationArchitecture(nn.Module):
         print('module_configs', module_configs)
         print('random_probs', random_probs)
 
+        print("Ablation Architecture")
+
         if random_probs is None:
             random_probs = {k: 0.0 for k in module_configs.keys()}
 
@@ -592,7 +595,56 @@ class AblationArchitecture(nn.Module):
             sigmoid_temp=sigmoid_temp
         ) if not module_configs['shared_decision'] else self.my_decision)
 
-
+    def get_module_dict(self):
+        return {
+            'treat_perception_my': self.treat_perception_my,
+            'treat_perception_op': self.treat_perception_op,
+            'vision_perception_my': self.vision_perception_my,
+            'vision_perception_op': self.vision_perception_op,
+            'presence_perception_my': self.presence_perception_my,
+            'presence_perception_op': self.presence_perception_op,
+            'my_belief': self.my_belief,
+            'op_belief': self.op_belief,
+            'my_decision': self.my_decision,
+            'op_decision': self.op_decision,
+            'my_combiner': self.my_combiner,
+            'op_combiner': self.op_combiner
+        }
+    
+    def get_trainable_modules(self):
+        trainable = []
+        for name, module in self.get_module_dict().items():
+            if any(p.requires_grad for p in module.parameters()):
+                trainable.append(name)
+        return trainable
+    
+    def get_neural_modules(self):
+        neural = []
+        for name, module in self.get_module_dict().items():
+            if module.use_neural:
+                neural.append(name)
+        return neural
+    
+    def freeze_modules(self, module_names):
+        module_dict = self.get_module_dict()
+        for name in module_names:
+            if name in module_dict:
+                for param in module_dict[name].parameters():
+                    param.requires_grad = False
+    
+    def unfreeze_modules(self, module_names):
+        module_dict = self.get_module_dict()
+        for name in module_names:
+            if name in module_dict:
+                for param in module_dict[name].parameters():
+                    param.requires_grad = True
+    
+    def set_module_training_state(self, trainable_modules, frozen_modules):
+        all_modules = list(self.get_module_dict().keys())
+        self.freeze_modules(all_modules)
+        self.unfreeze_modules(trainable_modules)
+        self.freeze_modules(frozen_modules)
+        
     def compare_tensors(self, name: str, new_tensor: torch.Tensor, old_tensor: torch.Tensor, threshold: float = 0.1,
                         **inputs):
         if isinstance(new_tensor, dict):

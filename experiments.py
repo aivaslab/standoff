@@ -28,7 +28,7 @@ def get_model_types(num, use_eval):
                     'a-mix-n-treat-op',
                     #'a-mix-n-treat-split',
                     'a-mix-n-vision-op',
-                    'a-mix-n-presence-op',
+                    #'a-mix-n-presence-op',
                     'a-mix-n-belief-op',
                     'a-mix-n-belief-my',
                     #'a-mix-n-belief-split',
@@ -37,7 +37,7 @@ def get_model_types(num, use_eval):
                     #'a-mix-n-decision-split',
                     'a-mix-n-all-my',
                     'a-mix-n-all-op',
-                    #'a-mix-n-all-split',
+                    'a-mix-n-all-split',
                     #'a-neural-split',
                     ]
 
@@ -199,10 +199,11 @@ def get_model_types(num, use_eval):
         return experiment_122_models
 
 
-def init_regimes():
+def init_regimes(rational_train_only=True):
     sub_regime_keys = [
-        "Fn", "Nf", "Tn", "Ff", "Tf", "Ft", "Tt", "Gg", "Gn", "Gf", "Gt", "Tg", "Fg", "Ng"
+        "Fn", "Nf", "Tn", "Ff", "Tf", "Ft", "Tt", "Gg", "Gn", "Ng"
     ] # removed Nn and Nt
+
     all_regimes = ['sl-' + x + '0' for x in sub_regime_keys] + ['sl-' + x + '1' for x in sub_regime_keys] + ['sl-Nn1', 'sl-Nt1a', 'sl-Nt1b', 'sl-Nn0', 'sl-Nt0'] #['sl-Nn1a', 'sl-Nn1b', 'sl-Nt1a', 'sl-Nt1b', 'sl-Nn0', 'sl-Nt0'] 
     mixed_regimes = {k: ['sl-' + x + '0' for x in sub_regime_keys] + ['sl-Nn1', 'sl-Nt1a', 'sl-Nt1b', 'sl-Nn0', 'sl-Nt0'] + ['sl-' + k + '1'] for k in sub_regime_keys} 
 
@@ -218,8 +219,11 @@ def init_regimes():
 
     fregimes = {}
     fregimes['s1'] = regimes['noOpponent']
-    fregimes['s2'] = ['sl-' + x + '0' for x in sub_regime_keys] + ['sl-Tt1'] + ['sl-Nn0', 'sl-Nt0']
-    fregimes['s21'] = ['sl-' + x + '0' for x in sub_regime_keys] + ['sl-Tt1'] + ['sl-Nn0', 'sl-Nt0'] + ['sl-Nn1a'] + ['sl-Nt1a'] #a has no swaps, b has swaps
+    fregimes['s2-x'] = ['sl-' + x + '0' for x in sub_regime_keys] + ['sl-Tt1', 'sl-Nn0', 'sl-Nt0', 'sl-Gg1']
+    fregimes['s2'] = ['sl-' + x + '0' for x in sub_regime_keys] + ['sl-Tt1', 'sl-Nn0', 'sl-Nt0']
+    #a has no swaps, b has swaps
+    fregimes['s21-x'] = ['sl-' + x + '0' for x in sub_regime_keys] + ['sl-Tt1', 'sl-Nn0', 'sl-Nt0', 'sl-Nn1a', 'sl-Nt1a', 'sl-Gg1', 'sl-Gn1', 'sl-Ng1'] 
+    fregimes['s21'] = ['sl-' + x + '0' for x in sub_regime_keys] + ['sl-Tt1'] + ['sl-Nn0', 'sl-Nt0'] + ['sl-Nn1a'] + ['sl-Nt1a'] 
     fregimes['s3'] = all_regimes
     # fregimes['homogeneous'] = hregime['homogeneous']
 
@@ -362,7 +366,7 @@ def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, sk
         label_tuples = [('correct-loc', 'loc')]
 
     if 2 in todo or 13 in todo or 133 in todo:
-        real_regimes = {'s21': fregimes['s21'], 's1': fregimes['s1'], 's2': fregimes['s2'], 's3': fregimes['s3']}
+        real_regimes = {'s21': fregimes['s21'],  's2': fregimes['s2'], 's21-r': fregimes['s21-r'],  's2-r': fregimes['s2-r']}
     elif 30 in todo:
         real_regimes = {'s3': fregimes['s3']}
     elif 20 in todo:
@@ -372,7 +376,7 @@ def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, sk
     elif 10 in todo:
         real_regimes = {'s1': fregimes['s1']}
     else:
-        real_regimes = {'s21': fregimes['s21'], 's2': fregimes['s2']}
+        real_regimes = {'s21': fregimes['s21'], 's2': fregimes['s2'], 's1': fregimes['s1']}
 
     print('eval regimes:', fregimes['s3'])
 
@@ -391,6 +395,7 @@ def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, sk
                     label=label,
                     model_type=model_type,
                     do_retrain_model=retrain,
+                    train_sets_dict={'s21': fregimes['s21'], 's2': fregimes['s2'], 's1': fregimes['s1']},
                     **session_params
                 )
                 conditions = [
@@ -421,7 +426,7 @@ def run_single_experiment(args_tuple):
 
 
     experiments([args.exp_num],
-                repetitions=3,
+                repetitions=5,
                 batches=4000,
                 skip_train=not args.t,
                 skip_eval=not args.e,
@@ -470,8 +475,8 @@ if __name__ == '__main__':
     #model_types = ['a-mix-n-treat-split',] #['a-mixed-n-belief-my', 'a-mixed-n-belief-op', 'a-mixed-n-decision-my', 'a-mixed-n-decision-op']
 
     #model_types = ['a-mix-n-perception-op', 'a-mix-n-vision-op', 'a-mix-n-treat-op', 'a-mix-n-belief-op',]
-    model_types = ['a-mix-n-belief-split',]
-    print('number of model types:', len(model_types))
+    model_types = ['a-mix-n-all-split',]
+    #print('number of model types:', len(model_types))
 
     labels = [('correct-loc', 'loc')]
 
@@ -480,7 +485,7 @@ if __name__ == '__main__':
 
         total_tasks = len(experiment_args)
         
-        with multiprocessing.Pool(processes=4) as pool:
+        with multiprocessing.Pool(processes=5) as pool:
             list(tqdm(
                 pool.imap(run_single_experiment, experiment_args),
                 total=total_tasks,
@@ -489,7 +494,7 @@ if __name__ == '__main__':
     else:
         print('running single')
         experiments([args.exp_num] if not args.g else [0],
-                repetitions=1,
+                repetitions=3,
                 batches=2500,
                 skip_train=not args.t,
                 skip_eval=not args.e,
