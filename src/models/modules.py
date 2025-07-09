@@ -644,7 +644,7 @@ class AblationArchitecture(nn.Module):
         self.freeze_modules(all_modules)
         self.unfreeze_modules(trainable_modules)
         self.freeze_modules(frozen_modules)
-        
+
     def compare_tensors(self, name: str, new_tensor: torch.Tensor, old_tensor: torch.Tensor, threshold: float = 0.1,
                         **inputs):
         if isinstance(new_tensor, dict):

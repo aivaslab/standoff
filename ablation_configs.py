@@ -72,11 +72,11 @@ BASE_NEURAL_CONFIGS = {
     'a-mix-n-decision-shared': {'my_decision': True, 'op_decision': True, 'shared_belief': True, 'shared_decision': True, 'detach': False, 'shared_treat': True},
     'a-mix-n-decision-detach': {'my_decision': True, 'op_decision': True, 'shared_belief': True, 'shared_decision': True, 'detach': True, 'shared_treat': True},
 
-    'a-mix-n-all-my': {'my_decision': True, 'my_belief': True, 'my_treat': True},
-    'a-mix-n-all-op': {'op_decision': True, 'op_belief': True, 'op_treat': True},
-    'a-mix-n-all-shared': {'my_treat': True, 'op_treat': True, 'my_belief': True, 'op_belief': True, 'shared_belief': True, 'shared_decision': True, 'detach': False, 'shared_treat': True},
-    'a-mix-n-all-detach': {'my_treat': True, 'op_treat': True, 'my_belief': True, 'op_belief': True, 'shared_belief': True, 'shared_decision': True, 'detach': True, 'shared_treat': True},
-    'a-mix-n-all-split': {'my_treat': True, 'op_treat': True, 'my_belief': True, 'op_belief': True, 'shared_belief': False, 'shared_decision': False, 'detach': False},
+    'a-mix-n-all-my': {'my_decision': True, 'my_belief': True, 'my_treat': True, 'vision_my': True, 'presence_my': True,},
+    'a-mix-n-all-op': {'op_decision': True, 'op_belief': True, 'op_treat': True, 'vision_op': True, 'presence_op': True},
+    'a-mix-n-all-shared': {'my_treat': True, 'op_treat': True, 'vision_my': True, 'presence_my': True, 'vision_op': True, 'presence_op': True, 'my_belief': True, 'op_belief': True, 'shared_belief': True, 'shared_decision': True, 'detach': False, 'shared_treat': True},
+    'a-mix-n-all-detach': {'my_treat': True, 'op_treat': True, 'vision_my': True, 'presence_my': True, 'vision_op': True, 'presence_op': True, 'my_belief': True, 'op_belief': True, 'shared_belief': True, 'shared_decision': True, 'detach': True, 'shared_treat': True},
+    'a-mix-n-all-split': {'my_treat': True, 'op_treat': True, 'vision_my': True, 'presence_my': True, 'vision_op': True, 'presence_op': True, 'my_belief': True, 'op_belief': True, 'shared_belief': False, 'shared_decision': False, 'detach': False},
 
     #'a-mix-n-belief-combiner-shared': {'my_belief': True, 'op_belief': True, 'shared_belief': True, 'shared_decision': True, 'combiner': True, 'shared_combiner': True},
     #'a-mix-n-belief-combiner-split': {'my_belief': True, 'op_belief': True, 'shared_belief': False, 'shared_decision': False, 'combiner': True, 'shared_combiner': False},

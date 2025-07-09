@@ -1,62 +1,188 @@
 class CurriculumConfig:
-    def __init__(self):
-        self.curriculum_stages = [
-            {
-                'stage_name': 'solo',
-                'batches': 500,
-                'data_regimes': ['s1'],
-                'trainable_modules': [
-                    'treat_perception_my', 'vision_perception_my', 'presence_perception_my',
-                    'my_belief', 'my_decision', 'my_combiner'
-                ],
-                'neural_modules': [
-                    'my_treat', 'vision_my', 'presence_my', 
-                    'my_belief', 'my_decision', 'combiner'
-                ],
-                'frozen_modules': [
-                    'treat_perception_op', 'vision_perception_op', 'presence_perception_op',
-                    'op_belief', 'op_decision', 'op_combiner'
-                ],
-                'copy_weights': None
-            },
-            {
-                'stage_name': 'informed',
-                'batches': 500,
-                'data_regimes': ['s2'],
-                'trainable_modules': ['treat_perception_op'],
-                'neural_modules': [
-                    'my_treat', 'vision_my', 'presence_my', 'my_belief', 'my_decision', 'combiner',
-                    'op_treat'
-                ],
-                'frozen_modules': [
-                    'treat_perception_my', 'vision_perception_my', 'presence_perception_my',
-                    'my_belief', 'my_decision', 'my_combiner',
-                    'vision_perception_op', 'presence_perception_op', 'op_belief', 'op_decision', 'op_combiner'
-                ],
-                'copy_weights': {
-                    'treat_perception_my': 'treat_perception_op',
-                    'vision_perception_my': 'vision_perception_op', 
-                    'presence_perception_my': 'presence_perception_op'
-                }
-            },
-            {
-                'stage_name': 'tom_simple',
-                'batches': 500,
-                'data_regimes': ['s21'],
-                'trainable_modules': ['op_belief', 'op_combiner'],
-                'neural_modules': [
-                    'my_treat', 'vision_my', 'presence_my', 'my_belief', 'my_decision', 'combiner',
-                    'op_treat', 'vision_op', 'presence_op', 'op_belief'
-                ],
-                'frozen_modules': [
-                    'treat_perception_my', 'vision_perception_my', 'presence_perception_my',
-                    'my_belief', 'my_decision', 'my_combiner',
-                    'treat_perception_op', 'vision_perception_op', 'presence_perception_op',
-                    'op_decision'
-                ],
-                'copy_weights': None
+    def __init__(self, curriculum_name):
+
+        module_map = {
+                'perception_my': ['treat_perception_my', 'vision_perception_my', 'presence_perception_my'],
+                'perception_op': ['treat_perception_op', 'vision_perception_op', 'presence_perception_op'],
+                'perception_both': ['treat_perception_my', 'vision_perception_my', 'presence_perception_my', 'treat_perception_op', 'vision_perception_op', 'presence_perception_op'],
+                'belief_my': ['my_belief'],
+                'belief_op': ['op_belief'],
+                'belief_both': ['my_belief', 'op_belief'],
+                'decision_my': ['my_decision'],
+                'decision_op': ['op_decision'],
+                'decision_both': ['my_decision', 'op_decision'],
             }
-        ]
+
+        all_modules = [
+                        'treat_perception_my', 
+                        'vision_perception_my', 
+                        'presence_perception_my',
+                        'treat_perception_op', 
+                        'vision_perception_op', 
+                        'presence_perception_op', 
+                        'my_belief',
+                        'op_belief',
+                        'my_decision',
+                        'op_decision', 
+                    ]
+
+        print('cur got', curriculum_name)
+
+        if curriculum_name == "three":
+            self.curriculum_stages = [
+                {
+                    'stage_name': 'solo',
+                    'batches': 500,
+                    'data_regimes': ['s1'],
+                    'trainable_modules': [
+                        'treat_perception_my', 
+                        'vision_perception_my', 
+                        'presence_perception_my',
+                        'my_belief',
+                        'my_decision',
+                    ],
+                    'copy_weights': None,
+                },
+                {
+                    'stage_name': 'informed',
+                    'batches': 750,
+                    'data_regimes': ['s2'],
+                    'trainable_modules': [
+                        'treat_perception_op', 
+                        'presence_perception_op', 
+                        'my_decision'],
+                    'copy_weights': {
+                        'treat_perception_my': 'treat_perception_op',
+                        'vision_perception_my': 'vision_perception_op', 
+                        'presence_perception_my': 'presence_perception_op',
+                        'my_belief': 'op_belief',
+                        'my_decision': 'op_decision'
+                    },
+                },
+                {
+                    'stage_name': 'tom_simple',
+                    'batches': 1000,
+                    'data_regimes': ['s21'],
+                    'trainable_modules': [
+                        'op_belief', 
+                        'vision_perception_op', 
+                        'op_decision', 
+                        'my_decision'],
+                    'copy_weights': None,
+                }
+            ]
+        elif curriculum_name == "everything":
+            self.curriculum_stages = [
+                {
+                    'stage_name': 'everything',
+                    'batches': 2000,
+                    'data_regimes': ['s3'],
+                    'trainable_modules': all_modules,
+                    'copy_weights': None,
+                },
+            ]
+        else:
+            def extract_regime_and_base(name):
+                regime = 's1'
+                base = name
+                for r in ['s21', 's3', 's2', 's1']:
+                    if name.endswith('_' + r):
+                        regime = r
+                        base = name[:-len('_' + r)]
+                        break
+                return regime, base
+
+            regime, base_curriculum_name = extract_regime_and_base(curriculum_name)
+            
+            if base_curriculum_name in module_map:
+                self.curriculum_stages = [{
+                    'stage_name': base_curriculum_name,
+                    'batches': 2000,
+                    'data_regimes': [regime],
+                    'trainable_modules': module_map[base_curriculum_name],
+                    'copy_weights': None,
+                }]
+
+            elif base_curriculum_name.endswith('_then_all'):
+                temp_name = base_curriculum_name[:-9]
+                if temp_name in module_map:
+                    self.curriculum_stages = [
+                        {
+                            'stage_name': temp_name,
+                            'batches': 1000,
+                            'data_regimes': [regime],
+                            'trainable_modules': module_map[temp_name],
+                            'copy_weights': None,
+                        },
+                        {
+                            'stage_name': 'all',
+                            'batches': 1000,
+                            'data_regimes': [regime],
+                            'trainable_modules': all_modules,
+                            'copy_weights': None,
+                        }
+                    ]
+
+            elif base_curriculum_name.endswith('_then_else'):
+                temp_name = base_curriculum_name[:-10]
+                if temp_name in module_map:
+                    self.curriculum_stages = [
+                        {
+                            'stage_name': temp_name,
+                            'batches': 1000,
+                            'data_regimes': [regime],
+                            'trainable_modules': module_map[temp_name],
+                            'copy_weights': None,
+                        },
+                        {
+                            'stage_name': 'all',
+                            'batches': 1000,
+                            'data_regimes': [regime],
+                            'trainable_modules': [module for module in all_modules if module not in module_map[temp_name]],
+                            'copy_weights': None,
+                        }
+                    ]
+
+            elif base_curriculum_name.startswith('else_then_'):
+                temp_name = base_curriculum_name[10:]
+                if temp_name in module_map:
+                    self.curriculum_stages = [
+                        {
+                            'stage_name': 'all',
+                            'batches': 1000,
+                            'data_regimes': [regime],
+                            'trainable_modules': [module for module in all_modules if module not in module_map[temp_name]],
+                            'copy_weights': None,
+                        },
+                        {
+                            'stage_name': temp_name,
+                            'batches': 1000,
+                            'data_regimes': [regime],
+                            'trainable_modules': module_map[temp_name],
+                            'copy_weights': None,
+                        }
+                    ]
+
+            elif base_curriculum_name.startswith('all_then_'):
+                temp_name = base_curriculum_name[9:]
+                if temp_name in module_map:
+                    self.curriculum_stages = [
+                        {
+                            'stage_name': 'all',
+                            'batches': 1000,
+                            'data_regimes': [regime],
+                            'trainable_modules': all_modules,
+                            'copy_weights': None,
+                        },
+                        {
+                            'stage_name': temp_name,
+                            'batches': 1000,
+                            'data_regimes': [regime],
+                            'trainable_modules': module_map[temp_name],
+                            'copy_weights': None,
+                        }
+                    ]
+
 
 def copy_module_weights(source_module, target_module):
     if hasattr(source_module, 'neural_network') and hasattr(target_module, 'neural_network'):
@@ -87,18 +213,30 @@ def apply_curriculum_stage(model, stage_config, train_sets_dict):
         'op_combiner': model.op_combiner
     }
     
+    if not hasattr(model, '_ever_trained'):
+        model._ever_trained = set()
+    copied_to_modules = set()
+    
     if stage_config['copy_weights']:
         for source_name, target_name in stage_config['copy_weights'].items():
             if source_name in all_modules and target_name in all_modules:
                 copy_module_weights(all_modules[source_name], all_modules[target_name])
+                copied_to_modules.add(target_name)
     
-    for module_name in all_modules:
-        if module_name in stage_config['frozen_modules']:
-            freeze_module_parameters(all_modules[module_name])
-        elif module_name in stage_config['trainable_modules']:
-            unfreeze_module_parameters(all_modules[module_name])
+    for module_name, module in all_modules.items():
+        if module_name in stage_config['trainable_modules']:
+            module.use_neural = True
+            unfreeze_module_parameters(module)
+            model._ever_trained.add(module_name)
+        elif module_name in model._ever_trained or module_name in copied_to_modules:
+            module.use_neural = True
+            freeze_module_parameters(module)
         else:
-            freeze_module_parameters(all_modules[module_name])
+            module.use_neural = False
+            freeze_module_parameters(module)
+    
+    trainable = [name for name, module in all_modules.items() if any(p.requires_grad for p in module.parameters())]
+    print(f"Trainable: {trainable}")
     
     stage_train_sets = []
     for regime in stage_config['data_regimes']:

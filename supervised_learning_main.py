@@ -189,7 +189,7 @@ def load_model(model_type, model_kwargs, device, multi=False):
     random_probs.update(model_random)
 
     #print('random probs:', random_probs)
-    print("load model")
+    print("load model", model_type)
     if multi:
         print('multi')
         return MultiAgentArchitecture(config, random_probs, model_kwargs['batch_size']).to(device)
@@ -658,7 +658,8 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
                            prior_metrics=[], key_param=None, key_param_value=None, save_every=1, skip_calc=True,
                            oracle_early=False, skip_eval=False, oracle_is_target=True, skip_figures=True,
                            act_label_names=[], skip_activations=True, batches=5000, label='correct-loc',
-                           last_timestep=True, model_type=None, do_retrain_model=True, train_sets_dict=None):
+                           last_timestep=True, model_type=None, do_retrain_model=True, train_sets_dict=None,
+                           curriculum_name=None):
     '''
     Runs a session of supervised learning. Different steps, such as whether we train+save models, evaluate models, or run statistics on evaluations, are optional.
 
@@ -672,165 +673,158 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
     num_random_tests = 1
 
     test = 0
-    while test < num_random_tests:
-        try:
-            model_kwargs = {"batch_size": 1024, "oracle_early": oracle_early, "hidden_size": 32, "num_layers": 3, "kernels": 16, "kernel_size1": 3, "kernel_size2": 5, "stride1": 1, "pool_kernel_size": 3, "pool_stride": 1, "padding1": 1, "padding2": 1, "use_pool": False, "use_conv2": False, "kernels2": 16, "lr": 0.0003, "oracle_len": 0, "output_len": 5, "channels": 5}
+    model_kwargs = {"batch_size": 1024, "oracle_early": oracle_early, "hidden_size": 32, "num_layers": 3, "kernels": 16, "kernel_size1": 3, "kernel_size2": 5, "stride1": 1, "pool_kernel_size": 3, "pool_stride": 1, "padding1": 1, "padding2": 1, "use_pool": False, "use_conv2": False, "kernels2": 16, "lr": 0.0003, "oracle_len": 0, "output_len": 5, "channels": 5}
 
-            model_name = "".join([str(x) + "," for x in model_kwargs.values()])
+    model_name = "".join([str(x) + "," for x in model_kwargs.values()])
 
-            dfs_paths = []
-            last_epoch_df_paths = []
-            loss_paths = []
+    dfs_paths = []
+    last_epoch_df_paths = []
+    loss_paths = []
 
-            if do_retrain_model:
-                retrain_path = save_path + '-retrain'
-                os.makedirs(retrain_path, exist_ok=True)
+    if do_retrain_model:
+        retrain_path = save_path + '-retrain'
+        os.makedirs(retrain_path, exist_ok=True)
 
-            good_for_early_stop = 0
-            for repetition in range(repetitions):
-                if not skip_train:
-                    loss_file_path = os.path.join(save_path, f'losses-{repetition}.csv')
-                    should_train = True
-                    if os.path.exists(loss_file_path) and False:
-                        df = pd.read_csv(loss_file_path, index_col=None)
-                        print(df.columns, os.path.abspath(loss_file_path), df)
-                        final_acc = df['Accuracy'].iloc[-1]
-                        if final_acc >= 0.996:
-                            should_train = False
-                            good_for_early_stop += 1
-                    if should_train:
-                        final_acc = train_model(train_sets, label, load_path=load_path, model_type=model_type,
-                                    save_path=save_path, epochs=epochs, batches=batches, model_kwargs=model_kwargs,
-                                    oracle_labels=oracle_labels, repetition=repetition, save_every=save_every,
-                                    oracle_is_target=oracle_is_target, last_timestep=last_timestep, train_sets_dict=train_sets_dict)
-                        if final_acc > 0.996:
-                            good_for_early_stop += 1
+    good_for_early_stop = 0
+    for repetition in range(repetitions):
+        if not skip_train:
+            loss_file_path = os.path.join(save_path, f'losses-{repetition}.csv')
+            should_train = True
+            if os.path.exists(loss_file_path) and False:
+                df = pd.read_csv(loss_file_path, index_col=None)
+                print(df.columns, os.path.abspath(loss_file_path), df)
+                final_acc = df['Accuracy'].iloc[-1]
+                if final_acc >= 0.996:
+                    should_train = False
+                    good_for_early_stop += 1
+            if should_train:
+                final_acc = train_model(train_sets, label, load_path=load_path, model_type=model_type,
+                            save_path=save_path, epochs=epochs, batches=batches, model_kwargs=model_kwargs,
+                            oracle_labels=oracle_labels, repetition=repetition, save_every=save_every,
+                            oracle_is_target=oracle_is_target, last_timestep=last_timestep, train_sets_dict=train_sets_dict,
+                            curriculum_name=curriculum_name)
+                if final_acc > 0.996:
+                    good_for_early_stop += 1
 
-                loss_paths.append(os.path.join(save_path, f'losses-{repetition}.csv'))
-                if good_for_early_stop > 4:
-                    break
-                if do_retrain_model:
-                    epoch = epochs - 1
-                    print('retraining', epoch)
-                    retrain_model(eval_sets, label, load_path=load_path,
-                                  model_type=model_type,
-                                  model_load_path=save_path,
-                                  retrain_path=retrain_path,
-                                  oracle_labels=oracle_labels,
-                                  repetition=repetition,
-                                  epoch_number=epoch,
-                                  prior_metrics=prior_metrics,
-                                  act_label_names=act_label_names,
-                                  last_timestep=last_timestep,
-                                  retrain_batches=batches)
-            if not skip_eval:
-                print('doing eval')
-                loss_file_pattern = os.path.join(save_path, 'losses-*.csv')
-                all_loss_paths = glob.glob(loss_file_pattern)
+        loss_paths.append(os.path.join(save_path, f'losses-{repetition}.csv'))
+        if good_for_early_stop > 4:
+            break
+        if do_retrain_model:
+            epoch = epochs - 1
+            print('retraining', epoch)
+            retrain_model(eval_sets, label, load_path=load_path,
+                          model_type=model_type,
+                          model_load_path=save_path,
+                          retrain_path=retrain_path,
+                          oracle_labels=oracle_labels,
+                          repetition=repetition,
+                          epoch_number=epoch,
+                          prior_metrics=prior_metrics,
+                          act_label_names=act_label_names,
+                          last_timestep=last_timestep,
+                          retrain_batches=batches)
+    if not skip_eval:
+        print('doing eval')
+        loss_file_pattern = os.path.join(save_path, 'losses-*.csv')
+        all_loss_paths = glob.glob(loss_file_pattern)
 
-                top_repetitions = []
+        top_repetitions = []
 
-                for loss_path in all_loss_paths:
-                    rep_str = os.path.basename(loss_path).replace('losses-', '').replace('.csv', '')
-                    rep_num = int(rep_str)
-                    df = pd.read_csv(loss_path)
-                    if not df.empty:
-                        final_loss = df['Loss'].iloc[-1]
-                        top_repetitions.append((rep_num, final_loss))
+        for loss_path in all_loss_paths:
+            rep_str = os.path.basename(loss_path).replace('losses-', '').replace('.csv', '')
+            rep_num = int(rep_str)
+            df = pd.read_csv(loss_path)
+            if not df.empty:
+                final_loss = df['Loss'].iloc[-1]
+                top_repetitions.append((rep_num, final_loss))
 
-                top_repetitions.sort(key=lambda x: x[1])
-                best_three = top_repetitions[:min(3000, len(top_repetitions))]
-                best_repetition_numbers = [rep for rep, loss in best_three]
+        top_repetitions.sort(key=lambda x: x[1])
+        best_three = top_repetitions[:min(3000, len(top_repetitions))]
+        best_repetition_numbers = [rep for rep, loss in best_three]
 
-                if "-r-" in model_type or 'hard' in model_type:
-                    best_repetition_numbers = [0]
+        if "-r-" in model_type or 'hard' in model_type:
+            best_repetition_numbers = [0]
 
-                print(f"best repetitions: {best_three}")
-                for repetition in best_repetition_numbers:
-                    for epoch in [epochs - 1]:
-                        print('evaluating', epoch, model_name)
-                        try:
-                            for this_path in [save_path]:#, retrain_path]: #retrain path removed
-                                for eval_prior in [False]:#[False, True] if this_path == save_path else [False]:
-                                    df_paths = evaluate_model(eval_sets, label, load_path=load_path,
-                                                          model_type=model_type,
-                                                          model_load_path=this_path,
-                                                          oracle_labels=oracle_labels,
-                                                          repetition=repetition,
-                                                          epoch_number=epoch,
-                                                          prior_metrics=prior_metrics,
-                                                          oracle_is_target=oracle_is_target,
-                                                          act_label_names=act_label_names,
-                                                          oracle_early=oracle_early,
-                                                          last_timestep=last_timestep,
-                                                          use_prior=eval_prior,
-                                                          num_activation_batches=0)
-                                    if df_paths is not None:
-                                        dfs_paths.extend(df_paths)
-                                        if epoch == epochs - 1 or eval_prior:
-                                            last_epoch_df_paths.extend(df_paths)
-                        except Exception as e:
-                            print(f"Error {e}")
+        print(f"best repetitions: {best_three}")
+        for repetition in best_repetition_numbers:
+            for epoch in [epochs - 1]:
+                print('evaluating', epoch, model_name)
+                try:
+                    for this_path in [save_path]:#, retrain_path]: #retrain path removed
+                        for eval_prior in [False]:#[False, True] if this_path == save_path else [False]:
+                            df_paths = evaluate_model(eval_sets, label, load_path=load_path,
+                                                  model_type=model_type,
+                                                  model_load_path=this_path,
+                                                  oracle_labels=oracle_labels,
+                                                  repetition=repetition,
+                                                  epoch_number=epoch,
+                                                  prior_metrics=prior_metrics,
+                                                  oracle_is_target=oracle_is_target,
+                                                  act_label_names=act_label_names,
+                                                  oracle_early=oracle_early,
+                                                  last_timestep=last_timestep,
+                                                  use_prior=eval_prior,
+                                                  num_activation_batches=0)
+                            if df_paths is not None:
+                                dfs_paths.extend(df_paths)
+                                if epoch == epochs - 1 or eval_prior:
+                                    last_epoch_df_paths.extend(df_paths)
+                except Exception as e:
+                    print(f"Error {e}")
 
-                
-                #loss_paths.append(os.path.join(retrain_path, f'losses-{repetition}.csv'))
-                #for file in glob.glob(os.path.join(retrain_path, '*-rt-losses.csv')):
-                #    loss_paths.append(file)
+        
+        #loss_paths.append(os.path.join(retrain_path, f'losses-{repetition}.csv'))
+        #for file in glob.glob(os.path.join(retrain_path, '*-rt-losses.csv')):
+        #    loss_paths.append(file)
 
-            dfs_paths = []
-            for this_path in [save_path]:#, retrain_path]:
-                if skip_train:
-                    #skipping prior
-                    dfs_paths.extend([path for path in find_df_paths(this_path, 'param_losses_*_*.csv') if 'prior' not in path])
-                    print('sup sess dfs paths', dfs_paths, save_path)
-                if len(dfs_paths):
-                    matches = []
-                    prior_matches = []
-                    for path in dfs_paths:
-                        match = re.search(r'(\d+)', path.split('_')[-2])
-                        if 'prior' in path.split('_')[-2]:
-                            prior_matches.append(path)
-                        if match:
-                            matches.append((path, int(match.group())))
-                    max_epoch = max(epoch for path, epoch in matches)
-                    last_epoch_df_paths = [path for path, epoch in matches if epoch == max_epoch]
-                    if prior_matches:
-                        last_epoch_df_paths.extend(prior_matches)
+    dfs_paths = []
+    for this_path in [save_path]:#, retrain_path]:
+        if skip_train:
+            #skipping prior
+            dfs_paths.extend([path for path in find_df_paths(this_path, 'param_losses_*_*.csv') if 'prior' not in path])
+            print('sup sess dfs paths', dfs_paths, save_path)
+        if len(dfs_paths):
+            matches = []
+            prior_matches = []
+            for path in dfs_paths:
+                match = re.search(r'(\d+)', path.split('_')[-2])
+                if 'prior' in path.split('_')[-2]:
+                    prior_matches.append(path)
+                if match:
+                    matches.append((path, int(match.group())))
+            max_epoch = max(epoch for path, epoch in matches)
+            last_epoch_df_paths = [path for path, epoch in matches if epoch == max_epoch]
+            if prior_matches:
+                last_epoch_df_paths.extend(prior_matches)
 
-                if not skip_calc and len(last_epoch_df_paths):
-                    print('loading dfs (with gzip)...', dfs_paths)
+        if not skip_calc and len(last_epoch_df_paths):
+            print('loading dfs (with gzip)...', dfs_paths)
 
-                    df_list = [pd.read_csv(df_path, compression='gzip') for df_path in dfs_paths]
-                    combined_df = pd.concat(df_list, ignore_index=True)
+            df_list = [pd.read_csv(df_path, compression='gzip') for df_path in dfs_paths]
+            combined_df = pd.concat(df_list, ignore_index=True)
 
-                    last_df_list = [pd.read_csv(df_path, compression='gzip') for df_path in last_epoch_df_paths]
-                    last_epoch_df = pd.concat(last_df_list, ignore_index=True)
-                    replace_dict = {'1': 1, '0': 0}
-                    combined_df.replace(replace_dict, inplace=True)
-                    last_epoch_df.replace(replace_dict, inplace=True)
-                    combined_df[key_param] = key_param_value
-                    last_epoch_df[key_param] = key_param_value
-                    # print('join replace took', time.time()-cur_time)
-                    # print('last_df cols', last_epoch_df.columns, last_epoch_df.t)
-                    combined_df['i-informedness'] = combined_df['i-informedness'].fillna('none')
-                    last_epoch_df['i-informedness'] = last_epoch_df['i-informedness'].fillna('none')
+            last_df_list = [pd.read_csv(df_path, compression='gzip') for df_path in last_epoch_df_paths]
+            last_epoch_df = pd.concat(last_df_list, ignore_index=True)
+            replace_dict = {'1': 1, '0': 0}
+            combined_df.replace(replace_dict, inplace=True)
+            last_epoch_df.replace(replace_dict, inplace=True)
+            combined_df[key_param] = key_param_value
+            last_epoch_df[key_param] = key_param_value
+            # print('join replace took', time.time()-cur_time)
+            # print('last_df cols', last_epoch_df.columns, last_epoch_df.t)
+            combined_df['i-informedness'] = combined_df['i-informedness'].fillna('none')
+            last_epoch_df['i-informedness'] = last_epoch_df['i-informedness'].fillna('none')
 
-                    avg_loss, variances, ranges_1, ranges_2, range_dict, range_dict3, stats, _, _, _, _ = calculate_statistics(
-                        combined_df, last_epoch_df, params + prior_metrics, skip_3x=True)
+            avg_loss, variances, ranges_1, ranges_2, range_dict, range_dict3, stats, _, _, _, _ = calculate_statistics(
+                combined_df, last_epoch_df, params + prior_metrics, skip_3x=True)
 
-                    write_metrics_to_file(os.path.join(this_path, 'metrics.txt'), last_epoch_df, ranges_1, params, stats, key_param=key_param)
+            write_metrics_to_file(os.path.join(this_path, 'metrics.txt'), last_epoch_df, ranges_1, params, stats, key_param=key_param)
 
-                    if not skip_figures:
-                        save_figures(os.path.join(this_path, 'figs'), combined_df, avg_loss, ranges_2, range_dict, range_dict3,
-                                     params + prior_metrics, last_epoch_df, num=12)
+            if not skip_figures:
+                save_figures(os.path.join(this_path, 'figs'), combined_df, avg_loss, ranges_2, range_dict, range_dict3,
+                             params + prior_metrics, last_epoch_df, num=12)
 
-                    test_names.append(model_name)
-            test += 1
-        except KeyboardInterrupt:
-            raise
-        except BaseException as e:
-            print(e)
-            traceback.print_exc()
+            test_names.append(model_name)
 
     if not skip_activations:
         print('corring activations...')

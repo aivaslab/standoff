@@ -26,19 +26,14 @@ def get_model_types(num, use_eval):
                     'a-mix-n-perception-op',
                     'a-mix-n-treat-my',
                     'a-mix-n-treat-op',
-                    #'a-mix-n-treat-split',
                     'a-mix-n-vision-op',
-                    #'a-mix-n-presence-op',
                     'a-mix-n-belief-op',
                     'a-mix-n-belief-my',
-                    #'a-mix-n-belief-split',
                     'a-mix-n-decision-op',
                     'a-mix-n-decision-my',
-                    #'a-mix-n-decision-split',
                     'a-mix-n-all-my',
                     'a-mix-n-all-op',
                     'a-mix-n-all-split',
-                    #'a-neural-split',
                     ]
 
     # real exp3/4
@@ -295,7 +290,7 @@ def init_regimes(rational_train_only=True):
 
 def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, skip_calc=False, batch_size=64, desired_evals=5,
                 skip_eval=False, skip_activations=False, last_timestep=True, retrain=False, current_model_type=None, current_label=None, current_label_name=None,
-                comparison=False, model_types=None):
+                comparison=False, model_types=None, curriculum_name=None):
     """What is the overall performance of naive, off-the-shelf models on this task? Which parameters of competitive
     feeding settings are the most sensitive to overall model performance? To what extent are different models
     sensitive to different parameters? """
@@ -386,7 +381,7 @@ def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, sk
                 kpname = f'{model_type}-{label_name}-{regime}'
                 print(model_type + '-' + label_name, 'regime:', regime, 'train_sets:', real_regimes[regime])
                 combined_paths, last_epoch_paths, lp = run_supervised_session(
-                    save_path=os.path.join('supervised', exp_name, kpname),
+                    save_path=os.path.join('supervised', exp_name, kpname) if curriculum_name is None else os.path.join('supervised', exp_name, curriculum_name),
                     train_sets=real_regimes[regime],
                     eval_sets=fregimes['s3'],
                     oracle_labels=[None],
@@ -395,7 +390,8 @@ def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, sk
                     label=label,
                     model_type=model_type,
                     do_retrain_model=retrain,
-                    train_sets_dict={'s21': fregimes['s21'], 's2': fregimes['s2'], 's1': fregimes['s1']},
+                    train_sets_dict={'s21': fregimes['s21'], 's2': fregimes['s2'], 's1': fregimes['s1'], 's3': fregimes['s3']},
+                    curriculum_name=curriculum_name,
                     **session_params
                 )
                 conditions = [
@@ -420,8 +416,8 @@ def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, sk
 
 
 def run_single_experiment(args_tuple):
-    model_type, (label, label_name), args = args_tuple
-    print(f"Running experiment with model_type: {model_type}, label: {label}, label_name: {label_name}")
+    model_type, (label, label_name), args, curriculum_name = args_tuple
+    print(f"Running experiment with model_type: {model_type}, label: {label}, label_name: {label_name}, curriculum: {curriculum_name}")
     print(f"Process: {multiprocessing.current_process().name}")
 
 
@@ -439,7 +435,8 @@ def run_single_experiment(args_tuple):
                 current_model_type=model_type,
                 current_label=label,
                 current_label_name=label_name,
-                comparison=args.p)
+                comparison=args.p,
+                curriculum_name=curriculum_name)
 
 def tqdm_pool_map(pool, func, args, total=None):
     total = total or len(args)
@@ -475,13 +472,31 @@ if __name__ == '__main__':
     #model_types = ['a-mix-n-treat-split',] #['a-mixed-n-belief-my', 'a-mixed-n-belief-op', 'a-mixed-n-decision-my', 'a-mixed-n-decision-op']
 
     #model_types = ['a-mix-n-perception-op', 'a-mix-n-vision-op', 'a-mix-n-treat-op', 'a-mix-n-belief-op',]
-    model_types = ['a-mix-n-all-split',]
+    model_types = ['a-neural-split',]
     #print('number of model types:', len(model_types))
 
     labels = [('correct-loc', 'loc')]
+    curriculum_names = [
+        "everything", 
+        ]
+    base_names = [
+        "perception_my", 
+        "perception_op",
+        "belief_my",
+        "belief_op",
+        "decision_my",
+        "decision_op",
+    ]
+    single_curriculum_names = [name + "_s21" for name in base_names]
+    early_curriculum_names = [name + "_then_all_s21" for name in base_names]
+    late_curriculum_names = ["all_then_" + name + "_s21" for name in base_names]
+    early_frozen_curriculum_names = [name + "_then_else_s3" for name in base_names]
+    late_frozen_curriculum_names = ["else_then_" + name + "_s3" for name in base_names]
+
+    curriculum_names = early_frozen_curriculum_names + late_frozen_curriculum_names
 
     if (not args.p) and (not args.g):
-        experiment_args = [(model_type, label, args) for model_type, label in product(model_types, labels)]
+        experiment_args = [(model_type, label, args, curriculum_name) for model_type, label, curriculum_name in product(model_types, labels, curriculum_names)]
 
         total_tasks = len(experiment_args)
         
@@ -505,7 +520,8 @@ if __name__ == '__main__':
                 desired_evals=1,
                 last_timestep=True,
                 comparison=args.p,
-                model_types=model_types)
+                model_types=model_types,
+                curriculum_name=curriculum_names[0])
 
     print("finished")
 
