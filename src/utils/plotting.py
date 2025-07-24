@@ -1857,17 +1857,15 @@ def plot_awareness_results(final_awareness_results, save_path=None, merge_states
     plt.figure(figsize=(12, 8))
 
     if merge_states:
-        # Define merged states and their colors
         colors = {
-            'TT': '#2196F3',  # Both correct - blue
-            'TF/FT': '#4CAF50',  # One correct, one wrong - green
-            'TN/NT': '#FFC107',  # One correct/wrong, one null - yellow
-            'FN/NF': '#3F0137',  # One correct/wrong, one null - yellow
-            'FF': '#F44336',  # Both wrong - red
-            'NN': '#9E9E9E',  # Both null - gray
+            'TT': '#2196F3', 
+            'TF/FT': '#4CAF50', 
+            'TN/NT': '#FFC107', 
+            'FN/NF': '#3F0137', 
+            'FF': '#F44336', 
+            'NN': '#9E9E9E', 
         }
 
-        # Compute merged states
         vision_probs = []
         merged_results = []
 
@@ -1887,17 +1885,16 @@ def plot_awareness_results(final_awareness_results, save_path=None, merge_states
         title = 'The effect of random vision on informedness'
 
     else:
-        # Original detailed states
         colors = {
-            'TT': '#2196F3',  # Both correct - blue
-            'TF': '#4CAF50',  # First correct, second wrong - green
-            'TN': '#FFC107',  # First correct, second null - yellow
-            'FT': '#9C27B0',  # First wrong, second correct - purple
-            'FF': '#F44336',  # Both wrong - red
-            'FN': '#795548',  # First wrong, second null - brown
-            'NT': '#607D8B',  # First null, second correct - gray-blue
-            'NF': '#FF5722',  # First null, second wrong - orange
-            'NN': '#9E9E9E',  # Both null - gray
+            'TT': '#2196F3',
+            'TF': '#4CAF50',
+            'TN': '#FFC107',
+            'FT': '#9C27B0',
+            'FF': '#F44336',
+            'FN': '#795548',
+            'NT': '#607D8B',
+            'NF': '#FF5722',
+            'NN': '#9E9E9E',
         }
 
         vision_probs = [r['visionProb'] for r in final_awareness_results]
@@ -2014,7 +2011,6 @@ def save_key_param_figures(save_dir, key_param_stats, oracle_stats, key_param, k
             df_list = df_list_from_stat_dict(stat_dict, param)
 
             df = pd.DataFrame(df_list, columns=[key_param, param, "accuracy mean", "accuracy std"])
-            # if the param shape has 2+ dimensions, use only the last timestep ones and aggregate
 
             table_save_path = os.path.join(this_save_dir, f'{param}_{label}_table.csv')
             df.to_csv(table_save_path, index=False)
@@ -2062,7 +2058,7 @@ def save_key_param_figures(save_dir, key_param_stats, oracle_stats, key_param, k
                             desired_order = ['Tt0', 'Tf0', 'Tn0', 'Ft0', 'Ff0', 'Fn0', 'Nt0', 'Nf0', 'Nn0', 'Tt1', 'Tf1',
                                              'Tn1', 'Ft1', 'Ff1', 'Fn1', 'Nt1', 'Nf1', 'Nn1']
                         else:
-                            desired_order = ['Tt1', 'Tf1', 'Tn1', 'Ft1', 'Ff1', 'Fn1', 'Nt1', 'Nf1', 'Nn1']
+                            desired_order = ['Tt1', 'Tf1', 'Tn1', 'Ft1', 'Ff1', 'Fn1', 'Nt1a', 'Nt1b', 'Nf1', 'Nn1']
                         # todo: don't even make these if there's only 1 repetition
                         for use_std in [True, False]:
 

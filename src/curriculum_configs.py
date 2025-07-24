@@ -1,3 +1,14 @@
+
+def extract_regime_and_base(name):
+    regime = 's1'
+    base = name
+    for r in ['s21', 's3', 's2', 's1']:
+        if name.endswith('_' + r):
+            regime = r
+            base = name[:-len('_' + r)]
+            break
+    return regime, base
+
 class CurriculumConfig:
     def __init__(self, curriculum_name):
 
@@ -24,6 +35,8 @@ class CurriculumConfig:
                         'op_belief',
                         'my_decision',
                         'op_decision', 
+                        'full_model',
+                        'op_model'
                     ]
 
         print('cur got', curriculum_name)
@@ -71,33 +84,36 @@ class CurriculumConfig:
                     'copy_weights': None,
                 }
             ]
-        elif curriculum_name == "everything":
+        elif "everything" in curriculum_name:
+            regime, base_curriculum_name = extract_regime_and_base(curriculum_name)
             self.curriculum_stages = [
                 {
-                    'stage_name': 'everything',
-                    'batches': 2000,
-                    'data_regimes': ['s3'],
+                    'stage_name': curriculum_name,
+                    'batches': 4000,
+                    'data_regimes': [regime],
                     'trainable_modules': all_modules,
                     'copy_weights': None,
                 },
             ]
+        elif "opponent" in curriculum_name:
+            regime, base_curriculum_name = extract_regime_and_base(curriculum_name)
+            self.curriculum_stages = [
+                {
+                    'stage_name': base_curriculum_name,
+                    'batches': 4000,
+                    'data_regimes': [regime],
+                    'trainable_modules': ['op_model'],
+                    'copy_weights': None,
+                },
+            ]
         else:
-            def extract_regime_and_base(name):
-                regime = 's1'
-                base = name
-                for r in ['s21', 's3', 's2', 's1']:
-                    if name.endswith('_' + r):
-                        regime = r
-                        base = name[:-len('_' + r)]
-                        break
-                return regime, base
 
             regime, base_curriculum_name = extract_regime_and_base(curriculum_name)
             
             if base_curriculum_name in module_map:
                 self.curriculum_stages = [{
                     'stage_name': base_curriculum_name,
-                    'batches': 2000,
+                    'batches': 4000,
                     'data_regimes': [regime],
                     'trainable_modules': module_map[base_curriculum_name],
                     'copy_weights': None,
@@ -109,14 +125,14 @@ class CurriculumConfig:
                     self.curriculum_stages = [
                         {
                             'stage_name': temp_name,
-                            'batches': 1000,
+                            'batches': 2000,
                             'data_regimes': [regime],
                             'trainable_modules': module_map[temp_name],
                             'copy_weights': None,
                         },
                         {
                             'stage_name': 'all',
-                            'batches': 1000,
+                            'batches': 2000,
                             'data_regimes': [regime],
                             'trainable_modules': all_modules,
                             'copy_weights': None,
@@ -129,14 +145,14 @@ class CurriculumConfig:
                     self.curriculum_stages = [
                         {
                             'stage_name': temp_name,
-                            'batches': 1000,
+                            'batches': 2000,
                             'data_regimes': [regime],
                             'trainable_modules': module_map[temp_name],
                             'copy_weights': None,
                         },
                         {
                             'stage_name': 'all',
-                            'batches': 1000,
+                            'batches': 2000,
                             'data_regimes': [regime],
                             'trainable_modules': [module for module in all_modules if module not in module_map[temp_name]],
                             'copy_weights': None,
@@ -149,14 +165,14 @@ class CurriculumConfig:
                     self.curriculum_stages = [
                         {
                             'stage_name': 'all',
-                            'batches': 1000,
+                            'batches': 2000,
                             'data_regimes': [regime],
                             'trainable_modules': [module for module in all_modules if module not in module_map[temp_name]],
                             'copy_weights': None,
                         },
                         {
                             'stage_name': temp_name,
-                            'batches': 1000,
+                            'batches': 2000,
                             'data_regimes': [regime],
                             'trainable_modules': module_map[temp_name],
                             'copy_weights': None,
@@ -169,14 +185,14 @@ class CurriculumConfig:
                     self.curriculum_stages = [
                         {
                             'stage_name': 'all',
-                            'batches': 1000,
+                            'batches': 2000,
                             'data_regimes': [regime],
                             'trainable_modules': all_modules,
                             'copy_weights': None,
                         },
                         {
                             'stage_name': temp_name,
-                            'batches': 1000,
+                            'batches': 2000,
                             'data_regimes': [regime],
                             'trainable_modules': module_map[temp_name],
                             'copy_weights': None,
@@ -210,7 +226,9 @@ def apply_curriculum_stage(model, stage_config, train_sets_dict):
         'my_decision': model.my_decision,
         'op_decision': model.op_decision,
         'my_combiner': model.my_combiner,
-        'op_combiner': model.op_combiner
+        'op_combiner': model.op_combiner,
+        'full_model': model.full_model,
+        'op_model': model.op_model
     }
     
     if not hasattr(model, '_ever_trained'):
@@ -224,6 +242,8 @@ def apply_curriculum_stage(model, stage_config, train_sets_dict):
                 copied_to_modules.add(target_name)
     
     for module_name, module in all_modules.items():
+        if module is None:
+            continue
         if module_name in stage_config['trainable_modules']:
             module.use_neural = True
             unfreeze_module_parameters(module)
@@ -235,7 +255,10 @@ def apply_curriculum_stage(model, stage_config, train_sets_dict):
             module.use_neural = False
             freeze_module_parameters(module)
     
-    trainable = [name for name, module in all_modules.items() if any(p.requires_grad for p in module.parameters())]
+    trainable = [
+        name for name, module in model.get_module_dict().items()
+        if module is not None and any(p.requires_grad for p in module.parameters())
+    ]
     print(f"Trainable: {trainable}")
     
     stage_train_sets = []

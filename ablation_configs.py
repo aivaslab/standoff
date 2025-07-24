@@ -20,6 +20,11 @@ BASE_CONFIG = {
     'num_beliefs': 1,
     'vision_prob': 1.0,
     'mix_neurons': False,
+    'full_end2end': False,
+    'opponent_end2end': False,
+    'process_opponent_perception': False,
+    'output_type': 'my_decision',
+    'arch': 'mlp',
 }
 
 BASE_RANDOM = {k: BASE_CONFIG[k] for k in BASE_CONFIG if k not in ['shared_belief', 'shared_decision']}
@@ -34,10 +39,10 @@ TEMP_CONFIGS = {
 BASE_NEURAL_CONFIGS = {
     'a-hardcoded': {'shared_decision': True},
 
-    'a-neural-split': {k: True for k in BASE_CONFIG if k not in ['shared_belief', 'shared_decision', 'shared_treat']},
-    'a-neural-belief-shared': {k: True for k in BASE_CONFIG if k not in ['shared_decision', 'shared_treat']},
-    'a-neural-decision-shared': {k: True for k in BASE_CONFIG if k not in ['shared_belief', 'shared_treat']},
-    'a-neural-treat-shared': {k: True for k in BASE_CONFIG if k not in ['shared_belief', 'shared_decision']},
+    'a-neural-split': {k: True for k in BASE_CONFIG if k not in ['shared_belief', 'shared_decision', 'shared_treat', 'full_end2end', 'opponent_end2end', 'arch']},
+    'a-neural-belief-shared': {k: True for k in BASE_CONFIG if k not in ['shared_decision', 'shared_treat', 'full_end2end', 'opponent_end2end', 'arch']},
+    'a-neural-decision-shared': {k: True for k in BASE_CONFIG if k not in ['shared_belief', 'shared_treat', 'full_end2end', 'opponent_end2end', 'arch']},
+    'a-neural-treat-shared': {k: True for k in BASE_CONFIG if k not in ['shared_belief', 'shared_decision', 'full_end2end', 'opponent_end2end', 'arch']},
     'a-neural-shared': {k: True for k in BASE_CONFIG},
     'a-neural-detach': {k: True for k in BASE_CONFIG},
 
@@ -90,6 +95,18 @@ BASE_NEURAL_CONFIGS['a-neural-shared']['detach'] = False
 BASE_NEURAL_CONFIGS['a-neural-belief-shared']['detach'] = False
 BASE_NEURAL_CONFIGS['a-neural-decision-shared']['detach'] = False
 BASE_NEURAL_CONFIGS['a-neural-treat-shared']['detach'] = False
+
+for x in ['mlp', 'cnn', 'lstm32', 'lstm128', 'transformer32', 'transformer128']:
+    BASE_NEURAL_CONFIGS[f'a-full-{x}'] = {
+        **{k: False for k in BASE_CONFIG},
+        'full_end2end': True,
+        'arch': x,
+    }
+    BASE_NEURAL_CONFIGS[f'a-oponly-{x}'] = {
+        **{k: False for k in BASE_CONFIG},
+        'opponent_end2end': True,
+        'arch': x,
+    }
 
 NEURAL_CONFIGS = {}
 for base_name, base_config in BASE_NEURAL_CONFIGS.items():

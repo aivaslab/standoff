@@ -107,8 +107,8 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
     model_kwargs['oracle_is_target'] = oracle_is_target
 
     device = torch.device('cuda' if use_cuda else 'cpu')
-    total_steps = 20
-    epoch_steps = 20
+    total_steps = 15
+    epoch_steps = 15
     total_batches = sum(stage['batches'] for stage in curriculum_config.curriculum_stages)
     from supervised_learning_main import filter_indices, load_model
 
@@ -117,9 +117,9 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
         #'op_vision': 'vision',
         #'presence_perception': 'opponents',
         #'my_belief': ['loc-large', 'loc-small'],  
-        'op_belief': ['b-loc-large', 'b-loc-small'],  
+        #'op_belief': ['b-loc-large', 'b-loc-small'],  
         'my_decision': ['correct-loc'],
-        'op_decision': ['target-loc']
+        #'op_decision': ['target-loc']
     }
     module_label_data = {module: [] for module in module_labels.keys()} 
     batch_size = model_kwargs['batch_size']
@@ -135,7 +135,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
     criterion = nn.CrossEntropyLoss()
     oracle_criterion = nn.MSELoss(reduction='mean')
     #optimizer = torch.optim.Adam(model.parameters(), lr=5e-3)
-    optimizer = torch.optim.SGD(model.parameters(), lr=1e-1, momentum=0.95)
+    
     model.vision_prob = 1.0
 
     #optimizer = torch.optim.AdamW(model.parameters(), lr=1e-2, betas=(0.95, 0.999))
@@ -145,12 +145,14 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
     t = tqdm.trange(total_batches)
 
     for stage_config in curriculum_config.curriculum_stages:
+        #optimizer = torch.optim.SGD(model.parameters(), lr=1e-1, momentum=0.9, weight_decay=1e-4)
+        optimizer = torch.optim.AdamW(model.parameters(), lr=5e-4, betas=(0.95, 0.999))
         print('started curricular stage', stage_config['stage_name'])
         stage_train_sets = apply_curriculum_stage(model, stage_config, train_sets_dict)
         batches = stage_config['batches']
         print('training on these sets: ', stage_train_sets)
 
-        trainable = [name for name, module in model.get_module_dict().items() if any(p.requires_grad for p in module.parameters())]
+        trainable = [name for name, module in model.get_module_dict().items() if module is not None and any(p.requires_grad for p in module.parameters())]
         print('trainable modules:', trainable)
         print('module configs', model.kwargs['module_configs'])
 
@@ -268,8 +270,9 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
                 'Novel_Accuracy': baseline_results['novel_accuracy']
             }
             new_row = pd.DataFrame([new_row_data])
+            epoch_losses_df = pd.concat([epoch_losses_df, new_row], ignore_index=True)
             print(f"Acc: {baseline_results['accuracy']:.4f}, Nacc: {baseline_results['novel_accuracy']:.4f}, L: {baseline_results['loss']:.4f}, Vis:",
-                    model.vision_prob, 'Path:', os.path.basename(save_path), repetition)
+                    model.vision_prob, 'P:', save_path, repetition)
         else:
             train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=0, pin_memory=True)  # can't use more on windows
 
@@ -278,14 +281,14 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
         #criterion = torchvision.ops.sigmoid_focal_loss
         #sigmoid_scheduler = SigmoidTempScheduler(model, start_temp=90.0, end_temp=90.0, total_steps=total_steps, vision_prob_start=model.vision_prob, vision_prob_end=model.vision_prob_base, rate=2.0)
         #scheduler = ExponentialLR(optimizer, gamma=0.92)
-        #scheduler = OneCycleLR(
-        #    optimizer,
-        #    max_lr=1e-2,
-        #    total_steps=total_steps,
-        #    pct_start=0.3,
-        #    div_factor=1,
-        #    final_div_factor=1,
-        #)
+        '''scheduler = OneCycleLR(
+            optimizer,
+            max_lr=1e-2,
+            total_steps=total_steps,
+            pct_start=0.3,
+            div_factor=1,
+            final_div_factor=0.1,
+        )'''
 
         if False:  # if loading previous model, only for progressions
             last_digit = int(save_path[-1])
@@ -302,7 +305,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
 
         iter_loader = iter(train_loader)
 
-        if save_models:
+        if save_models and False:
             os.makedirs(save_path, exist_ok=True)
             torch.save([model.kwargs, model.state_dict()], os.path.join(save_path, f'{repetition}-checkpoint-prior.pt'))
 
@@ -351,7 +354,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
             flat_oracle = oracles.reshape(oracles.size(0), -1)
             optimizer.zero_grad()
             loss.backward()
-            #torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=5.0)
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=2.0)
             optimizer.step()
             #t.update(1)
 
@@ -361,7 +364,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
                     #sigmoid_scheduler.step()
                     t.update(epoch_length)
 
-            if record_loss and (((real_batch) % epoch_length_val == 0) or (batch == batches - 1)):
+            if record_loss and (((real_batch) % epoch_length_val == 0) or (real_batch == total_batches - 1)):
                 stage_results = evaluate_model_stage(model, test_loader, novel_loader, criterion, device, stage_config['stage_name'])
                 
                 new_row_data = {
@@ -380,7 +383,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
                 final_accuracy = stage_results['accuracy']
 
                 print(f"Acc: {stage_results['accuracy']:.4f}, Nacc: {stage_results['novel_accuracy']:.4f}, L: {stage_results['loss']:.4f}, Vis:",
-                    model.vision_prob, 'Path:', os.path.basename(save_path), repetition)
+                    model.vision_prob, 'Path:', save_path, repetition)
                 #print("Module MSE values:")
                 #for module, mse_val in module_mse_values.items():
                 #    print(f"  {module}: {np.mean(mse_val):.4f}")

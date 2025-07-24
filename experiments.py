@@ -377,36 +377,36 @@ def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, sk
 
     for label, label_name in label_tuples:
         for model_type in model_types:
-            for regime in list(real_regimes.keys()):
-                kpname = f'{model_type}-{label_name}-{regime}'
-                print(model_type + '-' + label_name, 'regime:', regime, 'train_sets:', real_regimes[regime])
-                combined_paths, last_epoch_paths, lp = run_supervised_session(
-                    save_path=os.path.join('supervised', exp_name, kpname) if curriculum_name is None else os.path.join('supervised', exp_name, curriculum_name),
-                    train_sets=real_regimes[regime],
-                    eval_sets=fregimes['s3'],
-                    oracle_labels=[None],
-                    key_param=key_param,
-                    key_param_value=kpname,
-                    label=label,
-                    model_type=model_type,
-                    do_retrain_model=retrain,
-                    train_sets_dict={'s21': fregimes['s21'], 's2': fregimes['s2'], 's1': fregimes['s1'], 's3': fregimes['s3']},
-                    curriculum_name=curriculum_name,
-                    **session_params
-                )
-                conditions = [
-                    (lambda x: 'prior' not in x and 'retrain' not in x, ''),
-                    #(lambda x: 'prior' in x and 'retrain' not in x, '-prior'),
-                    #(lambda x: 'prior' not in x and 'retrain' in x, '-retrain')
-                ]
+            #for regime in list(real_regimes.keys()):
+            kpname = f'{model_type}-{label_name}-{curriculum_name}'
+            print(model_type + '-' + label_name, 'train_sets:', curriculum_name)
+            combined_paths, last_epoch_paths, lp = run_supervised_session(
+                save_path=os.path.join('supervised', exp_name, kpname) if curriculum_name is None else os.path.join('.', 'new', exp_name, curriculum_name + "_" + model_type),
+                train_sets=None,#real_regimes[regime],
+                eval_sets=fregimes['s3'],
+                oracle_labels=[None],
+                key_param=key_param,
+                key_param_value=kpname,
+                label=label,
+                model_type=model_type,
+                do_retrain_model=retrain,
+                train_sets_dict={'s21': fregimes['s21'], 's2': fregimes['s2'], 's1': fregimes['s1'], 's3': fregimes['s3']},
+                curriculum_name=curriculum_name,
+                **session_params
+            )
+            conditions = [
+                (lambda x: 'prior' not in x and 'retrain' not in x, ''),
+                #(lambda x: 'prior' in x and 'retrain' not in x, '-prior'),
+                #(lambda x: 'prior' not in x and 'retrain' in x, '-retrain')
+            ]
 
-                print('paths found', combined_paths, last_epoch_paths)
+            print('paths found', combined_paths, last_epoch_paths)
 
-                for condition, suffix in conditions:
-                    last_path_list.append([x for x in last_epoch_paths if condition(x)])
-                    combined_path_list.append([x for x in combined_paths if condition(x)])
-                    key_param_list.append(kpname + suffix)
-                lp_list.append(lp)
+            for condition, suffix in conditions:
+                last_path_list.append([x for x in last_epoch_paths if condition(x)])
+                combined_path_list.append([x for x in combined_paths if condition(x)])
+                key_param_list.append(kpname + suffix)
+            lp_list.append(lp)
 
     if comparison:
         do_comparison(combined_path_list, last_path_list, key_param_list, key_param, exp_name, params, prior_metrics, lp_list)
@@ -472,13 +472,13 @@ if __name__ == '__main__':
     #model_types = ['a-mix-n-treat-split',] #['a-mixed-n-belief-my', 'a-mixed-n-belief-op', 'a-mixed-n-decision-my', 'a-mixed-n-decision-op']
 
     #model_types = ['a-mix-n-perception-op', 'a-mix-n-vision-op', 'a-mix-n-treat-op', 'a-mix-n-belief-op',]
-    model_types = ['a-neural-split',]
+    #model_types = ['a-full-' + x for x in ['lstm128', 'lstm32', 'transformer128', 'transformer32']]
+    model_types = ['a-oponly-' + x for x in ['cnn', 'mlp', 'lstm128', 'lstm32', 'transformer128', 'transformer32']]
     #print('number of model types:', len(model_types))
+    #model_types = ['a-neural-split']
 
     labels = [('correct-loc', 'loc')]
-    curriculum_names = [
-        "everything", 
-        ]
+
     base_names = [
         "perception_my", 
         "perception_op",
@@ -490,17 +490,18 @@ if __name__ == '__main__':
     single_curriculum_names = [name + "_s21" for name in base_names]
     early_curriculum_names = [name + "_then_all_s21" for name in base_names]
     late_curriculum_names = ["all_then_" + name + "_s21" for name in base_names]
-    early_frozen_curriculum_names = [name + "_then_else_s3" for name in base_names]
-    late_frozen_curriculum_names = ["else_then_" + name + "_s3" for name in base_names]
+    early_frozen_curriculum_names = [name + "_then_else_s21" for name in base_names]
+    late_frozen_curriculum_names = ["else_then_" + name + "_s21" for name in base_names]
 
-    curriculum_names = early_frozen_curriculum_names + late_frozen_curriculum_names
+    curriculum_names = ['opponent_s2', 'opponent_s21', 'opponent_s3'] if 'a-oponly-mlp' in model_types else ['everything_s2', 'everything_s21', 'everything_s3']
+    #single_curriculum_names + early_curriculum_names + late_curriculum_names + early_frozen_curriculum_names + late_frozen_curriculum_names
 
     if (not args.p) and (not args.g):
         experiment_args = [(model_type, label, args, curriculum_name) for model_type, label, curriculum_name in product(model_types, labels, curriculum_names)]
 
         total_tasks = len(experiment_args)
         
-        with multiprocessing.Pool(processes=5) as pool:
+        with multiprocessing.Pool(processes=6) as pool:
             list(tqdm(
                 pool.imap(run_single_experiment, experiment_args),
                 total=total_tasks,
