@@ -11,7 +11,8 @@ class EndToEndModel(nn.Module):
         super().__init__()
         self.arch = arch
         self.output_type = output_type
-        input_dim = 5 * 5 * 7 * 7
+        raw_input_dim = 5 * 5 * 7 * 7
+        processed_input_dim = 2 * 6 * 5 + 5 + 5  # treats(60) + vision(5) + presence_seq(5) = 70
         hidden = 128
 
         if output_type == 'op_belief':
@@ -20,9 +21,19 @@ class EndToEndModel(nn.Module):
             output_dim = 5
 
         if arch == 'mlp':
-            self.model = nn.Sequential(
+            self.raw_model = nn.Sequential(
                 nn.Flatten(),
-                nn.Linear(input_dim, hidden),
+                nn.Linear(raw_input_dim, hidden),
+                nn.BatchNorm1d(hidden),
+                nn.ReLU(),
+                nn.Linear(hidden, hidden),
+                nn.ReLU(),
+                nn.Linear(hidden, 32),
+                nn.ReLU(),
+                nn.Linear(32, output_dim)
+            )
+            self.processed_model = nn.Sequential(
+                nn.Linear(processed_input_dim, hidden),
                 nn.BatchNorm1d(hidden),
                 nn.ReLU(),
                 nn.Linear(hidden, hidden),
@@ -32,7 +43,7 @@ class EndToEndModel(nn.Module):
                 nn.Linear(32, output_dim)
             )
         elif arch == 'cnn':
-            self.model = nn.Sequential(
+            self.raw_model = nn.Sequential(
                 nn.Conv3d(5, 16, kernel_size=3, padding=1),
                 nn.ReLU(),
                 nn.Conv3d(16, 32, kernel_size=3, padding=1),
@@ -44,41 +55,67 @@ class EndToEndModel(nn.Module):
                 nn.ReLU(),
                 nn.Linear(32, output_dim)
             )
+            self.processed_model = nn.Sequential(
+                nn.Linear(processed_input_dim, hidden),
+                nn.BatchNorm1d(hidden),
+                nn.ReLU(),
+                nn.Linear(hidden, 32),
+                nn.ReLU(),
+                nn.Linear(32, output_dim)
+            )
         elif arch == 'lstm128':
-            self.rnn = nn.LSTM(input_size=5*7*7, hidden_size=128, batch_first=True)
+            self.raw_rnn = nn.LSTM(input_size=5*7*7, hidden_size=128, batch_first=True)
+            self.processed_rnn = nn.LSTM(input_size=processed_input_dim//5, hidden_size=128, batch_first=True)
             self.head = nn.Linear(128, output_dim)
         elif arch == 'lstm32':
-            self.rnn = nn.LSTM(input_size=5*7*7, hidden_size=32, batch_first=True)
+            self.raw_rnn = nn.LSTM(input_size=5*7*7, hidden_size=32, batch_first=True)
+            self.processed_rnn = nn.LSTM(input_size=processed_input_dim//5, hidden_size=32, batch_first=True)
             self.head = nn.Linear(32, output_dim)
         elif arch == 'transformer128':
-            self.embed = nn.Linear(5*7*7, 128)
+            self.raw_embed = nn.Linear(5*7*7, 128)
+            self.processed_embed = nn.Linear(processed_input_dim//5, 128)
             encoder = nn.TransformerEncoderLayer(d_model=128, nhead=4)
             self.transformer = nn.TransformerEncoder(encoder, num_layers=2)
             self.head = nn.Linear(128, output_dim)
         elif arch == 'transformer32':
-            self.embed = nn.Linear(5*7*7, 32)
+            self.raw_embed = nn.Linear(5*7*7, 32)
+            self.processed_embed = nn.Linear(processed_input_dim//5, 32)
             encoder = nn.TransformerEncoderLayer(d_model=32, nhead=4)
             self.transformer = nn.TransformerEncoder(encoder, num_layers=2)
             self.head = nn.Linear(32, output_dim)
         else:
             raise ValueError(f"Unknown arch: {arch}")
 
-    def forward(self, perceptual_field):
-        B, T, C, H, W = perceptual_field.shape
-
-        if self.arch == 'cnn':
-            x = perceptual_field.permute(0, 2, 1, 3, 4)
-            output = self.model(x)
-        elif self.arch in ['mlp']:
-            output = self.model(perceptual_field)
-        elif self.arch in ['lstm128', 'lstm32', 'transformer128', 'transformer32']:
-            x = perceptual_field.view(B, T, -1)
-            if 'transformer' in self.arch:
-                x = self.embed(x)
-                x = self.transformer(x)
-            else:
-                x = self.rnn(x)[0]
-            output = self.head(x[:, -1])
+    def forward(self, input_data):
+        if len(input_data.shape) == 5:
+            B, T, C, H, W = input_data.shape
+            
+            if self.arch == 'cnn':
+                x = input_data.permute(0, 2, 1, 3, 4)
+                output = self.raw_model(x)
+            elif self.arch in ['mlp']:
+                output = self.raw_model(input_data)
+            elif self.arch in ['lstm128', 'lstm32', 'transformer128', 'transformer32']:
+                x = input_data.view(B, T, -1)
+                if 'transformer' in self.arch:
+                    x = self.raw_embed(x)
+                    x = self.transformer(x)
+                else:
+                    x = self.raw_rnn(x)[0]
+                output = self.head(x[:, -1])
+        else:
+            B = input_data.shape[0]
+            
+            if self.arch in ['mlp', 'cnn']:
+                output = self.processed_model(input_data)
+            elif self.arch in ['lstm128', 'lstm32', 'transformer128', 'transformer32']:
+                x = input_data.view(B, 5, -1)
+                if 'transformer' in self.arch:
+                    x = self.processed_embed(x)
+                    x = self.transformer(x)
+                else:
+                    x = self.processed_rnn(x)[0]
+                output = self.head(x[:, -1])
 
         if self.output_type == 'op_belief':
             output = output.view(B, 2, 6)
@@ -384,6 +421,27 @@ class NormalizedBeliefNetwork(nn.Module):
         #x = torch.sigmoid(x)
         return x
 
+class NormalizedTSBeliefNetwork(nn.Module):
+    def __init__(self):
+        super().__init__()
+        #self.input_norm = nn.BatchNorm1d(35)
+        self.fc1 = nn.Linear(13, 12)
+        self.fc2 = nn.Linear(12, 6)
+        #self.fc3 = nn.Linear(16, 6)
+
+    def forward(self, treats, vision, prev_beliefs):
+        batch_size = treats.shape[0]
+
+        x = torch.cat([treats.reshape(batch_size, -1), vision.reshape(batch_size, -1), prev_beliefs.reshape(batch_size, -1),], dim=1)
+        #x = self.input_norm(x)
+        x = F.leaky_relu_(self.fc1(x))
+        x = self.fc2(x)
+        #x = F.relu(self.fc3(x))
+        x = x.view(batch_size, 6)
+        #x = F.softmax(x, dim=-1)
+        #x = torch.sigmoid(x)
+        return x
+
 
 class BeliefModule(BaseModule):
     def __init__(self, use_neural: bool = True, random_prob: float = 0.0, sigmoid_temp: float = 20.0, uncertainty=0.0):
@@ -421,6 +479,89 @@ class BeliefModule(BaseModule):
         beliefs.scatter_(1, random_indices.unsqueeze(1), 1.0)
 
         return beliefs #F.softmax(beliefs, dim=-1)
+
+class BeliefModulePerTimestep(BaseModule):
+    def __init__(self, use_neural: bool = True, random_prob: float = 0.0, sigmoid_temp: float = 20.0, uncertainty=0.0):
+        super().__init__(use_neural, random_prob, sigmoid_temp)
+        self.uncertainty = uncertainty
+        self.transition_counts = {}
+
+    def _bin_beliefs(self, beliefs: torch.Tensor) -> list:
+        quantized = torch.round(beliefs).long()
+        return [tuple(row.tolist()) for row in quantized]
+
+    def _create_neural_network(self) -> nn.Module:
+        return NormalizedTSBeliefNetwork()
+
+    def _count_transitions(self, visible_treats: torch.Tensor, vision: torch.Tensor, prev_beliefs: torch.Tensor, new_beliefs: torch.Tensor):
+        if not self.training:
+            prev_state = self._bin_beliefs(prev_beliefs)
+            new_state = self._bin_beliefs(new_beliefs)
+            treat_state = self._bin_beliefs(visible_treats)
+            vision_expanded = vision.expand(prev_beliefs.shape[0])
+            vision_bins = (vision_expanded > 0.5).long()
+            for i in range(prev_beliefs.shape[0]):
+                transition = (prev_state[i], treat_state[i], vision_bins[i].item(), new_state[i])
+                self.transition_counts[transition] = self.transition_counts.get(transition, 0) + 1
+        
+    def _hardcoded_forward(self, visible_treats: torch.Tensor, vision: torch.Tensor, prev_beliefs: torch.Tensor) -> torch.Tensor:
+        treat_observed = visible_treats[:, :5].max(dim=-1)[0]  
+        
+        update_weight = vision * treat_observed
+        keep_weight = 1 - update_weight
+
+        new_beliefs = update_weight.unsqueeze(-1) * visible_treats + keep_weight.unsqueeze(-1) * prev_beliefs
+
+        return new_beliefs
+
+    def _random_forward(self, visible_treats: torch.Tensor, vision: torch.Tensor) -> torch.Tensor:
+        batch_size = visible_treats.shape[0]
+        device = visible_treats.device
+
+        beliefs = torch.zeros(batch_size, 6, device=device)
+        random_indices = torch.randint(0, 6, (batch_size,), device=device)
+        beliefs.scatter_(1, random_indices.unsqueeze(1), 1.0)
+
+        return beliefs #F.softmax(beliefs, dim=-1)
+
+    def forward(self, visible_treats: torch.Tensor, vision: torch.Tensor, prev_beliefs: torch.Tensor) -> torch.Tensor:
+        if self.use_neural:
+            new_beliefs = self._neural_forward(visible_treats, vision, prev_beliefs)
+        else:
+            self.sigmoid_temp = 90.0
+            new_beliefs = self._hardcoded_forward(visible_treats, vision, prev_beliefs)
+        
+        self._count_transitions(visible_treats, vision, prev_beliefs, new_beliefs)
+        
+        return new_beliefs
+
+    def save_transition_table(self, filepath='transition_table.csv'):
+        import pandas as pd
+        
+        rows = []
+        for (prev_state, treat_state, vision, new_state), count in self.transition_counts.items():
+            rows.append({
+                'from_state': str(prev_state), 
+                'treat_state': str(treat_state), 
+                'vision': vision, 
+                'to_state': str(new_state), 
+                'count': count
+            })
+        
+        df = pd.DataFrame(rows)
+        
+        df.to_csv(filepath, index=False)
+        
+        pivot_table = df.pivot_table(
+            index=['from_state', 'treat_state', 'vision'], 
+            columns='to_state', 
+            values='count', 
+            fill_value=0
+        )
+        pivot_filepath = filepath.replace('.csv', '_pivot.csv')
+        pivot_table.to_csv(pivot_filepath)
+        
+        return df, pivot_table
 
 
 class CombinerNetwork(nn.Module):
@@ -601,8 +742,10 @@ class AblationArchitecture(nn.Module):
         self.detach_combiner = module_configs['shared_combiner'] and module_configs['combiner'] and module_configs['detach']
         self.use_combiner = module_configs['use_combiner']
         
-        self.process_opponent_perception = module_configs.get('process_opponent_perception', False)
+        self.process_opponent_perception = module_configs.get('opponent_perception', False)
         self.output_type = module_configs.get('output_type', 'my_decision')
+        self.use_per_timestep_opponent = False
+        self.store_per_timestep_beliefs = False
 
         sigmoid_temp = module_configs.get('sigmoid_temp', 50.0)
 
@@ -620,6 +763,7 @@ class AblationArchitecture(nn.Module):
         if module_configs.get('end2end'):
             self.end2end_model = EndToEndModel(arch=module_configs['arch'], output_type=self.output_type)
         else:
+            print("not e2e")
             self.end2end_model = None
 
         self.treat_perception_my = TreatPerceptionModule(
@@ -680,7 +824,17 @@ class AblationArchitecture(nn.Module):
             use_neural=module_configs['op_belief'],
             random_prob=random_probs['op_belief'],
             sigmoid_temp=sigmoid_temp, uncertainty=0.0
+        ) if not module_configs['shared_belief'] else self.my_belief) if not self.use_per_timestep_opponent else (BeliefModulePerTimestep(
+            use_neural=module_configs['op_belief'],
+            random_prob=random_probs['op_belief'],
+            sigmoid_temp=sigmoid_temp, uncertainty=0.0
         ) if not module_configs['shared_belief'] else self.my_belief)
+
+        self.og_op_belief = BeliefModule(
+            use_neural=module_configs['op_belief'],
+            random_prob=random_probs['op_belief'],
+            sigmoid_temp=sigmoid_temp, uncertainty=0.0
+        )
 
         self.my_decision = DecisionModule(
             use_neural=module_configs['my_decision'],
@@ -715,7 +869,7 @@ class AblationArchitecture(nn.Module):
         trainable = []
         for name, module in self.get_module_dict().items():
             if any(p.requires_grad for p in module.parameters()):
-                trainable.append(name)
+                trainable.append(name, module)
         return trainable
     
     def get_neural_modules(self):
@@ -745,95 +899,82 @@ class AblationArchitecture(nn.Module):
         self.unfreeze_modules(trainable_modules)
         self.freeze_modules(frozen_modules)
 
-    def compare_tensors(self, name: str, new_tensor: torch.Tensor, old_tensor: torch.Tensor, threshold: float = 0.1,
-                        **inputs):
-        if isinstance(new_tensor, dict):
-            for k in new_tensor.keys():
-                self.compare_tensors(f"{name}[{k}]", new_tensor[k], old_tensor[k], threshold, **inputs)
-            return
-
-        if torch.isnan(new_tensor).any():
-            print(f"\nNANs detected in {name}:")
-            for i in range(new_tensor.shape[0]):
-                if torch.isnan(new_tensor[i]).any():
-                    print(f"Batch {i} contains NANs")
-                    print("Inputs:")
-                    for input_name, input_tensor in inputs.items():
-                        if isinstance(input_tensor, dict):
-                            print(f"{input_name}:")
-                            for k, v in input_tensor.items():
-                                print(f"  {k}:")
-                                print(v[i])
-                        else:
-                            print(f"{input_name}:")
-                            print(input_tensor[i])
-                    print("Output with NANs:")
-                    print(new_tensor[i])
-                    break
-            return
-
-        for i in range(new_tensor.shape[0]):
-            new_decision = torch.argmax(new_tensor[i].float(), dim=-1) if len(new_tensor[i].shape) > 0 else new_tensor[
-                i]
-            old_decision = torch.argmax(old_tensor[i].float(), dim=-1) if len(old_tensor[i].shape) > 0 else old_tensor[
-                i]
-
-            if not torch.equal(new_decision, old_decision):
-                print(f"\nDecision difference in {name} at batch {i}:")
-                print("Inputs:")
-                for input_name, input_tensor in inputs.items():
-                    if isinstance(input_tensor, dict):
-                        print(f"{input_name}:")
-                        for k, v in input_tensor.items():
-                            print(f"  {k}:")
-                            print(v[i])
-                            if len(v[i].shape) > 0:
-                                print(f"  {k} decisions:")
-                                print(torch.argmax(v[i], dim=-1))
-                    else:
-                        print(f"{input_name}:")
-                        print(input_tensor[i])
-                        if len(input_tensor[i].shape) > 0:
-                            print(f"{input_name} decisions:")
-                            print(torch.argmax(input_tensor[i], dim=-1))
-                print("New output & decision:")
-                print(new_tensor[i])
-                print(new_decision)
-                print("Old output & decision:")
-                print(old_tensor[i])
-                print(old_decision)
-                break
 
     def forward(self, perceptual_field: torch.Tensor, additional_input: torch.Tensor) -> torch.Tensor:
         device = perceptual_field.device
         batch_size = perceptual_field.shape[0]
 
-        if self.end2end_model is not None and self.output_type == 'my_decision':
-            return {'my_decision': self.end2end_model(perceptual_field)}
+        treats_op = self.treat_perception_op(perceptual_field)
+        treats_l_op, treats_s_op = treats_op[:, :, 0:2].unbind(2)
+        opponent_vision = self.vision_perception_op(perceptual_field, is_p1=0)
+        opponent_presence = self.presence_perception_op(perceptual_field, is_p1=0)
+        
+        if self.detach_treat:
+            treats_l_op = treats_l_op.detach()
+            treats_s_op = treats_s_op.detach()
+            opponent_vision = opponent_vision.detach()
+            opponent_presence = opponent_presence.detach()
 
-        if self.process_opponent_perception:
-            treats_op = self.treat_perception_op(perceptual_field)
-            treats_l_op, treats_s_op = treats_op[:, :, 0:2].unbind(2)
-            opponent_vision = self.vision_perception_op(perceptual_field, is_p1=0)
-            opponent_presence = self.presence_perception_op(perceptual_field, is_p1=0)
-            
-            if self.detach_treat:
-                treats_l_op = treats_l_op.detach()
-                treats_s_op = treats_s_op.detach()
-                opponent_vision = opponent_vision.detach()
-                opponent_presence = opponent_presence.detach()
-        else:
-            treats_op = self.treat_perception_op._hardcoded_forward(perceptual_field)
-            treats_l_op, treats_s_op = treats_op[:, :, 0:2].unbind(2)
-            opponent_vision = self.vision_perception_op._hardcoded_forward(perceptual_field, is_p1=0)
-            opponent_presence = self.presence_perception_op._hardcoded_forward(perceptual_field, is_p1=0)
+        if self.end2end_model is not None and self.output_type == 'my_decision':
+            if self.process_opponent_perception:
+                if opponent_presence.shape[1] == 1:
+                    opponent_presence_seq = opponent_presence.repeat(1, 5)
+                else:
+                    opponent_presence_seq = opponent_presence
+                end2end_input = torch.cat([
+                    treats_op.flatten(start_dim=1),
+                    opponent_vision.flatten(start_dim=1),
+                    opponent_presence_seq.flatten(start_dim=1)
+                ], dim=1)
+            else:
+                end2end_input = perceptual_field
+            return {'my_decision': self.end2end_model(end2end_input)}
 
         if self.end2end_model is not None and self.output_type == 'op_belief':
-            op_belief_vector = self.end2end_model(perceptual_field)
+            if self.process_opponent_perception:
+                if opponent_presence.shape[1] == 1:
+                    opponent_presence_seq = opponent_presence.repeat(1, 5)
+                else:
+                    opponent_presence_seq = opponent_presence
+                end2end_input = torch.cat([
+                    treats_op.flatten(start_dim=1),
+                    opponent_vision.flatten(start_dim=1),
+                    opponent_presence_seq.flatten(start_dim=1)
+                ], dim=1)
+            else:
+                end2end_input = perceptual_field
+            op_belief_vector = self.end2end_model(end2end_input)
         else:
-            self.op_belief.uncertainty = 0
-            op_belief_l = self.op_belief(treats_l_op * opponent_vision.unsqueeze(-1), opponent_vision)
-            op_belief_s = self.op_belief(treats_s_op * opponent_vision.unsqueeze(-1), opponent_vision)
+            if self.use_per_timestep_opponent:
+                op_belief_l = torch.zeros(batch_size, 6, device=device)
+                op_belief_l[:, 5] = 1.0
+
+                op_belief_s = torch.zeros(batch_size, 6, device=device) 
+                op_belief_s[:, 5] = 1.0
+
+                if self.store_per_timestep_beliefs:
+                    op_beliefs_l_timesteps = []
+                    op_beliefs_s_timesteps = []
+                
+                for t in range(5):
+                    op_belief_l = self.op_belief.forward(treats_l_op[:, t], opponent_vision[:, t], op_belief_l)
+                    op_belief_s = self.op_belief.forward(treats_s_op[:, t], opponent_vision[:, t], op_belief_s)
+
+                    if self.store_per_timestep_beliefs:
+                        op_beliefs_l_timesteps.append(op_belief_l.clone())
+                        op_beliefs_s_timesteps.append(op_belief_s.clone())
+
+                op_belief_l = torch.softmax(op_belief_l, dim=-1)
+                op_belief_s = torch.softmax(op_belief_s, dim=-1)
+                #following for debug
+                og_op_belief_l = self.og_op_belief(treats_l_op * opponent_vision.unsqueeze(-1), opponent_vision)
+                og_op_belief_s = self.og_op_belief(treats_s_op * opponent_vision.unsqueeze(-1), opponent_vision)
+                og_op_beliefs = torch.stack([og_op_belief_l, og_op_belief_s], dim=1)
+
+            else:
+                self.op_belief.uncertainty = 0
+                op_belief_l = self.op_belief(treats_l_op * opponent_vision.unsqueeze(-1), opponent_vision)
+                op_belief_s = self.op_belief(treats_s_op * opponent_vision.unsqueeze(-1), opponent_vision)
 
             if self.detach_belief:
                 op_belief_l = op_belief_l.detach()
@@ -846,7 +987,19 @@ class AblationArchitecture(nn.Module):
                 op_belief_vector = op_belief_vector.detach()
 
         if self.end2end_model is not None and self.output_type == 'op_decision':
-            op_decision = self.end2end_model(perceptual_field)
+            if self.process_opponent_perception:
+                if opponent_presence.shape[1] == 1:
+                    opponent_presence_seq = opponent_presence.repeat(1, 5)
+                else:
+                    opponent_presence_seq = opponent_presence
+                end2end_input = torch.cat([
+                    treats_op.flatten(start_dim=1),
+                    opponent_vision.flatten(start_dim=1),
+                    opponent_presence_seq.flatten(start_dim=1)
+                ], dim=1)
+            else:
+                end2end_input = perceptual_field
+            op_decision = self.end2end_model(end2end_input)
         else:
             op_decision = self.op_decision(op_belief_vector, self.null_decision[:batch_size].to(device), self.null_presence[:batch_size].to(device))
 
@@ -874,13 +1027,22 @@ class AblationArchitecture(nn.Module):
 
         my_decision = self.my_decision.forward(my_belief_vector, op_decision, opponent_presence)
 
-        return {
+        result = {
             'treat_perception': treats_op,
             'vision_perception': opponent_vision,
             'vision_perception_my': my_vision,
             'presence_perception': opponent_presence,
             'my_belief': my_belief_vector,
+            'og_op_belief': og_op_beliefs if self.store_per_timestep_beliefs else None,
             'op_belief': op_belief_vector,
             'my_decision': my_decision,
             'op_decision': op_decision
         }
+
+        if self.store_per_timestep_beliefs and self.use_per_timestep_opponent:
+            result['op_belief_t'] = torch.stack([
+                torch.stack(op_beliefs_l_timesteps, dim=1), 
+                torch.stack(op_beliefs_s_timesteps, dim=1)
+            ], dim=1)
+
+        return result

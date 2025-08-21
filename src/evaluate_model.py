@@ -17,7 +17,104 @@ from src.utils.plotting import save_double_param_figures, save_single_param_figu
     save_fixed_triple_param_figures, save_key_param_figures, save_delta_figures, plot_regime_lengths, \
     plot_awareness_results, plot_accuracy_vs_vision
 
+def visualize_transition_network(csv_path, save_path=None):
+    import pandas as pd
+    import networkx as nx
+    import matplotlib.pyplot as plt
+    import numpy as np
+    
+    df = pd.read_csv(csv_path)
+    G = nx.DiGraph()
+    
+    unique_states = list(set(df['from_state'].tolist() + df['to_state'].tolist()))
+    cmap = plt.cm.Set3
+    state_colors = {state: cmap(i/len(unique_states)) for i, state in enumerate(unique_states)}
+    
+    transitions = []
+    node_states = {}
+    
+    for _, row in df.iterrows():
+        from_state = row['from_state']
+        to_state = row['to_state']
+        from_node = "None" if from_state == 5 else str(from_state)
+        to_node = "None" if to_state == 5 else str(to_state)
+        
+        node_states[from_node] = from_state
+        node_states[to_node] = to_state
+        
+        treat_num = str(row['treat_state'])
+        vision = row['vision']
+        
+        if vision == 0:
+            base_text = f"{treat_num}({row['count']})"
+            label_text = ''.join(char + '̶' for char in base_text)
+            color = 'gray'
+        else:
+            label_text = f"{treat_num}({row['count']})"
+            color = state_colors[to_state]
 
+        transitions.append({
+            'from': from_node, 'to': to_node, 
+            'label': label_text, 'color': color, 'weight': row['count']
+        })
+        
+        if not G.has_edge(from_node, to_node):
+            G.add_edge(from_node, to_node)
+    
+    plt.figure(figsize=(15, 10))
+    pos = nx.circular_layout(G)
+    
+    node_colors = [state_colors[node_states[node]] for node in G.nodes()]
+    
+    nx.draw_networkx_edges(G, pos, alpha=0.6, edge_color='gray', arrows=True, arrowsize=25, min_target_margin=30)
+    nx.draw_networkx_nodes(G, pos, node_color=node_colors, node_size=3000, alpha=0.9)
+    nx.draw_networkx_labels(G, pos, font_size=14, font_weight='bold')
+    
+    edge_transitions = {}
+    for t in transitions:
+        key = (t['from'], t['to'])
+        if key not in edge_transitions:
+            edge_transitions[key] = []
+        edge_transitions[key].append(t)
+    
+    processed_pairs = set()
+    
+    for (u, v), trans_list in edge_transitions.items():
+        if u == v:
+            x, y = pos[u]
+            combined_label = "\n".join([t['label'] for t in trans_list])
+            plt.text(x, y+0.3, combined_label, fontsize=8, ha='center', va='center', 
+                    bbox=dict(boxstyle="round,pad=0.2", facecolor='lightgray', alpha=0.8))
+        elif (v, u) in processed_pairs:
+            continue
+        else:
+            x1, y1 = pos[u]
+            x2, y2 = pos[v]
+            mid_x, mid_y = (x1 + x2) / 2, (y1 + y2) / 2
+            angle = np.degrees(np.arctan2(y2 - y1, x2 - x1))
+            
+            if (v, u) in edge_transitions:
+                dx, dy = x2 - x1, y2 - y1
+                length = np.sqrt(dx**2 + dy**2)
+                offset_x, offset_y = -dy/length * 0.04, dx/length * 0.04
+                
+                for i, t in enumerate(trans_list):
+                    plt.text(mid_x + offset_x, mid_y + offset_y + i*0.05, t['label'], fontsize=8, ha='center', va='center', 
+                            rotation=angle, bbox=dict(boxstyle="round,pad=0.2", facecolor=t['color'], alpha=0.8))
+                
+                for i, t in enumerate(edge_transitions[(v, u)]):
+                    plt.text(mid_x - offset_x, mid_y - offset_y + i*0.05, t['label'], fontsize=8, ha='center', va='center', 
+                            rotation=angle+180, bbox=dict(boxstyle="round,pad=0.2", facecolor=t['color'], alpha=0.8))
+                processed_pairs.add((u, v))
+            else:
+                for i, t in enumerate(trans_list):
+                    plt.text(mid_x, mid_y + i*0.05, t['label'], fontsize=8, ha='center', va='center', 
+                            rotation=angle, bbox=dict(boxstyle="round,pad=0.2", facecolor=t['color'], alpha=0.8))
+    
+    plt.title("Belief State Transition Network")
+    plt.axis('off')
+    if save_path:
+        plt.savefig(save_path, dpi=150, bbox_inches='tight')
 
 
 def register_hooks(model, hook):
@@ -145,9 +242,9 @@ def compare_with_hardcoded(hardcoded_model, inputs, outputs, keys_to_compare):
 def evaluate_model(test_sets, target_label, load_path='supervised/', model_load_path='', oracle_labels=[], repetition=0,
                    epoch_number=0, prior_metrics=[], num_activation_batches=-1, oracle_is_target=False, act_label_names=[], save_labels=False,
                    oracle_early=False, last_timestep=True, model_type=None, seed=0, test_percent=0.2, use_prior=False, train_sets=None):
-    
 
     from supervised_learning_main import load_model_data_eval_retrain, load_model, decode_event_name
+    os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
 
     test_loaders, special_criterion, oracle_criterion, model, device, \
     data, labels, params, oracles, act_labels, batch_size, prior_metrics_data, \
@@ -163,6 +260,7 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_load_
     param_losses_list = []
 
     print('eval sets', test_sets)
+
 
     hook = SaveActivations()
     activation_data = {
@@ -198,6 +296,8 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_load_
     num_visions = 1
     model.vision_prob = 1
 
+    #visualize_transition_network(os.path.join(model_load_path, 'transitions.csv'), os.path.join(model_load_path, 'transition_network.png'))
+
     print('kwargs', model_kwargs)
     #exit()
 
@@ -213,31 +313,35 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_load_
                 inputs, labels = inputs.to(device), labels.to(device)
                 #inputs, labels, oracles = inputs.to(device), labels.to(device), oracles.to(device)
                 #print(labels.shape)
-                labels = labels[:,:-1]
+                #print(labels[0])
+                labels = labels[:,-5:]
+
                 max_labels = torch.argmax(labels, dim=1)
                 outputs = model(inputs, None)
                 #print(inputs.shape, str(model))
 
                 keys_to_compare = [
-                    'treat_perception', 
-                    'vision_perception', 
-                    'vision_perception_my', 
-                    'presence_perception', 
+                    #'treat_perception', 
+                    #'vision_perception', 
+                    #'vision_perception_my', 
+                    #'presence_perception', 
                     'my_decision', 
-                    'my_belief',
-                    'op_belief',
-                    'op_decision'
+                    #'my_belief',
+                    #'op_belief',
+                    #'op_decision'
                 ]
                 if False:
                     compare_with_hardcoded(hardcoded_model, inputs, outputs, keys_to_compare)
                     
 
                 outputs = outputs['my_decision']
+                #print(outputs.shape, max_labels.shape)
                 if do_vision_stuff:
                     vision_check(uncertainties, vision_probs, model, inputs, max_labels)
                     
                 losses = special_criterion(outputs, max_labels)
                 predicted = outputs.argmax(1)
+                print(predicted, max_labels)
 
                 corrects = predicted.eq(max_labels)
                 total = corrects.numel()
@@ -289,6 +393,10 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_load_
                 param_losses_list.extend(batch_param_losses)
 
     print('correct', overall_correct, overall_total)
+
+    model.op_belief_per_timestep.save_transition_table(os.path.join(model_load_path, f'transitions-{repetition}.csv'))
+    visualize_transition_network(os.path.join(model_load_path, f'transitions-{repetition}.csv'), os.path.join(model_load_path, f'transition_network-{repetition}.png'))
+
 
     fig = plot_accuracy_vs_vision(accuracy_results1, vision_probs, uncertainties)
     save_path = os.path.join(load_path, f'accuracy_plot_epoch{epoch_number}-{num_visions}.png')

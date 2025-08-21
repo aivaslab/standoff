@@ -231,7 +231,10 @@ def load_model_eval(model_save_path, repetition, use_prior=False, desired_epoch=
             if not files:
                 file_name = load_last_model(model_save_path, repetition)
     else:
-        file_name = load_last_model(model_save_path, repetition)
+        files = [f for f in os.listdir(model_save_path) if f.startswith(f'{repetition}-checkpoint-') and f.endswith('.pt')]
+        if not files:
+            raise FileNotFoundError(f"No checkpoint files found for repetition {repetition} in {model_save_path}")
+        file_name = files[-1]
 
 
     # Load the model
@@ -246,10 +249,13 @@ def load_model_data_eval_retrain(test_sets, load_path, target_label, last_timest
     mmap_mode = None
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     special_criterion = nn.CrossEntropyLoss(reduction='none')
+    #special_criterion = nn.MSELoss(reduction='mean')
     oracle_criterion = HungarianMSELoss()#nn.MSELoss(reduction='none')
 
+    print('load_model_data_eval', test_sets)
+
     if 'hardcoded' not in model_type and '-r-' not in model_type:
-        model_kwargs, state_dict = load_model_eval(model_save_path, repetition, use_prior, desired_epoch=desired_epoch)#f'{repetition}-model_epoch{epoch_number}.pt'))
+        model_kwargs, state_dict = load_model_eval(model_save_path, repetition, use_prior, desired_epoch=None)#f'{repetition}-model_epoch{epoch_number}.pt'))
         batch_size = model_kwargs['batch_size']
         batch_size = 1024
         model = load_model(model_type, model_kwargs, device)
@@ -291,8 +297,10 @@ def load_model_data_eval_retrain(test_sets, load_path, target_label, last_timest
             if last_timestep:
                 labels.append(labels_raw[..., -1, :])  # use only the last timestep (was last dimension but I changed it)...
             else:
-                labels.append(labels_raw.reshape(-1, 25))
+                #print(labels_raw.shape)
+                labels.append(labels_raw[...,:-1].reshape(-1, 25))
         else:
+            #print(labels_raw.shape)
             labels.append(labels_raw.reshape(-1, 25))
             # labels.append(labels_raw)
         # print('first', np.sum(labels_raw, axis=0), labels_raw[15, -1])
@@ -748,29 +756,31 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
         print(f"best repetitions: {best_three}")
         for repetition in best_repetition_numbers:
             for epoch in [epochs - 1]:
-                print('evaluating', epoch, model_name)
-                try:
-                    for this_path in [save_path]:#, retrain_path]: #retrain path removed
-                        for eval_prior in [False]:#[False, True] if this_path == save_path else [False]:
-                            df_paths = evaluate_model(eval_sets, label, load_path=load_path,
-                                                  model_type=model_type,
-                                                  model_load_path=this_path,
-                                                  oracle_labels=oracle_labels,
-                                                  repetition=repetition,
-                                                  epoch_number=epoch,
-                                                  prior_metrics=prior_metrics,
-                                                  oracle_is_target=oracle_is_target,
-                                                  act_label_names=act_label_names,
-                                                  oracle_early=oracle_early,
-                                                  last_timestep=last_timestep,
-                                                  use_prior=eval_prior,
-                                                  num_activation_batches=0)
-                            if df_paths is not None:
-                                dfs_paths.extend(df_paths)
-                                if epoch == epochs - 1 or eval_prior:
-                                    last_epoch_df_paths.extend(df_paths)
-                except Exception as e:
-                    print(f"Error {e}")
+                print('evaluating', epoch, model_name, save_path)
+                #try:
+                for this_path in [save_path]:#, retrain_path]: #retrain path removed
+                    for eval_prior in [False]:#[False, True] if this_path == save_path else [False]:
+                        print('e', last_timestep)
+                        df_paths = evaluate_model(eval_sets, label, load_path=load_path,
+                                              model_type=model_type,
+                                              model_load_path=this_path,
+                                              oracle_labels=[None],
+                                              repetition=repetition,
+                                              epoch_number=epoch,
+                                              prior_metrics=prior_metrics,
+                                              oracle_is_target=oracle_is_target,
+                                              act_label_names=act_label_names,
+                                              oracle_early=oracle_early,
+                                              last_timestep=False,
+                                              use_prior=eval_prior,
+                                              num_activation_batches=0)
+                        print('d')
+                        if df_paths is not None:
+                            dfs_paths.extend(df_paths)
+                            if epoch == epochs - 1 or eval_prior:
+                                last_epoch_df_paths.extend(df_paths)
+                #except Exception as e:
+                #    print(f"Error {e}")
 
         
         #loss_paths.append(os.path.join(retrain_path, f'losses-{repetition}.csv'))

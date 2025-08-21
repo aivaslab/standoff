@@ -23,6 +23,7 @@ import tqdm
 import copy
 import torch.nn as nn
 import torch.nn.functional as F
+import shutil
 import torch
 from src.supervised_learning import one_hot, serialize_data, identify_mismatches
 
@@ -86,16 +87,57 @@ def save_all_datasets(path, config_name, data_obs, data_params, data_labels, all
             modified_config = prefix + new_informedness + suffix
         
         main_path = os.path.join(path, modified_config)
-        save_dataset(main_path, indices, data_obs, data_params, data_labels, all_labels)
+        save_dataset_append(main_path, indices, data_obs, data_params, data_labels, all_labels)
         
         with_swaps_indices = [i for i in indices if has_swaps[i]]
         without_swaps_indices = [i for i in indices if not has_swaps[i]]
         
         swaps_path = os.path.join(path, modified_config + "b")
-        save_dataset(swaps_path, with_swaps_indices, data_obs, data_params, data_labels, all_labels)
+        save_dataset_append(swaps_path, with_swaps_indices, data_obs, data_params, data_labels, all_labels)
         
         no_swaps_path = os.path.join(path, modified_config + "a")
-        save_dataset(no_swaps_path, without_swaps_indices, data_obs, data_params, data_labels, all_labels)
+        save_dataset_append(no_swaps_path, without_swaps_indices, data_obs, data_params, data_labels, all_labels)
+
+def save_dataset_append(base_path, indices, data_obs, data_params, data_labels, all_labels):
+    if not indices or len(indices) == 0:
+        return
+    
+    os.makedirs(base_path, exist_ok=True)
+    
+    new_obs = np.array([data_obs[i] for i in indices])
+    new_params = np.array([data_params[i] for i in indices])
+    new_labels = {}
+    for label in all_labels:
+        if len(data_labels[label]) > 0:
+            new_labels[label] = np.array([data_labels[label][i] for i in indices])
+    
+    obs_path = os.path.join(base_path, 'obs.npz')
+    params_path = os.path.join(base_path, 'params.npz')
+    
+    if os.path.exists(obs_path):
+        existing_obs = np.load(obs_path)['arr_0']
+        combined_obs = np.concatenate([existing_obs, new_obs], axis=0)
+    else:
+        combined_obs = new_obs
+    
+    if os.path.exists(params_path):
+        existing_params = np.load(params_path)['arr_0']
+        combined_params = np.concatenate([existing_params, new_params], axis=0)
+    else:
+        combined_params = new_params
+    
+    np.savez_compressed(obs_path, combined_obs)
+    np.savez_compressed(params_path, combined_params)
+    
+    for label in all_labels:
+        if label in new_labels:
+            label_path = os.path.join(base_path, f'label-{label}.npz')
+            if os.path.exists(label_path):
+                existing_label = np.load(label_path)['arr_0']
+                combined_label = np.concatenate([existing_label, new_labels[label]], axis=0)
+            else:
+                combined_label = new_labels[label]
+            np.savez_compressed(label_path, combined_label)
 
 
 def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_extra_data=False, prior_metrics=[], conf=None):
@@ -105,6 +147,11 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
     Records and saves observations, as well as data including labels and metrics.
     '''
     # labels = ['loc', 'exist', 'vision', 'b-loc', 'b-exist', 'target']
+
+    for item in os.listdir(path):
+        if item.startswith('sl-') and os.path.isdir(os.path.join(path, item)):
+            shutil.rmtree(os.path.join(path, item))
+
     posterior_metrics = ['selection', 'selectedBig', 'selectedSmall', 'selectedNeither',
                          'selectedPrevBig', 'selectedPrevSmall', 'selectedPrevNeither',
                          'selectedSame', ]
@@ -153,6 +200,7 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
     unique_id = 0 # this is the id of each datapoint
 
     for configName in conf.stages:
+        print(f"Stage: {configName}, events: {list(conf.stages[configName]['events'].keys())}")
         g_count_big = 0
         g_count_small = 0
         total_count = 0
@@ -278,8 +326,17 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
                             for label in onehot_labels:
                                 data_labels[label].append(np.stack(one_labels[label]))
 
-                            data_labels['gettier_big'].append(np.array([info['p_0']['gettier_big']]))
-                            data_labels['gettier_small'].append(np.array([info['p_0']['gettier_small']]))
+                            informedness_str = data_name[3:-1]
+                            data_labels['gettier_big'].append(np.array([info['p_0']['gettier_big'] and 'T' in informedness_str]))
+                            data_labels['gettier_small'].append(np.array([info['p_0']['gettier_small'] and 't' in informedness_str]))
+
+                            #if 'b2w2v0fs-0' in str(conf.stages[data_name]['events']) and info['p_0']['gettier_big']:
+                            #    print(f"Stage {data_name} b2w2v0fs-0 has events", np.array([info['p_0']['gettier_big']]), np.array([info['p_0']['gettier_small']]))
+                            #if 'b2w2v0fs-1' in str(conf.stages[data_name]['events']) and info['p_0']['gettier_big']:
+                            #    print(f"Stage {data_name} b2w2v0fs-1 has events", np.array([info['p_0']['gettier_big']]), np.array([info['p_0']['gettier_small']]))
+
+                            if info['p_0']['gettier_big'] and info['p_0']['gettier_small']:
+                                print(f"Both gettier case from stage {data_name}, event {eName}")
 
                             data_labels['opponents'].append(params["num_puppets"])
                             data_labels['id'].append(unique_id)

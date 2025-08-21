@@ -1,4 +1,3 @@
-
 def extract_regime_and_base(name):
     regime = 's1'
     base = name
@@ -17,7 +16,7 @@ class CurriculumConfig:
                 'perception_op': ['treat_perception_op', 'vision_perception_op', 'presence_perception_op'],
                 'perception_both': ['treat_perception_my', 'vision_perception_my', 'presence_perception_my', 'treat_perception_op', 'vision_perception_op', 'presence_perception_op'],
                 'belief_my': ['my_belief'],
-                'belief_op': ['op_belief'],
+                'belief_op': ['op_belief', 'op_belief_t'],
                 'belief_both': ['my_belief', 'op_belief'],
                 'decision_my': ['my_decision'],
                 'decision_op': ['op_decision'],
@@ -35,8 +34,7 @@ class CurriculumConfig:
                         'op_belief',
                         'my_decision',
                         'op_decision', 
-                        'full_model',
-                        'op_model'
+                        'end2end_model'
                     ]
 
         print('cur got', curriculum_name)
@@ -95,14 +93,14 @@ class CurriculumConfig:
                     'copy_weights': None,
                 },
             ]
-        elif "opponent" in curriculum_name:
+        elif "end2end" in curriculum_name:
             regime, base_curriculum_name = extract_regime_and_base(curriculum_name)
             self.curriculum_stages = [
                 {
                     'stage_name': base_curriculum_name,
-                    'batches': 4000,
+                    'batches': 2000,
                     'data_regimes': [regime],
-                    'trainable_modules': ['op_model'],
+                    'trainable_modules': ['end2end_model'],
                     'copy_weights': None,
                 },
             ]
@@ -227,8 +225,7 @@ def apply_curriculum_stage(model, stage_config, train_sets_dict):
         'op_decision': model.op_decision,
         'my_combiner': model.my_combiner,
         'op_combiner': model.op_combiner,
-        'full_model': model.full_model,
-        'op_model': model.op_model
+        'end2end_model': model.end2end_model
     }
     
     if not hasattr(model, '_ever_trained'):
@@ -245,14 +242,17 @@ def apply_curriculum_stage(model, stage_config, train_sets_dict):
         if module is None:
             continue
         if module_name in stage_config['trainable_modules']:
-            module.use_neural = True
+            if hasattr(module, 'use_neural'):
+                module.use_neural = True
             unfreeze_module_parameters(module)
             model._ever_trained.add(module_name)
         elif module_name in model._ever_trained or module_name in copied_to_modules:
-            module.use_neural = True
+            if hasattr(module, 'use_neural'):
+                module.use_neural = True
             freeze_module_parameters(module)
         else:
-            module.use_neural = False
+            if hasattr(module, 'use_neural'):
+                module.use_neural = False
             freeze_module_parameters(module)
     
     trainable = [

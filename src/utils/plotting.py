@@ -1843,8 +1843,6 @@ def plot_accuracy_vs_vision(accuracy_results1, vision_probs, uncertainties, save
     if save_path:
         plt.savefig(save_path, bbox_inches='tight', dpi=300)
 
-    return plt.gcf()
-
 def plot_awareness_results(final_awareness_results, save_path=None, merge_states=False):
     """
     Plot awareness results with option to merge symmetric states

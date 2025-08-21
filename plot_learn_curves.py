@@ -53,60 +53,116 @@ def plot_accuracy_with_std_data_only(folder_path):
 def get_folder_info(folder_name):
     parts = folder_name.split('_')
     
-    if len(parts) >= 3:
-        training_mode = parts[0]
+    if len(parts) >= 3 and parts[0] == 'end2end':
         dataset = parts[1]
-        model_type = '_'.join(parts[2:])
+        remainder = '_'.join(parts[2:])
+        
+        if '-' in remainder:
+            regime_and_rest = remainder.split('-', 1)
+            regime = regime_and_rest[0]
+            rest = regime_and_rest[1]
+            
+            if '-sym-' in rest:
+                output_type = rest.split('-sym-')[0]
+                model_type = rest.split('-sym-')[1]
+                sym_flag = True
+            else:
+                rest_parts = rest.split('-')
+                output_type = rest_parts[0]
+                model_type = '-'.join(rest_parts[1:]) if len(rest_parts) > 1 else 'unknown'
+                sym_flag = False
+        else:
+            regime = remainder
+            output_type = 'unknown'
+            model_type = 'unknown'
+            sym_flag = False
     else:
-        training_mode = 'unknown'
         dataset = 'unknown'
+        regime = 'unknown'
+        output_type = 'unknown'
         model_type = folder_name
+        sym_flag = False
     
-    return dataset, training_mode, model_type
+    return dataset, regime, output_type, model_type, sym_flag
 
-def plot_grouped_accuracies(grouped_folders, group_name, basepath):
-    fig, ax = plt.subplots(1, 1, figsize=(12, 8))
+def get_display_name(folder_name):
+    if folder_name.startswith('end2end_'):
+        return folder_name[8:]
+    return folder_name
+
+def get_short_name(folder_name):
+    display_name = get_display_name(folder_name)
+    if '-' in display_name:
+        return display_name.split('-')[-1]
+    else:
+        parts = display_name.split('_')
+        return parts[-1] if parts else display_name
+
+def plot_grouped_accuracies_subplots(grouped_data, group_name, basepath, datasets, color_map):
+    fig, axes = plt.subplots(1, len(datasets), figsize=(16, 6), sharey=True)
+    if len(datasets) == 1:
+        axes = [axes]
     
-    colors = plt.cm.tab10(np.linspace(0, 1, len(grouped_folders)))
+    legend_handles = []
+    legend_labels = []
     
-    for i, (folder, data) in enumerate(grouped_folders.items()):
-        if data['batches'] is not None and data['accuracy_means'] is not None:
-            color = colors[i]
-            batches = np.array(data['batches'])
-            
-            train_means = np.array(data['accuracy_means'])
-            train_stds = np.array(data['accuracy_stds'])
-            ax.plot(batches, train_means, label=f"{folder} (train)", linewidth=2, color=color)
-            ax.fill_between(batches, train_means - train_stds, train_means + train_stds, 
-                           alpha=0.3, color=color)
-            
-            novel_means = np.array(data['novel_accuracy_means'])
-            novel_stds = np.array(data['novel_accuracy_stds'])
-            ax.plot(batches, novel_means, label=f"{folder} (novel)", linewidth=2, 
-                   color=color, linestyle='-.')
-            ax.fill_between(batches, novel_means - novel_stds, novel_means + novel_stds, 
-                           alpha=0.2, color=color)
-            
-            if data['val_accuracy_means'] is not None and data['dataset'] != 's3':
-                val_means = np.array(data['val_accuracy_means'])
-                val_stds = np.array(data['val_accuracy_stds'])
-                ax.plot(batches, val_means, label=f"{folder} (val)", linewidth=2, 
-                       color=color, linestyle='--')
-                ax.fill_between(batches, val_means - val_stds, val_means + val_stds, 
-                               alpha=0.15, color=color)
+    for dataset_idx, dataset in enumerate(datasets):
+        ax = axes[dataset_idx]
+        
+        if dataset not in grouped_data:
+            ax.set_title(f'{dataset} - No Data')
+            continue
+        
+        folders_in_dataset = grouped_data[dataset]
+        
+        for folder, data in folders_in_dataset.items():
+            if data['batches'] is not None and data['accuracy_means'] is not None:
+                short_name = get_short_name(folder)
+                color = color_map[short_name]
+                batches = np.array(data['batches'])
+                
+                train_means = np.array(data['accuracy_means'])
+                train_stds = np.array(data['accuracy_stds'])
+                train_line, = ax.plot(batches, train_means, linewidth=2, color=color)
+                ax.fill_between(batches, train_means - train_stds, train_means + train_stds, 
+                               alpha=0.3, color=color)
+                
+                novel_means = np.array(data['novel_accuracy_means'])
+                novel_stds = np.array(data['novel_accuracy_stds'])
+                ax.plot(batches, novel_means, linewidth=2, 
+                       color=color, linestyle='-.')
+                ax.fill_between(batches, novel_means - novel_stds, novel_means + novel_stds, 
+                               alpha=0.2, color=color)
+                
+                if data['val_accuracy_means'] is not None and dataset != 's3':
+                    val_means = np.array(data['val_accuracy_means'])
+                    val_stds = np.array(data['val_accuracy_stds'])
+                    ax.plot(batches, val_means, linewidth=2, 
+                           color=color, linestyle='--')
+                    ax.fill_between(batches, val_means - val_stds, val_means + val_stds, 
+                                   alpha=0.15, color=color)
+                
+                if dataset_idx == 0 and short_name not in legend_labels:
+                    legend_handles.append(train_line)
+                    legend_labels.append(short_name)
+        
+        ax.set_xlabel('Batch')
+        if dataset_idx == 0:
+            ax.set_ylabel('Accuracy')
+        ax.set_title(f'{dataset}')
+        ax.set_ylim(0, 1)
+        ax.grid(True, alpha=0.3)
     
-    ax.set_xlabel('Batch')
-    ax.set_ylabel('Accuracy')
-    ax.set_title(f'Grouped by {group_name}')
-    ax.set_ylim(0, 1)
-    ax.grid(True, alpha=0.3)
-    ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+    if legend_handles:
+        fig.legend(legend_handles, legend_labels, bbox_to_anchor=(1.02, 1), loc='upper left')
     
+    fig.suptitle(f'Grouped by {group_name}', fontsize=14, y=0.98)
     plt.tight_layout()
+    plt.subplots_adjust(top=0.9)
     plt.savefig(os.path.join(basepath, f"grouped_{group_name.replace(' ', '_').replace('/', '_')}.png"), bbox_inches='tight')
     plt.close()
 
-base_path = './new/exp_1-L'
+base_path = './new/exp_19-L'
 folders = [f for f in os.listdir(base_path) if os.path.isdir(os.path.join(base_path, f))]
 
 results = []
@@ -129,7 +185,7 @@ for folder in folders:
             'final_novel_accuracy_std': final_novel_std
         })
         
-        dataset, training_mode, model_type = get_folder_info(folder)
+        dataset, regime, output_type, model_type, sym_flag = get_folder_info(folder)
         folder_data[folder] = {
             'batches': batches,
             'accuracy_means': accuracy_means,
@@ -139,24 +195,29 @@ for folder in folders:
             'val_accuracy_means': val_accuracy_means,
             'val_accuracy_stds': val_accuracy_stds,
             'dataset': dataset,
-            'training_mode': training_mode,
-            'model_type': model_type
+            'regime': regime,
+            'output_type': output_type,
+            'model_type': model_type,
+            'sym_flag': sym_flag
         }
 
-dataset_training_groups = defaultdict(lambda: defaultdict(dict))
-dataset_model_groups = defaultdict(lambda: defaultdict(dict))
+all_short_names = set()
+for folder in folder_data.keys():
+    all_short_names.add(get_short_name(folder))
+
+color_list = ['red', 'blue', 'green', 'orange', 'purple', 'brown', 'pink', 'gray', 'olive', 'cyan']
+color_map = {name: color_list[i % len(color_list)] for i, name in enumerate(sorted(all_short_names))}
+
+datasets = sorted(set(data['dataset'] for data in folder_data.values()))
+
+output_type_sym_groups = defaultdict(lambda: defaultdict(dict))
 
 for folder, data in folder_data.items():
-    dataset_training_groups[data['dataset']][data['training_mode']][folder] = data
-    dataset_model_groups[data['dataset']][data['model_type']][folder] = data
+    output_sym_key = f"{data['output_type']}_{'sym' if data['sym_flag'] else 'nosym'}"
+    output_type_sym_groups[output_sym_key][data['dataset']][folder] = data
 
-for dataset, training_groups in dataset_training_groups.items():
-    for training_mode, folders_in_group in training_groups.items():
-        plot_grouped_accuracies(folders_in_group, f"dataset_{dataset}/training_{training_mode}", base_path)
-
-for dataset, model_groups in dataset_model_groups.items():
-    for model_type, folders_in_group in model_groups.items():
-        plot_grouped_accuracies(folders_in_group, f"dataset_{dataset}/model_{model_type}", base_path)
+for output_sym_key, dataset_groups in output_type_sym_groups.items():
+    plot_grouped_accuracies_subplots(dataset_groups, f"output_{output_sym_key}", base_path, datasets, color_map)
 
 results_df = pd.DataFrame(results)
 results_df.to_csv(os.path.join(base_path, 'final_accuracies_summary.csv'), index=False)
