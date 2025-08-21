@@ -239,6 +239,7 @@ def compare_with_hardcoded(hardcoded_model, inputs, outputs, keys_to_compare):
             #print(f"    MultiAgent: {model_val}")
             #print(f"    TwoAgent: {hc_val}")
 
+
 def evaluate_model(test_sets, target_label, load_path='supervised/', model_load_path='', oracle_labels=[], repetition=0,
                    epoch_number=0, prior_metrics=[], num_activation_batches=-1, oracle_is_target=False, act_label_names=[], save_labels=False,
                    oracle_early=False, last_timestep=True, model_type=None, seed=0, test_percent=0.2, use_prior=False, train_sets=None):
@@ -309,7 +310,7 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_load_
 
             tq = tqdm.trange(len(_val_loader))
 
-            for i, (inputs, labels, params, _, metrics, act_labels_dict) in enumerate(_val_loader):
+            for batch, (inputs, labels, params, oracles, metrics, act_labels_dict) in enumerate(_val_loader):
                 inputs, labels = inputs.to(device), labels.to(device)
                 #inputs, labels, oracles = inputs.to(device), labels.to(device), oracles.to(device)
                 #print(labels.shape)
@@ -341,7 +342,7 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_load_
                     
                 losses = special_criterion(outputs, max_labels)
                 predicted = outputs.argmax(1)
-                print(predicted, max_labels)
+                #print(predicted, max_labels)
 
                 corrects = predicted.eq(max_labels)
                 total = corrects.numel()
@@ -352,7 +353,9 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_load_
 
                 tq.update(1)
 
-                if i < num_activation_batches or num_activation_batches < 0:
+                
+
+                if batch < num_activation_batches or num_activation_batches < 0:
                     real_batch_size = len(labels)
                     for layer_name, activation in hook.activations.items():
                         if layer_name not in activation_data:

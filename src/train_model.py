@@ -11,6 +11,22 @@ import math
 
 from src.curriculum_configs import *
 
+def last_step_targets(flat_oracle, module_ranges, module_name):
+    s, e = module_ranges[module_name]
+    seg = flat_oracle[:, s:e]                       # [B, 10] or [B, 50]
+
+    if e - s == 10:                                 # op_belief (last step only)
+        x = seg.reshape(-1, 2, 5)                   # [B, 2, 5]
+    elif e - s == 50:                               # op_belief_t (5 steps)
+        x = seg.reshape(-1, 5, 2, 5)[:, -1]         # [B, 2, 5]  # take last timestep
+    else:
+        raise ValueError(f"Unexpected width {e-s} for {module_name}")
+
+    idx = x.argmax(dim=2)                           # [B, 2] lanes 0..4
+    none_mask = (x.sum(dim=2) == 0)                 # [B, 2]
+    idx[none_mask] = 5                              # class 5 = “none”
+    return idx                                      # [B, 2]
+
 def evaluate_model_stage(model, test_loader, novel_loader, novel_task_loader, criterion, device, stage_name=""):
     model.eval()
     test_losses, all_preds, all_targets = [], [], []
@@ -18,7 +34,7 @@ def evaluate_model_stage(model, test_loader, novel_loader, novel_task_loader, cr
     with torch.inference_mode():
         for inputs, target_labels, _, _, _ in test_loader:
             inputs = inputs.to(device)
-            target_labels = target_labels.float().to(device)[:,:-1]
+            target_labels = target_labels.float().to(device)
             
             outputs = model(inputs, None)
             loss = criterion(outputs['my_decision'], torch.argmax(target_labels, dim=1))
@@ -47,7 +63,7 @@ def evaluate_model_stage(model, test_loader, novel_loader, novel_task_loader, cr
             novel_task_preds, novel_task_targets = [], []
             for inputs, target_labels, _, _, _ in novel_task_loader:
                 inputs = inputs.to(device)
-                target_labels = target_labels.float().to(device)[:,:-1]
+                target_labels = target_labels.float().to(device)
                 
                 outputs = model(inputs, None)
                 novel_task_preds.append(outputs['my_decision'].argmax(dim=1))
@@ -147,9 +163,9 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
         for label in oracle_labels:
             if 'op_belief' in label:
                 if last_timestep:
-                    module_labels['op_belief'] = ['b-loc-large', 'b-loc-small']
+                    module_labels['op_belief'] = ['i-b-loc-large', 'i-b-loc-small']
                 else:
-                    module_labels['op_belief_t'] = ['b-loc-large', 'b-loc-small']
+                    module_labels['op_belief_t'] = ['i-b-loc-large', 'i-b-loc-small']
     else:
         module_labels = {
             'my_decision': ['correct-loc'],
@@ -339,7 +355,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
             os.makedirs(save_path, exist_ok=True)
             torch.save([model.kwargs, model.state_dict()], os.path.join(save_path, f'{repetition}-checkpoint-prior.pt'))
 
-        module_sizes = {'op_belief': 12, 'my_decision': 5, 'op_decision': 5, 'op_belief_t': 60}
+        module_sizes = {'op_belief': 10, 'my_decision': 5, 'op_decision': 5, 'op_belief_t': 50}
         module_names = module_labels.keys()
 
         first_batch_processed = False
@@ -354,7 +370,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
                 iter_loader = iter(train_loader)
                 inputs, target_labels, _, oracles, _ = next(iter_loader)
             inputs, target_labels, oracles = inputs.to(device), target_labels.float().to(device), oracles.to(device)
-            target_labels = target_labels[:,:-1]
+
             outputs = model(inputs, None)
 
             if not oracle_labels:
@@ -378,11 +394,12 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
 
             #print(oracle_labels)
 
-            if batch % 100 == 0 and batch > 0:
+            if batch % 500 == 0 and batch > 0:
                 with torch.no_grad():
                     original_use_neural = model.op_belief.use_neural
                     
                     model.op_belief.use_neural = False
+                    model.og_op_belief.use_neural = False
                     hardcoded_outputs = model(inputs, None)
                     hardcoded_beliefs = hardcoded_outputs['op_belief']
                     oghardcoded_beliefs = hardcoded_outputs['og_op_belief']
@@ -392,24 +409,36 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
                     neural_outputs = model(inputs, None)
                     neural_beliefs = neural_outputs['op_belief']
                     neural_decision = neural_outputs['my_decision']
+
+                    neural_beliefs_last = neural_outputs['op_belief_t'][:, :, -1, :]     
+                    hardcoded_beliefs_last = hardcoded_outputs['op_belief_t'][:, :, -1, :]
+                    oghardcoded_beliefs_last = oghardcoded_beliefs
                     
                     model.op_belief.use_neural = original_use_neural
-                    
-                    for i in range(min(3, inputs.shape[0])):
-                        print(f"\nSample {i}:")
-                        print(f"Oracle target indices: {target_indices[i]}")
-                        print(f"OG HC beliefs:")
-                        print(f"  Large: {oghardcoded_beliefs[i, 0]}")
-                        print(f"  Small: {oghardcoded_beliefs[i, 1]}")
-                        print(f"Hardcoded beliefs:")
-                        print(f"  Large: {hardcoded_beliefs[i, 0]}")
-                        print(f"  Small: {hardcoded_beliefs[i, 1]}")
-                        print(f"Neural beliefs:")
-                        print(f"  Large: {neural_beliefs[i, 0]}")
-                        print(f"  Small: {neural_beliefs[i, 1]}")
-                        print(f"Hardcoded decision: {hardcoded_decision[i].argmax().item()}")
-                        print(f"Neural decision: {neural_decision[i].argmax().item()}")
-                        print(f"Target decision: {torch.argmax(target_labels[i]).item()}")
+
+
+                hc_series = hardcoded_outputs['op_belief_t']
+                hc_idx = hc_series.argmax(dim=-1)
+
+                B = oracles.shape[0]
+                print(oracles.shape)
+                s, e = module_ranges['op_belief_t']
+                T = (e - s) // (2*5)
+                oracle_chunk = oracles.reshape(B, -1)[:, s:e]
+                oracle_5 = oracle_chunk.view(B, 2, T, 5)
+                oracle_sum = oracle_5.sum(dim=-1)
+                oracle_idx = oracle_5.argmax(dim=-1)
+                oracle_idx[oracle_sum == 0] = 5
+                #oracle_idx = oracle_idx.permute(0,2,1).contiguous() 
+                og_idx = oghardcoded_beliefs.argmax(dim=-1)
+
+                type_names = ["Large", "Small"]
+                for i in range(min(5, B)):
+                    print(f"\n=== Sample {i} ===")
+                    for ttype in range(2):
+                        print(f"{type_names[ttype]} Oracle: {oracle_idx[i,ttype].tolist()}")
+                        print(f"{type_names[ttype]} HC:     {hc_idx[i,ttype].tolist()}")
+                        print(f"{type_names[ttype]} OG:     {og_idx[i,ttype].item()}")
 
             if oracle_labels:
                 flat_oracle = oracles.reshape(oracles.size(0), -1)
@@ -418,27 +447,38 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
                 for module_name in module_labels.keys():
                     if module_name in outputs and module_name in module_ranges:
                         oracle_target = flat_oracle
+                        s, e = module_ranges[module_name]
+                        oracle_target = flat_oracle[:, s:e] #[bs, 50]
                         oracle_target_reshaped = oracle_target.reshape(-1, 2, 5)
                         target_indices = torch.argmax(oracle_target_reshaped, dim=2)
                         no_treat_mask = (oracle_target_reshaped.sum(dim=2) == 0)
+                        target_indices[no_treat_mask] = 5
+                        target_indices_flat = target_indices.reshape(-1) 
                         
                         if batch == 0:
                             print(f"Target indices shape: {target_indices.shape}")
                             print(f"Target indices[0]: {target_indices[0]}")
                             print(f"No treat mask[0]: {no_treat_mask[0]}")
+
+                            print("module_ranges:", module_ranges)  # ensure op_belief_t → (0, 50) if it’s the only oracle
+                            # Check the no-treat rate in oracle targets (per treat type)
+                            for k in ['op_belief_t']:
+                                s, e = module_ranges[k]
+                                x = flat_oracle[:, s:e].reshape(-1, 2, 5)
+                                none_rate = (x.sum(dim=2) == 0).float().mean(dim=0)  # (2,)
+                                print(f"{k} none_rate (L, S):", none_rate.tolist())
                         
                         model_output_raw = outputs[module_name]
+
                         
-                        if module_name == 'op_belief_t':
+                        if module_name == 'op_belief_t': #this is true
                             model_output = model_output_raw.permute(0, 2, 1, 3).reshape(-1, 2, 6)
                         else:
-                            batch_size = model_output_raw.shape[0]
-                            model_output = model_output_raw.unsqueeze(1).expand(batch_size, 5, 2, 6).reshape(-1, 2, 6)
+                            #batch_size = model_output_raw.shape[0]
+                            model_output = model_output_raw#.unsqueeze(1).expand(batch_size, 5, 2, 6).reshape(-1, 2, 6)
                         
                         model_output_flat = model_output.reshape(-1, 6)
                         
-                        target_indices[no_treat_mask] = 5
-                        target_indices_flat = target_indices.reshape(-1)
                         
                         if batch == 0:
                             print(f"Model output shape: {model_output.shape}")

@@ -641,8 +641,6 @@ class MiniStandoffEnv(para_MultiGridEnv):
                 # tile = self.grid.get(x, y)
                 # we cannot track shouldAvoidBig etc here because the treat location might change
 
-            #print(self.step_count, self.infos['p_0']["exist"], self.infos['p_0']["b-exist"], self.infos['p_0']["target"], self.infos['p_0']["vision"], self.infos['p_0']["loc"], self.infos['p_0']["b-loc"])
-
         
 
         if self.record_info:

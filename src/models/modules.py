@@ -455,6 +455,7 @@ class BeliefModule(BaseModule):
 
     def _hardcoded_forward(self, visible_treats: torch.Tensor, vision: torch.Tensor) -> torch.Tensor:
         time_weights = self.time_weights.to(visible_treats.device)
+        time_weights = self.time_weights[:, :visible_treats.size(1)]
         uncertainty = self.uncertainty
         sigmoid_temp = self.sigmoid_temp
 
@@ -504,13 +505,15 @@ class BeliefModulePerTimestep(BaseModule):
                 transition = (prev_state[i], treat_state[i], vision_bins[i].item(), new_state[i])
                 self.transition_counts[transition] = self.transition_counts.get(transition, 0) + 1
         
-    def _hardcoded_forward(self, visible_treats: torch.Tensor, vision: torch.Tensor, prev_beliefs: torch.Tensor) -> torch.Tensor:
-        treat_observed = visible_treats[:, :5].max(dim=-1)[0]  
-        
-        update_weight = vision * treat_observed
-        keep_weight = 1 - update_weight
+    def _hardcoded_forward(self, visible_treats: torch.Tensor, vision: torch.Tensor, prev_beliefs: torch.Tensor, t: int=0) -> torch.Tensor:
+        time_weight = torch.exp(torch.tensor(t, dtype=torch.float32, device=visible_treats.device) * 2.0)
+        update_mask = vision.unsqueeze(-1)
 
-        new_beliefs = update_weight.unsqueeze(-1) * visible_treats + keep_weight.unsqueeze(-1) * prev_beliefs
+        weighted_obs = time_weight * update_mask * visible_treats
+
+        new_beliefs = prev_beliefs + weighted_obs
+
+        new_beliefs = new_beliefs / (new_beliefs.sum(dim=-1, keepdim=True) + 1e-10)
 
         return new_beliefs
 
@@ -524,12 +527,12 @@ class BeliefModulePerTimestep(BaseModule):
 
         return beliefs #F.softmax(beliefs, dim=-1)
 
-    def forward(self, visible_treats: torch.Tensor, vision: torch.Tensor, prev_beliefs: torch.Tensor) -> torch.Tensor:
+    def forward(self, visible_treats: torch.Tensor, vision: torch.Tensor, prev_beliefs: torch.Tensor, t: int=0) -> torch.Tensor:
         if self.use_neural:
             new_beliefs = self._neural_forward(visible_treats, vision, prev_beliefs)
         else:
             self.sigmoid_temp = 90.0
-            new_beliefs = self._hardcoded_forward(visible_treats, vision, prev_beliefs)
+            new_beliefs = self._hardcoded_forward(visible_treats, vision, prev_beliefs, t)
         
         self._count_transitions(visible_treats, vision, prev_beliefs, new_beliefs)
         
@@ -571,15 +574,10 @@ class CombinerNetwork(nn.Module):
         self.belief_encoder = nn.Sequential(
             nn.Linear(belief_dim, hidden_dim),
             nn.ReLU(),
-            #nn.Linear(hidden_dim, hidden_dim),
-            #nn.ReLU(),
         )
 
         self.combiner = nn.Sequential(
-            #nn.Linear(hidden_dim, hidden_dim),
-            #nn.ReLU(),
             nn.Linear(hidden_dim, belief_dim),
-            #nn.Sigmoid(),
         )
 
     def forward(self, beliefs):
@@ -589,9 +587,6 @@ class CombinerNetwork(nn.Module):
 
         encoded_l = self.belief_encoder(belief_l)  # [batch_size, num_beliefs, hidden_dim]
         encoded_s = self.belief_encoder(belief_s)
-  # [batch_size, num_beliefs, 1]
-        #weighted_encoded_l = encoded_l * vision_weights
-        #weighted_encoded_s = encoded_s * vision_weights
 
         pooled_l = encoded_l.max(dim=1)[0]  # [batch_size, hidden_dim]
         pooled_s = encoded_s.max(dim=1)[0]
@@ -599,36 +594,8 @@ class CombinerNetwork(nn.Module):
         combined_l = self.combiner(pooled_l)  # [batch_size, belief_dim]
         combined_s = self.combiner(pooled_s)
 
-        #overlap = combined_l * combined_s
-        #overlap_sum = overlap.max(dim=-1, keepdim=True)[0]  # [batch_size, 1]
-        #penalty = 1 - 0.1*overlap_sum
-
-        #combined_l = combined_l * penalty
-        #combined_s = combined_s * penalty
-
         combined_l = F.softmax(combined_l, dim=-1)  # [batch_size, belief_dim]
         combined_s = F.softmax(combined_s, dim=-1)
-
-        '''
-        #position_probs_l = combined_l[:, :-1]  # [batch_size, 5]
-        #position_probs_s = combined_s[:, :-1]  # [batch_size, 5]
-        position_probs_l = combined_l
-        position_probs_s = combined_s
-
-        overlap = position_probs_l * position_probs_s
-        overlap_sum = overlap.sum(dim=-1, keepdim=True)  # [batch_size, 1]
-        penalty = 1 - overlap_sum
-
-        position_probs_l = position_probs_l * penalty
-        position_probs_s = position_probs_s * penalty
-
-        #final_l = torch.cat([position_probs_l, combined_l[:, -1:]], dim=-1)
-        #final_s = torch.cat([position_probs_s, combined_s[:, -1:]], dim=-1)
-        final_l = position_probs_l
-        final_s = position_probs_s
-
-        final_l = final_l / final_l.sum(dim=-1, keepdim=True)
-        final_s = final_s / final_s.sum(dim=-1, keepdim=True)'''
 
         return torch.stack([combined_l, combined_s], dim=1)
 
@@ -744,8 +711,8 @@ class AblationArchitecture(nn.Module):
         
         self.process_opponent_perception = module_configs.get('opponent_perception', False)
         self.output_type = module_configs.get('output_type', 'my_decision')
-        self.use_per_timestep_opponent = False
-        self.store_per_timestep_beliefs = False
+        self.use_per_timestep_opponent = True
+        self.store_per_timestep_beliefs = True
 
         sigmoid_temp = module_configs.get('sigmoid_temp', 50.0)
 
@@ -957,15 +924,23 @@ class AblationArchitecture(nn.Module):
                     op_beliefs_s_timesteps = []
                 
                 for t in range(5):
-                    op_belief_l = self.op_belief.forward(treats_l_op[:, t], opponent_vision[:, t], op_belief_l)
-                    op_belief_s = self.op_belief.forward(treats_s_op[:, t], opponent_vision[:, t], op_belief_s)
+                    #op_belief_l = self.op_belief.forward(treats_l_op[:, :t+1], opponent_vision[:, :t+1])
+                    #op_belief_s = self.op_belief.forward(treats_s_op[:, :t+1], opponent_vision[:, :t+1])
+                    op_belief_l = self.op_belief.forward(treats_l_op[:, t], opponent_vision[:, t], op_belief_l, t)
+                    op_belief_s = self.op_belief.forward(treats_s_op[:, t], opponent_vision[:, t], op_belief_s, t)
 
                     if self.store_per_timestep_beliefs:
                         op_beliefs_l_timesteps.append(op_belief_l.clone())
                         op_beliefs_s_timesteps.append(op_belief_s.clone())
 
-                op_belief_l = torch.softmax(op_belief_l, dim=-1)
-                op_belief_s = torch.softmax(op_belief_s, dim=-1)
+                stacked_op_beliefs = torch.stack([
+                    torch.stack(op_beliefs_l_timesteps, dim=1), 
+                    torch.stack(op_beliefs_s_timesteps, dim=1)
+                ], dim=1)
+
+                #print(stacked_op_beliefs.shape)
+                #op_belief_l = torch.softmax(op_belief_l, dim=-1)
+                #op_belief_s = torch.softmax(op_belief_s, dim=-1)
                 #following for debug
                 og_op_belief_l = self.og_op_belief(treats_l_op * opponent_vision.unsqueeze(-1), opponent_vision)
                 og_op_belief_s = self.og_op_belief(treats_s_op * opponent_vision.unsqueeze(-1), opponent_vision)
@@ -1040,9 +1015,6 @@ class AblationArchitecture(nn.Module):
         }
 
         if self.store_per_timestep_beliefs and self.use_per_timestep_opponent:
-            result['op_belief_t'] = torch.stack([
-                torch.stack(op_beliefs_l_timesteps, dim=1), 
-                torch.stack(op_beliefs_s_timesteps, dim=1)
-            ], dim=1)
+            result['op_belief_t'] = stacked_op_beliefs
 
         return result

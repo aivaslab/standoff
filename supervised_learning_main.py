@@ -250,7 +250,7 @@ def load_model_data_eval_retrain(test_sets, load_path, target_label, last_timest
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     special_criterion = nn.CrossEntropyLoss(reduction='none')
     #special_criterion = nn.MSELoss(reduction='mean')
-    oracle_criterion = HungarianMSELoss()#nn.MSELoss(reduction='none')
+    
 
     print('load_model_data_eval', test_sets)
 
@@ -764,7 +764,7 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
                         df_paths = evaluate_model(eval_sets, label, load_path=load_path,
                                               model_type=model_type,
                                               model_load_path=this_path,
-                                              oracle_labels=[None],
+                                              oracle_labels=oracle_labels,
                                               repetition=repetition,
                                               epoch_number=epoch,
                                               prior_metrics=prior_metrics,
