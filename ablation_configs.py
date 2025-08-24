@@ -95,6 +95,13 @@ for x in ['mlp', 'cnn', 'lstm32', 'lstm128', 'transformer32', 'transformer128']:
     BASE_NEURAL_CONFIGS[f'a-opbelief-sym-{x}'] = {'end2end': True, 'opponent_perception': True, 'output_type': 'op_belief', 'arch': x}
     BASE_NEURAL_CONFIGS[f'a-opdecision-sym-{x}'] = {'end2end': True, 'opponent_perception': True, 'output_type': 'op_decision', 'arch': x}
 
+    BASE_NEURAL_CONFIGS[f'a-fullM-{x}'] = {'end2end': True, 'opponent_perception': False, 'output_type': 'multi', 'arch': x}
+    BASE_NEURAL_CONFIGS[f'a-opbeliefM-{x}'] = {'end2end': True, 'opponent_perception': False, 'output_type': 'multi', 'arch': x}
+    BASE_NEURAL_CONFIGS[f'a-opdecisionM-{x}'] = {'end2end': True, 'opponent_perception': False, 'output_type': 'multi', 'arch': x}
+    BASE_NEURAL_CONFIGS[f'a-fullM-sym-{x}'] = {'end2end': True, 'opponent_perception': True, 'output_type': 'multi', 'arch': x}
+    BASE_NEURAL_CONFIGS[f'a-opbeliefM-sym-{x}'] = {'end2end': True, 'opponent_perception': True, 'output_type': 'multi', 'arch': x}
+    BASE_NEURAL_CONFIGS[f'a-opdecisionM-sym-{x}'] = {'end2end': True, 'opponent_perception': True, 'output_type': 'multi', 'arch': x}
+
 NEURAL_CONFIGS = {}
 for base_name, base_config in BASE_NEURAL_CONFIGS.items():
     NEURAL_CONFIGS[base_name] = {**base_config, 'vision_prob': 1.0, 'num_beliefs': 1}

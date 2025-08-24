@@ -7,6 +7,7 @@ from torch.utils.data import DataLoader, random_split
 import torch.nn as nn
 from torch.optim.lr_scheduler import ExponentialLR, OneCycleLR
 import pandas as pd
+import torch.nn.functional as F
 import math
 
 from src.curriculum_configs import *
@@ -163,9 +164,19 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
         for label in oracle_labels:
             if 'op_belief' in label:
                 if last_timestep:
-                    module_labels['op_belief'] = ['i-b-loc-large', 'i-b-loc-small']
+                    module_labels['op_belief'] = ['b-loc-large', 'b-loc-small']
                 else:
-                    module_labels['op_belief_t'] = ['i-b-loc-large', 'i-b-loc-small']
+                    module_labels['op_belief_t'] = ['b-loc-large', 'b-loc-small']
+            elif 'op_decision' in label:
+                if last_timestep:
+                    module_labels['op_decision'] = ['target-loc']
+                else:
+                    module_labels['op_decision_t'] = ['target-loc']
+            elif 'my_belief' in label:
+                if last_timestep:
+                    module_labels['my_belief'] = ['loc-large', 'loc-small']
+                else:
+                    module_labels['my_belief_t'] = ['loc-large', 'loc-small']
     else:
         module_labels = {
             'my_decision': ['correct-loc'],
@@ -177,12 +188,17 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
     batch_size = model_kwargs['batch_size']
     model = load_model(model_type, model_kwargs, device)
 
+    if oracle_labels:
+        model.store_per_timestep_beliefs = True
+    else:
+        model.store_per_timestep_beliefs = False
+
     stage_results = []
 
     real_batch = 0
 
     criterion = nn.CrossEntropyLoss()
-    oracle_criterion = nn.MSELoss()
+    oracle_criterion = nn.CrossEntropyLoss() 
     
     model.vision_prob = 1.0
 
@@ -191,7 +207,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
     t = tqdm.trange(total_batches)
 
     for stage_config in curriculum_config.curriculum_stages:
-        optimizer = torch.optim.AdamW(model.parameters(), lr=5e-4, betas=(0.95, 0.999))
+        optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4, betas=(0.95, 0.999))
         print('started curricular stage', stage_config['stage_name'])
         stage_train_sets = apply_curriculum_stage(model, stage_config, train_sets_dict)
         batches = stage_config['batches']
@@ -355,7 +371,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
             os.makedirs(save_path, exist_ok=True)
             torch.save([model.kwargs, model.state_dict()], os.path.join(save_path, f'{repetition}-checkpoint-prior.pt'))
 
-        module_sizes = {'op_belief': 10, 'my_decision': 5, 'op_decision': 5, 'op_belief_t': 50}
+        module_sizes = {'op_belief': 10, 'my_decision': 5, 'op_decision': 5, 'op_decision_t': 25, 'op_belief_t': 50, 'my_belief_t': 50}
         module_names = module_labels.keys()
 
         first_batch_processed = False
@@ -372,9 +388,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
             inputs, target_labels, oracles = inputs.to(device), target_labels.float().to(device), oracles.to(device)
 
             outputs = model(inputs, None)
-
-            if not oracle_labels:
-                loss = criterion(outputs['my_decision'], torch.argmax(target_labels, dim=1))
+            my_decision_loss = criterion(outputs['my_decision'], torch.argmax(target_labels, dim=1))
 
             if not first_batch_processed:
                 #print(oracles.shape, oracles[0:100])
@@ -390,11 +404,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
 
                 first_batch_processed = True
 
-            oracle_loss = 0.0
-
-            #print(oracle_labels)
-
-            if batch % 500 == 0 and batch > 0:
+            if batch % 500 == 0 and batch > 0 and model.record_og_beliefs:
                 with torch.no_grad():
                     original_use_neural = model.op_belief.use_neural
                     
@@ -421,7 +431,6 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
                 hc_idx = hc_series.argmax(dim=-1)
 
                 B = oracles.shape[0]
-                print(oracles.shape)
                 s, e = module_ranges['op_belief_t']
                 T = (e - s) // (2*5)
                 oracle_chunk = oracles.reshape(B, -1)[:, s:e]
@@ -429,7 +438,6 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
                 oracle_sum = oracle_5.sum(dim=-1)
                 oracle_idx = oracle_5.argmax(dim=-1)
                 oracle_idx[oracle_sum == 0] = 5
-                #oracle_idx = oracle_idx.permute(0,2,1).contiguous() 
                 og_idx = oghardcoded_beliefs.argmax(dim=-1)
 
                 type_names = ["Large", "Small"]
@@ -440,59 +448,87 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
                         print(f"{type_names[ttype]} HC:     {hc_idx[i,ttype].tolist()}")
                         print(f"{type_names[ttype]} OG:     {og_idx[i,ttype].item()}")
 
+            oracle_losses = {}
             if oracle_labels:
-                flat_oracle = oracles.reshape(oracles.size(0), -1)
-                oracle_criterion = nn.CrossEntropyLoss()
-                
-                for module_name in module_labels.keys():
-                    if module_name in outputs and module_name in module_ranges:
-                        oracle_target = flat_oracle
-                        s, e = module_ranges[module_name]
-                        oracle_target = flat_oracle[:, s:e] #[bs, 50]
-                        oracle_target_reshaped = oracle_target.reshape(-1, 2, 5)
-                        target_indices = torch.argmax(oracle_target_reshaped, dim=2)
-                        no_treat_mask = (oracle_target_reshaped.sum(dim=2) == 0)
-                        target_indices[no_treat_mask] = 5
-                        target_indices_flat = target_indices.reshape(-1) 
-                        
-                        if batch == 0:
-                            print(f"Target indices shape: {target_indices.shape}")
-                            print(f"Target indices[0]: {target_indices[0]}")
-                            print(f"No treat mask[0]: {no_treat_mask[0]}")
+                flat_oracle = oracles.view(oracles.size(0), -1)
 
-                            print("module_ranges:", module_ranges)  # ensure op_belief_t → (0, 50) if it’s the only oracle
-                            # Check the no-treat rate in oracle targets (per treat type)
-                            for k in ['op_belief_t']:
-                                s, e = module_ranges[k]
-                                x = flat_oracle[:, s:e].reshape(-1, 2, 5)
-                                none_rate = (x.sum(dim=2) == 0).float().mean(dim=0)  # (2,)
-                                print(f"{k} none_rate (L, S):", none_rate.tolist())
-                        
-                        model_output_raw = outputs[module_name]
+                for name in module_labels.keys():
+                    if name not in outputs or name not in module_ranges:
+                        print('error')
 
-                        
-                        if module_name == 'op_belief_t': #this is true
-                            model_output = model_output_raw.permute(0, 2, 1, 3).reshape(-1, 2, 6)
-                        else:
-                            #batch_size = model_output_raw.shape[0]
-                            model_output = model_output_raw#.unsqueeze(1).expand(batch_size, 5, 2, 6).reshape(-1, 2, 6)
-                        
-                        model_output_flat = model_output.reshape(-1, 6)
-                        
-                        
-                        if batch == 0:
-                            print(f"Model output shape: {model_output.shape}")
-                            print(f"Model output flat shape: {model_output_flat.shape}")
-                            print(f"Target indices flat shape: {target_indices_flat.shape}")
-                        
-                        oracle_loss += oracle_criterion(model_output_flat, target_indices_flat)
+                    s, e = module_ranges[name]
+                    oracle_slice = flat_oracle[:, s:e] 
+                    logits = outputs[name]
 
-            total_loss = oracle_loss
+                    if "belief_t" in name:
+                        B = oracle_slice.size(0)
+                        T = (e - s) // (2 * 5)
+                        tgt = oracle_slice.view(B, 2, T, 5)
+                        idx = tgt.argmax(-1)
+                        none_mask = tgt.sum(-1) == 0
+                        idx[none_mask] = 5
+                        idx = idx.permute(0, 2, 1).reshape(-1)
+                        loss = oracle_criterion(logits.permute(0, 2, 1, 3).reshape(-1, 6),idx.reshape(-1))
+                    elif name == "op_belief" or name == "my_belief":
+                        B = oracle_slice.size(0)
+                        tgt = oracle_slice.view(B, 2, 5)
+                        idx = tgt.argmax(-1)
+                        none_mask = tgt.sum(-1) == 0
+                        idx[none_mask] = 5
+                        loss = oracle_criterion(logits.reshape(-1, 6),idx.reshape(-1) )
+                    elif name == "op_decision":
+                        loss = oracle_criterion(logits,oracle_slice.argmax(-1))
+                    elif name == "op_decision_t":
+                        loss = oracle_criterion(logits.reshape(-1, 5), oracle_slice.view(B, T, 5).argmax(-1).reshape(-1))
+                    oracle_losses[name] = loss
 
+            oracle_loss = sum(oracle_losses.values())
+
+            ###
+            '''logits = outputs['op_belief_t']
+            B, S, T, C = logits.shape
+            device = logits.device
+
+            with torch.no_grad():
+                vis_op   = model.vision_perception_op(inputs, is_p1=0).to(logits.dtype)  # [B,T] in {0,1}
+                gt_pos   = model.treat_perception_op(inputs)                             # [B,T,2,6]
+                tgt_idx  = gt_pos.argmax(dim=-1)                                         # [B,T,2], 0..5
+
+            seen_mask   = (vis_op[:, 1:] == 1)                 # [B, T-1] bool
+            unseen_mask = ~seen_mask                           # [B, T-1] bool
+            seen_mask   = seen_mask.unsqueeze(1).expand(-1, S, -1)     # [B,2,T-1]
+            unseen_mask = unseen_mask.unsqueeze(1).expand(-1, S, -1)   # [B,2,T-1]
+
+            tgt_t = tgt_idx.permute(0, 2, 1)[:, :, 1:]         # [B,2,T-1]
+
+            if (seen_mask & (tgt_t < 5)).any():
+                ce_logits  = logits[:, :, 1:, :][seen_mask]    # [N_seen, 6]
+                ce_targets = tgt_t[seen_mask]                  # [N_seen]
+                loss_seen_ce = F.cross_entropy(ce_logits, ce_targets)
+            else:
+                loss_seen_ce = torch.zeros((), device=device)
+
+            logp_curr = logits[:, :, 1:, :].log_softmax(dim=-1)      # [B,2,T-1,6]
+            logp_prev = logits[:, :, :-1, :].log_softmax(dim=-1).detach()
+            p_prev    = logp_prev.exp()
+            kl = (p_prev * (logp_prev - logp_curr)).sum(dim=-1)      # [B,2,T-1]
+
+            if unseen_mask.any():
+                loss_persist = (kl * unseen_mask.float()).sum() / unseen_mask.float().sum().clamp_min(1.0)
+            else:
+                loss_persist = torch.zeros((), device=device)
+
+            delta_logits = (logits[:, :, 1:, :] - logits[:, :, :-1, :].detach()).pow(2).mean(dim=-1)  # [B,2,T-1]
+            if unseen_mask.any():
+                loss_delta = (delta_logits * unseen_mask.float()).sum() / unseen_mask.float().sum().clamp_min(1.0)
+            else:
+                loss_delta = torch.zeros((), device=device)'''
+
+            total_loss = my_decision_loss + 0.1 * oracle_loss #+ 0.01*loss_seen_ce + 0.01*loss_persist + 0.01*loss_delta
 
             optimizer.zero_grad()
             total_loss.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=2.0)
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
             optimizer.step()
 
             if (batch+1) % epoch_length == 0:
@@ -502,25 +538,39 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
             if record_loss and (((real_batch) % epoch_length_val == 0) or (real_batch == total_batches - 1)):
 
                 stage_results = evaluate_model_stage(model, test_loader, novel_loader, novel_task_loader, criterion, device, stage_config['stage_name'])
-                
+    
                 new_row_data = {
                     'Batch': real_batch,
                     'Loss': stage_results['loss'],
-                    'OLoss': oracle_loss.mean().cpu().item(),
+                    'OLoss_total': float(oracle_loss.item()) if oracle_labels else 0,
                     'Accuracy': stage_results['accuracy'],
                     'Novel_Accuracy': stage_results['novel_accuracy'],
                     'Novel_Task_Accuracy': stage_results['novel_task_accuracy']
                 }
+                for k, v in oracle_losses.items():
+                    new_row_data[f'OLoss_{k}'] = float(v.item())
+
                 new_row = pd.DataFrame([new_row_data])
-                
                 epoch_losses_df = pd.concat([epoch_losses_df, new_row], ignore_index=True)
                 model.train()
 
                 final_accuracy = stage_results['accuracy']
 
-                print(f"Acc: {stage_results['accuracy']:.4f}, Nacc: {stage_results['novel_accuracy']:.4f}, NTacc: {stage_results['novel_task_accuracy']:.4f}, L: {stage_results['loss']:.4f}, O: {oracle_loss.mean().cpu().item():.4f} Vis:",
-                    model.vision_prob, 'Path:', save_path, repetition)
+                if oracle_labels:
+                    oloss_strs = [f"{k}:{v.item():.3f}" for k, v in oracle_losses.items()]
+                    oloss_line = " | ".join(oloss_strs) + f" | sum:{oracle_loss.item():.4f}"
+                else:
+                    oloss_line = "none"
 
+                print(
+                    f"Acc: {stage_results['accuracy']:.3f}, "
+                    f"Nacc: {stage_results['novel_accuracy']:.3f}, "
+                    f"NTacc: {stage_results['novel_task_accuracy']:.3f}, "
+                    f"L: {stage_results['loss']:.3f}, "
+                    f"O: {oloss_line}, "
+                    #f"Persist: {loss_persist:.3f} delta: {loss_delta:.3f} cd: {loss_seen_ce:.3f}"
+                    f"Path: {save_path} Rep: {repetition}"
+                )
                 if save_models and real_batch == total_batches - 1:
                     os.makedirs(save_path, exist_ok=True)
                     torch.save([model.kwargs, model.state_dict()], os.path.join(save_path, f'{repetition}-checkpoint-{stage_config["stage_name"]}.pt'))
