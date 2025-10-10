@@ -31,6 +31,7 @@ def last_step_targets(flat_oracle, module_ranges, module_name):
 def evaluate_model_stage(model, test_loader, novel_loader, novel_task_loader, criterion, device, stage_name=""):
     model.eval()
     test_losses, all_preds, all_targets = [], [], []
+
     
     with torch.inference_mode():
         for inputs, target_labels, _, _, _ in test_loader:
@@ -51,8 +52,11 @@ def evaluate_model_stage(model, test_loader, novel_loader, novel_task_loader, cr
                 target_labels = target_labels.float().to(device)
                 
                 outputs = model(inputs, None)
+                #print(outputs['my_decision'].shape)
                 novel_preds.append(outputs['my_decision'].argmax(dim=1))
                 novel_targets.append(torch.argmax(target_labels, dim=1))
+
+                #print(novel_preds[:10], novel_targets[:10])
             
             if novel_preds:
                 novel_preds = torch.cat(novel_preds)
@@ -154,8 +158,8 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
     model_kwargs['oracle_is_target'] = oracle_is_target
 
     device = torch.device('cuda' if use_cuda else 'cpu')
-    total_steps = 8
-    epoch_steps = 8
+    total_steps = 24
+    epoch_steps = 24
     total_batches = sum(stage['batches'] for stage in curriculum_config.curriculum_stages)
     from supervised_learning_main import filter_indices, load_model
 
@@ -224,14 +228,22 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
 
         novel_eval_data, novel_eval_labels = [], []
         if novel_regimes:
-            for regime_name in novel_regimes[:3]:
+            for regime_name in novel_regimes:
                 dir = os.path.join(load_path, regime_name)
                 if os.path.exists(dir):
-                    regime_data = np.load(os.path.join(dir, 'obs.npz'), mmap_mode='r')['arr_0'][:100]
-                    regime_labels_raw = np.load(os.path.join(dir, 'label-' + target_label + '.npz'), mmap_mode='r')['arr_0'][:100]
+                    regime_data = np.load(os.path.join(dir, 'obs.npz'), mmap_mode='r')['arr_0']
+                    regime_labels_raw = np.load(os.path.join(dir, 'label-' + target_label + '.npz'), mmap_mode='r')['arr_0']
                     
-                    if last_timestep and len(regime_labels_raw.shape) > 2:
-                        regime_labels = regime_labels_raw[..., -1, :]
+                    if target_label == 'shouldGetBig':
+                        if last_timestep:
+                            regime_labels = np.eye(2)[regime_labels_raw[:, -1].astype(int)]
+                        else:
+                            regime_labels = np.eye(2)[regime_labels_raw.astype(int)].reshape(-1, 10)
+                    elif len(regime_labels_raw.shape) > 2:
+                        if last_timestep or True:
+                            regime_labels = regime_labels_raw[..., -1, :]
+                        else:
+                            regime_labels = regime_labels_raw.reshape(-1, 25)
                     else:
                         regime_labels = regime_labels_raw.reshape(-1, 25)
                     
@@ -377,6 +389,8 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
         first_batch_processed = False
         module_ranges = {}
 
+        model.end2end_model._using_shifted_sequences = False
+
         for batch in range(batches):
             real_batch += 1
             total_loss = 0.0
@@ -391,12 +405,10 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
             my_decision_loss = criterion(outputs['my_decision'], torch.argmax(target_labels, dim=1))
 
             if not first_batch_processed:
-                #print(oracles.shape, oracles[0:100])
                 flat_oracle = oracles.reshape(oracles.size(0), -1)
                 total_oracle_dims = flat_oracle.size(1)
                 pos = 0
                 for module_name in module_labels.keys():
-                    #print(module_name)
                     module_output = outputs[module_name]
                     flattened_output_size = module_sizes[module_name]
                     module_ranges[module_name] = (pos, pos + flattened_output_size)
@@ -479,52 +491,171 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
                     elif name == "op_decision":
                         loss = oracle_criterion(logits,oracle_slice.argmax(-1))
                     elif name == "op_decision_t":
-                        loss = oracle_criterion(logits.reshape(-1, 5), oracle_slice.view(B, T, 5).argmax(-1).reshape(-1))
+                        B = oracle_slice.size(0)
+                        T = (e - s) // 5
+                        tgt = oracle_slice.view(B, T, 5)
+                        idx = tgt.argmax(-1)
+                        none_mask = tgt.sum(-1) == 0 
+                        idx[none_mask] = 5  
+                        #print(logits.reshape(-1, 6).argmax(-1)[0], idx.reshape(-1)[0]) 
+                        loss = oracle_criterion(logits.reshape(-1, 6), idx.reshape(-1))
                     oracle_losses[name] = loss
 
             oracle_loss = sum(oracle_losses.values())
 
             ###
-            '''logits = outputs['op_belief_t']
-            B, S, T, C = logits.shape
-            device = logits.device
+            logits = outputs['op_belief_t']
+            my_logits = outputs['my_belief_t']
+            if True:
+                B, S, T, C = logits.shape
+                device = logits.device
 
-            with torch.no_grad():
-                vis_op   = model.vision_perception_op(inputs, is_p1=0).to(logits.dtype)  # [B,T] in {0,1}
-                gt_pos   = model.treat_perception_op(inputs)                             # [B,T,2,6]
-                tgt_idx  = gt_pos.argmax(dim=-1)                                         # [B,T,2], 0..5
+                vis_op = model.vision_perception_op(inputs, is_p1=0)          # [B,T], 0/1
+                unseen_mask_full = (vis_op.round() <0.5).view(B, 1, T).expand(-1, S, -1)  # [B,2,T]
 
-            seen_mask   = (vis_op[:, 1:] == 1)                 # [B, T-1] bool
-            unseen_mask = ~seen_mask                           # [B, T-1] bool
-            seen_mask   = seen_mask.unsqueeze(1).expand(-1, S, -1)     # [B,2,T-1]
-            unseen_mask = unseen_mask.unsqueeze(1).expand(-1, S, -1)   # [B,2,T-1]
+                logp_curr = logits.log_softmax(dim=-1)                        # [B,2,T,6]
 
-            tgt_t = tgt_idx.permute(0, 2, 1)[:, :, 1:]         # [B,2,T-1]
+                prior_logits = torch.full_like(logits[:, :, :1, :], -10)    # [B,2,1,6]
+                prior_logits[..., 5] = 10.0
 
-            if (seen_mask & (tgt_t < 5)).any():
-                ce_logits  = logits[:, :, 1:, :][seen_mask]    # [N_seen, 6]
-                ce_targets = tgt_t[seen_mask]                  # [N_seen]
-                loss_seen_ce = F.cross_entropy(ce_logits, ce_targets)
-            else:
-                loss_seen_ce = torch.zeros((), device=device)
+                prev_logits = torch.cat([prior_logits, logits[:, :, :-1, :].detach()], dim=2)  # [B,2,T,6]
+                logp_prev  = prev_logits.log_softmax(dim=-1)                                    # [B,2,T,6]
 
-            logp_curr = logits[:, :, 1:, :].log_softmax(dim=-1)      # [B,2,T-1,6]
-            logp_prev = logits[:, :, :-1, :].log_softmax(dim=-1).detach()
-            p_prev    = logp_prev.exp()
-            kl = (p_prev * (logp_prev - logp_curr)).sum(dim=-1)      # [B,2,T-1]
+                kl_t = F.kl_div(logp_curr, logp_prev, log_target=True, reduction="none").sum(dim=-1)  # [B,2,T]
 
-            if unseen_mask.any():
-                loss_persist = (kl * unseen_mask.float()).sum() / unseen_mask.float().sum().clamp_min(1.0)
-            else:
-                loss_persist = torch.zeros((), device=device)
+                # average KL over unseen steps only (including t=0 when unseen)
+                den = unseen_mask_full.float().sum().clamp_min(1.0)
+                loss_unseen_stability = (kl_t * unseen_mask_full.float()).sum() / den
+            if True:
+                logits = outputs['op_belief_t']
+                my_logits = outputs['my_belief_t']
+                B, S, T, C = logits.shape
+                device = logits.device
 
-            delta_logits = (logits[:, :, 1:, :] - logits[:, :, :-1, :].detach()).pow(2).mean(dim=-1)  # [B,2,T-1]
-            if unseen_mask.any():
-                loss_delta = (delta_logits * unseen_mask.float()).sum() / unseen_mask.float().sum().clamp_min(1.0)
-            else:
-                loss_delta = torch.zeros((), device=device)'''
+                with torch.no_grad():
+                    B = oracles.size(0)
+                    flat_oracle = oracles.view(B, -1)
+                    s_op, e_op = module_ranges['op_belief_t']
+                    T = (e_op - s_op) // (2 * 5)  # 2 treats × 5 positions
+                    op_gt = flat_oracle[:, s_op:e_op].view(B, 2, T, 5)
+                    op_idx = op_gt.argmax(-1)                  # [B,2,T] in {0..4}
+                    op_none = op_gt.sum(-1) == 0               # [B,2,T]
+                    op_idx[op_none] = 5                        # 5 = "none"
 
-            total_loss = my_decision_loss + 0.1 * oracle_loss #+ 0.01*loss_seen_ce + 0.01*loss_persist + 0.01*loss_delta
+                    vis = model.vision_perception_op(inputs, is_p1=0).round().long()  # [B,T]
+
+                    prev = torch.cat([torch.full_like(op_idx[:, :, :1], 5), op_idx[:, :, :-1]], dim=2)  # [B,2,T]
+
+                    t0_unseen = (vis[:, 0] < 0.5).view(B,1,1).expand(-1,2,1)                              # [B,2,1]
+                    t0_seen = (vis[:, 0] > 0.5).view(B,1,1).expand(-1,2,1)                              # [B,2,1]
+                    chg_t0 = ((op_idx[:, :, :1] != 5) & t0_unseen).float().mean().item()
+                    chg_t0_seen = ((op_idx[:, :, :1] != 5) & t0_seen).float().mean().item()
+
+                    seen_mask = (vis[:, 1:] > 0.5).view(B,1,T-1).expand(-1,2,-1)                          # [B,2,T-1]
+                    unseen_mask = ~seen_mask
+
+                    chg_unseen = ((op_idx[:, :, 1:] != prev[:, :, 1:]) & unseen_mask).float().mean().item()
+                    chg_seen = ((op_idx[:, :, 1:] != prev[:, :, 1:]) & seen_mask).float().mean().item()
+                    pred_idx = logits.argmax(-1)                      # [B,2,T]
+                    pred_prev = torch.cat([torch.full_like(pred_idx[:, :, :1], 5), pred_idx[:, :, :-1]], dim=2)
+
+                    seen_mask   = (vis[:, 1:] > 0.5).view(B,1,T-1).expand(-1,2,-1)
+                    unseen_mask = ~seen_mask
+
+                    pred_chg_unseen = ((pred_idx[:, :, 1:] != pred_prev[:, :, 1:]) & unseen_mask).float().mean().item()
+                    pred_chg_seen   = ((pred_idx[:, :, 1:] != pred_prev[:, :, 1:]) & seen_mask).float().mean().item()
+
+                logp = logits.log_softmax(dim=-1)                     # [B,2,T,6]
+
+
+                if batch % 500 == 0:
+                    print("GT:", chg_unseen, chg_seen, "PRED:", pred_chg_unseen, pred_chg_seen)
+
+                with torch.no_grad():
+                    vis_op   = model.vision_perception_op(inputs, is_p1=0).to(logits.dtype)  # [B,T] in {0,1}
+                    gt_pos   = model.treat_perception_op(inputs)                             # [B,T,2,6]
+                    tgt_idx  = gt_pos.argmax(dim=-1)                                         # [B,T,2], 0..5
+
+                seen_mask   = (vis_op[:, 1:].round() == 1)                 # [B, T-1] bool
+                unseen_mask = ~seen_mask                           # [B, T-1] bool
+                seen_mask   = seen_mask.unsqueeze(1).expand(-1, S, -1)     # [B,2,T-1]
+                unseen_mask = unseen_mask.unsqueeze(1).expand(-1, S, -1)   # [B,2,T-1]
+
+                tgt_t = tgt_idx.permute(0, 2, 1)[:, :, 1:]         # [B,2,T-1]
+
+                logp_curr = logits.log_softmax(-1)
+                logp_prev = prev_logits.log_softmax(-1)
+
+                seen_mask = (vis_op[:,1:].round()>0.51).view(B,1,T-1).expand(-1,S,-1)
+
+                p_t   = logp_curr[:,:,1:,:].exp()
+                p_tm1 = logp_prev[:,:,1:,:].exp()
+                q     = 0.5*(p_t+p_tm1)
+                js = 0.5*(
+                    F.kl_div(logp_curr[:,:,1:,:], q.log(), log_target=True, reduction="none").sum(-1) +
+                    F.kl_div(logp_prev[:,:,1:,:], q.log(), log_target=True, reduction="none").sum(-1)
+                )
+                margin = 0.10
+                loss_seen_ce = torch.relu(margin - js)
+                loss_seen_ce = (loss_seen_ce*seen_mask.float()).sum() / seen_mask.float().sum().clamp_min(1)
+
+                # for persisting past zeroth step
+                extended_seen_mask = torch.cat([(vis_op[:, :1] > 0.5).unsqueeze(1).expand(-1, 2, -1), seen_mask], dim=2)
+                extended_unseen_mask = ~extended_seen_mask
+                initial_logits = torch.zeros_like(logits[:, :, :1, :])
+                initial_logits[:, :, :, 5] = 10.0
+                extended_prev = torch.cat([initial_logits, logits[:, :, :-1, :]], dim=2)
+                extended_curr = logits
+                logp_curr = extended_curr.log_softmax(dim=-1)
+                logp_prev = extended_prev.log_softmax(dim=-1)
+                p_prev = logp_prev.exp()
+                kl = (p_prev * (logp_prev - logp_curr)).sum(dim=-1)
+                if extended_unseen_mask.any():
+                    loss_persist = (kl * extended_unseen_mask.float()).sum() / extended_unseen_mask.float().sum().clamp_min(1.0)
+                else:
+                    loss_persist = torch.zeros((), device=device)
+
+                if unseen_mask.any() and torch.rand(1).item() < 1:
+                    n_unseen = unseen_mask.sum().item()
+                    loss_misinformed = F.cross_entropy(logits[:, :, 1:, :][unseen_mask], torch.randint(0, 5, (n_unseen,), device=device))
+                else:
+                    loss_misinformed = torch.zeros((), device=device)
+
+                delta_logits = (logits[:, :, 1:, :] - logits[:, :, :-1, :]).pow(2).mean(dim=-1)  # [B,2,T-1]
+                if unseen_mask.any():
+                    loss_delta = (delta_logits * unseen_mask.float()).sum() / unseen_mask.float().sum().clamp_min(1.0)
+                else:
+                    loss_delta = torch.zeros((), device=device)
+
+                if True:
+                    flat_oracle = oracles.view(oracles.size(0), -1)
+
+                    s_my, e_my = module_ranges['my_belief_t']
+                    my_oracle_slice = flat_oracle[:, s_my:e_my]
+                    B = my_oracle_slice.size(0)
+                    T = (e_my - s_my) // (2 * 5)
+                    my_tgt = my_oracle_slice.view(B, 2, T, 5)
+                    my_gt_targets = my_tgt.argmax(-1)  # [B, 2, T]
+                    my_none_mask = my_tgt.sum(-1) == 0
+                    my_gt_targets[my_none_mask] = 5
+
+                    s_op, e_op = module_ranges['op_belief_t']
+                    op_oracle_slice = flat_oracle[:, s_op:e_op]
+                    op_tgt = op_oracle_slice.view(B, 2, T, 5)
+                    op_gt_targets = op_tgt.argmax(-1)  # [B, 2, T]
+                    op_none_mask = op_tgt.sum(-1) == 0
+                    op_gt_targets[op_none_mask] = 5
+
+                    my_pred = my_logits.argmax(dim=-1)  # [B, 2, T]
+                    op_pred = logits.argmax(dim=-1)     # [B, 2, T]
+                    should_differ = (my_gt_targets != op_gt_targets)  # [B, 2, T] bool
+                    preds_same = (my_pred == op_pred)   # [B, 2, T] bool
+                    wrong_agreement = should_differ & preds_same  # [B, 2, T] bool
+                    loss_wrong_agreement = wrong_agreement.float().mean()
+
+            #total_loss = my_decision_loss + 0.1*oracle_loss + 0.1*loss_misinformed + loss_seen_ce + loss_persist + loss_wrong_agreement
+
+            total_loss = my_decision_loss + oracle_loss #+ 0.5*loss_unseen_stability + 0.01*loss_seen_ce + 0.01*loss_delta + 0.01*loss_persist
 
             optimizer.zero_grad()
             total_loss.backward()
@@ -568,7 +699,9 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
                     f"NTacc: {stage_results['novel_task_accuracy']:.3f}, "
                     f"L: {stage_results['loss']:.3f}, "
                     f"O: {oloss_line}, "
-                    #f"Persist: {loss_persist:.3f} delta: {loss_delta:.3f} cd: {loss_seen_ce:.3f}"
+                    f"Persist: {loss_persist:.3f} delta: {loss_delta:.3f} ce: {loss_seen_ce:.3f} "
+                    f"LW: {loss_wrong_agreement:.3f} MI: {loss_misinformed:.3f}"
+                    f"LU: {loss_unseen_stability:.3f}"
                     f"Path: {save_path} Rep: {repetition}"
                 )
                 if save_models and real_batch == total_batches - 1:

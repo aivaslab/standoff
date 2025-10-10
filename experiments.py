@@ -26,10 +26,17 @@ def get_model_types(num, use_eval):
 
 def init_regimes(rational_train_only=True):
     sub_regime_keys = [
-        "Fn", "Nf", "Tn", "Ff", "Tf", "Ft", "Tt", "Gg", "Gn", "Ng"
+        "Fn", "Nf", "Tn", "Ff", "Tf", "Ft", "Tt", "Gg", "Gn", "Ng" #lacking Nt and Nn for splitting a/b
+    ] 
+    all_sub_regime_keys = [
+        "Fn", "Nf", "Tn", "Ff", "Tf", "Ft", "Tt", "Gg", "Gn", "Ng", "Nt", "Tn", "Nn"
+    ] 
+    all_sub_regime_keys_less = [
+        "Fn", "Nf", "Tn", "Ff", "Tf", "Tt", "Gg", "Gn", "Ng", "Nt", "Tn", "Nn"
     ] 
 
     all_regimes = ['sl-' + x + '0' for x in sub_regime_keys] + ['sl-' + x + '1' for x in sub_regime_keys] + ['sl-Nn1', 'sl-Nt1a', 'sl-Nt1b', 'sl-Nn0', 'sl-Nt0']
+    all_regimes_new = ['sl-' + x + '0' for x in all_sub_regime_keys] + ['sl-' + x + '1' for x in all_sub_regime_keys] 
     mixed_regimes = {k: ['sl-' + x + '0' for x in sub_regime_keys] + ['sl-Nn1', 'sl-Nt1a', 'sl-Nt1b', 'sl-Nn0', 'sl-Nt0'] + ['sl-' + k + '1'] for k in sub_regime_keys} 
 
     regimes = {}
@@ -47,8 +54,10 @@ def init_regimes(rational_train_only=True):
     fregimes['s2'] = ['sl-' + x + '0' for x in sub_regime_keys] + ['sl-Tt1', 'sl-Nn0', 'sl-Nt0']
     #a has no swaps, b has swaps
     fregimes['s21-x'] = ['sl-' + x + '0' for x in sub_regime_keys] + ['sl-Tt1', 'sl-Nn0', 'sl-Nt0', 'sl-Nn1a', 'sl-Nt1a', 'sl-Gg1', 'sl-Gn1', 'sl-Ng1'] 
-    fregimes['s21'] = ['sl-' + x + '0' for x in sub_regime_keys] + ['sl-Tt1'] + ['sl-Nn0', 'sl-Nt0'] + ['sl-Nn1a'] + ['sl-Nt1a'] 
-    fregimes['s3'] = all_regimes
+    fregimes['s21'] = ['sl-' + x + '0' for x in sub_regime_keys] + ['sl-Tt1'] + ['sl-Nn0', 'sl-Nt0'] + ['sl-Nn1a'] + ['sl-Nt1a', 'sl-Tn1a'] 
+    fregimes['s22'] = ['sl-' + x + '0' for x in all_sub_regime_keys] + ['sl-Tt1', 'sl-Nn1', 'sl-Nt1', 'sl-Tn1',]
+    fregimes['s23'] = ['sl-' + x + '0' for x in all_sub_regime_keys] + ['sl-Tt1', 'sl-Nn1', 'sl-Nt1', 'sl-Tn1', 'sl-Ft1', 'sl-Tf1', 'sl-Ft1', 'sl-Gg1', 'sl-Gn1', 'sl-Ng1', 'sl-Nf1', 'sl-Fn1', 'sl-Ff1']
+    fregimes['s3'] = all_regimes_new
 
     single_regimes = {k[3:]: [k] for k in all_regimes}
     leave_one_out_regimes = {}
@@ -199,7 +208,7 @@ def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, sk
                 label=label,
                 model_type=model_type,
                 do_retrain_model=retrain,
-                train_sets_dict={'s21': fregimes['s21'], 's2': fregimes['s2'], 's1': fregimes['s1'], 's3': fregimes['s3']},
+                train_sets_dict={'s21': fregimes['s21'], 's22': fregimes['s22'], 's2': fregimes['s2'], 's1': fregimes['s1'], 's3': fregimes['s3']},
                 curriculum_name=curriculum_name,
                 **session_params
             )
@@ -279,6 +288,7 @@ if __name__ == '__main__':
     #print('number of model types:', len(model_types))
     model_types = ['a-mix-n-belief-op']
     model_types = ['a-fullM-sym-lstm32']
+    #model_types = ['a-hardcoded']
 
     labels = [('correct-loc', 'loc')]
 

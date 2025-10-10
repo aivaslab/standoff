@@ -15,101 +15,74 @@ class EndToEndModel(nn.Module):
         self.arch = arch
         self.output_type = output_type
         self.transition_counts = defaultdict(float)
-        self.register_buffer('transition_counts_tensor', torch.zeros(2, 6, 6, 6, dtype=torch.int64), persistent=False)
+        self.register_buffer('transition_counts_tensor', torch.zeros(5, 2, 2, 6, 6, 6, dtype=torch.int64), persistent=False)
+        self.T_in = 5
+        self.T_pad = 8
         raw_input_dim = 5 * 5 * 7 * 7
-        processed_input_dim = 2 * 6 * 5 #+ 5 + 5  # treats(60) + vision(5) + presence_seq(5) = 70
+        processed_input_dim = 2 * 6 * self.T_in + self.T_in + self.T_in
+        self._using_shifted_sequences = False
         hidden = 128
-
         if output_type == 'op_belief':
             output_dim = 12
         elif output_type in ['op_decision', 'my_decision']:
             output_dim = 5
-        elif output_type == 'multi': 
-            output_dim = 2*5*6 + 2*5*6 + 5*5 + 5
-
+        elif output_type == 'multi':
+            output_dim = 2*self.T_in*6 + 2*self.T_in*6 + self.T_in*6 + 5
         if arch == 'mlp':
-            self.raw_model = nn.Sequential(
-                nn.Flatten(),
-                nn.Linear(raw_input_dim, hidden),
-                nn.BatchNorm1d(hidden),
-                nn.ReLU(),
-                nn.Linear(hidden, hidden),
-                nn.ReLU(),
-                nn.Linear(hidden, 32),
-                nn.ReLU(),
-                nn.Linear(32, output_dim)
-            )
-            self.processed_model = nn.Sequential(
-                nn.Linear(processed_input_dim, hidden),
-                nn.BatchNorm1d(hidden),
-                nn.ReLU(),
-                nn.Linear(hidden, hidden),
-                nn.ReLU(),
-                nn.Linear(hidden, 32),
-                nn.ReLU(),
-                nn.Linear(32, output_dim)
-            )
+            self.raw_model = nn.Sequential(nn.Flatten(), nn.Linear(raw_input_dim, hidden), nn.BatchNorm1d(hidden), nn.ReLU(), nn.Linear(hidden, hidden), nn.ReLU(), nn.Linear(hidden, 32), nn.ReLU(), nn.Linear(32, output_dim))
+            self.processed_model = nn.Sequential(nn.Linear(processed_input_dim, hidden), nn.BatchNorm1d(hidden), nn.ReLU(), nn.Linear(hidden, hidden), nn.ReLU(), nn.Linear(hidden, 32), nn.ReLU(), nn.Linear(32, output_dim))
         elif arch == 'cnn':
-            self.raw_model = nn.Sequential(
-                nn.Conv3d(5, 16, kernel_size=3, padding=1),
-                nn.ReLU(),
-                nn.Conv3d(16, 32, kernel_size=3, padding=1),
-                nn.ReLU(),
-                nn.AdaptiveAvgPool3d((1, 1, 1)),
-                nn.Flatten(),
-                nn.Linear(32, 32),
-                nn.BatchNorm1d(32),
-                nn.ReLU(),
-                nn.Linear(32, output_dim)
-            )
-            self.processed_model = nn.Sequential(
-                nn.Linear(processed_input_dim, hidden),
-                nn.BatchNorm1d(hidden),
-                nn.ReLU(),
-                nn.Linear(hidden, 32),
-                nn.ReLU(),
-                nn.Linear(32, output_dim)
-            )
+            self.raw_model = nn.Sequential(nn.Conv3d(5, 16, kernel_size=3, padding=1), nn.ReLU(), nn.Conv3d(16, 32, kernel_size=3, padding=1), nn.ReLU(), nn.AdaptiveAvgPool3d((1, 1, 1)), nn.Flatten(), nn.Linear(32, 32), nn.BatchNorm1d(32), nn.ReLU(), nn.Linear(32, output_dim))
+            self.processed_model = nn.Sequential(nn.Linear(processed_input_dim, hidden), nn.BatchNorm1d(hidden), nn.ReLU(), nn.Linear(hidden, 32), nn.ReLU(), nn.Linear(32, output_dim))
         elif arch == 'lstm128':
             self.raw_rnn = nn.LSTM(input_size=5*7*7, hidden_size=128, batch_first=True)
-            self.processed_rnn = nn.LSTM(input_size=processed_input_dim//5, hidden_size=128, batch_first=True)
+            self.processed_rnn = nn.LSTM(input_size=processed_input_dim//self.T_in, hidden_size=128, batch_first=True)
             self.head = nn.Linear(128, output_dim)
         elif arch == 'lstm32':
             self.raw_rnn = nn.LSTM(input_size=5*7*7, hidden_size=32, batch_first=True)
-            self.processed_rnn = nn.LSTM(input_size=processed_input_dim//5, hidden_size=32, batch_first=True)
+            self.processed_rnn = nn.LSTM(input_size=processed_input_dim//self.T_in, hidden_size=32, batch_first=True)
             self.head = nn.Linear(32, output_dim)
         elif arch == 'transformer128':
             self.raw_embed = nn.Linear(5*7*7, 128)
-            self.processed_embed = nn.Linear(processed_input_dim//5, 128)
+            self.processed_embed = nn.Linear(processed_input_dim//self.T_in, 128)
             encoder = nn.TransformerEncoderLayer(d_model=128, nhead=4, activation='gelu', dropout=0.1, batch_first=True)
             self.transformer = nn.TransformerEncoder(encoder, num_layers=2)
             self.head = nn.Linear(128, output_dim)
-
-            self.head_op_bel   = nn.Linear(128, 2*6)  # op beliefs (per t)
-            self.head_my_bel   = nn.Linear(128, 2*6)  # my beliefs (per t)
-            self.head_op_dec_t = nn.Linear(128, 5)    # op decisions (per t)
-            self.head_my_dec   = nn.Linear(128, 5)      # my decision (pooled)
+            self.head_op_bel   = nn.Linear(128, 2*6)
+            self.head_my_bel   = nn.Linear(128, 2*6)
+            self.head_op_dec_t = nn.Linear(128, 6)
+            self.head_my_dec   = nn.Linear(128, 5)
         elif arch == 'transformer32':
             self.raw_embed = nn.Linear(5*7*7, 32)
-            self.processed_embed = nn.Linear(processed_input_dim//5, 32)
+            self.processed_embed = nn.Linear(processed_input_dim//self.T_in, 32)
             encoder = nn.TransformerEncoderLayer(d_model=32, nhead=4, activation='gelu', dropout=0.1, batch_first=True)
             self.transformer = nn.TransformerEncoder(encoder, num_layers=2)
             self.head = nn.Linear(32, output_dim)
-
-            self.head_op_bel   = nn.Linear(32, 2*6)  # op beliefs (per t)
-            self.head_my_bel   = nn.Linear(32, 2*6)  # my beliefs (per t)
-            self.head_op_dec_t = nn.Linear(32, 5)    # op decisions (per t)
-            self.head_my_dec   = nn.Linear(32, 5)      # my decision (pooled)
+            self.head_op_bel   = nn.Linear(32, 2*6)
+            self.head_my_bel   = nn.Linear(32, 2*6)
+            self.head_op_dec_t = nn.Linear(32, 6)
+            self.head_my_dec   = nn.Linear(32, 5)
         else:
             raise ValueError(f"Unknown arch: {arch}")
 
     def _causal_mask(self, T, device):
         return torch.triu(torch.ones(T, T, dtype=torch.bool, device=device), diagonal=1)
 
+    def _pad_shift(self, x, T_in, T_pad, training):
+        B = x.size(0)
+        device = x.device
+        feat = x.size(-1)
+        shift = torch.randint(0, T_pad - T_in + 1, (B,), device=device) if training else torch.zeros(B, dtype=torch.long, device=device)
+        padded = torch.zeros(B, T_pad, feat, device=device)
+        t_idx = torch.arange(T_in, device=device).view(1, -1).expand(B, -1) + shift.view(B, 1)
+        b_idx = torch.arange(B, device=device).view(-1, 1).expand_as(t_idx)
+        padded[b_idx, t_idx] = x
+        last_idx = (shift + T_in - 1)
+        return padded, t_idx, last_idx
+
     def forward(self, input_data):
         if len(input_data.shape) == 5:
             B, T, C, H, W = input_data.shape
-            
             if self.arch == 'cnn':
                 x = input_data.permute(0, 2, 1, 3, 4)
                 output = self.raw_model(x)
@@ -118,51 +91,60 @@ class EndToEndModel(nn.Module):
             elif self.arch in ['lstm128', 'lstm32', 'transformer128', 'transformer32']:
                 x = input_data.view(B, T, -1)
                 if 'transformer' in self.arch:
+                    x = input_data.view(B, T, -1)
                     x = self.raw_embed(x)
-                    attn_mask = self._causal_mask(T, x.device)
-                    x = self.transformer(x, mask=attn_mask)
-                    pooled = x[:, -1]
-                    output = {
-                      'op_belief_t':   self.head_op_bel(x).view(B, 2, 5, 6),
-                      'my_belief_t':   self.head_my_bel(x).view(B, 2, 5, 6),
-                      'op_decision_t': self.head_op_dec_t(x).view(B, 5, 5),
-                      'my_decision':   self.head_my_dec(pooled),
-                    }
+                    x_pad, win_idx, last_idx = self._pad_shift(x, T, self.T_pad, self.training)
+                    attn_mask = self._causal_mask(self.T_pad, x.device)
+                    x_enc = self.transformer(x_pad, mask=attn_mask)
+                    B2 = x_enc.size(0)
+                    b_idx = torch.arange(B2, device=x_enc.device).view(-1, 1).expand_as(win_idx)
+                    x_win = x_enc[b_idx, win_idx]                             # (B,T,d)
+                    pooled = x_enc[torch.arange(B2, device=x_enc.device), last_idx]
+                    op_b = self.head_op_bel(x_win).view(B, T, 2, 6).permute(0, 2, 1, 3).contiguous()
+                    my_b = self.head_my_bel(x_win).view(B, T, 2, 6).permute(0, 2, 1, 3).contiguous()
+                    op_dt = self.head_op_dec_t(x_win).view(B, T, 6)
+                    output = {'op_belief_t': op_b, 'my_belief_t': my_b, 'op_decision_t': op_dt, 'my_decision': self.head_my_dec(pooled)}
                 else:
                     x = self.raw_rnn(x)[0]
                     output = self.head(x[:, -1])
         else:
             B = input_data.shape[0]
-            
+            per_step = 14
+            T_in = input_data.shape[1] // per_step
             if self.arch in ['mlp', 'cnn']:
                 output = self.processed_model(input_data)
             elif self.arch in ['lstm128', 'lstm32', 'transformer128', 'transformer32']:
-                x = input_data.view(B, 5, -1)
+                x = input_data.view(B, T_in, -1)
                 if 'transformer' in self.arch:
+                    x = input_data.view(B, T_in, -1)
                     x = self.processed_embed(x)
-                    attn_mask = self._causal_mask(x.size(1), x.device)
-                    x = self.transformer(x, mask=attn_mask)
-                    pooled = x[:, -1]
-                    output = {
-                      'op_belief_t':   self.head_op_bel(x).view(B, 2, 5, 6),
-                      'my_belief_t':   self.head_my_bel(x).view(B, 2, 5, 6),
-                      'op_decision_t': self.head_op_dec_t(x).view(B, 5, 5),
-                      'my_decision':   self.head_my_dec(pooled),
-                    }
+                    x_pad, win_idx, last_idx = self._pad_shift(x, T_in, self.T_pad, self.training)
+                    attn_mask = self._causal_mask(self.T_pad, x.device)
+                    x_enc = self.transformer(x_pad, mask=attn_mask)
+                    b_idx = torch.arange(B, device=x_enc.device).view(-1, 1).expand_as(win_idx)
+                    x_win = x_enc[b_idx, win_idx]                             # (B,T_in,d)
+                    pooled = x_enc[torch.arange(B, device=x_enc.device), last_idx]
+                    op_b = self.head_op_bel(x_win).view(B, T_in, 2, 6).permute(0, 2, 1, 3).contiguous()
+                    my_b = self.head_my_bel(x_win).view(B, T_in, 2, 6).permute(0, 2, 1, 3).contiguous()
+                    op_dt = self.head_op_dec_t(x_win).view(B, T_in, 6)
+                    output = {'op_belief_t': op_b, 'my_belief_t': my_b, 'op_decision_t': op_dt, 'my_decision': self.head_my_dec(pooled)}
                 else:
                     x = self.processed_rnn(x)[0]
                     output = self.head(x[:, -1])
-
         if not self.training:
-            B = output['op_belief_t'].size(0)
-            self._log_expected_transitions(input_data, output['op_belief_t'].view(B, 2, 5, 6), T=5)
-
+            ob = output['op_belief_t']            # [B,2,T,6]
+            self._log_expected_transitions(input_data, ob)
         if self.output_type == 'op_belief':
-            output = output.view(B, 2, 6)
-            return F.softmax(output, dim=-1)
+            if isinstance(output, dict):
+                out = output['op_belief_t'][:, -1].contiguous().view(output['op_belief_t'].size(0), 2, 6)
+            else:
+                out = output.view(output.size(0), 2, 6)
+            return F.softmax(out, dim=-1)
         elif self.output_type == 'multi':
             return output
         else:
+            if isinstance(output, dict):
+                return output
             return F.softmax(output, dim=-1)
 
     @staticmethod
@@ -175,63 +157,80 @@ class EndToEndModel(nn.Module):
     def _bin_vec_to_tuple(x_row):
         return tuple(torch.round(x_row).long().tolist())
 
-    def _parse_flat_end2end_input(self, x_flat: torch.Tensor, T: int = 5):
+    def _parse_flat_end2end_input(self, x_flat: torch.Tensor):
         B, D = x_flat.shape
-        treat_dim = (D - 2*T) // T
-        off = 0
-        treats_all = x_flat[:, off:off + T*treat_dim].view(B, T, treat_dim); off += T*treat_dim
-        vision     = x_flat[:, off:off + T].view(B, T); off += T
-        presence   = x_flat[:, off:off + T].view(B, T)
-
-        half = treat_dim // 2
-        treats_L = treats_all[:, :, :half]
-        treats_S = treats_all[:, :, half:]
-        return treats_L, treats_S, vision, presence
+        assert D % 14 == 0, f"flat input must be 14*T; got D={D}"
+        T = D // 14
+        xps = x_flat.view(B, T, 14)
+        treats = xps[:, :, :12].view(B, T, 2, 6)   # [B,T,2,6]
+        vision = xps[:, :, 12]                      # [B,T]
+        presence = xps[:, :, 13]                    # [B,T]
+        tL = treats[:, :, 0, :]                     # [B,T,6]
+        tS = treats[:, :, 1, :]                     # [B,T,6]
+        return T, tL, tS, vision, presence
 
     @torch.no_grad()
-    def _log_expected_transitions(self, x_flat: torch.Tensor, ob_logits: torch.Tensor, T: int = 5):
-        device = ob_logits.device
-        B = x_flat.size(0)
-        treats_L, treats_S, vision, presence = self._parse_flat_end2end_input(x_flat, T=T)
-        # ob_logits: [B, 2, T, 6]
-        cur_idx = ob_logits.argmax(dim=-1)  # [B, 2, T],
-        prev = torch.full((B,), 5, device=device, dtype=torch.long)
-
-        local = torch.zeros_like(self.transition_counts_tensor)  # [2,6,6,6], int64
-
-        for size_idx, tr_all in enumerate((treats_L, treats_S)):  # each [B,T,6]
-            p = prev
-            for t in range(T):
-                c = cur_idx[:, size_idx, t]           # [B], to_idx
-                k = tr_all[:, t, :].argmax(dim=-1)    # [B], treat_idx (works even if soft/near-one-hot)
-                v = vision[:, t].round().long()       # [B], 0/1
-                flat = (((v * 6 + p) * 6 + k) * 6 + c)           # [B]
-                bins = torch.bincount(flat, minlength=432)       # int64 [432]
-                local += bins.view(2, 6, 6, 6)
-
-                p = c 
-
-        self.transition_counts_tensor += local
+    def _log_expected_transitions(self, x_flat: torch.Tensor, ob_logits: torch.Tensor):
+        B, D = x_flat.shape
+        T, tL, tS, vis, pres = self._parse_flat_end2end_input(x_flat)
+        cur = ob_logits.argmax(-1).long()
+        prev = torch.cat([torch.full((B, 2, 1), 5, dtype=torch.long, device=cur.device), cur[:, :, :-1]], dim=2)
+        kL = tL.argmax(-1).long()
+        kS = tS.argmax(-1).long()
+        v = (vis > 0.5).long()
+        p_any = (pres > 0.5).any(dim=1).long()
+        for s in (0, 1):
+            prev_s = prev[:, s]
+            cur_s  = cur[:, s]
+            ks = kL if s == 0 else kS
+            for t in range(1, T):
+                m_base = p_any == 1
+                if not m_base.any():
+                    continue
+                enc = (prev_s[m_base, t] * 36 + ks[m_base, t] * 6 + cur_s[m_base, t])
+                v_t = v[m_base, t]
+                for vv in (0, 1):
+                    m = v_t == vv
+                    if m.any():
+                        bins = torch.bincount(enc[m], minlength=216).view(6, 6, 6)
+                        self.transition_counts_tensor[t, s, vv].add_(bins)
 
     def save_transition_table(self, filepath='transition_table.csv'):
-        os.makedirs(os.path.dirname(filepath), exist_ok=True)
-        tc = self.transition_counts_tensor.detach().cpu()  # [2,6,6,6]
-        nz = (tc > 0).nonzero(as_tuple=False)              # [N,4]: (v,i,k,j)
+        dirpath = os.path.dirname(filepath)
+        if dirpath:
+            os.makedirs(dirpath, exist_ok=True)
+        tc = self.transition_counts_tensor.detach().cpu()
+        eye = torch.eye(6, dtype=torch.long)
+        nz = (tc > 0).nonzero(as_tuple=False)
         rows = []
-        for v, i, k, j in nz:
+        for t, s, v, i, k, j in nz:
             rows.append({
-                'from_state': str(tuple(torch.eye(6, dtype=torch.long)[i].tolist())),
-                'treat_state': str(tuple(torch.eye(6, dtype=torch.long)[k].tolist())),
+                'timestep': int(t.item()),
+                'treat_size': int(s.item()),
+                'from_state': str(tuple(eye[i].tolist())),
+                'treat_state': str(tuple(eye[k].tolist())),
                 'vision': int(v.item()),
-                'to_state': str(tuple(torch.eye(6, dtype=torch.long)[j].tolist())),
-                'count': float(tc[v, i, k, j].item()),
+                'to_state': str(tuple(eye[j].tolist())),
+                'count': float(tc[t, s, v, i, k, j].item()),
             })
-        df = pd.DataFrame(rows, columns=['from_state','treat_state','vision','to_state','count'])
+        df = pd.DataFrame(rows, columns=['timestep','treat_size','from_state','treat_state','vision','to_state','count'])
         df.to_csv(filepath, index=False)
         if len(df) == 0:
             return df, pd.DataFrame()
-        pivot = df.pivot_table(index=['from_state','treat_state','vision'], columns='to_state', values='count', fill_value=0)
+        pivot = df.pivot_table(index=['timestep','treat_size','from_state','treat_state','vision'], columns='to_state', values='count', fill_value=0)
         pivot.to_csv(filepath.replace('.csv', '_pivot.csv'))
+        for t in sorted(df['timestep'].unique()):
+            dft = df[df['timestep'] == t]
+            dft.to_csv(filepath.replace('.csv', f'_t{t}.csv'), index=False)
+            pivt = dft.pivot_table(index=['treat_size','from_state','treat_state','vision'], columns='to_state', values='count', fill_value=0)
+            pivt.to_csv(filepath.replace('.csv', f'_t{t}_pivot.csv'))
+            for s in (0, 1):
+                dfts = dft[dft['treat_size'] == s]
+                if len(dfts) == 0:
+                    continue
+                dfts.to_csv(filepath.replace('.csv', f'_t{t}_s{s}.csv'), index=False)
+                pivts = dfts.pivot_table(index=['from_state','treat_state','vision'], columns='to_state', values='count', fill_value=0)
+                pivts.to_csv(filepath.replace('.csv', f'_t{t}_s{s}_pivot.csv'))
         return df, pivot
 
 
@@ -465,7 +464,7 @@ class PresencePerceptionModule(BaseModule):
         # channel 0 position (3,0) at time 0 indicates presence
         #if is_p1:
         #    print(perceptual_field[:, 0, 0, 3, 0+6*is_p1][:20])
-        return perceptual_field[:, 0, 0, 3, 0+6*is_p1].unsqueeze(1)
+        return perceptual_field[:, :, 0, 3, 0+6*is_p1].amax(dim=1, keepdim=True)
 
     def _random_forward(self, perceptual_field: torch.Tensor, is_p1) -> torch.Tensor:
         batch_size = perceptual_field.shape[0]
@@ -596,7 +595,8 @@ class BeliefModulePerTimestep(BaseModule):
     def __init__(self, use_neural: bool = True, random_prob: float = 0.0, sigmoid_temp: float = 20.0, uncertainty=0.0):
         super().__init__(use_neural, random_prob, sigmoid_temp)
         self.uncertainty = uncertainty
-        self.transition_counts = {}
+        self.T = 5
+        self.register_buffer('transition_counts_tensor', torch.zeros(5, 2, 2, 6, 6, 6, dtype=torch.int64), persistent=False)
 
     def _bin_beliefs(self, beliefs: torch.Tensor) -> list:
         quantized = torch.round(beliefs).long()
@@ -605,77 +605,89 @@ class BeliefModulePerTimestep(BaseModule):
     def _create_neural_network(self) -> nn.Module:
         return NormalizedTSBeliefNetwork()
 
-    def _count_transitions(self, visible_treats: torch.Tensor, vision: torch.Tensor, prev_beliefs: torch.Tensor, new_beliefs: torch.Tensor):
-        if not self.training:
-            prev_state = self._bin_beliefs(prev_beliefs)
-            new_state = self._bin_beliefs(new_beliefs)
-            treat_state = self._bin_beliefs(visible_treats)
-            vision_expanded = vision.expand(prev_beliefs.shape[0])
-            vision_bins = (vision_expanded > 0.5).long()
-            for i in range(prev_beliefs.shape[0]):
-                transition = (prev_state[i], treat_state[i], vision_bins[i].item(), new_state[i])
-                self.transition_counts[transition] = self.transition_counts.get(transition, 0) + 1
-        
+    @torch.no_grad()
+    def _count_transitions(self, visible_treats: torch.Tensor, vision: torch.Tensor, prev_beliefs: torch.Tensor, new_beliefs: torch.Tensor, t: int, presence: torch.Tensor, size_idx: int):
+        if self.training:
+            return
+        B = visible_treats.size(0)
+        prev_idx  = prev_beliefs.argmax(-1).long().view(B)
+        cur_idx   = new_beliefs.argmax(-1).long().view(B)
+        treat_idx = visible_treats.argmax(-1).long().view(B)
+        v = vision.round().long().view(B)
+        p = presence.view(B, -1).round().long().view(B)
+        if p.max() == 0:
+            return
+        idx = ((prev_idx * 6 + treat_idx) * 6 + cur_idx)
+        for vis in (0, 1):
+            m = (v == vis) & (p == 1)
+            if m.any():
+                bins = torch.bincount(idx[m], minlength=216).view(6, 6, 6)
+                self.transition_counts_tensor[t, size_idx, vis].add_(bins)
+            
     def _hardcoded_forward(self, visible_treats: torch.Tensor, vision: torch.Tensor, prev_beliefs: torch.Tensor, t: int, presence: torch.Tensor) -> torch.Tensor:
         time_weight = torch.exp(torch.tensor(t, dtype=torch.float32, device=visible_treats.device) * 2.0)
         update_mask = vision.unsqueeze(-1) * presence
-
         weighted_obs = time_weight * update_mask * visible_treats
-
         new_beliefs = prev_beliefs + weighted_obs
-
         new_beliefs = new_beliefs / (new_beliefs.sum(dim=-1, keepdim=True) + 1e-10)
-
         return new_beliefs
 
     def _random_forward(self, visible_treats: torch.Tensor, vision: torch.Tensor) -> torch.Tensor:
         batch_size = visible_treats.shape[0]
         device = visible_treats.device
-
         beliefs = torch.zeros(batch_size, 6, device=device)
         random_indices = torch.randint(0, 6, (batch_size,), device=device)
         beliefs.scatter_(1, random_indices.unsqueeze(1), 1.0)
+        return beliefs
 
-        return beliefs #F.softmax(beliefs, dim=-1)
-
-    def forward(self, visible_treats: torch.Tensor, vision: torch.Tensor, prev_beliefs: torch.Tensor, t: int, presence: torch.Tensor) -> torch.Tensor:
+    def forward(self, visible_treats: torch.Tensor, vision: torch.Tensor, prev_beliefs: torch.Tensor, t: int, presence: torch.Tensor, size_idx: int=0) -> torch.Tensor:
         if self.use_neural:
             new_beliefs = self._neural_forward(visible_treats, vision, prev_beliefs, presence)
         else:
             self.sigmoid_temp = 90.0
             new_beliefs = self._hardcoded_forward(visible_treats, vision, prev_beliefs, t, presence)
         
-        self._count_transitions(visible_treats, vision, prev_beliefs, new_beliefs)
+        self._count_transitions(visible_treats, vision, prev_beliefs, new_beliefs, t, presence, size_idx)
         
         return new_beliefs
 
     def save_transition_table(self, filepath='transition_table.csv'):
         import pandas as pd
-        
+        import os
+        os.makedirs(os.path.dirname(filepath), exist_ok=True)
+        tc = self.transition_counts_tensor.detach().cpu()
+        nz = (tc > 0).nonzero(as_tuple=False)
         rows = []
-        for (prev_state, treat_state, vision, new_state), count in self.transition_counts.items():
+        eye = torch.eye(6, dtype=torch.long)
+        for t, s, v, i, k, j in nz:
             rows.append({
-                'from_state': str(prev_state), 
-                'treat_state': str(treat_state), 
-                'vision': vision, 
-                'to_state': str(new_state), 
-                'count': count
+                'timestep': int(t.item()),
+                'treat_size': int(s.item()),
+                'from_state': str(tuple(eye[i].tolist())),
+                'treat_state': str(tuple(eye[k].tolist())),
+                'vision': int(v.item()),
+                'to_state': str(tuple(eye[j].tolist())),
+                'count': float(tc[t, s, v, i, k, j].item()),
             })
-        
-        df = pd.DataFrame(rows)
-        
+        df = pd.DataFrame(rows, columns=['timestep','treat_size','from_state','treat_state','vision','to_state','count'])
         df.to_csv(filepath, index=False)
-        
-        pivot_table = df.pivot_table(
-            index=['from_state', 'treat_state', 'vision'], 
-            columns='to_state', 
-            values='count', 
-            fill_value=0
-        )
-        pivot_filepath = filepath.replace('.csv', '_pivot.csv')
-        pivot_table.to_csv(pivot_filepath)
-        
-        return df, pivot_table
+        if len(df) == 0:
+            return df, pd.DataFrame()
+        pivot = df.pivot_table(index=['timestep','treat_size','from_state','treat_state','vision'], columns='to_state', values='count', fill_value=0)
+        pivot.to_csv(filepath.replace('.csv', '_pivot.csv'))
+        for t in range(self.T):
+            dft = df[df['timestep'] == t]
+            if len(dft) > 0:
+                dft.to_csv(filepath.replace('.csv', f'_t{t}.csv'), index=False)
+                pivt = dft.pivot_table(index=['treat_size','from_state','treat_state','vision'], columns='to_state', values='count', fill_value=0)
+                pivt.to_csv(filepath.replace('.csv', f'_t{t}_pivot.csv'))
+                for s in [0,1]:
+                    dfts = dft[dft['treat_size'] == s]
+                    if len(dfts) > 0:
+                        dfts.to_csv(filepath.replace('.csv', f'_t{t}_s{s}.csv'), index=False)
+                        pivts = dfts.pivot_table(index=['from_state','treat_state','vision'], columns='to_state', values='count', fill_value=0)
+                        pivts.to_csv(filepath.replace('.csv', f'_t{t}_s{s}_pivot.csv'))
+        return df, pivot
 
 
 class CombinerNetwork(nn.Module):
@@ -1011,62 +1023,98 @@ class AblationArchitecture(nn.Module):
             return {'my_decision': self.end2end_model(end2end_input)}
         elif self.end2end_model is not None and self.output_type == 'multi':
             if self.process_opponent_perception:
-                '''opponent_presence_seq = opponent_presence if opponent_presence.shape[1] != 1 else opponent_presence.repeat(1, 5)
-                end2end_input = torch.cat([
-                    treats_op.flatten(start_dim=1),           # (B, 2*5*5)
-                    opponent_vision.flatten(start_dim=1),     # (B, 5)
-                    opponent_presence_seq.flatten(start_dim=1)# (B, 5)
-                ], dim=1)
-                return self.end2end_model(end2end_input)'''
+                if True:
+                    opponent_presence_seq = opponent_presence if opponent_presence.shape[1] != 1 else opponent_presence.repeat(1, 5)
+                    '''treats_reshaped = treats_op.reshape(batch_size, 5, 12)
+                    end2end_input = torch.cat([
+                        treats_reshaped.flatten(start_dim=1),           # [B, 2*5*6]
+                        opponent_vision.flatten(start_dim=1),     # [B, 5]
+                        opponent_presence_seq.flatten(start_dim=1)# [B, 5]
+                    ], dim=1)
 
-                opponent_presence_seq = opponent_presence if opponent_presence.shape[1] != 1 else opponent_presence.repeat(1, 5)
-                gate = (opponent_vision * opponent_presence_seq).unsqueeze(-1).unsqueeze(-1)  # [B,5,1,1]
-                treats_op_gated = treats_op * gate + (1 - gate) * self.mask_token           # [B,5,2,6]
+                    treats_swap = treats_op.flip(dims=[2]) 
+                    treats_reshaped = treats_swap.reshape(batch_size, 5, 12)
+                    end2end_input_swap = torch.cat([
+                        treats_swap.flatten(start_dim=1),
+                        opponent_vision.flatten(start_dim=1),
+                        opponent_presence_seq.flatten(start_dim=1)
+                    ], dim=1)'''
 
-                end2end_input_op = torch.cat([
-                    treats_op_gated.flatten(start_dim=1),          # (B, 2*5*6)
-                    #opponent_vision.flatten(start_dim=1),          # (B, 5)
-                    #opponent_presence_seq.flatten(start_dim=1)     # (B, 5)
-                ], dim=1)
+                    def build_timestep_input(treats, vision, presence):
+                        timestep_chunks = []
+                        for t in range(5):
+                            chunk = torch.cat([
+                                treats[:, t].flatten(start_dim=1), 
+                                vision[:, t].unsqueeze(1),                  
+                                presence[:, t].unsqueeze(1)          
+                            ], dim=1)
+                            timestep_chunks.append(chunk)
+                        return torch.cat(timestep_chunks, dim=1)
 
-                op_out = self.end2end_model(end2end_input_op)   # shared weights
+                    #print(treats_op.shape)
 
-                op_belief_t   = op_out['op_belief_t']
-                op_decision_t = op_out['op_decision_t']
+                    end2end_input = build_timestep_input(treats_op, opponent_vision, opponent_presence_seq)
+                    treats_swap = treats_op.flip(dims=[2])
+                    end2end_input_swap = build_timestep_input(treats_swap, opponent_vision, opponent_presence_seq)
 
-                treats_my = treats_op              # [B,5,2,6]
-                my_presence_seq = torch.ones_like(opponent_presence_seq)
-                vis_full = torch.ones_like(opponent_vision)                         # [B,5]
+                    outputs_orig  = self.end2end_model(end2end_input)        # dict with [B,2,T,6]
+                    outputs_swap  = self.end2end_model(end2end_input_swap)   # dict with [B,2,T,6]
 
-                end2end_input_my = torch.cat([
-                    treats_my.flatten(start_dim=1),                                  # (B, 2*5*6)
-                    #vis_full.flatten(start_dim=1),                                   # (B, 5)
-                    #my_presence_seq.flatten(start_dim=1)                             # (B, 5)
-                ], dim=1)
+                    op_belief_t = 0.5 * (outputs_orig['op_belief_t'] + outputs_swap['op_belief_t'].flip(dims=[1]))
+                    my_belief_t = 0.5 * (outputs_orig['my_belief_t'] + outputs_swap['my_belief_t'].flip(dims=[1]))
 
-                my_out = self.end2end_model(end2end_input_my)     # same weights as above
+                    result = {
+                        'op_belief_t': op_belief_t,                  # [B,2,T,6]
+                        'my_belief_t': my_belief_t,                  # [B,2,T,6]
+                        'op_decision_t': outputs_orig['op_decision_t'],  # [B,T,6]
+                        'my_decision': outputs_orig['my_decision'],
+                        'op_presence': opponent_presence,
+                    }
+                    return result
 
-                my_belief_t  = my_out['my_belief_t']
-                my_decision  = my_out['my_decision']
+                else:
+                    opponent_presence_seq = opponent_presence if opponent_presence.shape[1] != 1 else opponent_presence.repeat(1, 5)
+                    gate = (opponent_vision * opponent_presence_seq).unsqueeze(-1).unsqueeze(-1)  # [B,5,1,1]
+                    treats_op_gated = treats_op * gate + (1 - gate) * self.mask_token           # [B,5,2,6]
 
-                return {
-                    'op_belief_t':   op_belief_t,
-                    'my_belief_t':   my_belief_t,
-                    'op_decision_t': op_decision_t,
-                    'my_decision':   my_decision,
-                }
+                    end2end_input_op = torch.cat([
+                        treats_op_gated.flatten(start_dim=1),          # (B, 2*5*6)
+                        #opponent_vision.flatten(start_dim=1),          # (B, 5)
+                        #opponent_presence_seq.flatten(start_dim=1)     # (B, 5)
+                    ], dim=1)
+
+                    op_out = self.end2end_model(end2end_input_op)   # shared weights
+
+                    op_belief_t   = op_out['op_belief_t']
+                    op_decision_t = op_out['op_decision_t']
+
+                    treats_my = treats_op              # [B,5,2,6]
+                    my_presence_seq = torch.ones_like(opponent_presence_seq)
+                    vis_full = torch.ones_like(opponent_vision)                         # [B,5]
+
+                    end2end_input_my = torch.cat([
+                        treats_my.flatten(start_dim=1),                                  # (B, 2*5*6)
+                        #vis_full.flatten(start_dim=1),                                   # (B, 5)
+                        #my_presence_seq.flatten(start_dim=1)                             # (B, 5)
+                    ], dim=1)
+
+                    my_out = self.end2end_model(end2end_input_my)     # same weights as above
+
+                    my_belief_t  = my_out['my_belief_t']
+                    my_decision  = my_out['my_decision']
+
+                    return {
+                        'op_belief_t':   op_belief_t,
+                        'my_belief_t':   my_belief_t,
+                        'op_decision_t': op_decision_t,
+                        'my_decision':   my_decision,
+                    }
 
             else:
                 end2end_input = perceptual_field
 
 
-            '''multi_logits = self.end2end_model(end2end_input)  
-            return {
-                'op_belief_t': multi_logits[..., :60].view(batch_size, 2, 5, 6),
-                'my_belief_t': multi_logits[..., 60:120].view(batch_size, 2, 5, 6),
-                'op_decision_t': multi_logits[..., 120:-5].view(batch_size, 5, 5),
-                'my_decision': multi_logits[..., -5:],
-            }'''
+            return self.end2end_model(end2end_input)  
 
         elif self.end2end_model is not None and self.output_type == 'op_belief':
             if self.process_opponent_perception:
@@ -1099,8 +1147,8 @@ class AblationArchitecture(nn.Module):
                 for t in range(1, 5):
                     #op_belief_l = self.op_belief.forward(treats_l_op[:, :t+1], opponent_vision[:, :t+1])
                     #op_belief_s = self.op_belief.forward(treats_s_op[:, :t+1], opponent_vision[:, :t+1])
-                    op_belief_l = self.op_belief.forward(treats_l_op[:, t], opponent_vision[:, t], op_belief_l, t, opponent_presence)
-                    op_belief_s = self.op_belief.forward(treats_s_op[:, t], opponent_vision[:, t], op_belief_s, t, opponent_presence)
+                    op_belief_l = self.op_belief.forward(treats_l_op[:, t], opponent_vision[:, t], op_belief_l, t, opponent_presence, 0)
+                    op_belief_s = self.op_belief.forward(treats_s_op[:, t], opponent_vision[:, t], op_belief_s, t, opponent_presence, 1)
 
                     if self.store_per_timestep_beliefs:
                         op_beliefs_l_timesteps.append(F.softmax(op_belief_l, dim=-1))

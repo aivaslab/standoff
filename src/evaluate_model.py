@@ -18,103 +18,116 @@ from src.utils.plotting import save_double_param_figures, save_single_param_figu
     plot_awareness_results, plot_accuracy_vs_vision
 
 def visualize_transition_network(csv_path, save_path=None):
-    import pandas as pd
-    import networkx as nx
-    import matplotlib.pyplot as plt
-    import numpy as np
-    
-    df = pd.read_csv(csv_path)
-    G = nx.DiGraph()
-    
-    unique_states = list(set(df['from_state'].tolist() + df['to_state'].tolist()))
-    cmap = plt.cm.Set3
-    state_colors = {state: cmap(i/len(unique_states)) for i, state in enumerate(unique_states)}
-    
-    transitions = []
-    node_states = {}
-    
-    for _, row in df.iterrows():
-        from_state = row['from_state']
-        to_state = row['to_state']
-        from_node = "None" if from_state == 5 else str(from_state)
-        to_node = "None" if to_state == 5 else str(to_state)
-        
-        node_states[from_node] = from_state
-        node_states[to_node] = to_state
-        
-        treat_num = str(row['treat_state'])
-        vision = row['vision']
-        
-        if vision == 0:
-            base_text = f"{treat_num}({row['count']})"
-            label_text = ''.join(char + '̶' for char in base_text)
-            color = 'gray'
+    import pandas as pd, numpy as np, matplotlib.pyplot as plt, networkx as nx, ast, math, os
+    def parse_onehot(s):
+        if isinstance(s,str):
+            t=ast.literal_eval(s); 
+            return t.index(1) if 1 in t else 5
+        return int(s)
+    def uniq(seq):
+        seen=set(); out=[]
+        for x in seq:
+            if x not in seen: out.append(x); seen.add(x)
+        return out
+    df=pd.read_csv(csv_path).copy()
+    for c in ['timestep','from_state','treat_state','vision','to_state','count']: assert c in df.columns
+    has_size='treat_size' in df.columns
+    df['from_idx']=df['from_state'].apply(parse_onehot)
+    df['to_idx']=df['to_state'].apply(parse_onehot)
+    df['treat_idx']=df['treat_state'].apply(parse_onehot)
+    df['vision']=df['vision'].astype(int)
+    df['count']=df['count'].astype(float)
+    if has_size: df['treat_size']=df['treat_size'].astype(int)
+    states=list(range(6))
+    label={i:('None' if i==5 else str(i)) for i in states}
+    palette={0:'#1f77b4',1:'#ff7f0e',2:'#2ca02c',3:'#d62728',4:'#9467bd',5:'#7f7f7f'}
+    pos_circle={label[i]:(math.cos(2*math.pi*i/6),math.sin(2*math.pi*i/6)) for i in states}
+    max_t=int(df['timestep'].max())
+    timesteps=list(range(max_t+1))
+    def pct_table(frame, include_timestep=True, extra_keys=()):
+        group_cols=(['timestep'] if include_timestep else [])+list(extra_keys)+['vision','from_idx','treat_idx','to_idx']
+        group_cols=uniq(group_cols)
+        agg=frame.groupby(group_cols,as_index=False)['count'].sum()
+        denom_cols=(['timestep'] if include_timestep else [])+list(extra_keys)+['vision','from_idx','treat_idx']
+        denom_cols=uniq(denom_cols)
+        den=agg.groupby(denom_cols,as_index=False)['count'].sum().rename(columns={'count':'denom'})
+        out=agg.merge(den,on=denom_cols,how='left')
+        out['pct']=np.where(out['denom']>0,100.0*out['count']/out['denom'],0.0)
+        return out
+    def draw_network(sub,title,suffix):
+        plt.figure(figsize=(9,7))
+        G=nx.DiGraph()
+        for i in states: G.add_node(label[i])
+        pos={label[i]:pos_circle[label[i]] for i in states}
+        node_cols=[palette[i] for i in states]
+        nx.draw_networkx_nodes(G,pos,node_color=node_cols,node_size=1400,alpha=0.95)
+        nx.draw_networkx_labels(G,pos,font_size=11,font_weight='bold')
+        edge_map={}
+        for _,r in sub.iterrows():
+            u=label[int(r['from_idx'])]; v=label[int(r['to_idx'])]
+            edge_map.setdefault((u,v),[]).append(r)
+            if not G.has_edge(u,v): G.add_edge(u,v)
+        nx.draw_networkx_edges(G,pos,alpha=0.7,edge_color='#000000',arrows=True,arrowsize=22,min_target_margin=12)
+        used=set()
+        for (u,v),rows in edge_map.items():
+            x1,y1=pos[u]; x2,y2=pos[v]
+            if u==v:
+                cx,cy=0.0,0.0
+                rx,ry=x1-cx,y1-cy
+                rl=max((rx*rx+ry*ry)**0.5,1e-6)
+                ux,uy=rx/rl,ry/rl
+                base_x,base_y=x1+ux*0.28,y1+uy*0.28
+                for i,r in enumerate(rows):
+                    fc=(palette[int(r['treat_idx'])] if int(r['vision'])==1 else '#d0d0d0')
+                    txt=f"{int(r['treat_idx'])}:{float(r['pct']):.0f}%"
+                    plt.text(base_x,base_y+0.045*i,txt,fontsize=8,ha='center',va='center',rotation=0,bbox=dict(boxstyle='round,pad=0.18',facecolor=fc,edgecolor='#222222',alpha=0.95))
+                continue
+            mx,my=(x1+x2)/2,(y1+y2)/2
+            ang=np.degrees(np.arctan2(y2-y1,x2-x1))
+            if ang>90: ang-=180
+            if ang<-90: ang+=180
+            dx,dy=x2-x1,y2-y1
+            L=max(math.hypot(dx,dy),1e-6)
+            ox,oy=-dy/L*0.06,dx/L*0.06
+            opp=edge_map.get((v,u),[])
+            for i,r in enumerate(rows):
+                fc=(palette[int(r['treat_idx'])] if int(r['vision'])==1 else '#d0d0d0')
+                txt=f"{int(r['treat_idx'])}:{float(r['pct']):.0f}%"
+                plt.text(mx+ox,my+oy+0.045*i,txt,fontsize=8,ha='center',va='center',rotation=ang,bbox=dict(boxstyle='round,pad=0.18',facecolor=fc,edgecolor='#222222',alpha=0.95))
+            if len(opp)>0 and (v,u) not in used:
+                for i,r in enumerate(opp):
+                    fc=(palette[int(r['treat_idx'])] if int(r['vision'])==1 else '#d0d0d0')
+                    txt=f"{int(r['treat_idx'])}:{float(r['pct']):.0f}%"
+                    plt.text(mx-ox,my-oy+0.045*i,txt,fontsize=8,ha='center',va='center',rotation=ang+180,bbox=dict(boxstyle='round,pad=0.18',facecolor=fc,edgecolor='#222222',alpha=0.95))
+                used.add((u,v))
+        plt.title(title,fontsize=12)
+        plt.axis('off')
+        plt.margins(0.006,0.006)
+        plt.subplots_adjust(0,0,1,1)
+        if save_path:
+            base,ext=os.path.splitext(save_path); fn=f"{base}{suffix}{ext}"; plt.savefig(fn,dpi=180,bbox_inches='tight',pad_inches=0.005); plt.close(); return fn
         else:
-            label_text = f"{treat_num}({row['count']})"
-            color = state_colors[to_state]
+            plt.show(); return None
+    outs=[]
+    per_t=pct_table(df,include_timestep=True,extra_keys=())
+    for t in timesteps:
+        sub=per_t[per_t['timestep']==t]
+        outs.append(draw_network(sub,f"Timestep {t}",f"_t{t}"))
+    if has_size:
+        per_t_size=pct_table(df,include_timestep=True,extra_keys=('treat_size',))
+        for sz in sorted(df['treat_size'].unique()):
+            for t in timesteps:
+                sub=per_t_size[(per_t_size['treat_size']==sz)&(per_t_size['timestep']==t)]
+                outs.append(draw_network(sub,f"Timestep {t} | size={int(sz)}",f"_t{t}_size_{int(sz)}"))
+    agg_all=pct_table(df,include_timestep=False,extra_keys=())
+    outs.append(draw_network(agg_all,"All timesteps","_agg"))
+    agg_tr=pct_table(df,include_timestep=False,extra_keys=('treat_idx',))
+    if has_size:
+        agg_sz=pct_table(df,include_timestep=False,extra_keys=('treat_size',))
+        for sz in sorted(df['treat_size'].unique()):
+            outs.append(draw_network(agg_sz[agg_sz['treat_size']==sz],f"All timesteps | size={int(sz)}",f"_agg_sz{int(sz)}"))
+    return [o for o in outs if o]
 
-        transitions.append({
-            'from': from_node, 'to': to_node, 
-            'label': label_text, 'color': color, 'weight': row['count']
-        })
-        
-        if not G.has_edge(from_node, to_node):
-            G.add_edge(from_node, to_node)
-    
-    plt.figure(figsize=(15, 10))
-    pos = nx.circular_layout(G)
-    
-    node_colors = [state_colors[node_states[node]] for node in G.nodes()]
-    
-    nx.draw_networkx_edges(G, pos, alpha=0.6, edge_color='gray', arrows=True, arrowsize=25, min_target_margin=30)
-    nx.draw_networkx_nodes(G, pos, node_color=node_colors, node_size=3000, alpha=0.9)
-    nx.draw_networkx_labels(G, pos, font_size=14, font_weight='bold')
-    
-    edge_transitions = {}
-    for t in transitions:
-        key = (t['from'], t['to'])
-        if key not in edge_transitions:
-            edge_transitions[key] = []
-        edge_transitions[key].append(t)
-    
-    processed_pairs = set()
-    
-    for (u, v), trans_list in edge_transitions.items():
-        if u == v:
-            x, y = pos[u]
-            combined_label = "\n".join([t['label'] for t in trans_list])
-            plt.text(x, y+0.3, combined_label, fontsize=8, ha='center', va='center', 
-                    bbox=dict(boxstyle="round,pad=0.2", facecolor='lightgray', alpha=0.8))
-        elif (v, u) in processed_pairs:
-            continue
-        else:
-            x1, y1 = pos[u]
-            x2, y2 = pos[v]
-            mid_x, mid_y = (x1 + x2) / 2, (y1 + y2) / 2
-            angle = np.degrees(np.arctan2(y2 - y1, x2 - x1))
-            
-            if (v, u) in edge_transitions:
-                dx, dy = x2 - x1, y2 - y1
-                length = np.sqrt(dx**2 + dy**2)
-                offset_x, offset_y = -dy/length * 0.04, dx/length * 0.04
-                
-                for i, t in enumerate(trans_list):
-                    plt.text(mid_x + offset_x, mid_y + offset_y + i*0.05, t['label'], fontsize=8, ha='center', va='center', 
-                            rotation=angle, bbox=dict(boxstyle="round,pad=0.2", facecolor=t['color'], alpha=0.8))
-                
-                for i, t in enumerate(edge_transitions[(v, u)]):
-                    plt.text(mid_x - offset_x, mid_y - offset_y + i*0.05, t['label'], fontsize=8, ha='center', va='center', 
-                            rotation=angle+180, bbox=dict(boxstyle="round,pad=0.2", facecolor=t['color'], alpha=0.8))
-                processed_pairs.add((u, v))
-            else:
-                for i, t in enumerate(trans_list):
-                    plt.text(mid_x, mid_y + i*0.05, t['label'], fontsize=8, ha='center', va='center', 
-                            rotation=angle, bbox=dict(boxstyle="round,pad=0.2", facecolor=t['color'], alpha=0.8))
-    
-    plt.title("Belief State Transition Network")
-    plt.axis('off')
-    if save_path:
-        plt.savefig(save_path, dpi=150, bbox_inches='tight')
 
 
 def register_hooks(model, hook):
@@ -394,7 +407,10 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_load_
 
     print('correct', overall_correct, overall_total)
 
-    model.end2end_model.save_transition_table(os.path.join(model_load_path, f'transitions-{repetition}.csv'))
+    try:
+        model.end2end_model.save_transition_table(os.path.join(model_load_path, f'transitions-{repetition}.csv'))
+    except:
+        model.belief_op.save_transition_table(os.path.join(model_load_path, f'transitions-{repetition}.csv'))
     visualize_transition_network(os.path.join(model_load_path, f'transitions-{repetition}.csv'), os.path.join(model_load_path, f'transition_network-{repetition}.png'))
 
 

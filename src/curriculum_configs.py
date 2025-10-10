@@ -1,7 +1,7 @@
 def extract_regime_and_base(name):
     regime = 's1'
     base = name
-    for r in ['s21', 's3', 's2', 's1']:
+    for r in ['s21', 's3', 's2', 's1', 's22']:
         if name.endswith('_' + r):
             regime = r
             base = name[:-len('_' + r)]
@@ -87,7 +87,7 @@ class CurriculumConfig:
             self.curriculum_stages = [
                 {
                     'stage_name': curriculum_name,
-                    'batches': 4000,
+                    'batches': 5000,
                     'data_regimes': [regime],
                     'trainable_modules': all_modules,
                     'copy_weights': None,
@@ -95,10 +95,11 @@ class CurriculumConfig:
             ]
         elif "end2end" in curriculum_name:
             regime, base_curriculum_name = extract_regime_and_base(curriculum_name)
+            print('regime', regime)
             self.curriculum_stages = [
                 {
                     'stage_name': base_curriculum_name,
-                    'batches': 2000,
+                    'batches': 5000,
                     'data_regimes': [regime],
                     'trainable_modules': ['end2end_model'],
                     'copy_weights': None,
@@ -111,7 +112,7 @@ class CurriculumConfig:
             if base_curriculum_name in module_map:
                 self.curriculum_stages = [{
                     'stage_name': base_curriculum_name,
-                    'batches': 4000,
+                    'batches': 5000,
                     'data_regimes': [regime],
                     'trainable_modules': module_map[base_curriculum_name],
                     'copy_weights': None,
