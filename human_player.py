@@ -186,9 +186,6 @@ for group_idx, (group_name, events_in_group) in enumerate(sorted(event_groups.it
                 
                 agent_actions = {'p_0': 2}
                 next_obs, rew, done, info = env.step(agent_actions)
-                if event_name == "b1w2v0fs-2":
-                    print(env.big_food_locations, env.small_food_locations)
-                    print(env.treat_was_wrong)
                 
                 human.save_step(obs['p_0'], 2, rew['p_0'], done)
                 obs = next_obs
@@ -201,9 +198,7 @@ for group_idx, (group_name, events_in_group) in enumerate(sorted(event_groups.it
         
         env.current_param_group_pos = 0
         group_gettiers.append([env.infos['p_0']['gettier_big'], env.infos['p_0']['gettier_small']])
-        if event_name == "b1w2v0fs-2":
-            print(env.big_food_locations, env.small_food_locations, env.infos['p_0']['gettier_big'], env.infos['p_0']['gettier_small'])
-            #exit()
+
     
     group_timestep_images = []
     group_metadata = []
@@ -268,7 +263,7 @@ for group_idx, (group_name, events_in_group) in enumerate(sorted(event_groups.it
             draw.text((10, y_offset), event_name_text, (0, 0, 0), font=large_font)
             
             stage_name_display = current_metadata['stage_name']
-            print(group_gettiers)
+
             if group_gettiers[event_idx][0]:
                 stage_name_display = stage_name_display.replace('T', 'G')
             if group_gettiers[event_idx][1]:

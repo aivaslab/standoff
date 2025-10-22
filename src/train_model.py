@@ -192,6 +192,8 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
     batch_size = model_kwargs['batch_size']
     model = load_model(model_type, model_kwargs, device)
 
+    print(model.kwargs, '######################################')
+
     if oracle_labels:
         model.store_per_timestep_beliefs = True
     else:
@@ -211,7 +213,10 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
     t = tqdm.trange(total_batches)
 
     for stage_config in curriculum_config.curriculum_stages:
-        optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4, betas=(0.95, 0.999))
+        if 'trans' in model.kwargs['module_configs']['arch']:
+            optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4, betas=(0.95, 0.999))
+        else:
+            optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4, betas=(0.9, 0.999))
         print('started curricular stage', stage_config['stage_name'])
         stage_train_sets = apply_curriculum_stage(model, stage_config, train_sets_dict)
         batches = stage_config['batches']
@@ -389,7 +394,6 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
         first_batch_processed = False
         module_ranges = {}
 
-        model.end2end_model._using_shifted_sequences = False
 
         for batch in range(batches):
             real_batch += 1
@@ -504,6 +508,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
             oracle_loss = sum(oracle_losses.values())
 
             ###
+            
             logits = outputs['op_belief_t']
             my_logits = outputs['my_belief_t']
             if True:
@@ -654,8 +659,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
                     loss_wrong_agreement = wrong_agreement.float().mean()
 
             #total_loss = my_decision_loss + 0.1*oracle_loss + 0.1*loss_misinformed + loss_seen_ce + loss_persist + loss_wrong_agreement
-
-            total_loss = my_decision_loss + oracle_loss #+ 0.5*loss_unseen_stability + 0.01*loss_seen_ce + 0.01*loss_delta + 0.01*loss_persist
+            total_loss = my_decision_loss + oracle_loss if model.use_oracle else my_decision_loss #+ 0.5*loss_unseen_stability + 0.01*loss_seen_ce + 0.01*loss_delta + 0.01*loss_persist
 
             optimizer.zero_grad()
             total_loss.backward()

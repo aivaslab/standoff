@@ -23,6 +23,11 @@ BASE_CONFIG = {
     'opponent_perception': False,
     'output_type': 'my_decision',
     'arch': 'mlp',
+    'size_swap': False,
+    'use_oracle': False,
+    'pad': False,
+    'split': False,
+    'shared': False,
 }
 
 BASE_RANDOM = {k: BASE_CONFIG[k] for k in BASE_CONFIG if k not in ['shared_belief', 'shared_decision']}
@@ -88,19 +93,21 @@ BASE_NEURAL_CONFIGS['a-neural-decision-shared']['detach'] = False
 BASE_NEURAL_CONFIGS['a-neural-treat-shared']['detach'] = False
 
 for x in ['mlp', 'cnn', 'lstm32', 'lstm128', 'transformer32', 'transformer128']:
-    BASE_NEURAL_CONFIGS[f'a-full-{x}'] = {'end2end': True, 'opponent_perception': False, 'output_type': 'my_decision', 'arch': x}
-    BASE_NEURAL_CONFIGS[f'a-opbelief-{x}'] = {'end2end': True, 'opponent_perception': False, 'output_type': 'op_belief', 'arch': x}
-    BASE_NEURAL_CONFIGS[f'a-opdecision-{x}'] = {'end2end': True, 'opponent_perception': False, 'output_type': 'op_decision', 'arch': x}
-    BASE_NEURAL_CONFIGS[f'a-full-sym-{x}'] = {'end2end': True, 'opponent_perception': True, 'output_type': 'my_decision', 'arch': x}
-    BASE_NEURAL_CONFIGS[f'a-opbelief-sym-{x}'] = {'end2end': True, 'opponent_perception': True, 'output_type': 'op_belief', 'arch': x}
-    BASE_NEURAL_CONFIGS[f'a-opdecision-sym-{x}'] = {'end2end': True, 'opponent_perception': True, 'output_type': 'op_decision', 'arch': x}
+    for y in ['', '-pad']:
+        BASE_NEURAL_CONFIGS[f'a-opbelief-{x}'] = {'end2end': True, 'opponent_perception': False, 'output_type': 'op_belief', 'arch': x, 'pad': y != ''}
+        BASE_NEURAL_CONFIGS[f'a-opdecision-{x}'] = {'end2end': True, 'opponent_perception': False, 'output_type': 'op_decision', 'arch': x, 'pad': y != ''}
+        BASE_NEURAL_CONFIGS[f'a-opbelief-sym-{x}'] = {'end2end': True, 'opponent_perception': True, 'output_type': 'op_belief', 'arch': x, 'pad': y != ''}
+        BASE_NEURAL_CONFIGS[f'a-opdecision-sym-{x}'] = {'end2end': True, 'opponent_perception': True, 'output_type': 'op_decision', 'arch': x, 'pad': y != ''}
 
-    BASE_NEURAL_CONFIGS[f'a-fullM-{x}'] = {'end2end': True, 'opponent_perception': False, 'output_type': 'multi', 'arch': x}
-    BASE_NEURAL_CONFIGS[f'a-opbeliefM-{x}'] = {'end2end': True, 'opponent_perception': False, 'output_type': 'multi', 'arch': x}
-    BASE_NEURAL_CONFIGS[f'a-opdecisionM-{x}'] = {'end2end': True, 'opponent_perception': False, 'output_type': 'multi', 'arch': x}
-    BASE_NEURAL_CONFIGS[f'a-fullM-sym-{x}'] = {'end2end': True, 'opponent_perception': True, 'output_type': 'multi', 'arch': x}
-    BASE_NEURAL_CONFIGS[f'a-opbeliefM-sym-{x}'] = {'end2end': True, 'opponent_perception': True, 'output_type': 'multi', 'arch': x}
-    BASE_NEURAL_CONFIGS[f'a-opdecisionM-sym-{x}'] = {'end2end': True, 'opponent_perception': True, 'output_type': 'multi', 'arch': x}
+        BASE_NEURAL_CONFIGS[f'a-opbeliefM-{x}'] = {'end2end': True, 'opponent_perception': False, 'output_type': 'multi', 'arch': x, 'pad': y != ''}
+        BASE_NEURAL_CONFIGS[f'a-opdecisionM-{x}'] = {'end2end': True, 'opponent_perception': False, 'output_type': 'multi', 'arch': x, 'pad': y != ''}
+        BASE_NEURAL_CONFIGS[f'a-opbeliefM-sym-{x}'] = {'end2end': True, 'opponent_perception': True, 'output_type': 'multi', 'arch': x, 'pad': y != ''}
+        BASE_NEURAL_CONFIGS[f'a-opdecisionM-sym-{x}'] = {'end2end': True, 'opponent_perception': True, 'output_type': 'multi', 'arch': x, 'pad': y != ''}
+
+        for z, size_swap in zip(['swap',''], [True, False]):
+            for o, use_oracle in zip(['oracle',''], [True, False]):
+                BASE_NEURAL_CONFIGS[f'a-fullM-{x}{y}-{z}-{o}'] = {'end2end': True, 'opponent_perception': False, 'output_type': 'multi', 'arch': x, 'size_swap': size_swap, 'use_oracle': use_oracle, 'pad': y != ''}
+                BASE_NEURAL_CONFIGS[f'a-fullM-sym-{x}{y}-{z}-{o}'] = {'end2end': True, 'opponent_perception': True, 'output_type': 'multi', 'arch': x, 'size_swap': size_swap, 'use_oracle': use_oracle, 'pad': y != ''}
 
 NEURAL_CONFIGS = {}
 for base_name, base_config in BASE_NEURAL_CONFIGS.items():

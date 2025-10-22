@@ -268,6 +268,8 @@ def tqdm_pool_map(pool, func, args, total=None):
     pbar.close()
     return results
 
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Run experiments with various options.")
 
@@ -287,8 +289,17 @@ if __name__ == '__main__':
     model_types = [y + x for y in ['a-full-', 'a-opbelief-', 'a-full-sym-', 'a-opbelief-sym-'] for x in ['mlp', 'lstm32', 'transformer32']]
     #print('number of model types:', len(model_types))
     model_types = ['a-mix-n-belief-op']
-    model_types = ['a-fullM-sym-lstm32']
-    #model_types = ['a-hardcoded']
+    model_types = [
+        #'a-fullM-transformer32-swap-oracle',
+        #'a-fullM-transformer32--',
+        'a-fullM-transformer32-pad-swap-',
+        'a-fullM-transformer32-pad--',
+        #'a-fullM-transformer32--oracle',
+        'a-fullM-transformer32-pad-swap-oracle',
+        'a-fullM-transformer32-pad--oracle',
+        #'a-fullM-transformer32-swap-',
+        ]
+    #model_types = ['a-fullM-sym-transformer32-swap-']
 
     labels = [('correct-loc', 'loc')]
 
@@ -315,7 +326,7 @@ if __name__ == '__main__':
 
         total_tasks = len(experiment_args)
         
-        with multiprocessing.Pool(processes=2) as pool:
+        with multiprocessing.Pool(processes=6) as pool:
             list(tqdm(
                 pool.imap(run_single_experiment, experiment_args),
                 total=total_tasks,
