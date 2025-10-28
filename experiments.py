@@ -289,17 +289,35 @@ if __name__ == '__main__':
     model_types = [y + x for y in ['a-full-', 'a-opbelief-', 'a-full-sym-', 'a-opbelief-sym-'] for x in ['mlp', 'lstm32', 'transformer32']]
     #print('number of model types:', len(model_types))
     model_types = ['a-mix-n-belief-op']
+    #model_types = ['a-mix-n-belief-op']
     model_types = [
-        #'a-fullM-transformer32-swap-oracle',
-        #'a-fullM-transformer32--',
-        'a-fullM-transformer32-pad-swap-',
-        'a-fullM-transformer32-pad--',
-        #'a-fullM-transformer32--oracle',
-        'a-fullM-transformer32-pad-swap-oracle',
-        'a-fullM-transformer32-pad--oracle',
-        #'a-fullM-transformer32-swap-',
+        #'a-shared-transformer32-pad-',
+        #'a-split-sym-transformer32-pad-',
+        #'a-shared-sym-transformer32-pad-',
         ]
+    '''model_types = [
+        #'a-mix-n-belief-op', 
+        #'a-mix-n-belief-op-transformer',
+        'a-mix-n-belief-split', 
+        'a-mix-n-belief-split-transformer',
+        'a-mix-n-belief-shared', 
+        'a-mix-n-belief-shared-transformer',
+    ]'''
     #model_types = ['a-fullM-sym-transformer32-swap-']
+    model_types = [
+        #'a-simv2-split-transformer32-pad-ri',
+        #'a-simv2-split-transformer32-pad-',
+        #'a-simv2-split-transformer32-pad-r',
+        #'a-simv2-split-transformer32-pad-i',
+        #'a-simv2-single-transformer32-pad-',
+        'a-simv2-single-transformer32-pad-r',
+        'a-simv2-single-transformer32-pad-i',
+        'a-simv2-single-transformer32-pad-ri',
+        #'a-simv2-shared-transformer32-pad-',
+        'a-simv2-shared-transformer32-pad-r',
+        'a-simv2-shared-transformer32-pad-i',
+        'a-simv2-shared-transformer32-pad-ri',
+        ]
 
     labels = [('correct-loc', 'loc')]
 
@@ -319,7 +337,8 @@ if __name__ == '__main__':
 
     #curriculum_names = ['end2end_s2', 'end2end_s21', 'end2end_s3']
     curriculum_names = ['end2end_s21'] 
-    #curriculum_names = ['belief_op_s21']
+
+    #curriculum_names = ['belief_both_s21']
 
     if (not args.p) and (not args.g):
         experiment_args = [(model_type, label, args, curriculum_name) for model_type, label, curriculum_name in product(model_types, labels, curriculum_names)]

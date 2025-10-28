@@ -9,17 +9,16 @@ import os
 import pandas as pd
 
 class EndToEndModel(nn.Module):
-    def __init__(self, arch='mlp', output_type='my_decision', pad='', in_channels=5):
+    def __init__(self, arch='mlp', output_type='my_decision', pad=''):
         super().__init__()
         self.arch = arch
         self.output_type = output_type
         self.transition_counts = defaultdict(float)
         self.register_buffer('transition_counts_tensor', torch.zeros(5, 2, 2, 6, 6, 6, dtype=torch.int64), persistent=False)
-        self.T_in = in_channels
+        self.T_in = 5
         self.T_pad = 5 if pad == '' else 10
-        self.register_buffer("causal_mask_full",torch.triu(torch.full((self.T_pad, self.T_pad), float("-inf")), diagonal=1))
         print('T_pad:', self.T_pad)
-        raw_input_dim = 5 * in_channels * 7 * 7
+        raw_input_dim = 5 * 5 * 7 * 7
         processed_input_dim = 2 * 6 * self.T_in + self.T_in + self.T_in
         hidden = 128
         if output_type == 'op_belief':
@@ -31,8 +30,29 @@ class EndToEndModel(nn.Module):
         if arch == 'mlp':
             self.raw_model = nn.Sequential(nn.Flatten(), nn.Linear(raw_input_dim, hidden), nn.BatchNorm1d(hidden), nn.ReLU(), nn.Linear(hidden, hidden), nn.ReLU(), nn.Linear(hidden, 32), nn.ReLU(), nn.Linear(32, output_dim))
             self.processed_model = nn.Sequential(nn.Linear(processed_input_dim, hidden), nn.BatchNorm1d(hidden), nn.ReLU(), nn.Linear(hidden, hidden), nn.ReLU(), nn.Linear(hidden, 32), nn.ReLU(), nn.Linear(32, output_dim))
+        elif arch == 'cnn':
+            self.raw_model = nn.Sequential(nn.Conv3d(5, 16, kernel_size=3, padding=1), nn.ReLU(), nn.Conv3d(16, 32, kernel_size=3, padding=1), nn.ReLU(), nn.AdaptiveAvgPool3d((1, 1, 1)), nn.Flatten(), nn.Linear(32, 32), nn.BatchNorm1d(32), nn.ReLU(), nn.Linear(32, output_dim))
+            self.processed_model = nn.Sequential(nn.Linear(processed_input_dim, hidden), nn.BatchNorm1d(hidden), nn.ReLU(), nn.Linear(hidden, 32), nn.ReLU(), nn.Linear(32, output_dim))
+        elif arch == 'lstm128':
+            self.raw_rnn = nn.LSTM(input_size=5*7*7, hidden_size=128, batch_first=True)
+            self.processed_rnn = nn.LSTM(input_size=processed_input_dim//self.T_in, hidden_size=128, batch_first=True)
+            self.head = nn.Linear(128, output_dim)
+            self.head_op_bel   = nn.Linear(128, 2*6)
+            self.head_my_bel   = nn.Linear(128, 2*6)
+            self.head_op_dec_t = nn.Linear(128, 6)
+            self.head_my_dec   = nn.Linear(128, 5)
+            self.layernorm = nn.LayerNorm(128)
+        elif arch == 'lstm32':
+            self.raw_rnn = nn.LSTM(input_size=5*7*7, hidden_size=32, batch_first=True)
+            self.processed_rnn = nn.LSTM(input_size=processed_input_dim//self.T_in, hidden_size=32, batch_first=True)
+            self.head = nn.Linear(32, output_dim)
+            self.head_op_bel   = nn.Linear(32, 2*6)
+            self.head_my_bel   = nn.Linear(32, 2*6)
+            self.head_op_dec_t = nn.Linear(32, 6)
+            self.head_my_dec   = nn.Linear(32, 5)
+            self.layernorm = nn.LayerNorm(32)
         elif arch == 'transformer128':
-            self.raw_embed = nn.Linear(in_channels*7*7, 128)
+            self.raw_embed = nn.Linear(5*7*7, 128)
             self.processed_embed = nn.Linear(processed_input_dim//self.T_in, 128)
             encoder = nn.TransformerEncoderLayer(d_model=128, nhead=4, activation='gelu', dropout=0.1, batch_first=True)
             self.transformer = nn.TransformerEncoder(encoder, num_layers=2)
@@ -40,9 +60,9 @@ class EndToEndModel(nn.Module):
             self.head_op_bel   = nn.Linear(128, 2*6)
             self.head_my_bel   = nn.Linear(128, 2*6)
             self.head_op_dec_t = nn.Linear(128, 6)
-            self.head_my_dec   = nn.Linear(128, 6)
+            self.head_my_dec   = nn.Linear(128, 5)
         elif arch == 'transformer32':
-            self.raw_embed = nn.Linear(in_channels*7*7, 32)
+            self.raw_embed = nn.Linear(5*7*7, 32)
             self.processed_embed = nn.Linear(processed_input_dim//self.T_in, 32)
             encoder = nn.TransformerEncoderLayer(d_model=32, nhead=4, activation='gelu', dropout=0.1, batch_first=True)
             self.transformer = nn.TransformerEncoder(encoder, num_layers=2)
@@ -50,7 +70,10 @@ class EndToEndModel(nn.Module):
             self.head_op_bel   = nn.Linear(32, 2*6)
             self.head_my_bel   = nn.Linear(32, 2*6)
             self.head_op_dec_t = nn.Linear(32, 6)
-            self.head_my_dec   = nn.Linear(32, 6)
+            self.head_my_dec   = nn.Linear(32, 5)
+
+    def _causal_mask(self, T, device):
+        return torch.triu(torch.ones(T, T, dtype=torch.bool, device=device), diagonal=1)
 
     def _pad_shift(self, x, T_in, T_pad, training):
         B = x.size(0)
@@ -67,8 +90,10 @@ class EndToEndModel(nn.Module):
     def forward(self, input_data):
         if len(input_data.shape) == 5:
             B, T, C, H, W = input_data.shape
-
-            if self.arch in ['mlp']:
+            if self.arch == 'cnn':
+                x = input_data.permute(0, 2, 1, 3, 4)
+                output = self.raw_model(x)
+            elif self.arch in ['mlp']:
                 output = self.raw_model(input_data)
                 if self.output_type == 'multi':
                     return {
@@ -79,13 +104,13 @@ class EndToEndModel(nn.Module):
                     }
                 elif self.output_type == 'my_decision':
                     return {'my_decision': F.softmax(output, dim=-1)}
-            elif self.arch in ['transformer128', 'transformer32']:
+            elif self.arch in ['lstm128', 'lstm32', 'transformer128', 'transformer32']:
                 x = input_data.view(B, T, -1)
                 if 'transformer' in self.arch:
                     x = input_data.view(B, T, -1)
                     x = self.raw_embed(x)
                     x_pad, win_idx, last_idx = self._pad_shift(x, T, self.T_pad, self.training)
-                    attn_mask = self.causal_mask_full[:self.T_pad, :self.T_pad]
+                    attn_mask = self._causal_mask(self.T_pad, x.device)
                     x_enc = self.transformer(x_pad, mask=attn_mask)
                     B2 = x_enc.size(0)
                     b_idx = torch.arange(B2, device=x_enc.device).view(-1, 1).expand_as(win_idx)
@@ -111,15 +136,15 @@ class EndToEndModel(nn.Module):
             B = input_data.shape[0]
             per_step = 14
             T_in = input_data.shape[1] // per_step
-            if self.arch in ['mlp']:
+            if self.arch in ['mlp', 'cnn']:
                 output = self.processed_model(input_data)
-            elif self.arch in ['transformer128', 'transformer32']:
+            elif self.arch in ['lstm128', 'lstm32', 'transformer128', 'transformer32']:
                 x = input_data.view(B, T_in, -1)
                 if 'transformer' in self.arch:
                     x = input_data.view(B, T_in, -1)
                     x = self.processed_embed(x)
                     x_pad, win_idx, last_idx = self._pad_shift(x, T_in, self.T_pad, self.training)
-                    attn_mask = self.causal_mask_full[:self.T_pad, :x.device]
+                    attn_mask = self._causal_mask(self.T_pad, x.device)
                     x_enc = self.transformer(x_pad, mask=attn_mask)
                     b_idx = torch.arange(B, device=x_enc.device).view(-1, 1).expand_as(win_idx)
                     x_win = x_enc[b_idx, win_idx]                             # (B,T_in,d)
@@ -144,7 +169,7 @@ class EndToEndModel(nn.Module):
                 self._log_expected_transitions(input_data, ob)
         if self.output_type == 'op_belief':
             if isinstance(output, dict):
-                out = output['op_belief_t'][:, :, -1].contiguous().view(output['op_belief_t'].size(0), 2, 6)
+                out = output['op_belief_t'][:, -1].contiguous().view(output['op_belief_t'].size(0), 2, 6)
             else:
                 out = output.view(output.size(0), 2, 6)
             return F.softmax(out, dim=-1)
@@ -759,6 +784,65 @@ class BeliefModulePerTimestep(BaseModule):
         return df, pivot
 
 
+class CombinerNetwork(nn.Module):
+    def __init__(self, belief_dim=6, hidden_dim=12):
+        super().__init__()
+
+        self.belief_encoder = nn.Sequential(
+            nn.Linear(belief_dim, hidden_dim),
+            nn.ReLU(),
+        )
+
+        self.combiner = nn.Sequential(
+            nn.Linear(hidden_dim, belief_dim),
+        )
+
+    def forward(self, beliefs):
+
+        belief_l = beliefs[..., 0, :]  # [batch_size, num_beliefs, belief_dim]
+        belief_s = beliefs[..., 1, :]
+
+        encoded_l = self.belief_encoder(belief_l)  # [batch_size, num_beliefs, hidden_dim]
+        encoded_s = self.belief_encoder(belief_s)
+
+        pooled_l = encoded_l.max(dim=1)[0]  # [batch_size, hidden_dim]
+        pooled_s = encoded_s.max(dim=1)[0]
+
+        combined_l = self.combiner(pooled_l)  # [batch_size, belief_dim]
+        combined_s = self.combiner(pooled_s)
+
+        combined_l = F.softmax(combined_l, dim=-1)  # [batch_size, belief_dim]
+        combined_s = F.softmax(combined_s, dim=-1)
+
+        return torch.stack([combined_l, combined_s], dim=1)
+
+
+class CombinerModule(BaseModule):
+    def __init__(self, use_neural: bool = True, random_prob: float = 0.0, sigmoid_temp: float = 20.0):
+        super().__init__(use_neural, random_prob, sigmoid_temp)
+
+    def _create_neural_network(self) -> nn.Module:
+        return CombinerNetwork()
+
+    def _random_forward(self, beliefs: torch.Tensor) -> torch.Tensor:
+        batch_size = beliefs.shape[0]
+        device = beliefs.device
+
+        random_beliefs = torch.rand(batch_size, 2, 6, device=device)
+        return F.softmax(random_beliefs, dim=-1)
+
+    def _hardcoded_forward(self, beliefs: torch.Tensor) -> torch.Tensor:
+        #probs = beliefs
+        weights = 1-(beliefs * torch.log(beliefs + 1e-10)).sum(dim=-1)  # (batch_size, num_visions, 2)
+
+        #weights = vision_sums / vision_sums.sum(dim=1, keepdim=True).clamp(min=1e-10)
+        weights = weights.unsqueeze(-1)
+        #weights = 1-entropy  # (batch_size, num_visions, 2)
+
+        weighted_beliefs = beliefs*weights  # (batch_size, num_visions, 2, 6)
+        combined_beliefs = weighted_beliefs.max(dim=1)[0]  # (batch_size, 2, 6)
+
+        return torch.sigmoid(5*(combined_beliefs-0.5))
 
 
 # Greedy Decision module
@@ -916,6 +1000,18 @@ class AblationArchitecture(nn.Module):
             archx=module_configs['archx']
         )
 
+        self.my_combiner = CombinerModule(
+            use_neural=module_configs['combiner'],
+            random_prob=random_probs['combiner'],
+            sigmoid_temp=sigmoid_temp
+        )
+
+        self.op_combiner = (CombinerModule(
+            use_neural=module_configs['combiner'],
+            random_prob=random_probs['combiner'],
+            sigmoid_temp=sigmoid_temp
+        ) if not module_configs['shared_combiner'] else self.my_combiner)
+
         self.op_belief = (BeliefModule(
             use_neural=module_configs['op_belief'],
             random_prob=random_probs['op_belief'],
@@ -957,6 +1053,8 @@ class AblationArchitecture(nn.Module):
             'op_belief': self.op_belief,
             'my_decision': self.my_decision,
             'op_decision': self.op_decision,
+            'my_combiner': self.my_combiner,
+            'op_combiner': self.op_combiner,
             'end2end_model': self.end2end_model
         }
     
@@ -1166,6 +1264,10 @@ class AblationArchitecture(nn.Module):
                 op_belief_s = op_belief_s.detach()
 
             op_beliefs = torch.stack([op_belief_l, op_belief_s], dim=1)
+            op_belief_vector = self.op_combiner(op_beliefs.unsqueeze(1)) if self.use_combiner else op_beliefs
+
+            if self.detach_combiner:
+                op_belief_vector = op_belief_vector.detach()
 
         if self.end2end_model is not None and self.output_type == 'op_decision':
             if self.process_opponent_perception:
@@ -1204,7 +1306,7 @@ class AblationArchitecture(nn.Module):
             beliefs = torch.stack([belief_l, belief_s], dim=1)
             beliefs_list.append(beliefs)
         beliefs_tensor = torch.stack(beliefs_list, dim=1)
-        my_belief_vector = beliefs_tensor.squeeze(1)
+        my_belief_vector = self.my_combiner.forward(beliefs_tensor) if self.use_combiner else beliefs_tensor.squeeze(1)
 
         my_decision = self.my_decision.forward(my_belief_vector, op_decision, opponent_presence)
 
@@ -1227,161 +1329,3 @@ class AblationArchitecture(nn.Module):
         return result
 
 
-
-class OpponentRawSimulator(nn.Module):
-    def __init__(self, d_model=32, T=5, C=5, H=7, W=7, style="r"):
-        super().__init__()
-        self.T, self.C, self.H, self.W = T, C, H, W
-        self.style = style
-        in_dim  = C * H * W
-        out_dim = C * H * W
-        self.encoder = nn.Sequential(
-            nn.Conv2d(C, 16, 3, padding=1), nn.ReLU(),
-            nn.Conv2d(16, 8, 3, padding=1), nn.ReLU(),
-        )
-        self.head_r = nn.Linear(8*H*W, C*H*W)
-        self.head_i = nn.Linear(8*H*W, C*H*W)
-
-    def forward(self, x_enc):
-        B, T, C, H, W = x_enc.shape
-        x = x_enc.view(B * T, C, H, W) 
-        x = self.encoder(x)
-        x = x.view(B, T, 8 * H * W)
-        out_r = self.head_r(x).view(B, T, self.C, self.H, self.W)
-        out_i = self.head_i(x).view(B, T, self.C, self.H, self.W)
-
-        if self.style == "r":
-            return {"r": out_r}
-        elif self.style == "i":
-            return {"i": out_i}
-        else:
-            return {"r": out_r, "i": out_i}
-
-    @torch.no_grad()
-    def build_ground_truth(self, perceptual_field, vision, presence, style):
-        B, T, C, H, W = perceptual_field.shape
-        gt = perceptual_field.clone()
-
-        gt_r, gt_i = None, None
-        if style in ("r", "ri"):
-            eff_v_r = (vision * presence.view(B, 1)).view(B, T, 1, 1, 1)
-            gt_r = gt.clone()
-            gt_r[:, :, 2:4].mul_(eff_v_r)
-        if style in ("i", "ri"):
-            eff_v_i = vision.view(B, T, 1, 1, 1)
-            gt_i = gt.clone()
-            gt_i[:, :, 2:4].mul_(eff_v_i)
-
-        if style == "r":
-            return {"r": gt_r}
-        elif style == "i":
-            return {"i": gt_i}
-        else: 
-            return {"r": gt_r, "i": gt_i}
-
-    def loss(self, pred, gt):
-        return {k: F.mse_loss(pred[k], gt[k]) for k in pred if gt[k] is not None}
-
-class SimulationEndToEnd(nn.Module):
-    def __init__(self, module_configs: dict, random_probs, batch_size=256):
-        super().__init__()
-        self.module_configs = module_configs
-        self.arch = module_configs["arch"]
-        self.pad = module_configs.get("pad", "")
-        self.output_type = module_configs.get("output_type", "multi")
-        self.sim_style = module_configs.get("sim_type", "ri")
-        self.kwargs = {'module_configs': module_configs}
-        self.mode = "shared" if module_configs["shared"] else "split" if module_configs["split"] else "single"
-        self.use_oracle = module_configs.get('use_oracle', False)
-        self.register_buffer("zero", torch.tensor(0.0))
-
-        print(module_configs)
-
-        self.use_per_timestep_opponent = False
-        self.store_per_timestep_beliefs = True
-        self.record_og_beliefs = False
-
-        print(self.mode)
-
-        d_model = 32 if "32" in self.arch else 128
-
-        in_channels = 5
-        if self.mode == "single" and self.sim_style != "":
-            in_channels += 5
-        if self.sim_style == "ri":
-            in_channels += 5
-
-        self.end2end_self = EndToEndModel(arch=self.arch, output_type=self.output_type, pad=self.pad, in_channels=in_channels if self.mode == "single" else 5)
-        if self.mode == "shared":
-            self.end2end_op = self.end2end_self
-        elif self.mode == "split":
-            self.end2end_op = EndToEndModel(arch=self.arch, output_type=self.output_type, pad=self.pad)
-        elif self.mode == "single":
-            self.end2end_op = None
-
-        self.simulator = OpponentRawSimulator(d_model=d_model, style=self.sim_style)
-
-        sig = module_configs.get("sigmoid_temp", 50.0)
-        ax = module_configs.get("archx", "mlp")
-        self.treat_op = TreatPerceptionModule(use_neural=False, random_prob=0.0, sigmoid_temp=sig, archx=ax)
-        self.vision_op = VisionPerceptionModule(use_neural=False, random_prob=0.0, sigmoid_temp=sig)
-        self.presence_op = PresencePerceptionModule(use_neural=False, random_prob=0.0, sigmoid_temp=sig)
-
-        comb_in = 6
-        if self.mode != "single":
-            comb_in += 6
-
-        self.combiner = nn.Sequential(nn.Linear(comb_in, d_model), nn.ReLU(), nn.Linear(d_model, 6))
-
-    def forward(self, my_raw: torch.Tensor, additional_input: torch.Tensor):
-        opp_vision = self.vision_op(my_raw, is_p1=0)
-        opp_presence = self.presence_op(my_raw, is_p1=0)
-
-        gt_raw = self.simulator.build_ground_truth(my_raw, opp_vision, opp_presence, self.sim_style)
-
-        sim_pred = self.simulator(my_raw)
-        if self.sim_style == "r":
-            sim_field = sim_pred["r"]
-        elif self.sim_style == "i":
-            sim_field = sim_pred["i"]
-        elif self.sim_style == "ri":
-            sim_field = torch.cat([sim_pred["r"], sim_pred["i"]], dim=1)
-
-        if self.sim_style != "":
-
-            if self.mode == "single":
-                joint_raw = torch.cat([my_raw, sim_field], dim=2)
-                joint_out = self.end2end_self(joint_raw)
-                my_decision = joint_out["my_decision"]
-                #op_belief_t = joint_out.get("op_belief_t", None)
-            else:
-                my_out = self.end2end_self(my_raw) if self.sim_style != "ri" else self.end2end_self(torch.cat([my_raw, my_raw], dim=1))
-                op_out = self.end2end_op(sim_field)
-                #op_belief_t = op_out.get("op_belief_t", None)
-                z_self = my_out["my_decision"]
-                z_op = op_out["my_decision"]
-                comb_input = torch.cat([z_self, z_op], dim=-1)
-                logits = self.combiner(comb_input)
-                my_decision = logits
-
-        else:
-            if self.mode == "single":
-                joint_out = self.end2end_self(my_raw)
-                my_decision = joint_out["my_decision"]
-                #op_belief_t = joint_out.get("op_belief_t", None)
-            else:
-                my_out = self.end2end_self(my_raw)
-                op_out = self.end2end_op(my_raw)
-                #op_belief_t = op_out.get("op_belief_t", None)
-                #print(my_out)
-                z_self = my_out["my_decision"]
-                z_op = op_out["my_decision"]
-                comb_input = torch.cat([z_self, z_op], dim=-1)
-                logits = self.combiner(comb_input)
-                my_decision = logits
-
-        return {
-            "my_decision": my_decision,
-            #"op_belief_t": op_belief_t,
-            "sim_loss": {"r": self.zero, "i": self.zero, **self.simulator.loss(sim_pred, gt_raw)},
-        }

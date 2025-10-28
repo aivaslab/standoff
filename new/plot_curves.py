@@ -13,7 +13,7 @@ exp_effects = {
     #"exp_558": "pad 5, loss=D, size swaps",
     #"exp_567": "pad 8, loss=D",
     #"exp_568": "pad 5, loss=D",
-    "exp_601": "x",
+    "exp_600": "x",
 }
 
 
@@ -70,47 +70,46 @@ big_df.to_csv(out_csv, index=False)
 print(f"Saved combined CSV: {out_csv}")
 
 for modelType in ['sym', 'full']:  
-    dfb = big_df[big_df["modeltype"]==modelType]
-    #for arch in ['mlp', 'lstm32', 'transformer32']: 
-    #    dfb = dfa[dfa["arch"]==arch]
-    arch = ""
-    for series in ["s21","s22"]:
-        dfc = dfb[dfb["series"]==series]
-        if dfc.empty:
-            continue
+    dfa = big_df[big_df["modeltype"]==modelType]
+    for arch in ['mlp', 'lstm32', 'transformer32']: 
+        dfb = dfa[dfa["arch"]==arch]
+        for series in ["s21","s22"]:
+            dfc = dfb[dfb["series"]==series]
+            if dfc.empty:
+                continue
 
-        per_run = dfc.groupby(["model","pad","swap","oracle","run_id"], as_index=False)["Novel_Accuracy_mean"].mean()
-        summary = dfc.groupby(["pad","swap","oracle"], as_index=False)["Novel_Accuracy_mean"].mean()
-        summary_std = dfc.groupby(["pad","swap","oracle"], as_index=False)["Novel_Accuracy_mean"].std()
+            per_run = dfc.groupby(["model","pad","swap","oracle","run_id"], as_index=False)["Novel_Accuracy_mean"].mean()
+            summary = dfc.groupby(["pad","swap","oracle"], as_index=False)["Novel_Accuracy_mean"].mean()
+            summary_std = dfc.groupby(["pad","swap","oracle"], as_index=False)["Novel_Accuracy_mean"].std()
 
-        print(f"\n[{series}] Means:\n", summary)
-        print(f"\n[{series}] Stds:\n", summary_std)
+            print(f"\n[{series}] Means:\n", summary)
+            print(f"\n[{series}] Stds:\n", summary_std)
 
-        for var in ["pad","swap","oracle"]:
-            mean_diff, std_diff = contrast(per_run, var)
-            print(f"[{series}] {var}: mean change={mean_diff:.4f} ({std_diff:.4f})")
+            for var in ["pad","swap","oracle"]:
+                mean_diff, std_diff = contrast(per_run, var)
+                print(f"[{series}] {var}: mean change={mean_diff:.4f} ({std_diff:.4f})")
 
-        subset = per_run[per_run["oracle"]]
-        for var in ["pad","swap"]:
-            mean_diff, std_diff = contrast(subset, var)
-            print(f"[{series}] {var} (oracle=True): mean change={mean_diff:.4f} ({std_diff:.4f})")
+            subset = per_run[per_run["oracle"]]
+            for var in ["pad","swap"]:
+                mean_diff, std_diff = contrast(subset, var)
+                print(f"[{series}] {var} (oracle=True): mean change={mean_diff:.4f} ({std_diff:.4f})")
 
-        plt.figure(figsize=[10,8])
-        for (pad, swap, oracle, model), g in (
-            dfc.groupby(["pad","swap","oracle","Batch","model"])["Novel_Accuracy_mean"]
-            .agg(["mean","std"])
-            .reset_index()
-            .groupby(["pad","swap","oracle","model"])
-        ):
-            label = f"{model}, pad={pad}, swap={swap}, oracle={oracle}"
-            plt.plot(g["Batch"], g["mean"], label=label)
-            plt.fill_between(g["Batch"], g["mean"]-g["std"], g["mean"]+g["std"], alpha=0.2)
+            plt.figure(figsize=[10,8])
+            for (pad, swap, oracle, model), g in (
+                dfc.groupby(["pad","swap","oracle","Batch","model"])["Novel_Accuracy_mean"]
+                .agg(["mean","std"])
+                .reset_index()
+                .groupby(["pad","swap","oracle","model"])
+            ):
+                label = f"{model}, pad={pad}, swap={swap}, oracle={oracle}"
+                plt.plot(g["Batch"], g["mean"], label=label)
+                plt.fill_between(g["Batch"], g["mean"]-g["std"], g["mean"]+g["std"], alpha=0.2)
 
-        plt.xlabel("Batch")
-        plt.ylabel("Accuracy")
-        plt.ylim([0.7,1.0])
-        plt.title(f"Accuracy Across Runs ({series}-{arch})")
-        plt.legend()
-        plt.tight_layout()
-        plt.savefig(root / f"accuracy_{series}_{modelType}_{arch}_601.png")
-        plt.close()
+            plt.xlabel("Batch")
+            plt.ylabel("Accuracy")
+            plt.ylim([0.7,1.0])
+            plt.title(f"Accuracy Across Runs ({series}-{arch})")
+            plt.legend()
+            plt.tight_layout()
+            plt.savefig(root / f"accuracy_{series}_{modelType}_{arch}_604d.png")
+            plt.close()

@@ -25,7 +25,7 @@ import heapq
 from scipy.stats import sem, t
 
 
-from src.models.modules import AblationArchitecture
+from src.models.modules import AblationArchitecture, SimulationEndToEnd
 from src.models.modules_multiagent import MultiAgentArchitecture
 from src.train_model import train_model
 from src.evaluate_model import evaluate_model
@@ -170,6 +170,7 @@ def create_scheduler(model, total_steps, global_lr=1e-3, pct_start=0.2, div_fact
     return optimizer, scheduler
 
 def load_model(model_type, model_kwargs, device, multi=False):
+
     if model_type[0] != 'a':
         model_class = {
             'cnn': lambda: CNNModel(use_conv2=True, **model_kwargs),
@@ -193,7 +194,9 @@ def load_model(model_type, model_kwargs, device, multi=False):
     if multi:
         print('multi')
         return MultiAgentArchitecture(config, random_probs, model_kwargs['batch_size']).to(device)
-    return AblationArchitecture(config, random_probs, model_kwargs['batch_size']).to(device)
+    if "simv2" in model_type:
+        return SimulationEndToEnd(config, random_probs, model_kwargs['batch_size']).to(device)
+    return End2EndArchitecture(config, random_probs, model_kwargs['batch_size']).to(device)
 
 
 def load_last_model(model_save_path, repetition):

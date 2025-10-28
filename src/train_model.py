@@ -30,7 +30,7 @@ def last_step_targets(flat_oracle, module_ranges, module_name):
 
 def evaluate_model_stage(model, test_loader, novel_loader, novel_task_loader, criterion, device, stage_name=""):
     model.eval()
-    test_losses, all_preds, all_targets = [], [], []
+    test_losses, all_preds, all_targets, sim_r_losses, sim_i_losses = [], [], [], [], []
 
     
     with torch.inference_mode():
@@ -41,6 +41,8 @@ def evaluate_model_stage(model, test_loader, novel_loader, novel_task_loader, cr
             outputs = model(inputs, None)
             loss = criterion(outputs['my_decision'], torch.argmax(target_labels, dim=1))
             test_losses.append(loss.item())
+            sim_r_losses.append(outputs['sim_loss']["r"].item())
+            sim_i_losses.append(outputs['sim_loss']["i"].item())
             all_preds.append(outputs['my_decision'].argmax(dim=1))
             all_targets.append(torch.argmax(target_labels, dim=1))
         
@@ -80,12 +82,14 @@ def evaluate_model_stage(model, test_loader, novel_loader, novel_task_loader, cr
                 novel_task_accuracy = (novel_task_preds == novel_task_targets).float().mean().item()
     
     test_loss = sum(test_losses) / len(test_losses)
+    sim_r_loss = sum(sim_r_losses) / len(sim_r_losses)
+    sim_i_loss = sum(sim_i_losses) / len(sim_i_losses)
     all_preds = torch.cat(all_preds)
     all_targets = torch.cat(all_targets)
     accuracy = (all_preds == all_targets).float().mean().item()
     
     model.train()
-    return {'accuracy': accuracy, 'novel_accuracy': novel_accuracy, 'novel_task_accuracy': novel_task_accuracy, 'loss': test_loss, 'stage': stage_name}
+    return {'accuracy': accuracy, 'novel_accuracy': novel_accuracy, 'novel_task_accuracy': novel_task_accuracy, 'loss': test_loss, 'stage': stage_name, 'sim_r_loss': sim_r_loss, 'sim_i_loss': sim_i_loss}
 
 class SigmoidTempScheduler:
     def __init__(self, model, start_temp=1.0, end_temp=100.0, total_steps=10000, vision_prob_start=0.9, vision_prob_end=1, rate=4.0):
@@ -163,6 +167,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
     total_batches = sum(stage['batches'] for stage in curriculum_config.curriculum_stages)
     from supervised_learning_main import filter_indices, load_model
 
+
     if oracle_labels:
         module_labels = {}
         for label in oracle_labels:
@@ -182,6 +187,13 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
                 else:
                     module_labels['my_belief_t'] = ['loc-large', 'loc-small']
     else:
+        module_labels = {
+            'my_decision': ['correct-loc'],
+        }
+
+    if True:
+        oracle_labels = []
+    if True:
         module_labels = {
             'my_decision': ['correct-loc'],
         }
@@ -211,24 +223,32 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
     epoch_losses_df = pd.DataFrame(columns=['Batch', 'Loss', 'Accuracy', 'Novel_Accuracy', 'Novel_Task_Accuracy'])
 
     t = tqdm.trange(total_batches)
+    from experiments import init_regimes
+    _, _, _, fregimes, _, _, _, _, _, _ = init_regimes()
+    all_s3_regimes = fregimes['s3']
 
     for stage_config in curriculum_config.curriculum_stages:
         if 'trans' in model.kwargs['module_configs']['arch']:
-            optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4, betas=(0.95, 0.999))
+            optimizer = torch.optim.AdamW(model.parameters(), lr=5e-5, betas=(0.95, 0.999))
+            print('transformer')
         else:
             optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4, betas=(0.9, 0.999))
         print('started curricular stage', stage_config['stage_name'])
-        stage_train_sets = apply_curriculum_stage(model, stage_config, train_sets_dict)
+        
+        # stage_train_sets = apply_curriculum_stage(model, stage_config, train_sets_dict)
+        stage_train_sets = []
+        for regime in stage_config['data_regimes']:
+            if regime in train_sets_dict:
+                stage_train_sets.extend(train_sets_dict[regime])
+
         batches = stage_config['batches']
         print('training on these sets: ', stage_train_sets)
 
-        trainable = [name for name, module in model.get_module_dict().items() if module is not None and any(p.requires_grad for p in module.parameters())]
-        print('trainable modules:', trainable)
+        #trainable = [name for name, module in model.get_module_dict().items() if module is not None and any(p.requires_grad for p in module.parameters())]
+        #print('trainable modules:', trainable)
         print('module configs', model.kwargs['module_configs'])
 
-        from experiments import init_regimes
-        _, _, _, fregimes, _, _, _, _, _, _ = init_regimes()
-        all_s3_regimes = fregimes['s3']
+        
         novel_regimes = [r for r in all_s3_regimes if r not in stage_train_sets]
 
         novel_eval_data, novel_eval_labels = [], []
@@ -361,11 +381,13 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
                 'Loss': baseline_results['loss'],
                 'Accuracy': baseline_results['accuracy'],
                 'Novel_Accuracy': baseline_results['novel_accuracy'],
-                'Novel_Task_Accuracy': baseline_results['novel_task_accuracy']
+                'Novel_Task_Accuracy': baseline_results['novel_task_accuracy'],
+                'sim_r_loss': baseline_results['sim_r_loss'],
+                'sim_i_loss': baseline_results['sim_i_loss'],
             }
             new_row = pd.DataFrame([new_row_data])
             epoch_losses_df = pd.concat([epoch_losses_df, new_row], ignore_index=True)
-            print(f"Acc: {baseline_results['accuracy']:.4f}, Nacc: {baseline_results['novel_accuracy']:.4f}, NTacc: {baseline_results['novel_task_accuracy']:.4f}, L: {baseline_results['loss']:.4f}, Vis:", model.vision_prob, 'P:', save_path, repetition)
+            print(f"Acc: {baseline_results['accuracy']:.4f}, Nacc: {baseline_results['novel_accuracy']:.4f}, NTacc: {baseline_results['novel_task_accuracy']:.4f}, L: {baseline_results['loss']:.4f}, P:", save_path, repetition)
         else:
             train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=0, pin_memory=True)
 
@@ -509,9 +531,9 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
 
             ###
             
-            logits = outputs['op_belief_t']
-            my_logits = outputs['my_belief_t']
-            if True:
+            if False: # set to false for mini
+                logits = outputs['op_belief_t']
+                my_logits = outputs['my_belief_t']
                 B, S, T, C = logits.shape
                 device = logits.device
 
@@ -531,7 +553,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
                 # average KL over unseen steps only (including t=0 when unseen)
                 den = unseen_mask_full.float().sum().clamp_min(1.0)
                 loss_unseen_stability = (kl_t * unseen_mask_full.float()).sum() / den
-            if True:
+            if False: # set to false for mini
                 logits = outputs['op_belief_t']
                 my_logits = outputs['my_belief_t']
                 B, S, T, C = logits.shape
@@ -661,6 +683,20 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
             #total_loss = my_decision_loss + 0.1*oracle_loss + 0.1*loss_misinformed + loss_seen_ce + loss_persist + loss_wrong_agreement
             total_loss = my_decision_loss + oracle_loss if model.use_oracle else my_decision_loss #+ 0.5*loss_unseen_stability + 0.01*loss_seen_ce + 0.01*loss_delta + 0.01*loss_persist
 
+            #print(outputs["sim_loss"])
+            if "r" in model.sim_style:
+                sim_r_loss = outputs["sim_loss"]["r"]
+                total_loss += 0.5*sim_r_loss
+            else:
+                sim_r_loss = 0.0
+            if "i" in model.sim_style:
+                sim_i_loss = outputs["sim_loss"]["i"]
+                total_loss += 0.5*sim_i_loss
+            else:
+                sim_i_loss = 0.0
+
+            #total_loss += 0.001 * sum((p1 - p2).pow(2).mean() for p1, p2 in zip(model.e2e_op_belief.parameters(), model.e2e_my_belief.parameters()))
+
             optimizer.zero_grad()
             total_loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
@@ -670,7 +706,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
                 if batch > 1:
                     t.update(epoch_length)
 
-            if record_loss and (((real_batch) % epoch_length_val == 0) or (real_batch == total_batches - 1)):
+            if record_loss and (((real_batch) % (4 * epoch_length_val) == 0) or (real_batch == total_batches - 1)):
 
                 stage_results = evaluate_model_stage(model, test_loader, novel_loader, novel_task_loader, criterion, device, stage_config['stage_name'])
     
@@ -680,7 +716,10 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
                     'OLoss_total': float(oracle_loss.item()) if oracle_labels else 0,
                     'Accuracy': stage_results['accuracy'],
                     'Novel_Accuracy': stage_results['novel_accuracy'],
-                    'Novel_Task_Accuracy': stage_results['novel_task_accuracy']
+                    'Novel_Task_Accuracy': stage_results['novel_task_accuracy'],
+                    "sim_r_loss": stage_results['sim_r_loss'],
+                    "sim_i_loss": stage_results['sim_i_loss'],
+
                 }
                 for k, v in oracle_losses.items():
                     new_row_data[f'OLoss_{k}'] = float(v.item())
@@ -703,9 +742,11 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
                     f"NTacc: {stage_results['novel_task_accuracy']:.3f}, "
                     f"L: {stage_results['loss']:.3f}, "
                     f"O: {oloss_line}, "
-                    f"Persist: {loss_persist:.3f} delta: {loss_delta:.3f} ce: {loss_seen_ce:.3f} "
-                    f"LW: {loss_wrong_agreement:.3f} MI: {loss_misinformed:.3f}"
-                    f"LU: {loss_unseen_stability:.3f}"
+                    f"SR: {sim_r_loss:.3f}, "
+                    f"SI: {sim_i_loss:.3f}, "
+                    #f"Persist: {loss_persist:.3f} delta: {loss_delta:.3f} ce: {loss_seen_ce:.3f} "
+                    #f"LW: {loss_wrong_agreement:.3f} MI: {loss_misinformed:.3f}"
+                    #f"LU: {loss_unseen_stability:.3f}"
                     f"Path: {save_path} Rep: {repetition}"
                 )
                 if save_models and real_batch == total_batches - 1:

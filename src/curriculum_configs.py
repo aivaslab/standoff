@@ -99,9 +99,9 @@ class CurriculumConfig:
             self.curriculum_stages = [
                 {
                     'stage_name': base_curriculum_name,
-                    'batches': 5000,
+                    'batches': 10000,
                     'data_regimes': [regime],
-                    'trainable_modules': ['end2end_model'],
+                    'trainable_modules': ['end2end_model'], #['end2end_model']
                     'copy_weights': None,
                 },
             ]
@@ -112,7 +112,7 @@ class CurriculumConfig:
             if base_curriculum_name in module_map:
                 self.curriculum_stages = [{
                     'stage_name': base_curriculum_name,
-                    'batches': 5000,
+                    'batches': 10000,
                     'data_regimes': [regime],
                     'trainable_modules': module_map[base_curriculum_name],
                     'copy_weights': None,
@@ -262,12 +262,7 @@ def apply_curriculum_stage(model, stage_config, train_sets_dict):
     ]
     print(f"Trainable: {trainable}")
     
-    stage_train_sets = []
-    for regime in stage_config['data_regimes']:
-        if regime in train_sets_dict:
-            stage_train_sets.extend(train_sets_dict[regime])
     
-    return stage_train_sets
 
 def freeze_module_parameters(module):
     for param in module.parameters():
