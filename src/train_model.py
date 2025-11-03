@@ -9,6 +9,21 @@ from torch.optim.lr_scheduler import ExponentialLR, OneCycleLR
 import pandas as pd
 import torch.nn.functional as F
 import math
+import time
+
+from torch.multiprocessing import set_start_method
+set_start_method('spawn', force=True)
+
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
+torch.set_num_threads(1)
+torch.set_num_interop_threads(1)
+torch.backends.cudnn.benchmark = True
+torch.backends.cuda.matmul.allow_tf32 = True
+torch.backends.cudnn.allow_tf32 = True
+torch.set_float32_matmul_precision("medium")
+torch.backends.cuda.enable_flash_sdp(True)
+
 
 from src.curriculum_configs import *
 
@@ -31,32 +46,33 @@ def last_step_targets(flat_oracle, module_ranges, module_name):
 def evaluate_model_stage(model, test_loader, novel_loader, novel_task_loader, criterion, device, stage_name=""):
     model.eval()
     test_losses, all_preds, all_targets, sim_r_losses, sim_i_losses = [], [], [], [], []
+    prev_time = time.time()
 
     
     with torch.inference_mode():
         for inputs, target_labels, _, _, _ in test_loader:
             inputs = inputs.to(device)
-            target_labels = target_labels.float().to(device)
+            target_labels = target_labels.to(device)
             
             outputs = model(inputs, None)
-            loss = criterion(outputs['my_decision'], torch.argmax(target_labels, dim=1))
+            loss = criterion(outputs['my_decision'], target_labels)
             test_losses.append(loss.item())
             sim_r_losses.append(outputs['sim_loss']["r"].item())
             sim_i_losses.append(outputs['sim_loss']["i"].item())
             all_preds.append(outputs['my_decision'].argmax(dim=1))
-            all_targets.append(torch.argmax(target_labels, dim=1))
+            all_targets.append(target_labels)
         
         novel_accuracy = 0.0
         if novel_loader is not None:
             novel_preds, novel_targets = [], []
             for inputs, target_labels, _, _, _ in novel_loader:
                 inputs = inputs.to(device)
-                target_labels = target_labels.float().to(device)
+                target_labels = target_labels.to(device)
                 
                 outputs = model(inputs, None)
                 #print(outputs['my_decision'].shape)
                 novel_preds.append(outputs['my_decision'].argmax(dim=1))
-                novel_targets.append(torch.argmax(target_labels, dim=1))
+                novel_targets.append(target_labels)
 
                 #print(novel_preds[:10], novel_targets[:10])
             
@@ -70,11 +86,11 @@ def evaluate_model_stage(model, test_loader, novel_loader, novel_task_loader, cr
             novel_task_preds, novel_task_targets = [], []
             for inputs, target_labels, _, _, _ in novel_task_loader:
                 inputs = inputs.to(device)
-                target_labels = target_labels.float().to(device)
+                target_labels = target_labels.to(device)
                 
                 outputs = model(inputs, None)
                 novel_task_preds.append(outputs['my_decision'].argmax(dim=1))
-                novel_task_targets.append(torch.argmax(target_labels, dim=1))
+                novel_task_targets.append(target_labels)
             
             if novel_task_preds:
                 novel_task_preds = torch.cat(novel_task_preds)
@@ -89,6 +105,7 @@ def evaluate_model_stage(model, test_loader, novel_loader, novel_task_loader, cr
     accuracy = (all_preds == all_targets).float().mean().item()
     
     model.train()
+    print(time.time() - prev_time)
     return {'accuracy': accuracy, 'novel_accuracy': novel_accuracy, 'novel_task_accuracy': novel_task_accuracy, 'loss': test_loss, 'stage': stage_name, 'sim_r_loss': sim_r_loss, 'sim_i_loss': sim_i_loss}
 
 class SigmoidTempScheduler:
@@ -229,10 +246,13 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
 
     for stage_config in curriculum_config.curriculum_stages:
         if 'trans' in model.kwargs['module_configs']['arch']:
-            optimizer = torch.optim.AdamW(model.parameters(), lr=5e-5, betas=(0.95, 0.999))
+            optimizer = torch.optim.AdamW(model.parameters(), lr=3e-5, betas=(0.95, 0.999))
+            # if not softmaxing output do 5e-5
+            scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.95)
             print('transformer')
         else:
             optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4, betas=(0.9, 0.999))
+            scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.95)
         print('started curricular stage', stage_config['stage_name'])
         
         # stage_train_sets = apply_curriculum_stage(model, stage_config, train_sets_dict)
@@ -281,7 +301,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
             
             novel_indices = list(range(sum(len(d) for d in novel_eval_data)))
             novel_dataset = TrainDatasetBig(novel_eval_data, novel_eval_labels, novel_params, novel_oracles, novel_indices)
-            novel_loader = DataLoader(novel_dataset, batch_size=batch_size, shuffle=False, num_workers=0)
+            novel_loader = DataLoader(novel_dataset, batch_size=batch_size, shuffle=False, num_workers=0, pin_memory=True)
         else:
             novel_loader = None
 
@@ -364,7 +384,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
         
         if novel_task_indices:
             novel_task_dataset = TrainDatasetBig(data, labels, params, module_data_combined, novel_task_indices)
-            novel_task_loader = DataLoader(novel_task_dataset, batch_size=batch_size, shuffle=False, num_workers=0)
+            novel_task_loader = DataLoader(novel_task_dataset, batch_size=batch_size, shuffle=False, num_workers=0, pin_memory=True)
         else:
             novel_task_loader = None
 
@@ -416,19 +436,19 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
         first_batch_processed = False
         module_ranges = {}
 
-
         for batch in range(batches):
             real_batch += 1
-            total_loss = 0.0
+            total_loss = torch.zeros((), device=device)
             try:
                 inputs, target_labels, _, oracles, _ = next(iter_loader)
             except StopIteration:
                 iter_loader = iter(train_loader)
                 inputs, target_labels, _, oracles, _ = next(iter_loader)
-            inputs, target_labels, oracles = inputs.to(device), target_labels.float().to(device), oracles.to(device)
+            inputs, target_labels, oracles = (t.to(device, non_blocking=True) for t in (inputs, target_labels, oracles))
+
 
             outputs = model(inputs, None)
-            my_decision_loss = criterion(outputs['my_decision'], torch.argmax(target_labels, dim=1))
+            my_decision_loss = criterion(outputs['my_decision'], target_labels)
 
             if not first_batch_processed:
                 flat_oracle = oracles.reshape(oracles.size(0), -1)
@@ -684,20 +704,24 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
             total_loss = my_decision_loss + oracle_loss if model.use_oracle else my_decision_loss #+ 0.5*loss_unseen_stability + 0.01*loss_seen_ce + 0.01*loss_delta + 0.01*loss_persist
 
             #print(outputs["sim_loss"])
-            if "r" in model.sim_style:
+            if "r" in model.sim_style and not model.use_gt_sim:
                 sim_r_loss = outputs["sim_loss"]["r"]
-                total_loss += 0.5*sim_r_loss
+                total_loss += sim_r_loss
             else:
                 sim_r_loss = 0.0
-            if "i" in model.sim_style:
+            if "i" in model.sim_style and not model.use_gt_sim:
                 sim_i_loss = outputs["sim_loss"]["i"]
-                total_loss += 0.5*sim_i_loss
+                total_loss += sim_i_loss
             else:
                 sim_i_loss = 0.0
 
             #total_loss += 0.001 * sum((p1 - p2).pow(2).mean() for p1, p2 in zip(model.e2e_op_belief.parameters(), model.e2e_my_belief.parameters()))
 
-            optimizer.zero_grad()
+            optimizer.zero_grad(set_to_none=True)
+            #scaler.scale(total_loss).backward()
+            #scaler.unscale_(optimizer) 
+            #scaler.step(optimizer)
+            #scaler.update()
             total_loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
             optimizer.step()
@@ -705,8 +729,9 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
             if (batch+1) % epoch_length == 0:
                 if batch > 1:
                     t.update(epoch_length)
+                    scheduler.step()
 
-            if record_loss and (((real_batch) % (4 * epoch_length_val) == 0) or (real_batch == total_batches - 1)):
+            if record_loss and (((real_batch) % (2*epoch_length_val) == 0) or (real_batch == total_batches - 1)):
 
                 stage_results = evaluate_model_stage(model, test_loader, novel_loader, novel_task_loader, criterion, device, stage_config['stage_name'])
     
