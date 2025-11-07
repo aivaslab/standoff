@@ -99,7 +99,7 @@ class CurriculumConfig:
             self.curriculum_stages = [
                 {
                     'stage_name': base_curriculum_name,
-                    'batches': 10000,
+                    'batches': 20000,
                     'data_regimes': [regime],
                     'trainable_modules': ['end2end_model'], #['end2end_model']
                     'copy_weights': None,

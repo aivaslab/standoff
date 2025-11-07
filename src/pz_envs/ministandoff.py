@@ -109,6 +109,7 @@ class MiniStandoffEnv(para_MultiGridEnv):
         self.subject_visible_decs = subject_visible_decs
         self.opponent_visible_decs = opponent_visible_decs
         self.persistent_treat_images = persistent_treat_images
+        print("persistent treat images", self.persistent_treat_images)
         self.gaze_highlighting = gaze_highlighting
         self.persistent_gaze_highlighting = persistent_gaze_highlighting
         self.only_highlight_treats = True
@@ -521,7 +522,7 @@ class MiniStandoffEnv(para_MultiGridEnv):
 
                 x = box + 1
                 tile = self.grid.get(x, y)
-                if tile is not None and tile.type == "Goal":
+                if tile is not None and tile.type == "Goal" and not getattr(tile, "hide", False):
                     # mark for hiding at the next timer step
                     self.objs_to_hide.append(tile)
                     self.box_updated_this_timestep[box] = True
@@ -575,7 +576,9 @@ class MiniStandoffEnv(para_MultiGridEnv):
                 self.del_obj(x, _y)
             if arg == 0:
                 for x, _y in self.curtain_tiles:
-                    self.put_obj(Curtain(color='red'), x, _y, update_vis=False)
+                    # commented out 11/25
+                    pass
+                    #self.put_obj(Curtain(color='red'), x, _y, update_vis=False)
             if self.stop_on_release is True:
                 self.dones['p_0'] = True
             self.has_released = True
@@ -591,7 +594,8 @@ class MiniStandoffEnv(para_MultiGridEnv):
         target_agents = []
         if name == "b" or name == "sw" or name == "rem" or (self.hidden is True and name == "re"):
             for key, value in self.last_seen_reward.items():
-                self.last_seen_reward[key] = value - 1 # we discount older rewards to prefer new updates
+                if value > 0:
+                    self.last_seen_reward[key] = value - 1 # we discount older rewards to prefer new updates
             did_swap = False
             for box in range(self.boxes):
                 x = box + 1
@@ -599,7 +603,7 @@ class MiniStandoffEnv(para_MultiGridEnv):
                     if self.can_see[agent + str(box)] and self.currently_visible:
                         tile = self.grid.get(x, y)
                         # if hasattr(tile, "reward") and hasattr(tile, "size"):
-                        if tile is not None and tile.type == "Goal":
+                        if tile is not None and tile.type == "Goal" :
                             if name == "sw":
                                 if not did_swap:
                                     did_swap = True
@@ -609,20 +613,21 @@ class MiniStandoffEnv(para_MultiGridEnv):
                                     self.last_seen_reward[b1] = self.last_seen_reward[b2]
                                     self.last_seen_reward[b2] = temp
 
-                            if hasattr(tile, 'get_reward'):
+                            if hasattr(tile, 'get_reward') and not getattr(tile, "hide", False):
                                 self.last_seen_reward[agent + str(box)] = tile.get_reward()
 
 
             self.new_target = False
             for box in range(self.boxes):
                 for agent in self.puppets + ['i']:
-                    reward = self.last_seen_reward[agent + str(box)]
-                    if reward >= self.best_reward[agent]:
-                        self.agent_goal[agent] = box
-                        self.best_reward[agent] = reward
-                        self.new_target = True
-                        target_agents.append(agent)
-                        #print('new target', self.best_reward[agent], self.agent_goal[agent], self.last_seen_reward)
+                    if self.currently_visible:
+                        reward = self.last_seen_reward[agent + str(box)]
+                        if reward >= self.best_reward[agent]:
+                            self.agent_goal[agent] = box
+                            self.best_reward[agent] = reward
+                            self.new_target = True
+                            target_agents.append(agent)
+                            #print('new target', self.best_reward[agent], self.agent_goal[agent], self.last_seen_reward)
         if self.new_target:
             self.new_target = False
             for target_agent in target_agents:
@@ -641,9 +646,10 @@ class MiniStandoffEnv(para_MultiGridEnv):
                 # tile = self.grid.get(x, y)
                 # we cannot track shouldAvoidBig etc here because the treat location might change
 
+
         
 
-        if self.record_info:
+        if True:
             # if agent's goal of player_1 matches big treat location, then shouldAvoidBig is True
 
             info = self.infos['p_0']
@@ -654,6 +660,7 @@ class MiniStandoffEnv(para_MultiGridEnv):
                     info['shouldGetBig'] = False
                     info['shouldGetSmall'] = True
                     info['shouldAvoidSmall'] = False
+
                 elif len(self.small_food_locations) > 0 and info['puppet_goal'] == self.small_food_locations[-1]:
                     info['shouldAvoidSmall'] = not self.subject_is_dominant
                     info['shouldAvoidBig'] = False

@@ -45,37 +45,40 @@ def last_step_targets(flat_oracle, module_ranges, module_name):
 
 def evaluate_model_stage(model, test_loader, novel_loader, novel_task_loader, criterion, device, stage_name=""):
     model.eval()
-    test_losses, all_preds, all_targets, sim_r_losses, sim_i_losses = [], [], [], [], []
+    test_losses, all_preds, all_targets = [], [], []
+    sim_r_losses, sim_i_losses = [], []
+    novel_sim_r_losses, novel_sim_i_losses = [], []
+    novel_task_sim_r_losses, novel_task_sim_i_losses = [], []
     prev_time = time.time()
 
-    
     with torch.inference_mode():
         for inputs, target_labels, _, _, _ in test_loader:
             inputs = inputs.to(device)
             target_labels = target_labels.to(device)
-            
             outputs = model(inputs, None)
+
             loss = criterion(outputs['my_decision'], target_labels)
             test_losses.append(loss.item())
-            sim_r_losses.append(outputs['sim_loss']["r"].item())
-            sim_i_losses.append(outputs['sim_loss']["i"].item())
+            if 'sim_loss' in outputs.keys():
+                sim_r_losses.append(outputs['sim_loss']["r"].item())
+                sim_i_losses.append(outputs['sim_loss']["i"].item())
             all_preds.append(outputs['my_decision'].argmax(dim=1))
             all_targets.append(target_labels)
-        
+
         novel_accuracy = 0.0
         if novel_loader is not None:
             novel_preds, novel_targets = [], []
             for inputs, target_labels, _, _, _ in novel_loader:
                 inputs = inputs.to(device)
                 target_labels = target_labels.to(device)
-                
                 outputs = model(inputs, None)
-                #print(outputs['my_decision'].shape)
+
                 novel_preds.append(outputs['my_decision'].argmax(dim=1))
                 novel_targets.append(target_labels)
+                if 'sim_loss' in outputs.keys():
+                    novel_sim_r_losses.append(outputs['sim_loss']["r"].item())
+                    novel_sim_i_losses.append(outputs['sim_loss']["i"].item())
 
-                #print(novel_preds[:10], novel_targets[:10])
-            
             if novel_preds:
                 novel_preds = torch.cat(novel_preds)
                 novel_targets = torch.cat(novel_targets)
@@ -87,26 +90,55 @@ def evaluate_model_stage(model, test_loader, novel_loader, novel_task_loader, cr
             for inputs, target_labels, _, _, _ in novel_task_loader:
                 inputs = inputs.to(device)
                 target_labels = target_labels.to(device)
-                
                 outputs = model(inputs, None)
+
                 novel_task_preds.append(outputs['my_decision'].argmax(dim=1))
                 novel_task_targets.append(target_labels)
-            
+                if 'sim_loss' in outputs.keys():
+                    novel_task_sim_r_losses.append(outputs['sim_loss']["r"].item())
+                    novel_task_sim_i_losses.append(outputs['sim_loss']["i"].item())
+
             if novel_task_preds:
                 novel_task_preds = torch.cat(novel_task_preds)
                 novel_task_targets = torch.cat(novel_task_targets)
                 novel_task_accuracy = (novel_task_preds == novel_task_targets).float().mean().item()
-    
+
     test_loss = sum(test_losses) / len(test_losses)
-    sim_r_loss = sum(sim_r_losses) / len(sim_r_losses)
-    sim_i_loss = sum(sim_i_losses) / len(sim_i_losses)
+
     all_preds = torch.cat(all_preds)
     all_targets = torch.cat(all_targets)
     accuracy = (all_preds == all_targets).float().mean().item()
-    
+
     model.train()
+    return_dict = {
+        'accuracy': accuracy,
+        'novel_accuracy': novel_accuracy,
+        'novel_task_accuracy': novel_task_accuracy,
+        'loss': test_loss,
+        'stage': stage_name,
+    }
+    if len(sim_r_losses):
+        sim_r_loss = sum(sim_r_losses) / len(sim_r_losses)
+        sim_i_loss = sum(sim_i_losses) / len(sim_i_losses)
+        novel_sim_r_loss = sum(novel_sim_r_losses) / len(novel_sim_r_losses) if novel_sim_r_losses else 0.0
+        novel_sim_i_loss = sum(novel_sim_i_losses) / len(novel_sim_i_losses) if novel_sim_i_losses else 0.0
+        novel_task_sim_r_loss = sum(novel_task_sim_r_losses) / len(novel_task_sim_r_losses) if novel_task_sim_r_losses else 0.0
+        novel_task_sim_i_loss = sum(novel_task_sim_i_losses) / len(novel_task_sim_i_losses) if novel_task_sim_i_losses else 0.0
+
+        return_dict.update({
+
+            'sim_r_loss': sim_r_loss,
+            'sim_i_loss': sim_i_loss,
+            'novel_sim_r_loss': novel_sim_r_loss,
+            'novel_sim_i_loss': novel_sim_i_loss,
+            'novel_task_sim_r_loss': novel_task_sim_r_loss,
+            'novel_task_sim_i_loss': novel_task_sim_i_loss}
+        )
     print(time.time() - prev_time)
-    return {'accuracy': accuracy, 'novel_accuracy': novel_accuracy, 'novel_task_accuracy': novel_task_accuracy, 'loss': test_loss, 'stage': stage_name, 'sim_r_loss': sim_r_loss, 'sim_i_loss': sim_i_loss}
+    return return_dict
+
+    
+
 
 class SigmoidTempScheduler:
     def __init__(self, model, start_temp=1.0, end_temp=100.0, total_steps=10000, vision_prob_start=0.9, vision_prob_end=1, rate=4.0):
@@ -169,10 +201,10 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
     print('got curriculum name:', curriculum_name)
     curriculum_config = CurriculumConfig(curriculum_name)
 
-    torch.manual_seed(42+repetition)
-    torch.cuda.manual_seed(42+repetition)
-    torch.cuda.manual_seed_all(42+repetition)
-    np.random.seed(42+repetition)
+    torch.manual_seed(42+repetition+5)
+    torch.cuda.manual_seed(42+repetition+5)
+    torch.cuda.manual_seed_all(42+repetition+5)
+    np.random.seed(42+repetition+5)
 
     model_kwargs['output_len'] = 5
     model_kwargs['channels'] = 5
@@ -246,10 +278,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
 
     for stage_config in curriculum_config.curriculum_stages:
         if 'trans' in model.kwargs['module_configs']['arch']:
-            optimizer = torch.optim.AdamW(model.parameters(), lr=3e-5, betas=(0.95, 0.999))
-            # if not softmaxing output do 5e-5
-            scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.95)
-            print('transformer')
+            optimizer = torch.optim.AdamW(model.parameters(), lr=2e-5, betas=(0.95, 0.999), weight_decay=0.02)
         else:
             optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4, betas=(0.9, 0.999))
             scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.95)
@@ -402,8 +431,12 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
                 'Accuracy': baseline_results['accuracy'],
                 'Novel_Accuracy': baseline_results['novel_accuracy'],
                 'Novel_Task_Accuracy': baseline_results['novel_task_accuracy'],
-                'sim_r_loss': baseline_results['sim_r_loss'],
-                'sim_i_loss': baseline_results['sim_i_loss'],
+                'sim_r_loss': baseline_results['sim_r_loss'] if 'sim_r_loss' in baseline_results.keys() else 0,
+                'sim_i_loss': baseline_results['sim_i_loss'] if 'sim_r_loss' in baseline_results.keys() else 0,
+                'novel_sim_r_loss': baseline_results['novel_sim_r_loss'] if 'sim_r_loss' in baseline_results.keys() else 0,
+                'novel_sim_i_loss': baseline_results['novel_sim_i_loss'] if 'sim_r_loss' in baseline_results.keys() else 0,
+                'novel_task_sim_r_loss': baseline_results['novel_task_sim_r_loss'] if 'sim_r_loss' in baseline_results.keys() else 0,
+                'novel_task_sim_i_loss': baseline_results['novel_task_sim_i_loss'] if 'sim_r_loss' in baseline_results.keys() else 0,
             }
             new_row = pd.DataFrame([new_row_data])
             epoch_losses_df = pd.concat([epoch_losses_df, new_row], ignore_index=True)
@@ -435,6 +468,11 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
 
         first_batch_processed = False
         module_ranges = {}
+
+        if 'trans' in model.kwargs['module_configs']['arch']:
+            scheduler = torch.optim.lr_scheduler.OneCycleLR( optimizer, max_lr=1e-5, total_steps=batches, anneal_strategy='cos' )
+        else:
+            scheduler = torch.optim.lr_scheduler.OneCycleLR( optimizer, max_lr=5e-5, total_steps=batches, anneal_strategy='cos' )
 
         for batch in range(batches):
             real_batch += 1
@@ -704,12 +742,12 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
             total_loss = my_decision_loss + oracle_loss if model.use_oracle else my_decision_loss #+ 0.5*loss_unseen_stability + 0.01*loss_seen_ce + 0.01*loss_delta + 0.01*loss_persist
 
             #print(outputs["sim_loss"])
-            if "r" in model.sim_style and not model.use_gt_sim:
+            if "r" in model.sim_style and not model.use_gt_sim and not model.skip_sim_loss:
                 sim_r_loss = outputs["sim_loss"]["r"]
                 total_loss += sim_r_loss
             else:
                 sim_r_loss = 0.0
-            if "i" in model.sim_style and not model.use_gt_sim:
+            if "i" in model.sim_style and not model.use_gt_sim and not model.skip_sim_loss:
                 sim_i_loss = outputs["sim_loss"]["i"]
                 total_loss += sim_i_loss
             else:
@@ -725,11 +763,11 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
             total_loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
             optimizer.step()
+            scheduler.step()
 
             if (batch+1) % epoch_length == 0:
                 if batch > 1:
                     t.update(epoch_length)
-                    scheduler.step()
 
             if record_loss and (((real_batch) % (2*epoch_length_val) == 0) or (real_batch == total_batches - 1)):
 
@@ -742,8 +780,12 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
                     'Accuracy': stage_results['accuracy'],
                     'Novel_Accuracy': stage_results['novel_accuracy'],
                     'Novel_Task_Accuracy': stage_results['novel_task_accuracy'],
-                    "sim_r_loss": stage_results['sim_r_loss'],
-                    "sim_i_loss": stage_results['sim_i_loss'],
+                    "sim_r_loss": stage_results['sim_r_loss'] if 'sim_r_loss' in stage_results.keys() else 0,
+                    "sim_i_loss": stage_results['sim_i_loss'] if 'sim_r_loss' in stage_results.keys() else 0,
+                    'novel_sim_r_loss': stage_results['novel_sim_r_loss'] if 'sim_r_loss' in stage_results.keys() else 0,
+                    'novel_sim_i_loss': stage_results['novel_sim_i_loss'] if 'sim_r_loss' in stage_results.keys() else 0,
+                    'novel_task_sim_r_loss': stage_results['novel_task_sim_r_loss'] if 'sim_r_loss' in stage_results.keys() else 0,
+                    'novel_task_sim_i_loss': stage_results['novel_task_sim_i_loss'] if 'sim_r_loss' in stage_results.keys() else 0,
 
                 }
                 for k, v in oracle_losses.items():
@@ -767,8 +809,8 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
                     f"NTacc: {stage_results['novel_task_accuracy']:.3f}, "
                     f"L: {stage_results['loss']:.3f}, "
                     f"O: {oloss_line}, "
-                    f"SR: {sim_r_loss:.3f}, "
-                    f"SI: {sim_i_loss:.3f}, "
+                    f"SR: {stage_results['sim_r_loss'] if 'sim_r_loss' in stage_results.keys() else 0:.3f} {stage_results['novel_sim_r_loss'] if 'sim_r_loss' in stage_results.keys() else 0:.3f}, "
+                    f"SI: {stage_results['sim_i_loss'] if 'sim_r_loss' in stage_results.keys() else 0:.3f} {stage_results['novel_sim_i_loss'] if 'sim_r_loss' in stage_results.keys() else 0:.3f}, "
                     #f"Persist: {loss_persist:.3f} delta: {loss_delta:.3f} ce: {loss_seen_ce:.3f} "
                     #f"LW: {loss_wrong_agreement:.3f} MI: {loss_misinformed:.3f}"
                     #f"LU: {loss_unseen_stability:.3f}"

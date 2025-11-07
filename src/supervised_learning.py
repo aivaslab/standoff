@@ -6,6 +6,7 @@ import h5py
 import sys
 import os
 
+
 import pandas as pd
 
 from .utils.conversion import calculate_informedness
@@ -303,6 +304,18 @@ class BaseDatasetBig(Dataset):
         self.metrics = metrics
         self.included_indices = included_indices
 
+        self.labels_list = []
+        for arr in labels_list:
+            if arr.ndim > 1:
+                arr = np.argmax(arr, axis=-1).astype(np.int64)
+            else:
+                arr = arr.astype(np.int64)
+            self.labels_list.append(arr)
+
+        for i in range(len(data_list)):
+            if isinstance(data_list[i][0], (bytes, bytearray)):
+                data_list[i] = [pickle.loads(x) for x in data_list[i]]
+
         self.cumulative_sizes = self._cumulative_sizes()
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -329,7 +342,7 @@ def custom_collate(batch):
     data, labels, params, oracles, metrics, act_labels_batch = zip(*batch)
 
     data = default_collate(data)
-    labels = default_collate(labels)
+    labels = default_collate(labels).long()
     oracles = default_collate(oracles)
     params = default_collate(params)
     if metrics and isinstance(metrics[0], dict):
@@ -347,8 +360,8 @@ class TrainDatasetBig(BaseDatasetBig):
     def __getitem__(self, idx):
         index = self.included_indices[idx]
         list_index, local_index = self._find_list_index(index)
-        data = torch.from_numpy(pickle.loads(self.data_list[list_index][local_index])).float()
-        labels = torch.from_numpy(self.labels_list[list_index][local_index].astype(np.int8))
+        data = torch.from_numpy(self.data_list[list_index][local_index]).float()
+        labels = torch.as_tensor(self.labels_list[list_index][local_index], dtype=torch.long)
         oracles = torch.from_numpy(self.oracles_list[list_index][local_index].astype(np.float32)) if len(
             self.oracles_list) > 1 else torch.tensor([])
 

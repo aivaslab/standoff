@@ -136,6 +136,8 @@ def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, sk
     if last_timestep:
         exp_name += "-L"
 
+    print(repetitions)
+
     session_params = {
         'repetitions': repetitions,
         'epochs': epochs,
@@ -240,7 +242,7 @@ def run_single_experiment(args_tuple):
 
 
     experiments([args.exp_num],
-                repetitions=5,
+                repetitions=8,
                 batches=10000,
                 skip_train=not args.t,
                 skip_eval=not args.e,
@@ -309,14 +311,39 @@ if __name__ == '__main__':
         #'a-simv2-split-transformer32-pad-',
         #'a-simv2-split-transformer32-pad-r',
         #'a-simv2-split-transformer32-pad-i',
-        #'a-simv2-single-transformer32-pad-',
-        'a-simv2-single-transformer32-pad-r',
+
+        #'a-simv2-single-transformer32-pad-rp-gts',
+        'a-simv2-single-transformer32-pad-r-gts',
+        'a-simv2-single-transformer32-pad',
+        #'a-simv2-single-transformer32-pad-r',
         'a-simv2-single-transformer32-pad-i',
         'a-simv2-single-transformer32-pad-ri',
+        'a-simv2-single-transformer32-pad-r-nsl',
+        'a-simv2-single-transformer32-pad-r-gts',
+        'a-simv2-single-transformer32-pad-i-gts',
+        'a-simv2-single-transformer32-pad-ri-gts',
+
         #'a-simv2-shared-transformer32-pad-',
-        'a-simv2-shared-transformer32-pad-r',
-        'a-simv2-shared-transformer32-pad-i',
-        'a-simv2-shared-transformer32-pad-ri',
+        #'a-simv2-shared-transformer32-pad-r',
+        #'a-simv2-shared-transformer32-pad-i',
+        #'a-simv2-shared-transformer32-pad-ri',
+        ]
+
+    model_types = [
+        "a-hardcoded",
+        "a-mix-n-perception-my", 
+        "a-mix-n-perception-op",
+        'a-mix-n-treat-my',
+        'a-mix-n-treat-op',
+        'a-mix-n-belief-my',
+        'a-mix-n-belief-op',
+        'a-mix-n-decision-my',
+        'a-mix-n-decision-op',
+        'a-mix-n-all-my',
+        'a-mix-n-all-op',
+        'a-mix-n-treat-op-transformer',
+        'a-mix-n-belief-op-transformer',
+        'a-mix-n-decision-op-transformer'
         ]
 
     labels = [('correct-loc', 'loc')]
@@ -336,7 +363,7 @@ if __name__ == '__main__':
     late_frozen_curriculum_names = ["else_then_" + name + "_s21" for name in base_names]
 
     #curriculum_names = ['end2end_s2', 'end2end_s21', 'end2end_s3']
-    curriculum_names = ['end2end_s21'] 
+    curriculum_names = [ 'end2end_s3', 'end2end_s2'] 
 
     #curriculum_names = ['belief_both_s21']
 
@@ -354,7 +381,7 @@ if __name__ == '__main__':
     else:
         print('running single')
         experiments([args.exp_num] if not args.g else [0],
-                repetitions=3,
+                repetitions=8,
                 batches=2500,
                 skip_train=not args.t,
                 skip_eval=not args.e,

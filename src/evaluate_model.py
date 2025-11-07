@@ -314,6 +314,8 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_load_
     print('kwargs', model_kwargs)
     #exit()
 
+    bad_params = {}
+
     # i have commented out oracle related things
     # this includes oracle_is_target check
     for idx, _val_loader in enumerate(test_loaders):
@@ -327,9 +329,9 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_load_
                 #inputs, labels, oracles = inputs.to(device), labels.to(device), oracles.to(device)
                 #print(labels.shape)
                 #print(labels[0])
-                labels = labels[:,-5:]
+                _labels = labels[:,-5:]
 
-                max_labels = torch.argmax(labels, dim=1)
+                max_labels = torch.argmax(labels[:,-5:], dim=1)
                 outputs = model(inputs, None)
                 #print(inputs.shape, str(model))
 
@@ -357,6 +359,34 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_load_
                 print(predicted, max_labels)
 
                 corrects = predicted.eq(max_labels)
+
+                wrong = ~corrects
+                if wrong.any():
+                    wrong_idx = torch.where(wrong)[0]
+                    for k in wrong_idx.tolist():
+                        param = params[k]
+                        byte_list = param.tolist()
+
+                        print('metrics bloc l,s', metrics['b-loc-large'][k], metrics['b-loc-small'][k])
+
+                        byte_list = [b for b in byte_list if b != 0]
+
+                        params_str = ''.join([chr(c) for c in byte_list])
+
+                        decoded = decode_event_name(param)   # use your existing decoder
+                        print(decoded)
+                        if params_str in bad_params.keys():
+                            bad_params[params_str] += 1
+                        else:
+                            bad_params[params_str] = 1
+
+                        if params_str == "b0w2v1s-4":
+                            print(predicted[k], max_labels[k])
+                            _ = model(inputs, k)
+
+                        print(labels)
+                        exit()
+
                 total = corrects.numel()
                 num_correct = corrects.sum().item()
                 pred = predicted.cpu()
@@ -407,11 +437,17 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_load_
 
     print('correct', overall_correct, overall_total)
 
+    print(bad_params)
+
     try:
         model.end2end_model.save_transition_table(os.path.join(model_load_path, f'transitions-{repetition}.csv'))
+        visualize_transition_network(os.path.join(model_load_path, f'transitions-{repetition}.csv'), os.path.join(model_load_path, f'transition_network-{repetition}.png'))
     except:
-        model.belief_op.save_transition_table(os.path.join(model_load_path, f'transitions-{repetition}.csv'))
-    visualize_transition_network(os.path.join(model_load_path, f'transitions-{repetition}.csv'), os.path.join(model_load_path, f'transition_network-{repetition}.png'))
+        try:
+            model.belief_op.save_transition_table(os.path.join(model_load_path, f'transitions-{repetition}.csv'))
+            visualize_transition_network(os.path.join(model_load_path, f'transitions-{repetition}.csv'), os.path.join(model_load_path, f'transition_network-{repetition}.png'))
+        except:
+            print('no transition table')
 
 
     fig = plot_accuracy_vs_vision(accuracy_results1, vision_probs, uncertainties)
@@ -505,7 +541,7 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_load_
         epoch_number = 'prior'
 
 
-    df.to_csv(os.path.join(model_load_path, f'param_losses_{epoch_number}_{repetition}.csv'), index=False, compression='gzip')
+    df.to_csv(os.path.join(model_load_path, f'param_losses_{epoch_number}_{repetition}.csv'), index=False)
     print('compressed write time (gzip):', time.time() - curtime)
 
     df_paths.append(os.path.join(model_load_path, f'param_losses_{epoch_number}_{repetition}.csv'))

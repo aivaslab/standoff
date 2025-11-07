@@ -196,7 +196,8 @@ def load_model(model_type, model_kwargs, device, multi=False):
         return MultiAgentArchitecture(config, random_probs, model_kwargs['batch_size']).to(device)
     if "simv2" in model_type:
         return SimulationEndToEnd(config, random_probs, model_kwargs['batch_size']).to(device)
-    return End2EndArchitecture(config, random_probs, model_kwargs['batch_size']).to(device)
+    return AblationArchitecture(config, random_probs, model_kwargs['batch_size']).to(device)
+    #return End2EndArchitecture(config, random_probs, model_kwargs['batch_size']).to(device)
 
 
 def load_last_model(model_save_path, repetition):
@@ -277,6 +278,7 @@ def load_model_data_eval_retrain(test_sets, load_path, target_label, last_timest
 
     test_loaders = []
     data, labels, params, oracles, act_labels = [], [], [], [], []
+    print(last_timestep, "last timestep")
     for val_set_name in test_sets:
         regime_name = val_set_name[3:]
         dir = os.path.join(load_path, val_set_name)
@@ -301,6 +303,7 @@ def load_model_data_eval_retrain(test_sets, load_path, target_label, last_timest
                 labels.append(labels_raw[..., -1, :])  # use only the last timestep (was last dimension but I changed it)...
             else:
                 #print(labels_raw.shape)
+                print(target_label)
                 labels.append(labels_raw[...,:-1].reshape(-1, 25))
         else:
             #print(labels_raw.shape)
@@ -697,6 +700,7 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
         os.makedirs(retrain_path, exist_ok=True)
 
     good_for_early_stop = 0
+    print('repetitions', repetitions)
     for repetition in range(repetitions):
         if not skip_train:
             loss_file_path = os.path.join(save_path, f'losses-{repetition}.csv')
@@ -718,7 +722,7 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
                     good_for_early_stop += 1
 
         loss_paths.append(os.path.join(save_path, f'losses-{repetition}.csv'))
-        if good_for_early_stop > 4:
+        if good_for_early_stop > 4 and False:
             break
         if do_retrain_model:
             epoch = epochs - 1

@@ -570,17 +570,27 @@ class para_MultiGridEnv(ParallelEnv):
 
         if self.observation_style == 'rich':
             self.rich_observation_layers = [
-                lambda k, mapping: (((mapping[k].type == 'Agent') + mapping[k].valence) if hasattr(mapping[k], 'valence') else False),
+                lambda k, mapping: int(mapping[k] is not None and getattr(mapping[k], "type", None) == "Agent"),
                 lambda k, mapping: (mapping[k].type == 'Box' * mapping[k].state if hasattr(mapping[k], 'type') else False) if self.use_box_colors
-                else (mapping[k].type == 'Box' if hasattr(mapping[k], 'type') else False),
+                else mapping[k].type == "Box" if hasattr(mapping[k], 'type') else 0 #now this is overwritten in gen agent obs
             ]
             if self.use_separate_reward_layers:
                 # big and small refer to the numbers shown here, which are always what the opponent sees
                 # if sub_valence is not 1, the observation changes, but not the object reward states
                 # so sub_observed_reward shows the post-valence change reward
                 self.rich_observation_layers.extend([
-                    lambda k, mapping: (mapping[k].get_sub_obs_reward() == 100 if hasattr(mapping[k], 'get_sub_obs_reward') and mapping[k].contains is None else 0),
-                    lambda k, mapping: (mapping[k].get_sub_obs_reward() == 33 if hasattr(mapping[k], 'get_sub_obs_reward') and mapping[k].contains is None else 0),
+                    lambda k, mapping: int(
+                        hasattr(mapping[k], "get_sub_obs_reward")
+                        and (not hasattr(mapping[k], "contains") or mapping[k].contains is None)
+                        and not getattr(mapping[k], "hide", False)
+                        and mapping[k].get_sub_obs_reward() == 100
+                    ),
+                    lambda k, mapping: int(
+                        hasattr(mapping[k], "get_sub_obs_reward")
+                        and (not hasattr(mapping[k], "contains") or mapping[k].contains is None)
+                        and not getattr(mapping[k], "hide", False)
+                        and mapping[k].get_sub_obs_reward() == 33
+                    ),
                 ])
             else:
                 self.rich_observation_layers.extend([
@@ -901,7 +911,9 @@ class para_MultiGridEnv(ParallelEnv):
             pos = obj.pos
             obj.hide = True
             box = self.grid.get(pos[0], pos[1])  
+            # removed 11/25
             box.hide = True
+
             #self.put_obj(obj, pos[0], pos[1], update_vis=False)
             #obj.hide = True
             '''if self.use_box_colors:
@@ -1199,7 +1211,7 @@ class para_MultiGridEnv(ParallelEnv):
                 agent_belief_loc = -1
                 target_reward = self.bigReward if treat_type == 'big' else self.smallReward
                 for box in range(self.boxes):
-                    if abs(self.last_seen_reward[agent + str(box)] - target_reward) < 16:
+                    if abs(self.last_seen_reward[agent + str(box)] - target_reward) < 6:
                         agent_belief_loc = box
                         break
                 
@@ -1209,7 +1221,7 @@ class para_MultiGridEnv(ParallelEnv):
                 if self.can_see[agent + str(current_loc)]:
                     self.treat_was_wrong[agent][treat_type] = False
 
-        if self.record_oracle_labels and ((self.step_count <= self.end_at_frame or self.end_at_frame == -1) or self.has_released):
+        if True: #self.record_oracle_labels and ((self.step_count <= self.end_at_frame or self.end_at_frame == -1) or self.has_released):
             tolerance = 6
             y = self.height // 2
             target_agent = "p_1"
@@ -1236,7 +1248,7 @@ class para_MultiGridEnv(ParallelEnv):
 
                     agent_belief_loc = -1
                     for box in range(self.boxes):
-                        if abs(self.last_seen_reward['i' + str(box)] - target_reward) < 33:
+                        if abs(self.last_seen_reward['i' + str(box)] - target_reward) < 6:
                             agent_belief_loc = box
                             break
 
@@ -1539,6 +1551,12 @@ class para_MultiGridEnv(ParallelEnv):
                 else:
                     #obs[i, :, :] = np.multiply(np.vectorize(layer)(view_grid.grid, mapping), vis_mask)
                     obs[i, :, :] = np.vectorize(layer)(view_grid.grid, mapping)
+
+            for i, updated in enumerate(self.box_updated_this_timestep):
+                if updated:
+                    obs[1, self.height - i - 3, self.height // 2 - 1] = 0
+                else:
+                    obs[1, self.height - i - 3, self.height // 2 - 1] = 1
 
             # remove this to speed up training, though it's useful for debugging
             '''

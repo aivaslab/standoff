@@ -6,6 +6,7 @@ from src.pz_envs import env_from_config
 from src.pz_envs.scenario_configs import ScenarioConfigs
 from PIL import Image, ImageDraw
 from collections import defaultdict
+import time
 
 class HumanPlayer:
     def __init__(self):
@@ -99,6 +100,9 @@ human.start_episode()
 
 for group_idx, (group_name, events_in_group) in enumerate(sorted(event_groups.items())):
     print(f"Processing group {group_idx + 1}/{len(event_groups)}: {group_name} with {len(events_in_group)} events")
+    if group_name != "b0w2v1s":
+        continue
+
     
     group_by_text = {}
     group_metadata = []
@@ -113,6 +117,8 @@ for group_idx, (group_name, events_in_group) in enumerate(sorted(event_groups.it
     
     for event_name, stage_name in sorted(events_in_group):
         print(f"  Processing event: {event_name}")
+        if event_name != "b0w2v1s-4":
+            continue
         
         stage_with_event = None
         for s_name, stage_data in conf.stages.items():
@@ -125,6 +131,9 @@ for group_idx, (group_name, events_in_group) in enumerate(sorted(event_groups.it
         
         events = {event_name: conf.stages[stage_with_event]['events'][event_name]}
         params = configs[conf.stages[stage_with_event]['params']]
+
+        print(params)
+        params['num_puppets'] = 1
         reset_configs = params.copy()
         
         if isinstance(reset_configs["num_agents"], list):
@@ -168,11 +177,14 @@ for group_idx, (group_name, events_in_group) in enumerate(sorted(event_groups.it
                     'delay_count': len(delay_variations)
                 }
             }
+
+
         
         for delay_idx, delay_pattern in enumerate(delay_variations):
             env.reset(override_params=0)
             env.current_param_group_pos = delay_idx
             env.deterministic_seed = env.current_param_group_pos
+            env.render_mode = "human"
 
             obs = env.reset()
             
@@ -183,9 +195,16 @@ for group_idx, (group_name, events_in_group) in enumerate(sorted(event_groups.it
                 img = Image.fromarray(obs['p_0'], 'RGB')
                 if step_count > 0:
                     timestep_images.append(img.copy())
+
+                env.render()
                 
+                human.player_window.imshow(obs['p_0'])
+                #act = human.action_step(obs['p_0'])
+                time.sleep(1)
                 agent_actions = {'p_0': 2}
                 next_obs, rew, done, info = env.step(agent_actions)
+                print(info['p_0']['target-loc'], env.big_food_locations, env.small_food_locations, info['p_0']['correct-loc'],)
+
                 
                 human.save_step(obs['p_0'], 2, rew['p_0'], done)
                 obs = next_obs

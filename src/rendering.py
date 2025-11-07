@@ -85,17 +85,15 @@ class InteractivePlayerWindow(SimpleImageViewer):
     def get_action(self, obs):
         if self.window is None:
             self.imshow(obs)
-
             @self.window.event
             def on_key_press(symbol, modifiers):
                 self.key = symbol
 
-            return self.get_action(obs)
-    
         self.imshow(obs)
+        print('a')
+        self.window.activate()   # <— fix lag / key unresponsiveness
         self.key = None
         while self.key not in self.action_map:
             self.window.dispatch_events()
             pyglet.clock.tick()
-
         return self.action_map[self.key]

@@ -32,6 +32,10 @@ BASE_CONFIG = {
     'full': False,
     'full_infer_decisions': False,
     'sim_type': "r",
+    'use_sim_loss': True,
+    'use_gt_sim': False,
+    'use_behavior_loss': False,
+    'use_self_belief_loss': False,
 }
 
 BASE_RANDOM = {k: BASE_CONFIG[k] for k in BASE_CONFIG if k not in ['shared_belief', 'shared_decision']}
@@ -112,10 +116,13 @@ BASE_NEURAL_CONFIGS['a-neural-treat-shared']['detach'] = False
 
 for x in ['mlp', 'transformer32', 'transformer128']:
     for y in ['', '-pad']:
-        for sim_type in ["", "r", "i", "ri"]:
-            BASE_NEURAL_CONFIGS[f'a-simv2-single-{x}{y}-{sim_type}'] = {'arch': x, 'pad': y != '', "sim_type": sim_type, "output_type": 'op_decision'}
-            BASE_NEURAL_CONFIGS[f'a-simv2-split-{x}{y}-{sim_type}'] = {'arch': x, 'pad': y != '', "sim_type": sim_type, "output_type": 'op_decision', "split": True}
-            BASE_NEURAL_CONFIGS[f'a-simv2-shared-{x}{y}-{sim_type}'] = {'arch': x, 'pad': y != '', "sim_type": sim_type, "output_type": 'op_decision', "shared": True}
+        for sim_type in ["", "-r", "-i", "-ri", "-rp"]:
+            for sim_loss in ["", "-nsl"]:
+                for gt_sim in ["", "-gts"]:
+                    for decision_loss in ["", "-dl"]:
+                        BASE_NEURAL_CONFIGS[f'a-simv2-single-{x}{y}{sim_type}{sim_loss}{gt_sim}{decision_loss}'] = {'arch': x, 'pad': y != '', "sim_type": sim_type, "output_type": 'op_decision', 'use_sim_loss': sim_loss=="", 'use_gt_sim': gt_sim != '', 'use_behavior_loss': decision_loss != ''}
+                        BASE_NEURAL_CONFIGS[f'a-simv2-split-{x}{y}{sim_type}{sim_loss}{gt_sim}{decision_loss}'] = {'arch': x, 'pad': y != '', "sim_type": sim_type, "output_type": 'op_decision', "split": True, 'use_sim_loss': sim_loss=="", 'use_gt_sim': gt_sim != '', 'use_behavior_loss': decision_loss != ''}
+                        BASE_NEURAL_CONFIGS[f'a-simv2-shared-{x}{y}{sim_type}{sim_loss}{gt_sim}{decision_loss}'] = {'arch': x, 'pad': y != '', "sim_type": sim_type, "output_type": 'op_decision', "shared": True, 'use_sim_loss': sim_loss=="", 'use_gt_sim': gt_sim != '', 'use_behavior_loss': decision_loss != ''}
 
 
         BASE_NEURAL_CONFIGS[f'a-opbelief-{x}{y}'] = {'end2end': True, 'opponent_perception': False, 'output_type': 'op_belief', 'arch': x, 'pad': y != ''}
