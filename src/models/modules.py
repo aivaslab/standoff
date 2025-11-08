@@ -11,7 +11,7 @@ import pandas as pd
 
 
 class EndToEndModel(nn.Module):
-    def __init__(self, arch='mlp', output_type='my_decision', pad='', in_channels=5):
+    def __init__(self, arch='mlp', output_type='my_decision', pad='', in_channels=3):
         super().__init__()
         self.arch = arch
         self.output_type = output_type
@@ -378,7 +378,7 @@ class TreatPerceptionNetwork(nn.Module):
     def __init__(self):
         super().__init__()
         self.treat_detector = nn.Sequential(
-            nn.Linear(5 * 5, 5 * 6),
+            nn.Linear(5 * 5, 2 * 5 * 6),
             #nn.ReLU()
         )
 
@@ -386,13 +386,8 @@ class TreatPerceptionNetwork(nn.Module):
         batch_size = x.shape[0]
         num_timesteps = x.shape[1]
 
-        treat1_input = x[:, :, 2, 1:6, 3].reshape(batch_size, 5 * 5)
-        treat1 = self.treat_detector(treat1_input).view(batch_size, 5, 6)
-
-        treat2_input = x[:, :, 3, 1:6, 3].reshape(batch_size, 5 * 5)
-        treat2 = self.treat_detector(treat2_input).view(batch_size, 5, 6)
-        
-        treats = torch.stack([treat1, treat2], dim=2)
+        treat_input = x[:, :, 1, 1:6, 3].reshape(batch_size, 5 * 5)
+        treat = self.treat_detector(treat1_input).view(batch_size, 5, 2, 6)
         treats = F.softmax(treats, dim=-1)
 
         return treats
@@ -407,13 +402,32 @@ class TreatPerceptionModule(BaseModule):
             return SmallTransformer(245 * 5, 5 * 2 * 6, d_model=32)
         return TreatPerceptionNetwork()
 
-    def _hardcoded_forward(self, perceptual_field: torch.Tensor) -> torch.Tensor:
+    def _hardcoded_forward_2x(self, perceptual_field: torch.Tensor) -> torch.Tensor:
         # channel 2 is treat1, channel 3 is treat2, at x=3 and y=1-6
         logits = self.sigmoid_temp * (perceptual_field[:, :, 2:4, 1:6, 3] - 0.5)
         logits = torch.flip(logits, dims=[3])
         logit_sums = logits.exp().sum(dim=3, keepdim=True)
         no_treats_logits = self.sigmoid_temp * (0.1 - logit_sums)
         combined_logits = torch.cat([logits, no_treats_logits], dim=3)
+        treats = F.softmax(combined_logits, dim=3)
+        return treats
+
+    def _hardcoded_forward(self, perceptual_field: torch.Tensor) -> torch.Tensor:
+        x = perceptual_field[:, :, 1, 1:6, 3]          # [B, T, 5]
+
+        # Soft gates centred on class thresholds
+        # Adjust steepness with sigmoid_temp
+        large_mask = torch.sigmoid(self.sigmoid_temp * (x - 1.5))            # high when x≈2
+        small_mask = torch.sigmoid(self.sigmoid_temp * (1.5 - x)) * torch.sigmoid(self.sigmoid_temp * (x - 0.5))
+        none_mask  = torch.sigmoid(self.sigmoid_temp * (0.5 - x))            # high when x≈0
+
+        # Stack to emulate 2 treat channels
+        logits = self.sigmoid_temp * (torch.stack([large_mask, small_mask], dim=2) - 0.5)
+        logits = torch.flip(logits, dims=[3])                               # preserve old spatial order
+
+        logit_sums = logits.exp().sum(dim=3, keepdim=True)
+        no_treat_logits = self.sigmoid_temp * (none_mask.unsqueeze(2) - logit_sums)
+        combined_logits = torch.cat([logits, no_treat_logits], dim=3)
         treats = F.softmax(combined_logits, dim=3)
         return treats
 
@@ -449,7 +463,7 @@ class VisionPerceptionNetwork(nn.Module):
 
     def forward(self, x, is_p1=0):
         batch_size, timesteps = x.shape[:2]
-        x = x[:, :, 4, 3, 2+3*is_p1]  # Get vision spot
+        x = x[:, :, 2, 3, 2+3*is_p1]  # Get vision spot
         x = x.reshape(batch_size, 5)  
         x = torch.sigmoid_(self.vision_detector(x))
         return x.view(batch_size, timesteps)
@@ -463,7 +477,7 @@ class VisionPerceptionModule(BaseModule):
 
     def _hardcoded_forward(self, perceptual_field: torch.Tensor, is_p1=0) -> torch.Tensor:
         # channel 4 position (3,2) indicates vision
-        return torch.sigmoid_(self.sigmoid_temp * (torch.abs(perceptual_field[:, :, 4, 3, 2+3*is_p1] - 1.0) - 0.5))
+        return torch.sigmoid_(self.sigmoid_temp * (torch.abs(perceptual_field[:, :, 2, 3, 2+3*is_p1] - 1.0) - 0.5))
 
     def _random_forward(self, perceptual_field: torch.Tensor, is_p1) -> torch.Tensor:
         batch_size = perceptual_field.shape[0]
@@ -1014,18 +1028,13 @@ class AblationArchitecture(nn.Module):
 
         printing = additional_input
 
-        if printing:
-            print('print')
-
-
         opponent_vision = self.vision_perception_op(perceptual_field, is_p1=0)
         opponent_presence = self.presence_perception_op(perceptual_field, is_p1=0)
 
-        print(opponent_vision.shape)
 
         treats_op = self.treat_perception_op(perceptual_field)
+        print(treats_op.shape)
         if len(treats_op.shape) == 2:
-            print('egg')
             treats_op = treats_op.reshape([-1, 5, 2, 6])
         treats_l_op, treats_s_op = treats_op[:, :, 0:2].unbind(2)
         
@@ -1358,25 +1367,26 @@ class SimulationEndToEnd(nn.Module):
 
         print('padddd', self.pad, 'sim_loss skip', self.skip_sim_loss)
 
-        in_channels = 5
+        in_channels = 3
         if self.mode == "single":
-            in_channels += 5
+            in_channels += 3
         if self.sim_style in ("ri", "rp"):
-            in_channels += 5
+            in_channels += 3
 
         self.in_channels = in_channels
 
-        self.end2end_self = EndToEndModel(arch=self.arch, output_type=self.output_type, pad=self.pad, in_channels=in_channels if self.mode == "single" else 5 if self.sim_style not in ("ri", "rp") else 10)
+        self.end2end_self = EndToEndModel(arch=self.arch, output_type=self.output_type, pad=self.pad, in_channels=in_channels if self.mode == "single" else 3 if self.sim_style not in ("ri", "rp") else 6)
         if self.mode == "shared":
             self.end2end_op = self.end2end_self
         elif self.mode == "split":
-            self.end2end_op = EndToEndModel(arch=self.arch, output_type=self.output_type, pad=self.pad, in_channels=5 if self.sim_style not in ("ri", "rp") else 10)
+            self.end2end_op = EndToEndModel(arch=self.arch, output_type=self.output_type, pad=self.pad, in_channels=3 if self.sim_style not in ("ri", "rp") else 10)
         elif self.mode == "single":
             self.end2end_op = None
 
         self.simulator = OpponentRawSimulator(d_model=d_model, style=self.sim_style)
 
         sig = module_configs.get("sigmoid_temp", 50.0)
+        print('sigmoid temp', sig)
         ax = module_configs.get("archx", "mlp")
         self.treat_op = TreatPerceptionModule(use_neural=False, random_prob=0.0, sigmoid_temp=sig, archx=ax)
         self.vision_op = VisionPerceptionModule(use_neural=False, random_prob=0.0, sigmoid_temp=sig)
@@ -1405,10 +1415,10 @@ class SimulationEndToEnd(nn.Module):
             sim_field = torch.cat([sim_pred["r"], sim_pred["p"]], dim=2)
 
         #print("sim style", self.sim_style)
-        print("GT R")
-        print_perception(gt_raw["r"])
-        print("Raw")
-        print_perception(my_raw)
+        #print("GT R")
+        #print_perception(gt_raw["r"])
+        #print("Raw")
+        #print_perception(my_raw)
 
         if self.sim_style != "":
 

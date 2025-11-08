@@ -53,7 +53,7 @@ class MiniStandoffEnv(para_MultiGridEnv):
             gaze_highlighting=False,
             persistent_gaze_highlighting=False,
             supervised_model=None,
-            use_separate_reward_layers=True,
+            use_separate_reward_layers=False,
             conf=None,
     ):
         super().__init__(agents,

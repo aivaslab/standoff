@@ -207,7 +207,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
     np.random.seed(42+repetition+5)
 
     model_kwargs['output_len'] = 5
-    model_kwargs['channels'] = 5
+    model_kwargs['channels'] = 3
     model_kwargs['oracle_is_target'] = oracle_is_target
 
     device = torch.device('cuda' if use_cuda else 'cpu')
@@ -278,7 +278,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
 
     for stage_config in curriculum_config.curriculum_stages:
         if 'trans' in model.kwargs['module_configs']['arch']:
-            optimizer = torch.optim.AdamW(model.parameters(), lr=2e-5, betas=(0.95, 0.999), weight_decay=0.02)
+            optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4, betas=(0.95, 0.999), weight_decay=0.02)
         else:
             optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4, betas=(0.9, 0.999))
             scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.95)
@@ -470,9 +470,11 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
         module_ranges = {}
 
         if 'trans' in model.kwargs['module_configs']['arch']:
-            scheduler = torch.optim.lr_scheduler.OneCycleLR( optimizer, max_lr=1e-5, total_steps=batches, anneal_strategy='cos' )
+            print('transformer')
+            scheduler = torch.optim.lr_scheduler.OneCycleLR( optimizer, max_lr=1e-4, total_steps=batches, anneal_strategy='cos', div_factor=5.0 )
         else:
-            scheduler = torch.optim.lr_scheduler.OneCycleLR( optimizer, max_lr=5e-5, total_steps=batches, anneal_strategy='cos' )
+            print('non transformer!')
+            scheduler = torch.optim.lr_scheduler.OneCycleLR( optimizer, max_lr=5e-3, total_steps=batches, anneal_strategy='cos', div_factor=5.0 )
 
         for batch in range(batches):
             real_batch += 1

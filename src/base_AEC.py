@@ -564,6 +564,7 @@ class para_MultiGridEnv(ParallelEnv):
         self.channels = 3
         self.use_box_colors = False
         self.use_separate_reward_layers = use_separate_reward_layers
+        
 
         if self.use_box_colors:
             self.color_list = list(COLORS)
@@ -571,9 +572,10 @@ class para_MultiGridEnv(ParallelEnv):
         if self.observation_style == 'rich':
             self.rich_observation_layers = [
                 lambda k, mapping: int(mapping[k] is not None and getattr(mapping[k], "type", None) == "Agent"),
-                lambda k, mapping: (mapping[k].type == 'Box' * mapping[k].state if hasattr(mapping[k], 'type') else False) if self.use_box_colors
-                else mapping[k].type == "Box" if hasattr(mapping[k], 'type') else 0 #now this is overwritten in gen agent obs
+                
             ]
+            '''lambda k, mapping: (mapping[k].type == 'Box' * mapping[k].state if hasattr(mapping[k], 'type') else False) if self.use_box_colors
+                else mapping[k].type == "Box" if hasattr(mapping[k], 'type') else 0 #now this is overwritten in gen agent obs'''
             if self.use_separate_reward_layers:
                 # big and small refer to the numbers shown here, which are always what the opponent sees
                 # if sub_valence is not 1, the observation changes, but not the object reward states
@@ -594,7 +596,17 @@ class para_MultiGridEnv(ParallelEnv):
                 ])
             else:
                 self.rich_observation_layers.extend([
-                    lambda k, mapping: (mapping[k].get_reward() if hasattr(mapping[k], 'get_reward') and mapping[k].contains is None else 0)
+                    lambda k, mapping: (
+                        2 if hasattr(mapping[k], "get_sub_obs_reward")
+                        and (not hasattr(mapping[k], "contains") or mapping[k].contains is None)
+                        and not getattr(mapping[k], "hide", False)
+                        and mapping[k].get_sub_obs_reward() == 100
+                        else 1 if hasattr(mapping[k], "get_sub_obs_reward")
+                        and (not hasattr(mapping[k], "contains") or mapping[k].contains is None)
+                        and not getattr(mapping[k], "hide", False)
+                        and mapping[k].get_sub_obs_reward() == 33
+                        else 0
+                    )
                 ])
 
             # handle walls, etc
@@ -612,8 +624,9 @@ class para_MultiGridEnv(ParallelEnv):
                             1 * (mapping[k].volatile() if hasattr(mapping[k], 'volatile') else 0)
                     ),
                 )
-            if self.gaze_highlighting:
+            if self.gaze_highlighting and False:
                 self.rich_observation_layers.append('gaze')
+            print('supervised', self.supervised_model, self.dense_obs, len(self.rich_observation_layers), self.use_separate_reward_layers)
             self.channels = len(self.rich_observation_layers) + (1 if self.supervised_model is not None else 0)
 
         self.observation_spaces = {agent: Box(
@@ -1525,8 +1538,7 @@ class para_MultiGridEnv(ParallelEnv):
                                 self.prev_puppet_mask = np.logical_or(self.prev_puppet_mask, puppet_mask)
                                 puppet_mask = self.prev_puppet_mask
 
-                            puppet_mask = self.slice_gaze_grid(agent,
-                                                               puppet_mask)  # get relative gaze mask in agent view
+                            puppet_mask = self.slice_gaze_grid(agent, puppet_mask)  # get relative gaze mask in agent view
             else:
                 # otherwise puppet mask is just 0s
                 puppet_mask = np.zeros((agent.view_size, agent.view_size), dtype="uint8")
@@ -1552,11 +1564,13 @@ class para_MultiGridEnv(ParallelEnv):
                     #obs[i, :, :] = np.multiply(np.vectorize(layer)(view_grid.grid, mapping), vis_mask)
                     obs[i, :, :] = np.vectorize(layer)(view_grid.grid, mapping)
 
-            for i, updated in enumerate(self.box_updated_this_timestep):
-                if updated:
-                    obs[1, self.height - i - 3, self.height // 2 - 1] = 0
-                else:
-                    obs[1, self.height - i - 3, self.height // 2 - 1] = 1
+            if self.use_separate_reward_layers:
+
+                for i, updated in enumerate(self.box_updated_this_timestep):
+                    if updated:
+                        obs[1, self.height - i - 3, self.height // 2 - 1] = 0
+                    else:
+                        obs[1, self.height - i - 3, self.height // 2 - 1] = 1
 
             # remove this to speed up training, though it's useful for debugging
             '''
