@@ -248,12 +248,12 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
         }
     module_label_data = {module: [] for module in module_labels.keys()} 
     batch_size = model_kwargs['batch_size']
-    model_kwargs['batch_size'] = 1024
+    model_kwargs['batch_size'] = 2048
     lr = model_kwargs['lr']
     batch_size = model_kwargs['batch_size']
     model = load_model(model_type, model_kwargs, device)
 
-    print(model.kwargs, '######################################')
+    print(model.kwargs)
 
     if oracle_labels:
         model.store_per_timestep_beliefs = True
@@ -278,10 +278,13 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
 
     for stage_config in curriculum_config.curriculum_stages:
         if 'trans' in model.kwargs['module_configs']['arch']:
-            optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4, betas=(0.95, 0.999), weight_decay=0.02)
+            lr = 2e-3
+            optimizer = torch.optim.AdamW(model.parameters(), lr=lr, betas=(0.9, 0.98), weight_decay=0.02)
+            scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.97)
         else:
-            optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4, betas=(0.9, 0.999))
-            scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.95)
+            lr = 1e-4
+            optimizer = torch.optim.AdamW(model.parameters(), lr=lr, betas=(0.9, 0.99))
+            scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.97)
         print('started curricular stage', stage_config['stage_name'])
         
         # stage_train_sets = apply_curriculum_stage(model, stage_config, train_sets_dict)
@@ -400,7 +403,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
             all_unique_params.update(param_set)
         
         all_unique_params = list(all_unique_params)
-        n_withheld = max(1, int(0.1 * len(all_unique_params)))
+        n_withheld = max(1, int(0.05 * len(all_unique_params)))
         withheld_params = set(np.random.choice(len(all_unique_params), size=n_withheld, replace=False))
         withheld_params = {all_unique_params[i] for i in withheld_params}
         
@@ -471,10 +474,10 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
 
         if 'trans' in model.kwargs['module_configs']['arch']:
             print('transformer')
-            scheduler = torch.optim.lr_scheduler.OneCycleLR( optimizer, max_lr=1e-4, total_steps=batches, anneal_strategy='cos', div_factor=5.0 )
+            #scheduler = torch.optim.lr_scheduler.OneCycleLR( optimizer, max_lr=lr, total_steps=batches, anneal_strategy='cos', div_factor=5.0 )
         else:
             print('non transformer!')
-            scheduler = torch.optim.lr_scheduler.OneCycleLR( optimizer, max_lr=5e-3, total_steps=batches, anneal_strategy='cos', div_factor=5.0 )
+            #scheduler = torch.optim.lr_scheduler.OneCycleLR( optimizer, max_lr=lr, total_steps=batches, anneal_strategy='cos', div_factor=5.0 )
 
         for batch in range(batches):
             real_batch += 1
@@ -763,13 +766,14 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
             #scaler.step(optimizer)
             #scaler.update()
             total_loss.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+            #torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=2.0)
             optimizer.step()
-            scheduler.step()
+            #scheduler.step()
 
             if (batch+1) % epoch_length == 0:
                 if batch > 1:
                     t.update(epoch_length)
+                    scheduler.step()
 
             if record_loss and (((real_batch) % (2*epoch_length_val) == 0) or (real_batch == total_batches - 1)):
 

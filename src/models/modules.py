@@ -28,7 +28,7 @@ class EndToEndModel(nn.Module):
         print('T_pad:', self.T_pad)
         raw_input_dim = self.T_pad * in_channels * 7 * 7
         processed_input_dim = 2 * 6 * self.T_in + self.T_in + self.T_in
-        hidden = 128
+        hidden = 32
         if output_type == 'op_belief':
             output_dim = 12
         elif output_type in ['op_decision', 'my_decision']:
@@ -40,15 +40,24 @@ class EndToEndModel(nn.Module):
             self.processed_model = nn.Sequential(nn.Linear(processed_input_dim, hidden), nn.BatchNorm1d(hidden), nn.ReLU(), nn.Linear(hidden, hidden), nn.ReLU(), nn.Linear(hidden, 32), nn.ReLU(), nn.Linear(32, output_dim))
         elif arch == 'transformer32':
             self.raw_embed = nn.Linear(in_channels*7*7, 32)
-            self.pos_embed = nn.Parameter(torch.randn(1, self.T_pad, 32))
+            #self.pos_embed = nn.Parameter(torch.randn(1, self.T_pad, 32))
             self.processed_embed = nn.Linear(processed_input_dim//self.T_in, 32)
-            encoder = nn.TransformerEncoderLayer(d_model=32, nhead=2, activation='gelu', dropout=0.2, batch_first=True, norm_first=True)
+            encoder = nn.TransformerEncoderLayer(d_model=32, nhead=2, activation='gelu', dropout=0.2, batch_first=True, norm_first=False)
             self.transformer = nn.TransformerEncoder(encoder, num_layers=2)
-            self.head = nn.Linear(32, output_dim)
-            self.head_op_bel   = nn.Linear(32, 2*6)
-            self.head_my_bel   = nn.Linear(32, 2*6)
-            self.head_op_dec_t = nn.Linear(32, 6)
-            self.head_my_dec   = nn.Linear(32, 12)
+            #self.head = nn.Linear(32, output_dim)
+            #self.head_op_bel   = nn.Linear(32, 2*6)
+            #self.head_my_bel   = nn.Linear(32, 2*6)
+            #self.head_op_dec_t = nn.Linear(32, 6)
+            self.head_my_dec   = nn.Linear(32, output_dim)
+
+        for m in self.modules():
+            if isinstance(m, nn.Linear):
+                nn.init.kaiming_uniform_(m.weight, nonlinearity='relu')
+                if m.bias is not None:
+                    nn.init.zeros_(m.bias)
+            elif isinstance(m, nn.LayerNorm):
+                nn.init.ones_(m.weight)
+                nn.init.zeros_(m.bias)
 
     def _build_positional_encoding(self, T_pad, d_model):
         pe = torch.zeros(1, T_pad, d_model)
@@ -77,7 +86,7 @@ class EndToEndModel(nn.Module):
         if len(input_data.shape) == 5:
             B, T, C, H, W = input_data.shape
 
-            if self.arch in ['mlp']:
+            if self.arch == 'mlp':
                 x_flat = input_data.view(B, -1)
                 output = self.raw_model(x_flat)
                 if self.output_type == 'multi':
@@ -89,7 +98,7 @@ class EndToEndModel(nn.Module):
                     }
                 elif self.output_type == 'my_decision' or self.output_type == 'op_decision':
                     return {'my_decision': output}
-            elif self.arch in ['transformer128', 'transformer32']:
+            else:
                 x = input_data.view(B, T, -1)
                 x = self.raw_embed(x)
                 x_pad, win_idx, last_idx = self._pad_shift(x, T, self.T_pad, self.training)
@@ -106,7 +115,7 @@ class EndToEndModel(nn.Module):
                 #op_dt = self.head_op_dec_t(x_win).view(B, T, 6)
                 output = {'my_decision': self.head_my_dec(pooled)}
                 #output = {'op_belief_t': op_b, 'my_belief_t': my_b, 'op_decision_t': op_dt, 'my_decision': self.head_my_dec(pooled)}
-        else:
+        elif False:
             B = input_data.shape[0]
             per_step = 14
             T_in = input_data.shape[1] // per_step
@@ -415,15 +424,12 @@ class TreatPerceptionModule(BaseModule):
     def _hardcoded_forward(self, perceptual_field: torch.Tensor) -> torch.Tensor:
         x = perceptual_field[:, :, 1, 1:6, 3]          # [B, T, 5]
 
-        # Soft gates centred on class thresholds
-        # Adjust steepness with sigmoid_temp
-        large_mask = torch.sigmoid(self.sigmoid_temp * (x - 1.5))            # high when x≈2
+        large_mask = torch.sigmoid(self.sigmoid_temp * (x - 1.5))
         small_mask = torch.sigmoid(self.sigmoid_temp * (1.5 - x)) * torch.sigmoid(self.sigmoid_temp * (x - 0.5))
-        none_mask  = torch.sigmoid(self.sigmoid_temp * (0.5 - x))            # high when x≈0
+        none_mask  = torch.sigmoid(self.sigmoid_temp * (0.5 - x)) 
 
-        # Stack to emulate 2 treat channels
         logits = self.sigmoid_temp * (torch.stack([large_mask, small_mask], dim=2) - 0.5)
-        logits = torch.flip(logits, dims=[3])                               # preserve old spatial order
+        logits = torch.flip(logits, dims=[3])  
 
         logit_sums = logits.exp().sum(dim=3, keepdim=True)
         no_treat_logits = self.sigmoid_temp * (none_mask.unsqueeze(2) - logit_sums)
@@ -651,7 +657,7 @@ class BeliefModule(BaseModule):
         random_indices = torch.randint(0, 6, (batch_size,), device=device)
         beliefs.scatter_(1, random_indices.unsqueeze(1), 1.0)
 
-        return beliefs #F.softmax(beliefs, dim=-1)
+        return beliefs 
 
 class NormalizedTSBeliefNetwork(nn.Module):
     def __init__(self):
@@ -816,8 +822,8 @@ class DecisionModule(BaseModule):
         large_no_treat = belief_vector[:, 0, 5]
         small_no_treat = belief_vector[:, 1, 5]
 
-        large_choice = belief_vector[:, 0, :5]#F.softmax(belief_vector[:, 0, :5] * 4, dim=1)
-        small_choice = belief_vector[:, 1, :5]#F.softmax(belief_vector[:, 1, :5] * 4, dim=1)
+        large_choice = belief_vector[:, 0, :5]
+        small_choice = belief_vector[:, 1, :5]
 
         both_no_treat = large_no_treat * small_no_treat
         large_exists = 1 - large_no_treat
@@ -832,8 +838,6 @@ class DecisionModule(BaseModule):
         return dominant_present * subordinate_decision + (1 - dominant_present) * greedy_decision
 
     def _random_forward(self, belief_vector: torch.Tensor, dominant_decision: torch.Tensor = None, dominant_present: torch.Tensor = None) -> torch.Tensor:
-        #decisions = torch.rand(belief_vector.shape[0], 5, device=belief_vector.device)
-        #decisions = F.softmax(decisions, dim=-1)
         batch_size = belief_vector.shape[0]
         device = belief_vector.device
         decisions = torch.zeros(batch_size, 5, device=device)
@@ -1273,18 +1277,18 @@ class OpponentRawSimulator(nn.Module):
         in_dim  = C * H * W
         out_dim = C * H * W
         self.encoder = nn.Sequential(
-            nn.Conv2d(C, 16, 3, padding=1), nn.ReLU(),
-            nn.Conv2d(16, 8, 3, padding=1), nn.ReLU(),
+            nn.Conv2d(C, 4, 3, padding=1), nn.ReLU(),
+            #nn.Conv2d(8, 4, 3, padding=1), nn.ReLU(),
         )
-        self.head_r = nn.Linear(8*H*W, C*H*W)
-        self.head_i = nn.Linear(8*H*W, C*H*W)
-        self.head_p = nn.Linear(8*H*W, 1)
+        self.head_r = nn.Linear(4*H*W, C*H*W)
+        self.head_i = nn.Linear(4*H*W, C*H*W)
+        self.head_p = nn.Linear(4*H*W, 1)
 
     def forward(self, x_enc):
         B, T, C, H, W = x_enc.shape
         x = x_enc.view(B * T, C, H, W) 
         x = self.encoder(x)
-        x = x.view(B, T, 8 * H * W)
+        x = x.view(B, T, 4 * H * W)
         out_r = self.head_r(x).view(B, T, self.C, self.H, self.W)
         out_i = self.head_i(x).view(B, T, self.C, self.H, self.W)
         out_p = self.head_p(x).view(B, T, 1, 1, 1).expand(B, T, self.C, self.H, self.W)
@@ -1307,11 +1311,11 @@ class OpponentRawSimulator(nn.Module):
         if style in ("r", "ri", "rp"):
             eff_v_r = (vision * presence.view(B, 1)).view(B, T, 1, 1, 1)
             gt_r = gt.clone()
-            gt_r[:, :, :].mul_(eff_v_r)
+            gt_r[:, :, 1:2].mul_(eff_v_r)
         if style in ("i", "ri"):
             eff_v_i = vision.view(B, T, 1, 1, 1)
             gt_i = gt.clone()
-            gt_i[:, :, :].mul_(eff_v_i)
+            gt_i[:, :, 1:2].mul_(eff_v_i)
         if style in ("rp",):
             gt_p = presence.view(B, 1, 1, 1, 1).expand(B, T, C, H, W)
 
@@ -1385,16 +1389,16 @@ class SimulationEndToEnd(nn.Module):
 
         self.simulator = OpponentRawSimulator(d_model=d_model, style=self.sim_style)
 
-        sig = module_configs.get("sigmoid_temp", 50.0)
+        sig = module_configs.get("sigmoid_temp", 20.0)
         print('sigmoid temp', sig)
         ax = module_configs.get("archx", "mlp")
         self.treat_op = TreatPerceptionModule(use_neural=False, random_prob=0.0, sigmoid_temp=sig, archx=ax)
         self.vision_op = VisionPerceptionModule(use_neural=False, random_prob=0.0, sigmoid_temp=sig)
         self.presence_op = PresencePerceptionModule(use_neural=False, random_prob=0.0, sigmoid_temp=sig)
 
-        comb_in = 12
+        comb_in = 6
         if self.mode != "single":
-            comb_in += 12
+            comb_in += 6
 
         self.combiner = nn.Sequential(nn.Linear(comb_in, d_model), nn.ReLU(), nn.Linear(d_model, 6))
 
