@@ -278,7 +278,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
 
     for stage_config in curriculum_config.curriculum_stages:
         if 'trans' in model.kwargs['module_configs']['arch']:
-            lr = 2e-3
+            lr = 1e-3
             optimizer = torch.optim.AdamW(model.parameters(), lr=lr, betas=(0.9, 0.98), weight_decay=0.02)
             scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.97)
         else:

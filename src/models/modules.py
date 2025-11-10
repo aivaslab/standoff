@@ -20,7 +20,7 @@ class EndToEndModel(nn.Module):
         self.T_in = 5
         self.T_pad = 5 if pad == '' or pad == False else 10
         self.register_buffer("causal_mask_full",torch.triu(torch.full((self.T_pad, self.T_pad), float("-inf")), diagonal=1))
-        self.register_buffer("attn_mask", self.causal_mask_full[:self.T_pad, :self.T_pad])
+        self.register_buffer("attn_mask", self.causal_mask_full[:self.T_in, :self.T_in])
         self.register_buffer("t_idx_base", torch.arange(self.T_in).view(1, -1))
         self.register_buffer("padded_zero", torch.zeros(self.T_pad, 32))
         #self.register_buffer("pos_embed", self._build_positional_encoding(self.T_pad, d_model=32))
@@ -45,9 +45,9 @@ class EndToEndModel(nn.Module):
             encoder = nn.TransformerEncoderLayer(d_model=32, nhead=2, activation='gelu', dropout=0.2, batch_first=True, norm_first=False)
             self.transformer = nn.TransformerEncoder(encoder, num_layers=2)
             #self.head = nn.Linear(32, output_dim)
-            #self.head_op_bel   = nn.Linear(32, 2*6)
+            self.head_my_bel   = nn.Linear(32, 5*2*6)
             #self.head_my_bel   = nn.Linear(32, 2*6)
-            #self.head_op_dec_t = nn.Linear(32, 6)
+            self.head_op_dec = nn.Linear(32, 6)
             self.head_my_dec   = nn.Linear(32, output_dim)
 
         for m in self.modules():
@@ -101,20 +101,18 @@ class EndToEndModel(nn.Module):
             else:
                 x = input_data.view(B, T, -1)
                 x = self.raw_embed(x)
-                x_pad, win_idx, last_idx = self._pad_shift(x, T, self.T_pad, self.training)
-                #x_pad = x_pad + self.pos_embed[:, :x_pad.size(1)]
-                x_enc = self.transformer(x_pad, mask=self.attn_mask)
-                #x_enc = self.transformer(x_pad)
+                #x_pad, win_idx, last_idx = self._pad_shift(x, T, self.T_pad, self.training)
+                x_enc = self.transformer(x, mask=self.attn_mask)
                 B2 = x_enc.size(0)
                 b_idx = torch.arange(B2, device=x_enc.device).view(-1, 1).expand_as(win_idx)
                 x_win = x_enc[b_idx, win_idx]                             # (B,T,d)
                 #pooled = x_enc[torch.arange(B2, device=x_enc.device), last_idx]
                 pooled = x_win.mean(dim=1)
-                #op_b = self.head_op_bel(x_win).reshape(B, T, 2, 6).permute(0, 2, 1, 3)
-                #my_b = self.head_my_bel(x_win).reshape(B, T, 2, 6).permute(0, 2, 1, 3)
-                #op_dt = self.head_op_dec_t(x_win).view(B, T, 6)
-                output = {'my_decision': self.head_my_dec(pooled)}
-                #output = {'op_belief_t': op_b, 'my_belief_t': my_b, 'op_decision_t': op_dt, 'my_decision': self.head_my_dec(pooled)}
+                output = {
+                    'my_decision': self.head_my_dec(pooled),
+                    'op_decision': self.head_op_dec(pooled),
+                    'my_belief_t': self.head_my_bel(pooled),
+                    }
         elif False:
             B = input_data.shape[0]
             per_step = 14
@@ -333,7 +331,7 @@ class SmallTransformer(nn.Module):
         B = x.size(0)
         x = x.view(B, self.T, self.input_dim)
         x = self.embed(x)
-        x = self.encoder(x, mask=self.causal_mask[:self.T, :self.T])
+        x = self.encoder(x, mask=self.causal_mask)
         out = self.head(x)
         return out.reshape(B, -1)
 
@@ -1270,7 +1268,7 @@ class AblationArchitecture(nn.Module):
 
 
 class OpponentRawSimulator(nn.Module):
-    def __init__(self, d_model=32, T=5, C=5, H=7, W=7, style="r"):
+    def __init__(self, d_model=32, T=5, C=3, H=7, W=7, style="r"):
         super().__init__()
         self.T, self.C, self.H, self.W = T, C, H, W
         self.style = style
@@ -1356,6 +1354,7 @@ class SimulationEndToEnd(nn.Module):
         self.use_oracle = module_configs.get('use_oracle', False)
         self.skip_sim_loss = not module_configs['use_sim_loss']
         self.register_buffer("zero", torch.tensor(0.0))
+        self.augment_treats = module_configs.get('augment_treats', False)
 
         self.use_gt_sim = module_configs.get("use_gt_sim", False)
 
@@ -1369,7 +1368,8 @@ class SimulationEndToEnd(nn.Module):
 
         d_model = 32 if "32" in self.arch else 128
 
-        print('padddd', self.pad, 'sim_loss skip', self.skip_sim_loss)
+        print('padddd', self.pad)
+        print(f"skip_sim_loss: {self.skip_sim_loss}")
 
         in_channels = 3
         if self.mode == "single":
@@ -1402,6 +1402,26 @@ class SimulationEndToEnd(nn.Module):
 
         self.combiner = nn.Sequential(nn.Linear(comb_in, d_model), nn.ReLU(), nn.Linear(d_model, 6))
 
+    def augment_treats_continuous(self, raw_field):
+        augmented = raw_field.clone()
+        treat_channel = augmented[:, :, 1, :, :]
+        
+        is_small = (treat_channel == 1.0)
+        is_large = (treat_channel == 2.0)
+        
+        B = treat_channel.shape[0]
+        device = treat_channel.device
+        
+        midpoint = torch.rand(B, 1, 1, 1, device=device) * 2.0
+        small_values = midpoint / 2.0
+        large_values = (midpoint + 2.0) / 2.0
+        
+        treat_channel = torch.where(is_small, small_values, treat_channel)
+        treat_channel = torch.where(is_large, large_values, treat_channel)
+        
+        augmented[:, :, 1, :, :] = treat_channel
+        return augmented
+
     def forward(self, my_raw: torch.Tensor, additional_input: torch.Tensor):
         opp_vision = self.vision_op(my_raw, is_p1=0)
         opp_presence = self.presence_op(my_raw, is_p1=0)
@@ -1424,8 +1444,20 @@ class SimulationEndToEnd(nn.Module):
         #print("Raw")
         #print_perception(my_raw)
 
-        if self.sim_style != "":
+        if self.augment_treats:
+            my_raw = self.augment_treats_continuous(my_raw)
 
+        if self.sim_style == "":
+            if self.mode == "single":
+                joint_out = self.end2end_self(torch.cat([my_raw, my_raw], dim=2))
+                my_decision = joint_out["my_decision"]
+            else:
+                my_out = self.end2end_self(my_raw)
+                op_out = self.end2end_op(my_raw)
+                z_self = my_out["my_decision"]
+                z_op = op_out["my_decision"]
+                my_decision = self.combiner(torch.cat([z_self, z_op], dim=-1))
+        else:
             if self.mode == "single":
                 joint_raw = torch.cat([my_raw, sim_field], dim=2)
                 joint_out = self.end2end_self(joint_raw)
@@ -1437,18 +1469,19 @@ class SimulationEndToEnd(nn.Module):
                 z_op = op_out["my_decision"]
                 my_decision = self.combiner(torch.cat([z_self, z_op], dim=-1))
 
+        if "belief" in self.output_type:
+            my_belief = joint_out["my_belief_t"] if self.mode == "single" else my_out["my_belief_t"]
         else:
-            if self.mode == "single":
-                joint_out = self.end2end_self(torch.cat([my_raw, my_raw], dim=2))
-                my_decision = joint_out["my_decision"]
-            else:
-                my_out = self.end2end_self(my_raw)
-                op_out = self.end2end_op(my_raw)
-                z_self = my_out["my_decision"]
-                z_op = op_out["my_decision"]
-                my_decision = self.combiner(torch.cat([z_self, z_op], dim=-1))
+            my_belief = None
+
+        if "both" in self.output_type:
+            op_decision = joint_out["op_decision"] if self.mode == "single" else op_out["op_decision"]
+        else:
+            op_decision = None
 
         return {
             "my_decision": my_decision,
+            "op_decision": op_decision,
+            "my_belief": my_belief,
             "sim_loss": {"r": self.zero, "i": self.zero, **self.simulator.loss(sim_pred, gt_raw)},
         }
