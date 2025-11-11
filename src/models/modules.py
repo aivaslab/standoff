@@ -16,39 +16,41 @@ class EndToEndModel(nn.Module):
         self.arch = arch
         self.output_type = output_type
         self.transition_counts = defaultdict(float)
+        hidden = 64
         self.register_buffer('transition_counts_tensor', torch.zeros(5, 2, 2, 6, 6, 6, dtype=torch.int64), persistent=False)
         self.T_in = 5
         self.T_pad = 5 if pad == '' or pad == False else 10
         self.register_buffer("causal_mask_full",torch.triu(torch.full((self.T_pad, self.T_pad), float("-inf")), diagonal=1))
-        self.register_buffer("attn_mask", self.causal_mask_full[:self.T_in, :self.T_in])
+        self.register_buffer("attn_mask", self.causal_mask_full[:self.T_pad, :self.T_pad])
         self.register_buffer("t_idx_base", torch.arange(self.T_in).view(1, -1))
-        self.register_buffer("padded_zero", torch.zeros(self.T_pad, 32))
+        self.register_buffer("padded_zero", torch.zeros(self.T_pad, 64))
         #self.register_buffer("pos_embed", self._build_positional_encoding(self.T_pad, d_model=32))
 
         print('T_pad:', self.T_pad)
         raw_input_dim = self.T_pad * in_channels * 7 * 7
         processed_input_dim = 2 * 6 * self.T_in + self.T_in + self.T_in
-        hidden = 32
         if output_type == 'op_belief':
             output_dim = 12
         elif output_type in ['op_decision', 'my_decision']:
             output_dim = 6
         elif output_type == 'multi':
             output_dim = 2*self.T_in*6 + 2*self.T_in*6 + self.T_in*6 + 5
+        else:
+            output_dim = 6
         if arch == 'mlp':
             self.raw_model = nn.Sequential(nn.Flatten(), nn.Linear(raw_input_dim, hidden), nn.BatchNorm1d(hidden), nn.ReLU(), nn.Linear(hidden, hidden), nn.ReLU(), nn.Linear(hidden, 32), nn.ReLU(), nn.Linear(32, output_dim))
             self.processed_model = nn.Sequential(nn.Linear(processed_input_dim, hidden), nn.BatchNorm1d(hidden), nn.ReLU(), nn.Linear(hidden, hidden), nn.ReLU(), nn.Linear(hidden, 32), nn.ReLU(), nn.Linear(32, output_dim))
         elif arch == 'transformer32':
-            self.raw_embed = nn.Linear(in_channels*7*7, 32)
+            self.raw_embed = nn.Linear(in_channels*7*7, hidden)
             #self.pos_embed = nn.Parameter(torch.randn(1, self.T_pad, 32))
-            self.processed_embed = nn.Linear(processed_input_dim//self.T_in, 32)
-            encoder = nn.TransformerEncoderLayer(d_model=32, nhead=2, activation='gelu', dropout=0.2, batch_first=True, norm_first=False)
+            self.processed_embed = nn.Linear(processed_input_dim//self.T_in, hidden)
+            encoder = nn.TransformerEncoderLayer(d_model=hidden, nhead=2, activation='gelu', dropout=0.2, batch_first=True, norm_first=False)
             self.transformer = nn.TransformerEncoder(encoder, num_layers=2)
             #self.head = nn.Linear(32, output_dim)
-            self.head_my_bel   = nn.Linear(32, 5*2*6)
+            self.head_my_bel   = nn.Linear(hidden, 5*2*6)
             #self.head_my_bel   = nn.Linear(32, 2*6)
-            self.head_op_dec = nn.Linear(32, 6)
-            self.head_my_dec   = nn.Linear(32, output_dim)
+            self.head_op_dec = nn.Linear(hidden, 6)
+            self.head_my_dec   = nn.Linear(hidden, output_dim)
 
         for m in self.modules():
             if isinstance(m, nn.Linear):
@@ -101,8 +103,8 @@ class EndToEndModel(nn.Module):
             else:
                 x = input_data.view(B, T, -1)
                 x = self.raw_embed(x)
-                #x_pad, win_idx, last_idx = self._pad_shift(x, T, self.T_pad, self.training)
-                x_enc = self.transformer(x, mask=self.attn_mask)
+                x_pad, win_idx, last_idx = self._pad_shift(x, T, self.T_pad, self.training)
+                x_enc = self.transformer(x_pad, mask=self.attn_mask)
                 B2 = x_enc.size(0)
                 b_idx = torch.arange(B2, device=x_enc.device).view(-1, 1).expand_as(win_idx)
                 x_win = x_enc[b_idx, win_idx]                             # (B,T,d)
@@ -421,16 +423,13 @@ class TreatPerceptionModule(BaseModule):
 
     def _hardcoded_forward(self, perceptual_field: torch.Tensor) -> torch.Tensor:
         x = perceptual_field[:, :, 1, 1:6, 3]          # [B, T, 5]
-
         large_mask = torch.sigmoid(self.sigmoid_temp * (x - 1.5))
         small_mask = torch.sigmoid(self.sigmoid_temp * (1.5 - x)) * torch.sigmoid(self.sigmoid_temp * (x - 0.5))
         none_mask  = torch.sigmoid(self.sigmoid_temp * (0.5 - x)) 
-
         logits = self.sigmoid_temp * (torch.stack([large_mask, small_mask], dim=2) - 0.5)
         logits = torch.flip(logits, dims=[3])  
-
         logit_sums = logits.exp().sum(dim=3, keepdim=True)
-        no_treat_logits = self.sigmoid_temp * (none_mask.unsqueeze(2) - logit_sums)
+        no_treat_logits = self.sigmoid_temp * (none_mask.mean(dim=2, keepdim=True).unsqueeze(2) - logit_sums)
         combined_logits = torch.cat([logits, no_treat_logits], dim=3)
         treats = F.softmax(combined_logits, dim=3)
         return treats
@@ -891,6 +890,8 @@ class AblationArchitecture(nn.Module):
             print("not e2e")
             self.end2end_model = None
 
+
+
         self.treat_perception_my = TreatPerceptionModule(
             use_neural=module_configs['my_treat'],
             random_prob=random_probs['my_treat'],
@@ -932,6 +933,10 @@ class AblationArchitecture(nn.Module):
             random_prob=random_probs['my_belief'],
             sigmoid_temp=sigmoid_temp, uncertainty=0.0 if not module_configs['shared_belief'] else 0.0,
             archx=module_configs['archx']
+        ) if not self.use_per_timestep_opponent else BeliefModulePerTimestep(
+            use_neural=module_configs['my_belief'],
+            random_prob=random_probs['my_belief'],
+            sigmoid_temp=sigmoid_temp, uncertainty=0.0
         )
 
         self.op_belief = (BeliefModule(
@@ -1035,7 +1040,8 @@ class AblationArchitecture(nn.Module):
 
 
         treats_op = self.treat_perception_op(perceptual_field)
-        print(treats_op.shape)
+
+
         if len(treats_op.shape) == 2:
             treats_op = treats_op.reshape([-1, 5, 2, 6])
         treats_l_op, treats_s_op = treats_op[:, :, 0:2].unbind(2)
@@ -1161,6 +1167,7 @@ class AblationArchitecture(nn.Module):
                 for t in range(1, 5):
                     #op_belief_l = self.op_belief.forward(treats_l_op[:, :t+1], opponent_vision[:, :t+1])
                     #op_belief_s = self.op_belief.forward(treats_s_op[:, :t+1], opponent_vision[:, :t+1])
+
                     op_belief_l = self.op_belief.forward(treats_l_op[:, t], opponent_vision[:, t], op_belief_l, t, opponent_presence, 0)
                     op_belief_s = self.op_belief.forward(treats_s_op[:, t], opponent_vision[:, t], op_belief_s, t, opponent_presence, 1)
 
@@ -1218,19 +1225,52 @@ class AblationArchitecture(nn.Module):
         self.my_belief.uncertainty = 0.0
         beliefs_list = []
         treats_my = None
-        my_vision = None
-        for i in range(self.num_visions):
-            masked_vision = masked_visions[:, i]
-            masked_perceptual_field = perceptual_field * masked_vision.view(batch_size, 5, 1, 1, 1)
-            my_vision = self.vision_perception_my(masked_perceptual_field, is_p1=1) if self.vision_prob < 1 else masked_vision
-            treats_my = self.treat_perception_my(masked_perceptual_field)
-            belief_l = self.my_belief.forward(treats_my[:,:,0] * my_vision.unsqueeze(-1), my_vision)
-            belief_s = self.my_belief.forward(treats_my[:,:,1] * my_vision.unsqueeze(-1), my_vision)
 
-            beliefs = torch.stack([belief_l, belief_s], dim=1)
-            beliefs_list.append(beliefs)
-        beliefs_tensor = torch.stack(beliefs_list, dim=1)
-        my_belief_vector = beliefs_tensor.squeeze(1)
+        my_belief_l = torch.zeros(batch_size, 6, device=device)
+        my_belief_l[:, 5] = 1.0
+        my_belief_s = torch.zeros(batch_size, 6, device=device)
+        my_belief_s[:, 5] = 1.0
+        my_beliefs_l_timesteps = []
+        my_beliefs_s_timesteps = []
+        my_beliefs_l_timesteps.append(my_belief_l)
+        my_beliefs_s_timesteps.append(my_belief_s)
+        masked_vision = masked_visions[:, 0]
+        masked_perceptual_field = perceptual_field * masked_vision.view(batch_size, 5, 1, 1, 1)
+        treats_my = self.treat_perception_my(masked_perceptual_field)
+        if len(treats_op.shape) == 2:
+            treats_op = treats_op.reshape([-1, 5, 2, 6])
+
+        treats_l_my, treats_s_my = treats_my[:, :, 0:2].unbind(2)
+        if self.use_per_timestep_opponent:
+            my_vision = masked_vision
+            for t in range(1, 5):
+                my_belief_l = self.op_belief.forward(treats_l_my[:, t], my_vision[:, t], my_belief_l, t, torch.ones_like(opponent_presence), 0)
+                my_belief_s = self.op_belief.forward(treats_s_my[:, t], my_vision[:, t], my_belief_s, t, torch.ones_like(opponent_presence), 1)
+                
+                my_beliefs_l_timesteps.append(my_belief_l)
+                my_beliefs_s_timesteps.append(my_belief_s)
+            
+            stacked_my_beliefs = torch.stack([
+                torch.stack(my_beliefs_l_timesteps, dim=1),
+                torch.stack(my_beliefs_s_timesteps, dim=1)
+            ], dim=1).flatten(start_dim=1)
+            my_belief_vector = torch.stack([my_beliefs_l_timesteps[-1], my_beliefs_s_timesteps[-1]], dim=1)
+
+        else:
+            my_vision = None
+            for i in range(self.num_visions):
+                masked_vision = masked_visions[:, i]
+                masked_perceptual_field = perceptual_field * masked_vision.view(batch_size, 5, 1, 1, 1)
+                my_vision = self.vision_perception_my(masked_perceptual_field, is_p1=1) if self.vision_prob < 1 else masked_vision
+                treats_my = self.treat_perception_my(masked_perceptual_field)
+                belief_l = self.my_belief.forward(treats_my[:,:,0] * my_vision.unsqueeze(-1), my_vision)
+                belief_s = self.my_belief.forward(treats_my[:,:,1] * my_vision.unsqueeze(-1), my_vision)
+
+                beliefs = torch.stack([belief_l, belief_s], dim=1)
+                beliefs_list.append(beliefs)
+            beliefs_tensor = torch.stack(beliefs_list, dim=1)
+            my_belief_vector = beliefs_tensor.squeeze(1)
+
 
 
         my_decision = self.my_decision.forward(my_belief_vector, op_decision, opponent_presence)
@@ -1255,6 +1295,7 @@ class AblationArchitecture(nn.Module):
             'vision_perception_my': my_vision,
             'presence_perception': opponent_presence,
             'my_belief': my_belief_vector,
+            'my_belief_t': stacked_my_beliefs if self.store_per_timestep_beliefs else None,
             'og_op_belief': og_op_beliefs if self.record_og_beliefs else None,
             'op_belief_t': stacked_op_beliefs if self.store_per_timestep_beliefs else None,
             'op_belief': op_belief_vector,
@@ -1360,7 +1401,7 @@ class SimulationEndToEnd(nn.Module):
 
         print(module_configs)
 
-        self.use_per_timestep_opponent = False
+        self.use_per_timestep_opponent = True
         self.store_per_timestep_beliefs = True
         self.record_og_beliefs = False
 
@@ -1370,6 +1411,7 @@ class SimulationEndToEnd(nn.Module):
 
         print('padddd', self.pad)
         print(f"skip_sim_loss: {self.skip_sim_loss}")
+        print(f"skip_sim_loss: {self.augment_treats}")
 
         in_channels = 3
         if self.mode == "single":
@@ -1444,8 +1486,9 @@ class SimulationEndToEnd(nn.Module):
         #print("Raw")
         #print_perception(my_raw)
 
-        if self.augment_treats:
+        if self.training and self.augment_treats:
             my_raw = self.augment_treats_continuous(my_raw)
+            sim_field = self.augment_treats_continuous(sim_field)
 
         if self.sim_style == "":
             if self.mode == "single":
@@ -1469,12 +1512,12 @@ class SimulationEndToEnd(nn.Module):
                 z_op = op_out["my_decision"]
                 my_decision = self.combiner(torch.cat([z_self, z_op], dim=-1))
 
-        if "belief" in self.output_type:
+        if "mb" in self.output_type:
             my_belief = joint_out["my_belief_t"] if self.mode == "single" else my_out["my_belief_t"]
         else:
             my_belief = None
 
-        if "both" in self.output_type:
+        if "bd" in self.output_type:
             op_decision = joint_out["op_decision"] if self.mode == "single" else op_out["op_decision"]
         else:
             op_decision = None
@@ -1482,6 +1525,6 @@ class SimulationEndToEnd(nn.Module):
         return {
             "my_decision": my_decision,
             "op_decision": op_decision,
-            "my_belief": my_belief,
+            "my_belief_t": my_belief,
             "sim_loss": {"r": self.zero, "i": self.zero, **self.simulator.loss(sim_pred, gt_raw)},
         }

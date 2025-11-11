@@ -240,12 +240,10 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
             'my_decision': ['correct-loc'],
         }
 
-    if True:
+    if False:
         oracle_labels = []
-    if True:
-        module_labels = {
-            'my_decision': ['correct-loc'],
-        }
+
+    print('module labels', module_labels)
     module_label_data = {module: [] for module in module_labels.keys()} 
     batch_size = model_kwargs['batch_size']
     model_kwargs['batch_size'] = 2048
@@ -253,9 +251,33 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
     batch_size = model_kwargs['batch_size']
     model = load_model(model_type, model_kwargs, device)
 
+    hc_model = load_model('a-hardcoded', {'batch_size': model_kwargs['batch_size']}, device)
+
     print(model.kwargs)
 
-    if oracle_labels:
+    output_type = model.kwargs['module_configs'].get("output_type", "my_decision")
+    if output_type == "-bdmb":
+        module_labels = {
+            'my_decision': ['correct-loc'], #5
+            'op_decision': ['i-target-loc'], #5
+            'my_belief_t': ['loc-large', 'loc-small'], #25, 25
+        }
+    elif output_type == "-bd":
+        module_labels = {
+            'my_decision': ['correct-loc'],
+            'op_decision': ['i-target-loc'],
+        }
+    elif output_type == "-mb":
+        module_labels = {
+            'my_decision': ['correct-loc'],
+            'my_belief_t': ['loc-large', 'loc-small'],
+        }
+    else:
+        module_labels = {
+            'my_decision': ['correct-loc'],
+        }
+
+    if oracle_labels and False:
         model.store_per_timestep_beliefs = True
     else:
         model.store_per_timestep_beliefs = False
@@ -278,9 +300,9 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
 
     for stage_config in curriculum_config.curriculum_stages:
         if 'trans' in model.kwargs['module_configs']['arch']:
-            lr = 1e-3
+            lr = 1e-5
             optimizer = torch.optim.AdamW(model.parameters(), lr=lr, betas=(0.9, 0.98), weight_decay=0.02)
-            scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.97)
+            scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.95)
         else:
             lr = 1e-4
             optimizer = torch.optim.AdamW(model.parameters(), lr=lr, betas=(0.9, 0.99))
@@ -318,6 +340,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
                             regime_labels = np.eye(2)[regime_labels_raw.astype(int)].reshape(-1, 10)
                     elif len(regime_labels_raw.shape) > 2:
                         if last_timestep or True:
+                            print('last_timestep!')
                             regime_labels = regime_labels_raw[..., -1, :]
                         else:
                             regime_labels = regime_labels_raw.reshape(-1, 25)
@@ -367,23 +390,27 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
             
             data_arrays = []
             for module, label_list in module_labels.items():
+                #print('mod', module)
                 if not isinstance(label_list, list):
                     label_list = [label_list]
                     
                 for label_name in label_list:
+                    #print(label_name)
                     try:
                         label_data = np.load(os.path.join(dir, f'label-{label_name}.npz'), mmap_mode='r')['arr_0']
-                        if last_timestep and len(label_data.shape) > 2:
+
+                        if '_t' not in module and len(label_data.shape) > 2:
+                            #print(module, 'had last')
                             label_data = label_data[..., -1, :]
                             if label_name == 'correct-loc':
                                 label_data = label_data[:, :5] 
                             label_data = label_data.reshape(label_data.shape[0], -1)
-                        elif len(label_data.shape) > 2:
+                        elif len(label_data.shape) > 2 :
                             label_data = label_data.reshape(label_data.shape[0], -1)
                         if label_data.ndim == 1:
                             label_data = label_data.reshape(label_data.shape[0], 1)
 
-                            
+                        #print(label_data.shape)
                         data_arrays.append(label_data)
                     except Exception as e:
                         print(f"Error loading {label_name}: {e}")
@@ -466,7 +493,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
             os.makedirs(save_path, exist_ok=True)
             torch.save([model.kwargs, model.state_dict()], os.path.join(save_path, f'{repetition}-checkpoint-prior.pt'))
 
-        module_sizes = {'op_belief': 10, 'my_decision': 5, 'op_decision': 5, 'op_decision_t': 25, 'op_belief_t': 50, 'my_belief_t': 50}
+        module_sizes = {'op_belief': 10, 'my_decision': 5, 'op_decision': 5, 'op_decision_t': 25, 'op_belief_t': 60, 'my_belief_t': 50}
         module_names = module_labels.keys()
 
         first_batch_processed = False
@@ -491,6 +518,11 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
 
 
             outputs = model(inputs, None)
+            #predicted = outputs['my_decision'].argmax(1)
+            #max_labels = target_labels
+            #print('ddd', predicted, max_labels)
+            #corrects = predicted.eq(max_labels)
+
             my_decision_loss = criterion(outputs['my_decision'], target_labels)
 
             if not first_batch_processed:
@@ -504,6 +536,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
                     pos += flattened_output_size
 
                 first_batch_processed = True
+
 
             if batch % 500 == 0 and batch > 0 and model.record_og_beliefs:
                 with torch.no_grad():
@@ -556,20 +589,31 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
                 for name in module_labels.keys():
                     if name not in outputs or name not in module_ranges:
                         print('error')
+                    #print('name', name)
 
+                    logits = outputs[name]
+                    #print(logits.shape)
+                    if name == "my_decision" or logits is None:
+                        continue
                     s, e = module_ranges[name]
                     oracle_slice = flat_oracle[:, s:e] 
-                    logits = outputs[name]
 
                     if "belief_t" in name:
                         B = oracle_slice.size(0)
-                        T = (e - s) // (2 * 5)
+    
+                        T = logits.size(-1) // (2 * 6)
+
+                        #print(oracle_slice.shape)
+                        
                         tgt = oracle_slice.view(B, 2, T, 5)
                         idx = tgt.argmax(-1)
                         none_mask = tgt.sum(-1) == 0
                         idx[none_mask] = 5
+                        #print(idx[0])
                         idx = idx.permute(0, 2, 1).reshape(-1)
-                        loss = oracle_criterion(logits.permute(0, 2, 1, 3).reshape(-1, 6),idx.reshape(-1))
+                        
+                        logits_reshaped = logits.view(B, 2, T, 6)
+                        loss = oracle_criterion(logits_reshaped.permute(0, 2, 1, 3).reshape(-1, 6), idx.reshape(-1))
                     elif name == "op_belief" or name == "my_belief":
                         B = oracle_slice.size(0)
                         tgt = oracle_slice.view(B, 2, 5)
@@ -578,7 +622,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
                         idx[none_mask] = 5
                         loss = oracle_criterion(logits.reshape(-1, 6),idx.reshape(-1) )
                     elif name == "op_decision":
-                        loss = oracle_criterion(logits,oracle_slice.argmax(-1))
+                        loss = oracle_criterion(logits, oracle_slice.argmax(-1))
                     elif name == "op_decision_t":
                         B = oracle_slice.size(0)
                         T = (e - s) // 5
@@ -590,161 +634,17 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
                         loss = oracle_criterion(logits.reshape(-1, 6), idx.reshape(-1))
                     oracle_losses[name] = loss
 
-            oracle_loss = sum(oracle_losses.values())
+            if oracle_losses:
+                oracle_loss = sum(oracle_losses.values())
+            else:
+                oracle_loss = torch.zeros((), device=device)
+            #print(oracle_losses, my_decision_loss)
 
             ###
-            
-            if False: # set to false for mini
-                logits = outputs['op_belief_t']
-                my_logits = outputs['my_belief_t']
-                B, S, T, C = logits.shape
-                device = logits.device
-
-                vis_op = model.vision_perception_op(inputs, is_p1=0)          # [B,T], 0/1
-                unseen_mask_full = (vis_op.round() <0.5).view(B, 1, T).expand(-1, S, -1)  # [B,2,T]
-
-                logp_curr = logits.log_softmax(dim=-1)                        # [B,2,T,6]
-
-                prior_logits = torch.full_like(logits[:, :, :1, :], -10)    # [B,2,1,6]
-                prior_logits[..., 5] = 10.0
-
-                prev_logits = torch.cat([prior_logits, logits[:, :, :-1, :].detach()], dim=2)  # [B,2,T,6]
-                logp_prev  = prev_logits.log_softmax(dim=-1)                                    # [B,2,T,6]
-
-                kl_t = F.kl_div(logp_curr, logp_prev, log_target=True, reduction="none").sum(dim=-1)  # [B,2,T]
-
-                # average KL over unseen steps only (including t=0 when unseen)
-                den = unseen_mask_full.float().sum().clamp_min(1.0)
-                loss_unseen_stability = (kl_t * unseen_mask_full.float()).sum() / den
-            if False: # set to false for mini
-                logits = outputs['op_belief_t']
-                my_logits = outputs['my_belief_t']
-                B, S, T, C = logits.shape
-                device = logits.device
-
-                with torch.no_grad():
-                    B = oracles.size(0)
-                    flat_oracle = oracles.view(B, -1)
-                    s_op, e_op = module_ranges['op_belief_t']
-                    T = (e_op - s_op) // (2 * 5)  # 2 treats × 5 positions
-                    op_gt = flat_oracle[:, s_op:e_op].view(B, 2, T, 5)
-                    op_idx = op_gt.argmax(-1)                  # [B,2,T] in {0..4}
-                    op_none = op_gt.sum(-1) == 0               # [B,2,T]
-                    op_idx[op_none] = 5                        # 5 = "none"
-
-                    vis = model.vision_perception_op(inputs, is_p1=0).round().long()  # [B,T]
-
-                    prev = torch.cat([torch.full_like(op_idx[:, :, :1], 5), op_idx[:, :, :-1]], dim=2)  # [B,2,T]
-
-                    t0_unseen = (vis[:, 0] < 0.5).view(B,1,1).expand(-1,2,1)                              # [B,2,1]
-                    t0_seen = (vis[:, 0] > 0.5).view(B,1,1).expand(-1,2,1)                              # [B,2,1]
-                    chg_t0 = ((op_idx[:, :, :1] != 5) & t0_unseen).float().mean().item()
-                    chg_t0_seen = ((op_idx[:, :, :1] != 5) & t0_seen).float().mean().item()
-
-                    seen_mask = (vis[:, 1:] > 0.5).view(B,1,T-1).expand(-1,2,-1)                          # [B,2,T-1]
-                    unseen_mask = ~seen_mask
-
-                    chg_unseen = ((op_idx[:, :, 1:] != prev[:, :, 1:]) & unseen_mask).float().mean().item()
-                    chg_seen = ((op_idx[:, :, 1:] != prev[:, :, 1:]) & seen_mask).float().mean().item()
-                    pred_idx = logits.argmax(-1)                      # [B,2,T]
-                    pred_prev = torch.cat([torch.full_like(pred_idx[:, :, :1], 5), pred_idx[:, :, :-1]], dim=2)
-
-                    seen_mask   = (vis[:, 1:] > 0.5).view(B,1,T-1).expand(-1,2,-1)
-                    unseen_mask = ~seen_mask
-
-                    pred_chg_unseen = ((pred_idx[:, :, 1:] != pred_prev[:, :, 1:]) & unseen_mask).float().mean().item()
-                    pred_chg_seen   = ((pred_idx[:, :, 1:] != pred_prev[:, :, 1:]) & seen_mask).float().mean().item()
-
-                logp = logits.log_softmax(dim=-1)                     # [B,2,T,6]
-
-
-                if batch % 500 == 0:
-                    print("GT:", chg_unseen, chg_seen, "PRED:", pred_chg_unseen, pred_chg_seen)
-
-                with torch.no_grad():
-                    vis_op   = model.vision_perception_op(inputs, is_p1=0).to(logits.dtype)  # [B,T] in {0,1}
-                    gt_pos   = model.treat_perception_op(inputs)                             # [B,T,2,6]
-                    tgt_idx  = gt_pos.argmax(dim=-1)                                         # [B,T,2], 0..5
-
-                seen_mask   = (vis_op[:, 1:].round() == 1)                 # [B, T-1] bool
-                unseen_mask = ~seen_mask                           # [B, T-1] bool
-                seen_mask   = seen_mask.unsqueeze(1).expand(-1, S, -1)     # [B,2,T-1]
-                unseen_mask = unseen_mask.unsqueeze(1).expand(-1, S, -1)   # [B,2,T-1]
-
-                tgt_t = tgt_idx.permute(0, 2, 1)[:, :, 1:]         # [B,2,T-1]
-
-                logp_curr = logits.log_softmax(-1)
-                logp_prev = prev_logits.log_softmax(-1)
-
-                seen_mask = (vis_op[:,1:].round()>0.51).view(B,1,T-1).expand(-1,S,-1)
-
-                p_t   = logp_curr[:,:,1:,:].exp()
-                p_tm1 = logp_prev[:,:,1:,:].exp()
-                q     = 0.5*(p_t+p_tm1)
-                js = 0.5*(
-                    F.kl_div(logp_curr[:,:,1:,:], q.log(), log_target=True, reduction="none").sum(-1) +
-                    F.kl_div(logp_prev[:,:,1:,:], q.log(), log_target=True, reduction="none").sum(-1)
-                )
-                margin = 0.10
-                loss_seen_ce = torch.relu(margin - js)
-                loss_seen_ce = (loss_seen_ce*seen_mask.float()).sum() / seen_mask.float().sum().clamp_min(1)
-
-                # for persisting past zeroth step
-                extended_seen_mask = torch.cat([(vis_op[:, :1] > 0.5).unsqueeze(1).expand(-1, 2, -1), seen_mask], dim=2)
-                extended_unseen_mask = ~extended_seen_mask
-                initial_logits = torch.zeros_like(logits[:, :, :1, :])
-                initial_logits[:, :, :, 5] = 10.0
-                extended_prev = torch.cat([initial_logits, logits[:, :, :-1, :]], dim=2)
-                extended_curr = logits
-                logp_curr = extended_curr.log_softmax(dim=-1)
-                logp_prev = extended_prev.log_softmax(dim=-1)
-                p_prev = logp_prev.exp()
-                kl = (p_prev * (logp_prev - logp_curr)).sum(dim=-1)
-                if extended_unseen_mask.any():
-                    loss_persist = (kl * extended_unseen_mask.float()).sum() / extended_unseen_mask.float().sum().clamp_min(1.0)
-                else:
-                    loss_persist = torch.zeros((), device=device)
-
-                if unseen_mask.any() and torch.rand(1).item() < 1:
-                    n_unseen = unseen_mask.sum().item()
-                    loss_misinformed = F.cross_entropy(logits[:, :, 1:, :][unseen_mask], torch.randint(0, 5, (n_unseen,), device=device))
-                else:
-                    loss_misinformed = torch.zeros((), device=device)
-
-                delta_logits = (logits[:, :, 1:, :] - logits[:, :, :-1, :]).pow(2).mean(dim=-1)  # [B,2,T-1]
-                if unseen_mask.any():
-                    loss_delta = (delta_logits * unseen_mask.float()).sum() / unseen_mask.float().sum().clamp_min(1.0)
-                else:
-                    loss_delta = torch.zeros((), device=device)
-
-                if True:
-                    flat_oracle = oracles.view(oracles.size(0), -1)
-
-                    s_my, e_my = module_ranges['my_belief_t']
-                    my_oracle_slice = flat_oracle[:, s_my:e_my]
-                    B = my_oracle_slice.size(0)
-                    T = (e_my - s_my) // (2 * 5)
-                    my_tgt = my_oracle_slice.view(B, 2, T, 5)
-                    my_gt_targets = my_tgt.argmax(-1)  # [B, 2, T]
-                    my_none_mask = my_tgt.sum(-1) == 0
-                    my_gt_targets[my_none_mask] = 5
-
-                    s_op, e_op = module_ranges['op_belief_t']
-                    op_oracle_slice = flat_oracle[:, s_op:e_op]
-                    op_tgt = op_oracle_slice.view(B, 2, T, 5)
-                    op_gt_targets = op_tgt.argmax(-1)  # [B, 2, T]
-                    op_none_mask = op_tgt.sum(-1) == 0
-                    op_gt_targets[op_none_mask] = 5
-
-                    my_pred = my_logits.argmax(dim=-1)  # [B, 2, T]
-                    op_pred = logits.argmax(dim=-1)     # [B, 2, T]
-                    should_differ = (my_gt_targets != op_gt_targets)  # [B, 2, T] bool
-                    preds_same = (my_pred == op_pred)   # [B, 2, T] bool
-                    wrong_agreement = should_differ & preds_same  # [B, 2, T] bool
-                    loss_wrong_agreement = wrong_agreement.float().mean()
 
             #total_loss = my_decision_loss + 0.1*oracle_loss + 0.1*loss_misinformed + loss_seen_ce + loss_persist + loss_wrong_agreement
-            total_loss = my_decision_loss + oracle_loss if model.use_oracle else my_decision_loss #+ 0.5*loss_unseen_stability + 0.01*loss_seen_ce + 0.01*loss_delta + 0.01*loss_persist
+            #print(model.use_oracle)
+            total_loss = my_decision_loss + oracle_loss #+ 0.5*loss_unseen_stability + 0.01*loss_seen_ce + 0.01*loss_delta + 0.01*loss_persist
 
             #print(outputs["sim_loss"])
             if "r" in model.sim_style and not model.use_gt_sim and not model.skip_sim_loss:
@@ -758,6 +658,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
             else:
                 sim_i_loss = 0.0
 
+
             #total_loss += 0.001 * sum((p1 - p2).pow(2).mean() for p1, p2 in zip(model.e2e_op_belief.parameters(), model.e2e_my_belief.parameters()))
 
             optimizer.zero_grad(set_to_none=True)
@@ -765,6 +666,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
             #scaler.unscale_(optimizer) 
             #scaler.step(optimizer)
             #scaler.update()
+            #print(my_decision_loss)
             total_loss.backward()
             #torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=2.0)
             optimizer.step()
