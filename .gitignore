@@ -142,3 +142,4 @@ dmypy.json
 *.model
 AAAI24_experiments.py
 *metrics.txt
+*.txt
