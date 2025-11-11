@@ -38,8 +38,14 @@ class EndToEndModel(nn.Module):
         else:
             output_dim = 6
         if arch == 'mlp':
-            self.raw_model = nn.Sequential(nn.Flatten(), nn.Linear(raw_input_dim, hidden), nn.BatchNorm1d(hidden), nn.ReLU(), nn.Linear(hidden, hidden), nn.ReLU(), nn.Linear(hidden, 32), nn.ReLU(), nn.Linear(32, output_dim))
-            self.processed_model = nn.Sequential(nn.Linear(processed_input_dim, hidden), nn.BatchNorm1d(hidden), nn.ReLU(), nn.Linear(hidden, hidden), nn.ReLU(), nn.Linear(hidden, 32), nn.ReLU(), nn.Linear(32, output_dim))
+            self.backbone = nn.Sequential(
+                nn.Flatten(),
+                nn.Linear(raw_input_dim, hidden),
+                nn.ReLU(),
+            )
+            self.head_my_dec = nn.Linear(hidden, 6)
+            self.head_op_dec = nn.Linear(hidden, 6)
+            self.head_my_bel = nn.Linear(hidden, 5 * 2 * 6)
         elif arch == 'transformer32':
             self.raw_embed = nn.Linear(in_channels*7*7, hidden)
             #self.pos_embed = nn.Parameter(torch.randn(1, self.T_pad, 32))
@@ -89,17 +95,13 @@ class EndToEndModel(nn.Module):
             B, T, C, H, W = input_data.shape
 
             if self.arch == 'mlp':
-                x_flat = input_data.view(B, -1)
-                output = self.raw_model(x_flat)
-                if self.output_type == 'multi':
-                    return {
-                        'op_belief_t': torch.zeros(B, 2, self.T_in, 6, device=input_data.device),
-                        'my_belief_t': torch.zeros(B, 2, self.T_in, 6, device=input_data.device),
-                        'op_decision_t': torch.zeros(B, self.T_in, 6, device=input_data.device),
-                        'my_decision': F.softmax(output, dim=-1)
-                    }
-                elif self.output_type == 'my_decision' or self.output_type == 'op_decision':
-                    return {'my_decision': output}
+                x = self.backbone(input_data.view(B, -1))
+                return {
+                    'my_decision': self.head_my_dec(x),
+                    'op_decision': self.head_op_dec(x),
+                    'my_belief_t': self.head_my_bel(x)
+                }
+
             else:
                 x = input_data.view(B, T, -1)
                 x = self.raw_embed(x)
