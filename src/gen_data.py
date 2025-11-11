@@ -256,7 +256,7 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
 
                 env = env_from_config(env_config)
                 env.record_oracle_labels = True
-                env.record_info = True  # used for correct-loc right now
+                env.record_info = True 
 
                 env.target_param_group_count = 20
                 env.param_groups = [ {'eLists': {n: events[n]},

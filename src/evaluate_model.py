@@ -312,7 +312,6 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_load_
     #visualize_transition_network(os.path.join(model_load_path, 'transitions.csv'), os.path.join(model_load_path, 'transition_network.png'))
 
     print('kwargs', model_kwargs)
-    #exit()
 
     bad_params = {}
 
@@ -333,6 +332,7 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_load_
 
                 max_labels = torch.argmax(labels[:,-5:], dim=1)
                 outputs = model(inputs, None)
+
                 #print(inputs.shape, str(model))
 
                 keys_to_compare = [
@@ -385,7 +385,6 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_load_
                             _ = model(inputs, k)
 
                         print(labels)
-                        exit()
 
                 total = corrects.numel()
                 num_correct = corrects.sum().item()
