@@ -5,9 +5,9 @@ import re
 import numpy as np
 
 root = Path.cwd()
-out_csv = root / "all_losses.csv"
+num = "1002"
+out_csv = root / f"all_losses{num}.csv"
 
-num = "957"
 
 exp_effects = {
     f"exp_{num}": "x",

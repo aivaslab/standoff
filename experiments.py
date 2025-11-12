@@ -80,6 +80,7 @@ def init_regimes(rational_train_only=True):
         'loc-large',
         'loc-small',
         'target-loc',
+        'i-target-loc',
         'b-loc-large',
         'b-loc-small',
         'i-b-loc-large',
@@ -242,7 +243,7 @@ def run_single_experiment(args_tuple):
 
 
     experiments([args.exp_num],
-                repetitions=8,
+                repetitions=12,
                 batches=10000,
                 skip_train=not args.t,
                 skip_eval=not args.e,
@@ -311,17 +312,33 @@ if __name__ == '__main__':
         #'a-simv2-split-transformer32-pad-',
         #'a-simv2-split-transformer32-pad-r',
         #'a-simv2-split-transformer32-pad-i',
+        #'a-hardcoded',
 
-        #'a-simv2-single-transformer32-pad-rp-gts',
-        'a-simv2-single-transformer32-pad-r-gts',
+        'a-simv2-single-transformer32-ri-gts',
+        'a-simv2-shared-transformer32-pad-ri-gts',
+        'a-simv2-split-transformer32-pad-ri-gts',
+        'a-mix-n-treat-my',
         'a-simv2-single-transformer32-pad',
-        #'a-simv2-single-transformer32-pad-r',
-        'a-simv2-single-transformer32-pad-i',
+        'a-mix-n-treat-op',
         'a-simv2-single-transformer32-pad-ri',
+        'a-simv2-single-transformer32-pad-rp-gts',
+        "a-mix-n-perception-my", 
+        'a-simv2-single-transformer32-pad-r-gts',
+        'a-simv2-single-transformer32-pad-r',
+        "a-mix-n-perception-op",
+        'a-simv2-single-transformer32-pad-i',
         'a-simv2-single-transformer32-pad-r-nsl',
+        'a-mix-n-belief-my',
         'a-simv2-single-transformer32-pad-r-gts',
         'a-simv2-single-transformer32-pad-i-gts',
-        'a-simv2-single-transformer32-pad-ri-gts',
+        'a-mix-n-belief-op',
+        'a-mix-n-decision-my',
+        'a-mix-n-decision-op',
+        'a-mix-n-treat-op-transformer',
+        'a-mix-n-all-my',
+        'a-mix-n-all-op',
+        'a-mix-n-belief-op-transformer',
+        'a-mix-n-decision-op-transformer'
 
         #'a-simv2-shared-transformer32-pad-',
         #'a-simv2-shared-transformer32-pad-r',
@@ -330,22 +347,44 @@ if __name__ == '__main__':
         ]
 
     model_types = [
-        "a-hardcoded",
-        "a-mix-n-perception-my", 
-        "a-mix-n-perception-op",
-        'a-mix-n-treat-my',
-        'a-mix-n-treat-op',
-        'a-mix-n-belief-my',
-        'a-mix-n-belief-op',
-        'a-mix-n-decision-my',
-        'a-mix-n-decision-op',
-        'a-mix-n-all-my',
-        'a-mix-n-all-op',
-        'a-mix-n-treat-op-transformer',
-        'a-mix-n-belief-op-transformer',
-        'a-mix-n-decision-op-transformer'
+
+
+        #'a-simv2-single-mlp',
+        #'a-simv2-single-transformer32',
+        #'a-simv2-single-transformer32-pad',
+        #'a-simv2-single-transformer32-pad-ct',
+        #'a-simv2-single-transformer32-ct',
+
+        #'a-simv2-single-transformer32-pad-ip-gts',
+        'a-simv2-single-mlp-pad-bd',
+        #'a-simv2-single-transformer32-pad-ip-bd-gts', # didn't work
+        'a-simv2-single-mlp-pad-bdmb',
+        'a-simv2-single-mlp-pad-bdmb-i-gts',
+        'a-simv2-single-mlp-pad-bdmb-ip-gts',
+        'a-simv2-single-mlp-pad-mb',
+        'a-simv2-single-mlp',
+
+
+        'a-simv2-single-mlp-pad-ip-gts',
+        'a-simv2-single-mlp-pad',
+        'a-simv2-single-mlp-pad-ri-gts',
+        'a-simv2-single-mlp-pad-r-gts',
+        'a-simv2-single-mlp-pad-i-gts',
+        'a-simv2-single-mlp-pad-r-nsl',
+
+        #'a-simv2-single-transformer32-pad-rp-gts', #
+        #'a-simv2-single-transformer32-pad-r-gts'
+        #'a-simv2-single-transformer32-r-gts', #
+        #'a-simv2-single-transformer32-r', #
+        #'a-simv2-single-transformer32-ri-gts', #
+        #'a-simv2-single-transformer32-rp-gts', #
+        #'a-simv2-single-transformer32-i-gts', #
+
+
         ]
 
+    '''model_types = [
+        ]'''
     labels = [('correct-loc', 'loc')]
 
     base_names = [
@@ -363,7 +402,7 @@ if __name__ == '__main__':
     late_frozen_curriculum_names = ["else_then_" + name + "_s21" for name in base_names]
 
     #curriculum_names = ['end2end_s2', 'end2end_s21', 'end2end_s3']
-    curriculum_names = [ 'end2end_s3', 'end2end_s2'] 
+    curriculum_names = [ 'end2end_s21', 'end2end_s2',] 
 
     #curriculum_names = ['belief_both_s21']
 
@@ -372,7 +411,7 @@ if __name__ == '__main__':
 
         total_tasks = len(experiment_args)
         
-        with multiprocessing.Pool(processes=6) as pool:
+        with multiprocessing.Pool(processes=2) as pool:
             list(tqdm(
                 pool.imap(run_single_experiment, experiment_args),
                 total=total_tasks,
@@ -381,7 +420,7 @@ if __name__ == '__main__':
     else:
         print('running single')
         experiments([args.exp_num] if not args.g else [0],
-                repetitions=8,
+                repetitions=12,
                 batches=2500,
                 skip_train=not args.t,
                 skip_eval=not args.e,

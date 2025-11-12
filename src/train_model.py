@@ -300,13 +300,21 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
 
     for stage_config in curriculum_config.curriculum_stages:
         if 'trans' in model.kwargs['module_configs']['arch']:
-            lr = 1e-5
-            optimizer = torch.optim.AdamW(model.parameters(), lr=lr, betas=(0.9, 0.98), weight_decay=0.02)
-            scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.95)
+            lr = 2e-4
+            gamma = 0.95
+            betas = (0.90, 0.99)
+            decay = 0.02
         else:
-            lr = 1e-4
-            optimizer = torch.optim.AdamW(model.parameters(), lr=lr, betas=(0.9, 0.99))
-            scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.97)
+            lr = 2e-4
+            gamma = 0.97
+            betas = (0.9, 0.99)
+            decay = 0.02
+        optimizer = torch.optim.AdamW(model.parameters(), lr=lr, betas=betas, weight_decay=decay)
+        scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=gamma)
+        model.kwargs['module_configs']['gamma'] = gamma
+        model.kwargs['module_configs']['betas'] = betas
+        model.kwargs['module_configs']['lr'] = lr
+        model.kwargs['module_configs']['decay'] = decay
         print('started curricular stage', stage_config['stage_name'])
         
         # stage_train_sets = apply_curriculum_stage(model, stage_config, train_sets_dict)
@@ -321,6 +329,10 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
         #trainable = [name for name, module in model.get_module_dict().items() if module is not None and any(p.requires_grad for p in module.parameters())]
         #print('trainable modules:', trainable)
         print('module configs', model.kwargs['module_configs'])
+        config_txt_path = os.path.join(save_path, "config.txt")
+        with open(config_txt_path, "w") as f:
+            for k, v in model.kwargs.items():
+                f.write(f"{k}: {v}\n")
 
         
         novel_regimes = [r for r in all_s3_regimes if r not in stage_train_sets]

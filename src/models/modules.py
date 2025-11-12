@@ -1340,6 +1340,8 @@ class OpponentRawSimulator(nn.Module):
             return {"i": out_i}
         elif self.style == "rp":
             return {"r": out_r, "p": out_p}
+        elif self.style == "ip":
+            return {"i": out_i, "p": out_p}
         else:
             return {"r": out_r, "i": out_i}
 
@@ -1353,11 +1355,11 @@ class OpponentRawSimulator(nn.Module):
             eff_v_r = (vision * presence.view(B, 1)).view(B, T, 1, 1, 1)
             gt_r = gt.clone()
             gt_r[:, :, 1:2].mul_(eff_v_r)
-        if style in ("i", "ri"):
+        if style in ("i", "ri", "ip"):
             eff_v_i = vision.view(B, T, 1, 1, 1)
             gt_i = gt.clone()
             gt_i[:, :, 1:2].mul_(eff_v_i)
-        if style in ("rp",):
+        if style in ("rp", "ip"):
             gt_p = presence.view(B, 1, 1, 1, 1).expand(B, T, C, H, W)
 
         if style == "r":
@@ -1366,6 +1368,8 @@ class OpponentRawSimulator(nn.Module):
             return {"i": gt_i}
         elif style == "rp":
             return {"r": gt_r, "p": gt_p}
+        elif style == "ip":
+            return {"i": gt_i, "p": gt_p}
         else: 
             return {"r": gt_r, "i": gt_i}
 
@@ -1418,16 +1422,16 @@ class SimulationEndToEnd(nn.Module):
         in_channels = 3
         if self.mode == "single":
             in_channels += 3
-        if self.sim_style in ("ri", "rp"):
+        if self.sim_style in ("ri", "rp", "ip"):
             in_channels += 3
 
         self.in_channels = in_channels
 
-        self.end2end_self = EndToEndModel(arch=self.arch, output_type=self.output_type, pad=self.pad, in_channels=in_channels if self.mode == "single" else 3 if self.sim_style not in ("ri", "rp") else 6)
+        self.end2end_self = EndToEndModel(arch=self.arch, output_type=self.output_type, pad=self.pad, in_channels=in_channels if self.mode == "single" else 3 if self.sim_style not in ("ri", "rp", "ip") else 6)
         if self.mode == "shared":
             self.end2end_op = self.end2end_self
         elif self.mode == "split":
-            self.end2end_op = EndToEndModel(arch=self.arch, output_type=self.output_type, pad=self.pad, in_channels=3 if self.sim_style not in ("ri", "rp") else 10)
+            self.end2end_op = EndToEndModel(arch=self.arch, output_type=self.output_type, pad=self.pad, in_channels=3 if self.sim_style not in ("ri", "rp", "ip") else 10)
         elif self.mode == "single":
             self.end2end_op = None
 
@@ -1447,21 +1451,13 @@ class SimulationEndToEnd(nn.Module):
         self.combiner = nn.Sequential(nn.Linear(comb_in, d_model), nn.ReLU(), nn.Linear(d_model, 6))
 
     def augment_treats_continuous(self, raw_field):
+        B = raw_field.shape[0]
+        scale = 0.5 + torch.rand(B, 1, 1, 1, device=raw_field.device)
+        
         augmented = raw_field.clone()
         treat_channel = augmented[:, :, 1, :, :]
-        
-        is_small = (treat_channel == 1.0)
-        is_large = (treat_channel == 2.0)
-        
-        B = treat_channel.shape[0]
-        device = treat_channel.device
-        
-        midpoint = torch.rand(B, 1, 1, 1, device=device) * 2.0
-        small_values = midpoint / 2.0
-        large_values = (midpoint + 2.0) / 2.0
-        
-        treat_channel = torch.where(is_small, small_values, treat_channel)
-        treat_channel = torch.where(is_large, large_values, treat_channel)
+        mask = treat_channel > 0
+        treat_channel = torch.where(mask, treat_channel * scale, treat_channel)
         
         augmented[:, :, 1, :, :] = treat_channel
         return augmented
@@ -1481,6 +1477,8 @@ class SimulationEndToEnd(nn.Module):
             sim_field = torch.cat([sim_pred["r"], sim_pred["i"]], dim=2)
         elif self.sim_style == "rp":
             sim_field = torch.cat([sim_pred["r"], sim_pred["p"]], dim=2)
+        elif self.sim_style == "ip":
+            sim_field = torch.cat([sim_pred["i"], sim_pred["p"]], dim=2)
 
         #print("sim style", self.sim_style)
         #print("GT R")
@@ -1490,7 +1488,7 @@ class SimulationEndToEnd(nn.Module):
 
         if self.training and self.augment_treats:
             my_raw = self.augment_treats_continuous(my_raw)
-            sim_field = self.augment_treats_continuous(sim_field)
+            sim_field = self.augment_treats_continuous(sim_field) if self.sim_style != "" else None
 
         if self.sim_style == "":
             if self.mode == "single":
@@ -1508,7 +1506,7 @@ class SimulationEndToEnd(nn.Module):
                 joint_out = self.end2end_self(joint_raw)
                 my_decision = joint_out["my_decision"]
             else:
-                my_out = self.end2end_self(my_raw) if self.sim_style not in ("ri", "rp") else self.end2end_self(torch.cat([my_raw, my_raw], dim=2))
+                my_out = self.end2end_self(my_raw) if self.sim_style not in ("ri", "rp", "ip") else self.end2end_self(torch.cat([my_raw, my_raw], dim=2))
                 op_out = self.end2end_op(sim_field)
                 z_self = my_out["my_decision"]
                 z_op = op_out["my_decision"]

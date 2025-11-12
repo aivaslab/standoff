@@ -116,7 +116,7 @@ BASE_NEURAL_CONFIGS['a-neural-treat-shared']['detach'] = False
 
 for x in ['mlp', 'transformer32', 'transformer128']:
     for y in ['', '-pad']:
-        for sim_type in ["", "-r", "-i", "-ri", "-rp"]:
+        for sim_type in ["", "-r", "-i", "-ri", "-rp", "-ip"]:
             for sim_loss in ["", "-nsl"]:
                 for gt_sim in ["", "-gts"]:
                     for decision_loss in ["", "-dl"]:
