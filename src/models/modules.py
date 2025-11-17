@@ -20,11 +20,9 @@ class EndToEndModel(nn.Module):
         self.register_buffer('transition_counts_tensor', torch.zeros(5, 2, 2, 6, 6, 6, dtype=torch.int64), persistent=False)
         self.T_in = 5
         self.T_pad = 5 if pad == '' or pad == False else 10
-        self.register_buffer("causal_mask_full",torch.triu(torch.full((self.T_pad, self.T_pad), float("-inf")), diagonal=1))
-        self.register_buffer("attn_mask", self.causal_mask_full[:self.T_pad, :self.T_pad])
+        self.register_buffer("attn_mask", torch.triu(torch.full((self.T_pad, self.T_pad), float("-inf")), diagonal=1))
         self.register_buffer("t_idx_base", torch.arange(self.T_in).view(1, -1))
-        self.register_buffer("padded_zero", torch.zeros(self.T_pad, 64))
-        #self.register_buffer("pos_embed", self._build_positional_encoding(self.T_pad, d_model=32))
+        #self.register_buffer("padded_zero", torch.zeros(self.T_pad, 64))
 
         print('T_pad:', self.T_pad)
         raw_input_dim = self.T_pad * in_channels * 7 * 7
@@ -49,9 +47,9 @@ class EndToEndModel(nn.Module):
         elif arch == 'transformer32':
             self.raw_embed = nn.Linear(in_channels*7*7, hidden)
             #self.pos_embed = nn.Parameter(torch.randn(1, self.T_pad, 32))
-            self.processed_embed = nn.Linear(processed_input_dim//self.T_in, hidden)
-            encoder = nn.TransformerEncoderLayer(d_model=hidden, nhead=2, activation='gelu', dropout=0.2, batch_first=True, norm_first=False)
-            self.transformer = nn.TransformerEncoder(encoder, num_layers=2)
+            #self.processed_embed = nn.Linear(processed_input_dim//self.T_in, hidden)
+            encoder = nn.TransformerEncoderLayer(d_model=hidden, nhead=2, dropout=0.0, batch_first=True, norm_first=True)
+            self.transformer = torch.compile(nn.TransformerEncoder(encoder, num_layers=2))
             #self.head = nn.Linear(32, output_dim)
             self.head_my_bel   = nn.Linear(hidden, 5*2*6)
             #self.head_my_bel   = nn.Linear(32, 2*6)
@@ -75,18 +73,18 @@ class EndToEndModel(nn.Module):
         pe[0, :, 1::2] = torch.cos(pos * freqs)
         return pe
 
+
     def _pad_shift(self, x, T_in, T_pad, training):
-        B = x.size(0)
+        B, feat = x.size(0), x.size(-1)
         device = x.device
-        feat = x.size(-1)
-
+        
         shift = torch.randint(0, T_pad - T_in + 1, (B,), device=device) if training else torch.zeros(B, dtype=torch.long, device=device)
-
-        t_idx = self.t_idx_base.to(device) + shift.view(B, 1)
-        padded = self.padded_zero.to(device, dtype=x.dtype).expand(B, -1, -1).clone()
+        
+        t_idx = self.t_idx_base + shift.view(B, 1)
+        padded = torch.zeros(B, T_pad, feat, device=device, dtype=x.dtype)
         b_idx = torch.arange(B, device=device).view(-1, 1).expand_as(t_idx)
-
         padded[b_idx, t_idx] = x
+        
         last_idx = shift + T_in - 1
         return padded, t_idx, last_idx
 
@@ -95,6 +93,7 @@ class EndToEndModel(nn.Module):
             B, T, C, H, W = input_data.shape
 
             if self.arch == 'mlp':
+                input_data, _, _ = self._pad_shift(input_data.view(B, T, -1), T, self.T_pad, self.training)
                 x = self.backbone(input_data.view(B, -1))
                 return {
                     'my_decision': self.head_my_dec(x),
@@ -1308,7 +1307,48 @@ class AblationArchitecture(nn.Module):
 
         return result
 
-
+class CombinedPerceptionModule(nn.Module):
+    def __init__(self, use_neural=False, sigmoid_temp=20.0):
+        super().__init__()
+        self.use_neural = use_neural
+        self.sigmoid_temp = sigmoid_temp
+        
+        if use_neural:
+            self.treat_net = nn.Linear(5 * 5, 2 * 5 * 6)
+            self.vision_net = nn.Linear(5, 5)
+            self.presence_net = nn.Linear(1, 1)
+    
+    def forward(self, perceptual_field, is_p1=0):
+        B, T = perceptual_field.shape[:2]
+        
+        if self.use_neural:
+            treat_input = perceptual_field[:, :, 1, 1:6, 3].reshape(B, 5 * 5)
+            treats = self.treat_net(treat_input).view(B, 5, 2, 6)
+            treats = F.softmax(treats, dim=-1)
+            
+            vision_input = perceptual_field[:, :, 2, 3, 2+3*is_p1].reshape(B, 5)
+            vision = torch.sigmoid(self.vision_net(vision_input))
+            
+            presence_input = perceptual_field[:, 0, 0, 3, 0+6*is_p1].reshape(B, 1)
+            presence = torch.sigmoid(25 * self.presence_net(presence_input))
+        else:
+            x = perceptual_field[:, :, 1, 1:6, 3]
+            large_mask = torch.sigmoid(self.sigmoid_temp * (x - 1.5))
+            small_mask = torch.sigmoid(self.sigmoid_temp * (1.5 - x)) * torch.sigmoid(self.sigmoid_temp * (x - 0.5))
+            none_mask = torch.sigmoid(self.sigmoid_temp * (0.5 - x))
+            
+            logits = self.sigmoid_temp * (torch.stack([large_mask, small_mask], dim=2) - 0.5)
+            logits = torch.flip(logits, dims=[3])
+            logit_sums = logits.exp().sum(dim=3, keepdim=True)
+            no_treat_logits = self.sigmoid_temp * (none_mask.mean(dim=2, keepdim=True).unsqueeze(2) - logit_sums)
+            combined_logits = torch.cat([logits, no_treat_logits], dim=3)
+            treats = F.softmax(combined_logits, dim=3)
+            
+            vision = torch.sigmoid_(self.sigmoid_temp * (torch.abs(perceptual_field[:, :, 2, 3, 2+3*is_p1] - 1.0) - 0.5))
+            
+            presence = perceptual_field[:, :, 0, 3, 0+6*is_p1].amax(dim=1, keepdim=True)
+        
+        return treats, vision, presence
 
 class OpponentRawSimulator(nn.Module):
     def __init__(self, d_model=32, T=5, C=3, H=7, W=7, style="r"):
@@ -1318,7 +1358,8 @@ class OpponentRawSimulator(nn.Module):
         in_dim  = C * H * W
         out_dim = C * H * W
         self.encoder = nn.Sequential(
-            nn.Conv2d(C, 4, 3, padding=1), nn.ReLU(),
+            nn.Conv2d(C, 4, 3, padding=1, bias=False), 
+            nn.ReLU(inplace=True),
             #nn.Conv2d(8, 4, 3, padding=1), nn.ReLU(),
         )
         self.head_r = nn.Linear(4*H*W, C*H*W)
@@ -1348,16 +1389,15 @@ class OpponentRawSimulator(nn.Module):
     @torch.no_grad()
     def build_ground_truth(self, perceptual_field, vision, presence, style):
         B, T, C, H, W = perceptual_field.shape
-        gt = perceptual_field.clone()
 
         gt_r, gt_i, gt_p = None, None, None
         if style in ("r", "ri", "rp"):
             eff_v_r = (vision * presence.view(B, 1)).view(B, T, 1, 1, 1)
-            gt_r = gt.clone()
+            gt_r = perceptual_field.clone()
             gt_r[:, :, 1:2].mul_(eff_v_r)
         if style in ("i", "ri", "ip"):
             eff_v_i = vision.view(B, T, 1, 1, 1)
-            gt_i = gt.clone()
+            gt_i = perceptual_field.clone()
             gt_i[:, :, 1:2].mul_(eff_v_i)
         if style in ("rp", "ip"):
             gt_p = presence.view(B, 1, 1, 1, 1).expand(B, T, C, H, W)
@@ -1440,9 +1480,10 @@ class SimulationEndToEnd(nn.Module):
         sig = module_configs.get("sigmoid_temp", 20.0)
         print('sigmoid temp', sig)
         ax = module_configs.get("archx", "mlp")
-        self.treat_op = TreatPerceptionModule(use_neural=False, random_prob=0.0, sigmoid_temp=sig, archx=ax)
-        self.vision_op = VisionPerceptionModule(use_neural=False, random_prob=0.0, sigmoid_temp=sig)
-        self.presence_op = PresencePerceptionModule(use_neural=False, random_prob=0.0, sigmoid_temp=sig)
+
+        #self.vision_op = VisionPerceptionModule(use_neural=False, random_prob=0.0, sigmoid_temp=sig)
+        #self.presence_op = PresencePerceptionModule(use_neural=False, random_prob=0.0, sigmoid_temp=sig)
+        self.perception_op = CombinedPerceptionModule(use_neural=False, sigmoid_temp=sig)
 
         comb_in = 6
         if self.mode != "single":
@@ -1455,16 +1496,15 @@ class SimulationEndToEnd(nn.Module):
         scale = 0.5 + torch.rand(B, 1, 1, 1, device=raw_field.device)
         
         augmented = raw_field.clone()
-        treat_channel = augmented[:, :, 1, :, :]
+        treat_channel = augmented[:, :, 1:2]
         mask = treat_channel > 0
-        treat_channel = torch.where(mask, treat_channel * scale, treat_channel)
-        
-        augmented[:, :, 1, :, :] = treat_channel
+        treat_ch[mask] *= scale.expand_as(treat_ch)[mask]
         return augmented
 
     def forward(self, my_raw: torch.Tensor, additional_input: torch.Tensor):
-        opp_vision = self.vision_op(my_raw, is_p1=0)
-        opp_presence = self.presence_op(my_raw, is_p1=0)
+        #opp_vision = self.vision_op(my_raw, is_p1=0)
+        #opp_presence = self.presence_op(my_raw, is_p1=0)
+        _, opp_vision, opp_presence = self.perception_op(my_raw, is_p1=0)
 
         gt_raw = self.simulator.build_ground_truth(my_raw, opp_vision, opp_presence, self.sim_style)
 

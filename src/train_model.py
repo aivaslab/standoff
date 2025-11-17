@@ -10,6 +10,7 @@ import pandas as pd
 import torch.nn.functional as F
 import math
 import time
+import torch.profiler as profiler
 
 from torch.multiprocessing import set_start_method
 set_start_method('spawn', force=True)
@@ -251,7 +252,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
     batch_size = model_kwargs['batch_size']
     model = load_model(model_type, model_kwargs, device)
 
-    hc_model = load_model('a-hardcoded', {'batch_size': model_kwargs['batch_size']}, device)
+    #hc_model = load_model('a-hardcoded', {'batch_size': model_kwargs['batch_size']}, device)
 
     print(model.kwargs)
 
@@ -305,7 +306,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
             betas = (0.90, 0.99)
             decay = 0.02
         else:
-            lr = 2e-4
+            lr = 5e-4
             gamma = 0.97
             betas = (0.9, 0.99)
             decay = 0.02
@@ -377,6 +378,8 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
         data, labels, params, module_data_combined = [], [], [], []
         all_params_sets = []
 
+        print('training on', stage_train_sets)
+
         for data_name in stage_train_sets:
             dir = os.path.join(load_path, data_name)
             data.append(np.load(os.path.join(dir, 'obs.npz'), mmap_mode='r')['arr_0'])
@@ -440,6 +443,13 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
         all_unique_params = set()
         for param_set in all_params_sets:
             all_unique_params.update(param_set)
+
+
+        print('\nRegime distribution:')
+        total_samples = sum(len(d) for d in data)
+        for regime_name, regime_data in zip(stage_train_sets, data):
+            print(f'{regime_name}: {len(regime_data)}: {len(regime_data) / total_samples:0.4f} samples')
+        print(f'Total: {sum(len(d) for d in data)} samples\n')
         
         all_unique_params = list(all_unique_params)
         n_withheld = max(1, int(0.05 * len(all_unique_params)))
@@ -484,7 +494,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
             epoch_losses_df = pd.concat([epoch_losses_df, new_row], ignore_index=True)
             print(f"Acc: {baseline_results['accuracy']:.4f}, Nacc: {baseline_results['novel_accuracy']:.4f}, NTacc: {baseline_results['novel_task_accuracy']:.4f}, L: {baseline_results['loss']:.4f}, P:", save_path, repetition)
         else:
-            train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=0, pin_memory=True)
+            train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=0, pin_memory=True, drop_last=True)
 
         if False:
             last_digit = int(save_path[-1])
@@ -528,6 +538,11 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
                 inputs, target_labels, _, oracles, _ = next(iter_loader)
             inputs, target_labels, oracles = (t.to(device, non_blocking=True) for t in (inputs, target_labels, oracles))
 
+            #with profiler.profile(activities=[profiler.ProfilerActivity.CPU, profiler.ProfilerActivity.CUDA]) as prof:
+            #    for _ in range(10):
+            #        outputs = model(inputs, None)
+
+            #print(prof.key_averages().table(sort_by="cuda_time_total", row_limit=10))
 
             outputs = model(inputs, None)
             #predicted = outputs['my_decision'].argmax(1)
@@ -689,7 +704,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
                     t.update(epoch_length)
                     scheduler.step()
 
-            if record_loss and (((real_batch) % (2*epoch_length_val) == 0) or (real_batch == total_batches - 1)):
+            if record_loss and (((real_batch) % (epoch_length_val) == 0) or (real_batch == total_batches - 1)):
 
                 stage_results = evaluate_model_stage(model, test_loader, novel_loader, novel_task_loader, criterion, device, stage_config['stage_name'])
     

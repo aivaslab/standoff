@@ -5,7 +5,7 @@ import re
 import numpy as np
 
 root = Path.cwd()
-num = "1002"
+num = "1011"
 out_csv = root / f"all_losses{num}.csv"
 
 
@@ -104,6 +104,30 @@ if last_batch_records:
             f"{row['novel_i_loss_mean']:.4f}, {row['novel_r_loss_mean']:.4f}"
         )
 
+    def top3_stats(group):
+        top3 = group.nlargest(3, 'novel_accuracy')
+        return pd.Series({
+            'novel_accuracy_mean': top3['novel_accuracy'].mean(),
+            'novel_accuracy_std': top3['novel_accuracy'].std(),
+            'novel_i_loss_mean': top3['novel_i_loss'].mean(),
+            'novel_r_loss_mean': top3['novel_r_loss'].mean(),
+            'sim_r_loss_mean': top3['sim_r_loss'].mean(),
+            'sim_i_loss_mean': top3['sim_i_loss'].mean(),
+            'count': len(top3)
+        })
+
+    summary = last_df.groupby(["exp_id", "model"]).apply(top3_stats)
+    
+    print("\n" + "="*80)
+    print("LAST BATCH NOVEL_TASK_ACCURACY SUMMARY (TOP 3)")
+    for (exp_id, model), row in summary.iterrows():
+        print(
+            f"{model}, {int(row['count'])}, "
+            f"{row['novel_accuracy_mean']:.4f}, {row['novel_accuracy_std']:.5f}, "
+            f"{row['sim_i_loss_mean']:.4f}, {row['sim_r_loss_mean']:.4f},"
+            f"{row['novel_i_loss_mean']:.4f}, {row['novel_r_loss_mean']:.4f}"
+        )
+
 big_df = pd.concat(records, ignore_index=True)
 print(sorted(big_df["model"].unique()))
 big_df["series"] = big_df["model"].apply(detect_series)
@@ -170,11 +194,27 @@ if True:
                 plt.title(f"Loss Metrics Across Runs ({series}-{arch})")
                 plt.legend(fontsize=7)
                 plt.tight_layout()
-                plt.savefig(root / f"losses_{series}_{arch}_{num}.png")
+                plt.savefig(root / f"exp_{num}/losses_{series}_{arch}_{num}.png")
                 plt.close()
             acc_metrics = [m for m in ["Novel_Accuracy_mean","Accuracy_mean","Novel_Task_Accuracy_mean"] if m in dfc.columns]
             if acc_metrics:
-                plt.figure(figsize=[10,8])
+                plt.figure(figsize=[10,10])
+                
+                configs = sorted(dfc.groupby(["pad","swap","oracle","model"]).groups.keys())
+                colors = plt.cm.tab10.colors
+                color_map = {cfg: colors[i % len(colors)] for i, cfg in enumerate(configs)}
+                
+                for cfg in configs:
+                    pad, swap, oracle, model = cfg
+                    color = color_map[cfg]
+                    
+                    subset = dfc[dfc["pad"].eq(pad) & dfc["swap"].eq(swap) & 
+                                 dfc["oracle"].eq(oracle) & dfc["model"].eq(model)]
+                    
+                    for run_id, g in subset.groupby("run_id"):
+                        g_sorted = g.sort_values("Batch")
+                        plt.plot(g_sorted["Batch"], g_sorted["Novel_Accuracy_mean"],  color=color, alpha=0.6, linewidth=0.8)
+                
                 base = (
                     dfc.groupby(["pad","swap","oracle","Batch","model"])[acc_metrics]
                     .agg(["mean","std"])
@@ -183,12 +223,12 @@ if True:
                 )
                 for (pad, swap, oracle, model), g in base:
                     label = f"{model}, pad={pad}, swap={swap}, oracle={oracle}"
+                    color = color_map[(pad, swap, oracle, model)]
                     first = acc_metrics[0]
                     f_mean = g[(first, "mean")]
                     f_std  = g[(first, "std")]
-                    line, = plt.plot(g["Batch"], f_mean, label=label)
-                    plt.fill_between(g["Batch"], f_mean - f_std, f_mean + f_std, alpha=0.2, color=line.get_color())
-                    color = line.get_color()
+                    plt.plot(g["Batch"], f_mean, label=label, color=color)
+                    plt.fill_between(g["Batch"], f_mean - f_std, f_mean + f_std, alpha=0.2, color=color)
 
                     for am, style in zip(acc_metrics[1:], styles[1:]):
                         m_mean = g[(am, "mean")]
@@ -198,9 +238,9 @@ if True:
 
                 plt.xlabel("Batch")
                 plt.ylabel("Accuracy")
-                plt.ylim([0.5, 1.0])
+                plt.ylim([0.25, 1.0])
                 plt.title(f"Accuracy ({series}-{arch})")
                 plt.legend(fontsize=7)
                 plt.tight_layout()
-                plt.savefig(root / f"accuracy_all_{series}_{arch}_{num}.png")
+                plt.savefig(root / f"exp_{num}/accuracy_all_{series}_{arch}_{num}.png")
                 plt.close()

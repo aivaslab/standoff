@@ -285,7 +285,9 @@ def gen_data(labels=[], path='supervised', pref_type='', role_type='', record_ex
                     obs = env.reset()
                     if env.current_param_group != prev_param_group:
                         eName = env.current_event_list_name
-                        contains_swaps = "v0" not in eName
+                        #contains_swaps = "v0" not in eName
+                        print(eName, contains_swaps)
+                        contains_swaps = not ("w2v2" in eName or "w1v1" in eName or "w0v0" in eName)
 
                         tq.update(1)
                     prev_param_group = env.current_param_group

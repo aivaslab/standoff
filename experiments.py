@@ -29,11 +29,21 @@ def init_regimes(rational_train_only=True):
         "Fn", "Nf", "Tn", "Ff", "Tf", "Ft", "Tt", "Gg", "Gn", "Ng" #lacking Nt and Nn for splitting a/b
     ] 
     all_sub_regime_keys = [
-        "Fn", "Nf", "Tn", "Ff", "Tf", "Ft", "Tt", "Gg", "Gn", "Ng", "Nt", "Tn", "Nn"
+        "Fn", "Nf", "Tn", "Ff", "Tf", "Ft", "Tt", "Gg", "Gn", "Ng", "Nt", "Nn"
     ] 
     all_sub_regime_keys_less = [
         "Fn", "Nf", "Tn", "Ff", "Tf", "Tt", "Gg", "Gn", "Ng", "Nt", "Tn", "Nn"
     ] 
+
+    split_regimes = ["Nn", "Nt", "Tn"]
+    no_split_regimes = ["Fn", "Nf", "Ff", "Tf", "Ft", "Tt"]
+    eval_only_regimes = ["Gg", "Gn", "Ng"]
+
+    s3_regimes = []
+    for r in no_split_regimes:
+        s3_regimes.extend([f'sl-{r}0', f'sl-{r}1'])
+    for r in split_regimes:
+        s3_regimes.extend([f'sl-{r}0', f'sl-{r}1a', f'sl-{r}1b'])
 
     all_regimes = ['sl-' + x + '0' for x in sub_regime_keys] + ['sl-' + x + '1' for x in sub_regime_keys] + ['sl-Nn1', 'sl-Nt1a', 'sl-Nt1b', 'sl-Nn0', 'sl-Nt0']
     all_regimes_new = ['sl-' + x + '0' for x in all_sub_regime_keys] + ['sl-' + x + '1' for x in all_sub_regime_keys] 
@@ -57,7 +67,11 @@ def init_regimes(rational_train_only=True):
     fregimes['s21'] = ['sl-' + x + '0' for x in sub_regime_keys] + ['sl-Tt1'] + ['sl-Nn0', 'sl-Nt0'] + ['sl-Nn1a'] + ['sl-Nt1a', 'sl-Tn1a'] 
     fregimes['s22'] = ['sl-' + x + '0' for x in all_sub_regime_keys] + ['sl-Tt1', 'sl-Nn1', 'sl-Nt1', 'sl-Tn1',]
     fregimes['s23'] = ['sl-' + x + '0' for x in all_sub_regime_keys] + ['sl-Tt1', 'sl-Nn1', 'sl-Nt1', 'sl-Tn1', 'sl-Ft1', 'sl-Tf1', 'sl-Ft1', 'sl-Gg1', 'sl-Gn1', 'sl-Ng1', 'sl-Nf1', 'sl-Fn1', 'sl-Ff1']
-    fregimes['s3'] = all_regimes_new
+    fregimes['s3'] = s3_regimes
+
+    fregimes['s3e'] = all_regimes_new
+
+    print(fregimes['s3'])
 
     single_regimes = {k[3:]: [k] for k in all_regimes}
     leave_one_out_regimes = {}
@@ -204,7 +218,7 @@ def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, sk
             combined_paths, last_epoch_paths, lp = run_supervised_session(
                 save_path=save_path,
                 train_sets=None,
-                eval_sets=fregimes['s3'],
+                eval_sets=fregimes['s3e'],
                 oracle_labels=['op_belief', 'op_decision', 'my_belief'],
                 key_param=key_param,
                 key_param_value=kpname,
@@ -243,7 +257,7 @@ def run_single_experiment(args_tuple):
 
 
     experiments([args.exp_num],
-                repetitions=12,
+                repetitions=8,
                 batches=10000,
                 skip_train=not args.t,
                 skip_eval=not args.e,
@@ -356,21 +370,22 @@ if __name__ == '__main__':
         #'a-simv2-single-transformer32-ct',
 
         #'a-simv2-single-transformer32-pad-ip-gts',
-        'a-simv2-single-mlp-pad-bd',
+        #'a-simv2-single-mlp-pad-bd',
         #'a-simv2-single-transformer32-pad-ip-bd-gts', # didn't work
-        'a-simv2-single-mlp-pad-bdmb',
-        'a-simv2-single-mlp-pad-bdmb-i-gts',
-        'a-simv2-single-mlp-pad-bdmb-ip-gts',
-        'a-simv2-single-mlp-pad-mb',
-        'a-simv2-single-mlp',
+        #'a-simv2-single-mlp-pad-bdmb',
+        #'a-simv2-single-mlp-pad-bdmb-i-gts',
+        #'a-simv2-single-mlp-pad-bdmb-ip-gts',
+        #'a-simv2-single-mlp-pad-mb',
+        #'a-simv2-single-mlp',
+        'a-simv2-shared-transformer32-pad-ip-gts',
 
 
-        'a-simv2-single-mlp-pad-ip-gts',
-        'a-simv2-single-mlp-pad',
-        'a-simv2-single-mlp-pad-ri-gts',
-        'a-simv2-single-mlp-pad-r-gts',
-        'a-simv2-single-mlp-pad-i-gts',
-        'a-simv2-single-mlp-pad-r-nsl',
+        'a-simv2-single-transformer32-pad-ip-gts',
+        'a-simv2-single-transformer32-pad',
+        'a-simv2-single-transformer32-pad-ri-gts',
+        'a-simv2-single-transformer32-pad-r-gts',
+        'a-simv2-single-transformer32-pad-i-gts',
+        'a-simv2-single-transformer32-pad-r-nsl',
 
         #'a-simv2-single-transformer32-pad-rp-gts', #
         #'a-simv2-single-transformer32-pad-r-gts'
@@ -402,7 +417,7 @@ if __name__ == '__main__':
     late_frozen_curriculum_names = ["else_then_" + name + "_s21" for name in base_names]
 
     #curriculum_names = ['end2end_s2', 'end2end_s21', 'end2end_s3']
-    curriculum_names = [ 'end2end_s21', 'end2end_s2',] 
+    curriculum_names = [ 'end2end_s21'] 
 
     #curriculum_names = ['belief_both_s21']
 
@@ -411,7 +426,7 @@ if __name__ == '__main__':
 
         total_tasks = len(experiment_args)
         
-        with multiprocessing.Pool(processes=2) as pool:
+        with multiprocessing.Pool(processes=4) as pool:
             list(tqdm(
                 pool.imap(run_single_experiment, experiment_args),
                 total=total_tasks,
@@ -420,7 +435,7 @@ if __name__ == '__main__':
     else:
         print('running single')
         experiments([args.exp_num] if not args.g else [0],
-                repetitions=12,
+                repetitions=8,
                 batches=2500,
                 skip_train=not args.t,
                 skip_eval=not args.e,
