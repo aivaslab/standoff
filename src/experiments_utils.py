@@ -20,7 +20,89 @@ import numpy as np
 import random
 
 import warnings
+import matplotlib.pyplot as plt
 
+
+def plot_gg_vs_ng_scatter(last_epoch_df, save_path, key_param=None):
+
+    rename = {
+        #'a-simv2-single-transformer32-loc-end2end_s21': 'Baseline',
+        'a-simv2-single-transformer32-ct-loc-end2end_s21': 'Augmented Treats',
+        'a-simv2-single-transformer32-pad-loc-end2end_s21': 'Padded Timesteps',
+        'a-simv2-single-transformer32-pad-ct-loc-end2end_s21': 'Baseline',
+        #'a-simv2-single-transformer32-pad-r-gts-ct-loc-end2end_s21': 'Real',
+        #'a-simv2-single-transformer32-pad-i-gts-ct-loc-end2end_s21': 'Imaginary',
+        #'a-simv2-single-transformer32-pad-ri-gts-ct-loc-end2end_s21': 'Real + Imaginary',
+        #'a-simv2-single-transformer32-pad-ip-gts-ct-loc-end2end_s21': 'Imaginary + Presence',
+        'a-simv2-single-transformer32-pad-r-nsl-ct-loc-end2end_s21': 'Unsupervised',
+        'a-simv2-single-transformer32-pad-r-ct-loc-end2end_s21': 'Real',
+        'a-simv2-single-transformer32-pad-i-ct-loc-end2end_s21': 'Imaginary',
+        'a-simv2-single-transformer32-pad-ri-ct-loc-end2end_s21': 'Real + Imaginary',
+        'a-simv2-single-transformer32-pad-ip-ct-loc-end2end_s21': 'Imaginary + Presence',
+
+        'a-simv2-split-transformer32-pad-ct-loc-end2end_s21': 'Split',
+        'a-simv2-split-transformer32-pad-r-nsl-ct-loc-end2end_s21': 'Split, Unsupervised Sim.',
+        'a-simv2-split-transformer32-pad-i-gts-ct-loc-end2end_s21': 'Split, Imaginary Sim',
+        'a-simv2-split-transformer32-pad-ip-gts-ct-loc-end2end_s21': 'Split, Imag.+Pres. Sim',
+        'a-simv2-shared-transformer32-pad-ct-loc-end2end_s21': 'Shared',
+        'a-simv2-shared-transformer32-pad-r-nsl-ct-loc-end2end_s21': 'Shared, Unsupervised Sim.',
+        'a-simv2-shared-transformer32-pad-i-gts-ct-loc-end2end_s21': 'Shared, Imaginary Sim',
+        'a-simv2-shared-transformer32-pad-ip-gts-ct-loc-end2end_s21': 'Shared, Imag.+Pres. Sim',
+
+        'a-simv2-shared-transformer32-pad-ip-gts-bd-ct-loc-end2end_s21': 'Supervised Sim. + Behavior',
+        'a-simv2-shared-transformer32-pad-ip-gts-mb-ct-loc-end2end_s21': 'Supervised Sim. + Beliefs',
+        'a-simv2-shared-transformer32-pad-ip-gts-bdmb-ct-loc-end2end_s21': 'Supervised Sim. + Behavior and Beliefs',
+        'a-simv2-shared-transformer32-pad-r-nsl-bd-ct-loc-end2end_s21': 'Unsupervised Sim. + Behavior',
+        'a-simv2-shared-transformer32-pad-r-nsl-mb-ct-loc-end2end_s21': 'Unsupervised Sim. + Beliefs',
+        'a-simv2-shared-transformer32-pad-r-nsl-bdmb-ct-loc-end2end_s21': 'Unsupervised Sim. + Behavior and Beliefs',
+    }
+
+    
+    gg1 = last_epoch_df[last_epoch_df['test_regime'] == 'Gg1']
+    gn1 = last_epoch_df[last_epoch_df['test_regime'] == 'Gn1']
+    ng1 = last_epoch_df[last_epoch_df['test_regime'] == 'Ng1']
+
+    group_cols = ['repetition']
+    if key_param:
+        group_cols.append(key_param)
+
+    gg1m = gg1.groupby(group_cols)['accuracy'].mean()
+    gn1m = gn1.groupby(group_cols)['accuracy'].mean()
+    ng1m = ng1.groupby(group_cols)['accuracy'].mean()
+
+    gg_gn_mean = (gg1m + gn1m) / 2
+
+    aligned = pd.DataFrame({
+        'gg_gn_mean': gg_gn_mean,
+        'ng1': ng1m
+    }).dropna()
+    ordered_keys = [k for k in rename if k in aligned.index.get_level_values(key_param)]
+
+    aligned['gg_gn_mean_flipped'] = 1 - aligned['gg_gn_mean'] #for gg, picking smaller is accurate
+
+    fig, ax = plt.subplots(figsize=(8, 8))
+
+    if key_param and key_param in aligned.index.names:
+        for key_val in ordered_keys:
+            subset = aligned.xs(key_val, level=key_param)
+            eps = 0.015
+            x = subset['gg_gn_mean_flipped'] + np.random.uniform(-eps, eps, size=len(subset))
+            y = subset['ng1'] + np.random.uniform(-eps, eps, size=len(subset))
+            ax.scatter(x, y, s=50, alpha=0.7, label=rename[key_val])
+
+    ax.set_xlabel('Large-treat probability (Gg and Gn)')
+    ax.set_ylabel('Large-treat probability (Ng)')
+    ax.set_xlim(0, 1.05)
+    ax.set_ylim(0, 1.05)
+    ax.set_title('Gettier Comparison')
+
+    if key_param:
+        ax.legend(loc='lower right')
+
+    plt.tight_layout()
+    plt.savefig(save_path)
+    plt.close()
+    
 
 def run_hparam_search(trials=64, repetitions=3, log_file='hparam_search_log.txt', train_sets=None, epochs=5):
     model_kwargs_base = {'hidden_size': [6, 8, 12, 16, 32],
@@ -402,7 +484,7 @@ def generate_accuracy_tables(df, output_path, is_baseline=False, retrain=False):
 def do_comparison(combined_path_list, last_path_list, key_param_list, key_param, exp_name, params, prior_metrics, lp_list, used_regimes=None):
 
     print('combined paths', combined_path_list)
-    combined_path = os.path.join('supervised', exp_name, 'c')
+    combined_path = os.path.join('new', exp_name, 'c')
     os.makedirs(combined_path, exist_ok=True)
 
     #plot_learning_curves(combined_path, lp_list)
@@ -594,15 +676,20 @@ def do_comparison(combined_path_list, last_path_list, key_param_list, key_param,
     print('last epoch df columns', last_epoch_df.columns)
 
     if all_epochs_df is not None and last_epoch_df is not None:
-        create_combined_histogram(last_epoch_df, all_epochs_df, key_param, os.path.join('supervised', exp_name))
+        create_combined_histogram(last_epoch_df, all_epochs_df, key_param, os.path.join('new', exp_name))
 
         avg_loss, variances, ranges_1, ranges_2, range_dict, range_dict3, stats, key_param_stats, oracle_stats, delta_sum, delta_x = calculate_statistics(
             all_epochs_df, last_epoch_df, list(set(params + prior_metrics + [key_param])),
-            skip_3x=True, skip_1x=True, key_param=key_param, used_regimes=used_regimes, savepath=os.path.join('supervised', exp_name), last_timestep=True)
+            skip_3x=True, skip_1x=True, key_param=key_param, used_regimes=used_regimes, savepath=os.path.join('new', exp_name), last_timestep=True)
 
 
     combined_ifr_df = None # temporary
     write_metrics_to_file(os.path.join(combined_path, 'metrics.txt'), last_epoch_df, ranges_1, params, stats, key_param=key_param, d_s=delta_sum, d_x=delta_x)
+
+
+    print('plotting gettier', combined_path)
+
+    plot_gg_vs_ng_scatter(last_epoch_df, os.path.join(combined_path, 'gg_vs_ng_scatter.png'), key_param=key_param)
     save_figures(combined_path, combined_ifr_df, avg_loss, ranges_2, range_dict, range_dict3,
                  params, last_epoch_df, num=12, key_param_stats=key_param_stats, oracle_stats=oracle_stats,
                  key_param=key_param, delta_sum=delta_sum, delta_x=delta_x)

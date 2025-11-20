@@ -15,7 +15,7 @@ import json
 import seaborn as sns
 from stable_baselines3.common.monitor import get_monitor_files
 import matplotlib.colors as mcolors
-
+from pathlib import Path
 
 def moving_average(values, window):
     """
@@ -1552,7 +1552,7 @@ def make_ifrscores(combined_df, combined_path, act, retrain, prior):
         merged_df = mean_df.merge(std_df, on=['feature', 'model'], suffixes=('_mean', '_std'))
 
         formatted_values = {
-            (row['feature'], row['model']): f"{row[f'{use_acc}_mean']:.2f} ({row[f'{use_acc}_std']:.2f})"
+            (row['feature'], row['model']): f"{row[f'{use_acc}_mean']:.3f} ({row[f'{use_acc}_std']:.3f})"
             for _, row in merged_df.iterrows()
         }
         heatmap_colors = mean_df.pivot_table(index='feature', columns='model', values=use_acc, fill_value=0)
@@ -2041,13 +2041,43 @@ def save_key_param_figures(save_dir, key_param_stats, oracle_stats, key_param, k
                 quadmesh.set_xlabel("Test Group", fontsize=10)
                 quadmesh.set_ylabel("Training Dataset", fontsize=10)
                 
-                plt.colorbar(quadmesh.collections[0], cax=cbar_ax, orientation='horizontal', cmap='RdBu')
+                #plt.colorbar(quadmesh.collections[0], cax=cbar_ax, orientation='horizontal', cmap='RdBu')
                 plt.tight_layout()
                 
                 plot_save_path = os.path.join(save_dir, f'{label}_{param}_heatmap.png')
                 print('saving fig to', plot_save_path)
                 plt.savefig(plot_save_path, bbox_inches='tight')
                 plt.close()
+
+            rename = {
+                'a-simv2-single-transformer32-loc-end2end_s21': 'Baseline',
+                'a-simv2-single-transformer32-ct-loc-end2end_s21': 'Augmented Treats',
+                'a-simv2-single-transformer32-pad-loc-end2end_s21': 'Padded Timesteps',
+                'a-simv2-single-transformer32-pad-ct-loc-end2end_s21': 'Augmented Treats + Padded Timesteps',
+                #'a-simv2-single-transformer32-pad-r-gts-ct-loc-end2end_s21': 'Real',
+                #'a-simv2-single-transformer32-pad-i-gts-ct-loc-end2end_s21': 'Imaginary',
+                #'a-simv2-single-transformer32-pad-ri-gts-ct-loc-end2end_s21': 'Real + Imaginary',
+                #'a-simv2-single-transformer32-pad-ip-gts-ct-loc-end2end_s21': 'Imaginary + Presence',
+                'a-simv2-split-transformer32-pad-ct-loc-end2end_s21': 'Split',
+                'a-simv2-split-transformer32-pad-r-nsl-ct-loc-end2end_s21': 'Split, Unsupervised Sim.',
+                'a-simv2-split-transformer32-pad-i-gts-ct-loc-end2end_s21': 'Split, Imaginary Sim',
+                'a-simv2-split-transformer32-pad-ip-gts-ct-loc-end2end_s21': 'Split, Imag.+Pres. Sim',
+                'a-simv2-shared-transformer32-pad-ct-loc-end2end_s21': 'Shared',
+                'a-simv2-shared-transformer32-pad-r-nsl-ct-loc-end2end_s21': 'Shared, Unsupervised Sim.',
+                'a-simv2-shared-transformer32-pad-i-gts-ct-loc-end2end_s21': 'Shared, Imaginary Sim',
+                'a-simv2-shared-transformer32-pad-ip-gts-ct-loc-end2end_s21': 'Shared, Imag.+Pres. Sim',
+                'a-simv2-single-transformer32-pad-r-ct-loc-end2end_s21': 'Real',
+                'a-simv2-single-transformer32-pad-i-ct-loc-end2end_s21': 'Imaginary',
+                'a-simv2-single-transformer32-pad-ri-ct-loc-end2end_s21': 'Real + Imaginary',
+                'a-simv2-single-transformer32-pad-ip-ct-loc-end2end_s21': 'Imaginary + Presence',
+                'a-simv2-single-transformer32-pad-r-nsl-ct-loc-end2end_s21': 'Unsupervised',
+                'a-simv2-shared-transformer32-pad-ip-gts-bd-ct-loc-end2end_s21': 'Supervised Sim. + Behavior',
+                'a-simv2-shared-transformer32-pad-ip-gts-mb-ct-loc-end2end_s21': 'Supervised Sim. + Beliefs',
+                'a-simv2-shared-transformer32-pad-ip-gts-bdmb-ct-loc-end2end_s21': 'Supervised Sim. + Behavior and Beliefs',
+                'a-simv2-shared-transformer32-pad-r-nsl-bd-ct-loc-end2end_s21': 'Unsupervised Sim. + Behavior',
+                'a-simv2-shared-transformer32-pad-r-nsl-mb-ct-loc-end2end_s21': 'Unsupervised Sim. + Beliefs',
+                'a-simv2-shared-transformer32-pad-r-nsl-bdmb-ct-loc-end2end_s21': 'Unsupervised Sim. + Behavior and Beliefs',
+            }
 
             if param == 'test_regime':
                 for type in ['loc',]:# 'box', 'size'] if split_by_type else ['']:
@@ -2056,7 +2086,8 @@ def save_key_param_figures(save_dir, key_param_stats, oracle_stats, key_param, k
                             desired_order = ['Tt0', 'Tf0', 'Tn0', 'Ft0', 'Ff0', 'Fn0', 'Nt0', 'Nf0', 'Nn0', 'Tt1', 'Tf1',
                                              'Tn1', 'Ft1', 'Ff1', 'Fn1', 'Nt1', 'Nf1', 'Nn1']
                         else:
-                            desired_order = ['Tt1', 'Tf1', 'Tn1', 'Ft1', 'Ff1', 'Fn1', 'Nt1a', 'Nt1b', 'Nf1', 'Nn1']
+                            #desired_order = ['Tt1', 'Tf1', 'Tn1', 'Ft1', 'Ff1', 'Fn1', 'Nt1', 'Nf1', 'Nn1', 'Gg1', 'Gn1', 'Ng1']
+                            desired_order = ['Tf1', 'Tn1b', 'Ft1', 'Ff1', 'Fn1', 'Nt1b', 'Nf1', 'Nn1b', 'Gg1', 'Gn1', 'Ng1']
                         # todo: don't even make these if there's only 1 repetition
                         for use_std in [True, False]:
 
@@ -2064,12 +2095,12 @@ def save_key_param_figures(save_dir, key_param_stats, oracle_stats, key_param, k
                             if use_std:
                                 df["accuracy std"] = pd.to_numeric(df["accuracy std"], errors='coerce')
                                 print('df!', df['accuracy std'], df['accuracy mean'])
-                                df["Accuracy mean (Accuracy std)"] = df["accuracy mean"].map("{:.2f}".format) + " (" + df["accuracy std"].map("{:.2f}".format) + ")"
-                            df_filtered = df[df[param].astype(str).str.endswith('1')] if not use_zero_op else df
+                                df["Accuracy mean (Accuracy std)"] = df["accuracy mean"].map("{:.3f}".format) + "\n(" + df["accuracy std"].map("{:.3f}".format) + ")"
+                            df_filtered = df[df[param].astype(str).str.contains('1')] if not use_zero_op else df
                             if use_std:
                                 all_stds.extend(df["accuracy std"].values.tolist())
                                 pivot_df = df_filtered.pivot(index=key_param, columns=param, values="Accuracy mean (Accuracy std)")
-                                mean_values_df = pivot_df.applymap(lambda x: float(x.split(' ')[0]))
+                                mean_values_df = pivot_df.applymap(lambda x: float(x.split('\n')[0]))
                                 pivot_df = pivot_df.reindex(columns=desired_order)
                                 mean_values_df = mean_values_df.reindex(columns=desired_order)
                                 #rename_dict = {x: x.replace('a-mix-n-', '').replace('-loc-s2', '') for x in pivot_df.index.tolist()}
@@ -2079,16 +2110,16 @@ def save_key_param_figures(save_dir, key_param_stats, oracle_stats, key_param, k
                             else:
                                 pivot_df = df_filtered.pivot(index=key_param, columns=param, values="accuracy mean")
                                 mean_values_df = pivot_df
-                                pivot_df = pivot_df.applymap(lambda x: f"{x:.2f}")
+                                pivot_df = pivot_df.applymap(lambda x: f"{x:.3f}")
                                 pivot_df = pivot_df.reindex(columns=desired_order)
                                 mean_values_df = mean_values_df.reindex(columns=desired_order)
                                 #rename_dict = {x: x.replace('a-mix-n-', '').replace('-loc-s2', '') for x in pivot_df.index.tolist()}
                                 #pivot_df = pivot_df.rename(index=rename_dict)
                                 #mean_values_df = mean_values_df.rename(index=rename_dict)
 
-                            fig = plt.figure(figsize=(8, 13 - 6 * split_by_type))
+                            fig = plt.figure(figsize=(12, 12 - 6 * split_by_type))
                             heatmap_ax = fig.add_axes([0.0, 0.11, 1.0, 0.9])
-                            cbar_ax = fig.add_axes([0.0, 0.03, 1.0, 0.02])
+                            #cbar_ax = fig.add_axes([0.0, 0.03, 1.0, 0.02])
 
                             original_row_order = pivot_df.index.tolist()
 
@@ -2138,11 +2169,78 @@ def save_key_param_figures(save_dir, key_param_stats, oracle_stats, key_param, k
                             # mean_values_df['min'] = row_minima
                             # pivot_df['min'] = row_minima.map("{:.2f}".format)
                             print('mean values df', mean_values_df)
+                            last_batch_records = []
+                            exp_dir = Path(save_dir).parent 
+                            for subdir in exp_dir.iterdir():
+                                if not subdir.is_dir():
+                                    continue
+                                folder_name = subdir.name
+                                if folder_name.startswith('end2end_'):
+                                    parts = folder_name.split('_', 2) 
+                                    if len(parts) == 3:
+                                        series = parts[1]
+                                        base = parts[2]
+                                        model_label = f"{base}-loc-end2end_{series}"
+                                    else:
+                                        model_label = folder_name
+                                else:
+                                    model_label = folder_name
+                                csvs = list(subdir.glob("losses-*.csv"))
+                                for f in csvs:
+                                    df_losses = pd.read_csv(f)
+                                    last_batch = df_losses.iloc[-1]
+                                    last_batch_records.append({
+                                        "model": model_label,
+                                        "novel_accuracy": last_batch["Novel_Accuracy"],
+                                    })
+                            
+                            last_df = pd.DataFrame(last_batch_records)
+                            
+                            # Now add the All column using this data
+                            all_column_data = {}
+                            all_column_std = {}
+                            
+                            for training_dataset in pivot_df.index:
+                                model_data = last_df[last_df['model'] == training_dataset]
+                                
+                                if len(model_data) >= 5:
+                                    top3 = model_data.nlargest(5, 'novel_accuracy')
+                                    all_column_data[training_dataset] = top3['novel_accuracy'].mean()
+                                    all_column_std[training_dataset] = top3['novel_accuracy'].std()
+                                elif len(model_data) > 0:
+                                    all_column_data[training_dataset] = model_data['novel_accuracy'].mean()
+                                    all_column_std[training_dataset] = model_data['novel_accuracy'].std() if len(model_data) > 1 else 0.0
+                                else:
+                                    all_column_data[training_dataset] = np.nan
+                                    all_column_std[training_dataset] = 0.0
+                            
+                            if use_std:
+                                pivot_df['All'] = pd.Series({
+                                    k: f"{all_column_data.get(k, np.nan):.3f}\n({all_column_std.get(k, 0.0):.3f})" 
+                                    if not pd.isna(all_column_data.get(k, np.nan)) else ""
+                                    for k in pivot_df.index
+                                })
+                                mean_values_df['All'] = pd.Series(all_column_data)
+                            else:
+                                pivot_df['All'] = pd.Series(all_column_data).map(
+                                    lambda x: f"{x:.3f}" if not pd.isna(x) else ""
+                                )
+                                mean_values_df['All'] = pd.Series(all_column_data)
+
+                            pivot_df = pivot_df.rename(index=rename)
+                            mean_values_df = mean_values_df.rename(index=rename)
+
+                            ordered_existing = [x for x in rename.values() if x in pivot_df.index]
+                            pivot_df = pivot_df.loc[ordered_existing]
+                            mean_values_df = mean_values_df.loc[ordered_existing]
 
                             quadmesh = sns.heatmap(mean_values_df, annot=pivot_df, fmt='', cmap='RdBu', linewidths=0.5, linecolor='white', vmin=0, vmax=1, cbar=False, ax=heatmap_ax)
+                            if 'All' in mean_values_df.columns:
+                                num_original_cols = len(desired_order)
+                                quadmesh.vlines(num_original_cols, *quadmesh.get_ylim(), color='white', linewidth=3)
                             quadmesh.set_yticklabels(quadmesh.get_yticklabels(), rotation=0)
                             quadmesh.set_xlabel("Test regime", fontsize=10)
-                            quadmesh.set_ylabel("Training dataset", fontsize=10)
+                            quadmesh.set_ylabel("", fontsize=10)
 
                             if use_special_rows:
                                 # thicker white lines manually added
@@ -2153,7 +2251,7 @@ def save_key_param_figures(save_dir, key_param_stats, oracle_stats, key_param, k
 
                             # if not split_by_type:
                             # attempt to not draw a colorbar resulted in a bad one
-                            plt.colorbar(quadmesh.collections[0], cax=cbar_ax, orientation='horizontal', cmap='RdBu')
+                            #plt.colorbar(quadmesh.collections[0], cax=cbar_ax, orientation='horizontal', cmap='RdBu')
                             plt.tight_layout()
 
                             plot_save_path = os.path.join(save_dir, f'{label}_{param}_{use_std}_{use_zero_op}_{type}heatmap.png')
@@ -2213,7 +2311,7 @@ def save_key_param_figures(save_dir, key_param_stats, oracle_stats, key_param, k
                         inner_gs = gridspec.GridSpecFromSubplotSpec(1, len(all_filters), subplot_spec=ax_main, wspace=0.2, hspace=0.6, height_ratios=[0.8])
                         for ending_idx, filter in enumerate(all_filters):
                             ax = plt.subplot(inner_gs[ending_idx])
-                            df_filtered = df[df[param].str.endswith(filter)]
+                            df_filtered = df[df[param].str.contains(filter)]
                             subset_df = df_filtered[(df_filtered[key_param] == key_param_val)]
                             subset_df['param_char1'] = subset_df[param].str[0]
                             subset_df['param_char2'] = subset_df[param].str[1]
@@ -2223,7 +2321,7 @@ def save_key_param_figures(save_dir, key_param_stats, oracle_stats, key_param, k
                             subset_pivot = subset_pivot.reindex(custom_row_order)
                             subset_pivot = subset_pivot.reindex(columns=custom_col_order)
 
-                            sns.heatmap(subset_pivot, annot=True, fmt='.2f', cmap='RdBu', linewidths=0.5, linecolor='white', vmin=0, vmax=1, ax=ax, cbar=False)
+                            sns.heatmap(subset_pivot, annot=True, fmt='.3f', cmap='RdBu', linewidths=0.5, linecolor='white', vmin=0, vmax=1, ax=ax, cbar=False)
 
                             if len(all_filters) < 2:
                                 ax.set_xlabel("")
@@ -2676,7 +2774,7 @@ def plot_losses(data_name, label, train_losses, val_losses, val_set_names, speci
     plt.ylabel('Loss')
     plt.ylim(bottom=0)
     plt.tight_layout()
-    plt.savefig(f'supervised/{data_name}-{label}-losses.png')
+    plt.savefig(f'new/{data_name}-{label}-losses.png')
 
 
 def create_combined_histogram(df, combined_avg, param, folder):

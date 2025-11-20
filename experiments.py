@@ -69,7 +69,13 @@ def init_regimes(rational_train_only=True):
     fregimes['s23'] = ['sl-' + x + '0' for x in all_sub_regime_keys] + ['sl-Tt1', 'sl-Nn1', 'sl-Nt1', 'sl-Tn1', 'sl-Ft1', 'sl-Tf1', 'sl-Ft1', 'sl-Gg1', 'sl-Gn1', 'sl-Ng1', 'sl-Nf1', 'sl-Fn1', 'sl-Ff1']
     fregimes['s3'] = s3_regimes
 
-    fregimes['s3e'] = all_regimes_new
+    s3e_regimes = []
+    for r in all_sub_regime_keys:
+        if r in split_regimes:  # split_regimes = ["Nn", "Nt", "Tn"]
+            s3e_regimes.extend([f'sl-{r}0', f'sl-{r}1a', f'sl-{r}1b'])
+        else:
+            s3e_regimes.extend([f'sl-{r}0', f'sl-{r}1'])
+    fregimes['s3e'] = s3e_regimes
 
     print(fregimes['s3'])
 
@@ -225,7 +231,7 @@ def experiments(todo, repetitions, epochs=50, batches=5000, skip_train=False, sk
                 label=label,
                 model_type=model_type,
                 do_retrain_model=retrain,
-                train_sets_dict={'s21': fregimes['s21'], 's22': fregimes['s22'], 's2': fregimes['s2'], 's1': fregimes['s1'], 's3': fregimes['s3']},
+                train_sets_dict={'s21': fregimes['s21'], 's22': fregimes['s22'], 's2': fregimes['s2'], 's1': fregimes['s1'], 's3': fregimes['s3e']},
                 curriculum_name=curriculum_name,
                 **session_params
             )
@@ -257,7 +263,7 @@ def run_single_experiment(args_tuple):
 
 
     experiments([args.exp_num],
-                repetitions=8,
+                repetitions=12,
                 batches=10000,
                 skip_train=not args.t,
                 skip_eval=not args.e,
@@ -360,46 +366,75 @@ if __name__ == '__main__':
         #'a-simv2-shared-transformer32-pad-ri',
         ]
 
-    model_types = [
 
+    # Experiment 1, padding and continuous treats, in 1016 currently, sans MLPs #1018, dropout version #1116 #using 1116
+    e1model_types = [
 
+        #'a-simv2-single-mlp-pad',
         #'a-simv2-single-mlp',
-        #'a-simv2-single-transformer32',
-        #'a-simv2-single-transformer32-pad',
-        #'a-simv2-single-transformer32-pad-ct',
-        #'a-simv2-single-transformer32-ct',
-
-        #'a-simv2-single-transformer32-pad-ip-gts',
-        #'a-simv2-single-mlp-pad-bd',
-        #'a-simv2-single-transformer32-pad-ip-bd-gts', # didn't work
-        #'a-simv2-single-mlp-pad-bdmb',
-        #'a-simv2-single-mlp-pad-bdmb-i-gts',
-        #'a-simv2-single-mlp-pad-bdmb-ip-gts',
-        #'a-simv2-single-mlp-pad-mb',
-        #'a-simv2-single-mlp',
-        'a-simv2-shared-transformer32-pad-ip-gts',
-
-
-        'a-simv2-single-transformer32-pad-ip-gts',
+        'a-simv2-single-transformer32-pad-ct',
+        'a-simv2-single-transformer32-ct',
+        'a-simv2-single-transformer32',
         'a-simv2-single-transformer32-pad',
-        'a-simv2-single-transformer32-pad-ri-gts',
-        'a-simv2-single-transformer32-pad-r-gts',
-        'a-simv2-single-transformer32-pad-i-gts',
-        'a-simv2-single-transformer32-pad-r-nsl',
-
-        #'a-simv2-single-transformer32-pad-rp-gts', #
-        #'a-simv2-single-transformer32-pad-r-gts'
-        #'a-simv2-single-transformer32-r-gts', #
-        #'a-simv2-single-transformer32-r', #
-        #'a-simv2-single-transformer32-ri-gts', #
-        #'a-simv2-single-transformer32-rp-gts', #
-        #'a-simv2-single-transformer32-i-gts', #
-
-
         ]
 
-    '''model_types = [
-        ]'''
+    # Experiment 2a #1020 took 2:04 to run # 1021 #using 1021
+    e2amodel_types = [
+        'a-simv2-single-transformer32-pad-ct',
+        'a-simv2-single-transformer32-pad-ip-gts-ct',
+        'a-simv2-single-transformer32-pad-ri-gts-ct',
+        'a-simv2-single-transformer32-pad-r-gts-ct',
+        'a-simv2-single-transformer32-pad-i-gts-ct',
+        #'a-simv2-single-transformer32-pad-ct-r-nsl',
+        ]
+
+    # Experiment 2b (whatever of 2a best but do it learning, plus unsupervised version) #1030, #1031 
+    e2bmodel_types = [
+        'a-simv2-single-transformer32-pad-r-ct',
+        'a-simv2-single-transformer32-pad-ri-ct',
+        'a-simv2-single-transformer32-pad-ip-ct',
+        'a-simv2-single-transformer32-pad-i-ct',
+        'a-simv2-single-transformer32-pad-r-nsl-ct',
+        ]
+
+    #nsl was the best... um... 2nd best was what? If a transformation of the input is useful, why not 2? I is 2nd best
+
+    # Experiment 3: shared and split gts #1035, #1037 with higher lr and dropout
+    e3model_types = [
+        'a-simv2-split-transformer32-pad-r-nsl-ct',
+        'a-simv2-shared-transformer32-pad-r-nsl-ct',
+        'a-simv2-split-transformer32-pad-ct',
+        'a-simv2-shared-transformer32-pad-ct',
+        'a-simv2-split-transformer32-pad-i-gts-ct',
+        'a-simv2-shared-transformer32-pad-i-gts-ct',
+        'a-simv2-split-transformer32-pad-ip-gts-ct',
+        'a-simv2-shared-transformer32-pad-ip-gts-ct',
+        ]
+
+    # 1036
+    e3bmodel_types = [
+        'a-simv2-shared-transformer32-pad-ip-gts-bdmb-ct',
+        ]
+
+    # Experiment 4: whatever best of those plus op decision, my belief #1040, #1041 with higher lr and dropout,
+    e4model_types = [
+        'a-simv2-shared-transformer32-pad-ip-gts-bdmb-ct',
+        'a-simv2-shared-transformer32-pad-ip-gts-bd-ct',
+        'a-simv2-shared-transformer32-pad-ip-gts-mb-ct',
+        'a-simv2-shared-transformer32-pad-r-nsl-bd-ct',
+        'a-simv2-shared-transformer32-pad-r-nsl-mb-ct',
+        'a-simv2-shared-transformer32-pad-r-nsl-bdmb-ct',
+        ]
+
+    # Experiment 5: modular stuff
+    e5model_types = [
+        'a-mix-n-treat-op-transformer',
+        'a-mix-n-belief-op-transformer',
+        'a-mix-n-all-op',
+        ]
+
+    model_types = e4model_types
+
     labels = [('correct-loc', 'loc')]
 
     base_names = [
@@ -426,7 +461,7 @@ if __name__ == '__main__':
 
         total_tasks = len(experiment_args)
         
-        with multiprocessing.Pool(processes=4) as pool:
+        with multiprocessing.Pool(processes=6) as pool:
             list(tqdm(
                 pool.imap(run_single_experiment, experiment_args),
                 total=total_tasks,
@@ -435,7 +470,7 @@ if __name__ == '__main__':
     else:
         print('running single')
         experiments([args.exp_num] if not args.g else [0],
-                repetitions=8,
+                repetitions=12,
                 batches=2500,
                 skip_train=not args.t,
                 skip_eval=not args.e,

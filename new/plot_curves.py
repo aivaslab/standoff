@@ -5,7 +5,7 @@ import re
 import numpy as np
 
 root = Path.cwd()
-num = "1011"
+num = "1021b"
 out_csv = root / f"all_losses{num}.csv"
 
 
@@ -137,7 +137,7 @@ print(f"Saved combined CSV: {out_csv}")
 
 if True:
     dfa = big_df
-    for arch in ['mlp', 'lstm32', 'transformer32']: 
+    for arch in ['transformer32']: 
         dfb = dfa[dfa["arch"]==arch]
         dfb = dfa
         for series in ["s21","s22", "s2"]:
@@ -161,7 +161,7 @@ if True:
                 mean_diff, std_diff = contrast(subset, var)
                 print(f"[{series}] {var} (oracle=True): mean change={mean_diff:.4f} ({std_diff:.4f})")
 
-            loss_metrics = [m for m in ["Loss_mean", "sim_r_loss_mean", "sim_i_loss_mean"] if m in dfc.columns]
+            loss_metrics = [m for m in ["Loss_mean", "Novel_Loss_mean", "Novel_Task_Loss_mean",] if m in dfc.columns] #  "sim_r_loss_mean", "sim_i_loss_mean"
             styles = ["-", "--", ":"]
             if loss_metrics:
                 plt.figure(figsize=[10,8])
@@ -184,13 +184,14 @@ if True:
                     )
 
                     for lm, style in zip(loss_metrics, styles):
-                        plt.plot(g["Batch"], g[lm], linestyle=style, color=color, linewidth=1.5)
+                        print(lm, len(g[lm]), g[lm].head())
+                        plt.plot(g["Batch"], g[lm], linestyle=style, color=color, linewidth=1.5, label=f"{label} {lm}")
 
                     plt.plot([], [], color=color, label=label)
 
                 plt.xlabel("Batch")
                 plt.ylabel("Loss")
-                plt.ylim([0.0, 0.15])
+                plt.ylim([0.0, 1.2])
                 plt.title(f"Loss Metrics Across Runs ({series}-{arch})")
                 plt.legend(fontsize=7)
                 plt.tight_layout()

@@ -167,7 +167,9 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=True, skip_2x1=False
     print('key param stats')
 
     key_param_stats = {}
+    key_param_stats_top3 = {}
     oracle_key_param_stats = {}
+    
     if key_param is not None:
         for param in params:
             print(param)
@@ -190,7 +192,6 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=True, skip_2x1=False
                         z_value = 1.96  # For a 95% CI
                         standard_errors = (z_value * np.sqrt(repetition_means * (1 - repetition_means) / counts)).groupby(level=param).mean()
 
-                        #print(key_val, param, 'ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ')
 
                         if key_val not in save_dict:
                             save_dict[key_val] = {}

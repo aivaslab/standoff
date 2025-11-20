@@ -51,6 +51,8 @@ import torch.multiprocessing as mp
 mp.set_start_method('spawn', force=True)
 
 
+
+
 class HungarianMSELoss(nn.Module):
     def __init__(self):
         super(HungarianMSELoss, self).__init__()
@@ -258,10 +260,11 @@ def load_model_data_eval_retrain(test_sets, load_path, target_label, last_timest
 
     print('load_model_data_eval', test_sets)
 
-    if 'hardcoded' not in model_type and '-r-' not in model_type:
+    if 'hardcoded' not in model_type:
         model_kwargs, state_dict = load_model_eval(model_save_path, repetition, use_prior, desired_epoch=None)#f'{repetition}-model_epoch{epoch_number}.pt'))
-        batch_size = model_kwargs['batch_size']
-        batch_size = 1024
+        #batch_size = model_kwargs['batch_size']
+        batch_size = 2048
+        model_kwargs['batch_size'] = batch_size
         model = load_model(model_type, model_kwargs, device)
         model.load_state_dict(state_dict)
     else:
@@ -685,6 +688,7 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
     test_names = []
 
     num_random_tests = 1
+    top_n = 5
 
     test = 0
     model_kwargs = {"batch_size": 1024, "oracle_early": oracle_early, "hidden_size": 32, "num_layers": 3, "kernels": 16, "kernel_size1": 3, "kernel_size2": 5, "stride1": 1, "pool_kernel_size": 3, "pool_stride": 1, "padding1": 1, "padding2": 1, "use_pool": False, "use_conv2": False, "kernels2": 16, "lr": 0.0003, "oracle_len": 0, "output_len": 5, "channels": 3}
@@ -750,15 +754,15 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
             rep_num = int(rep_str)
             df = pd.read_csv(loss_path)
             if not df.empty:
-                final_loss = df['Loss'].iloc[-1]
+                final_loss = df['Novel_Loss'].iloc[-1]
                 top_repetitions.append((rep_num, final_loss))
 
         top_repetitions.sort(key=lambda x: x[1])
-        best_three = top_repetitions[:min(3000, len(top_repetitions))]
+        best_three = top_repetitions[:min(top_n, len(top_repetitions))]
         best_repetition_numbers = [rep for rep, loss in best_three]
 
-        if "-r-" in model_type or 'hard' in model_type:
-            best_repetition_numbers = [0]
+        #if "-r-" in model_type or 'hard' in model_type:
+        #    best_repetition_numbers = [0]
 
         print(f"best repetitions: {best_three}")
         for repetition in best_repetition_numbers:
@@ -817,10 +821,22 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
         if not skip_calc and len(last_epoch_df_paths):
             print('loading dfs (with gzip)...', dfs_paths)
 
-            df_list = [pd.read_csv(df_path, compression='gzip') for df_path in dfs_paths]
+            filtered_paths = []
+            for path in last_epoch_df_paths:
+                parts = path.split('_')
+                if len(parts) >= 2:
+                    rep_part = parts[-1].replace('.csv', '').replace('.gz', '')
+                    try:
+                        rep_num = int(rep_part)
+                        if rep_num in best_repetition_numbers[:top_n]:  # Use same best_repetition_numbers from eval
+                            filtered_paths.append(path)
+                    except ValueError:
+                        continue
+
+            df_list = [pd.read_csv(df_path) for df_path in filtered_paths]
             combined_df = pd.concat(df_list, ignore_index=True)
 
-            last_df_list = [pd.read_csv(df_path, compression='gzip') for df_path in last_epoch_df_paths]
+            last_df_list = [pd.read_csv(df_path) for df_path in filtered_paths]
             last_epoch_df = pd.concat(last_df_list, ignore_index=True)
             replace_dict = {'1': 1, '0': 0}
             combined_df.replace(replace_dict, inplace=True)
@@ -831,6 +847,7 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
             # print('last_df cols', last_epoch_df.columns, last_epoch_df.t)
             combined_df['i-informedness'] = combined_df['i-informedness'].fillna('none')
             last_epoch_df['i-informedness'] = last_epoch_df['i-informedness'].fillna('none')
+
 
             avg_loss, variances, ranges_1, ranges_2, range_dict, range_dict3, stats, _, _, _, _ = calculate_statistics(
                 combined_df, last_epoch_df, params + prior_metrics, skip_3x=True)
@@ -858,14 +875,13 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
             rep_num = int(rep_str)
             df = pd.read_csv(loss_path)
             if not df.empty:
-                final_loss = df['Loss'].iloc[-1]
+                final_loss = df['Novel_Loss'].iloc[-1]
                 final_accuracy = df['Accuracy'].iloc[-1] if 'Accuracy' in df.columns else 0
                 top_repetitions.append((rep_num, final_loss, loss_path))
         except Exception as e:
             print(f"Error reading {loss_path}: {e}")
             continue
 
-    top_n = 3000
     
     top_repetitions.sort(key=lambda x: (x[1]))
     best_n = top_repetitions[:min(top_n, len(top_repetitions))]

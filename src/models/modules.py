@@ -30,15 +30,20 @@ class EndToEndModel(nn.Module):
         if output_type == 'op_belief':
             output_dim = 12
         elif output_type in ['op_decision', 'my_decision']:
-            output_dim = 6
+            output_dim = 12
         elif output_type == 'multi':
             output_dim = 2*self.T_in*6 + 2*self.T_in*6 + self.T_in*6 + 5
         else:
-            output_dim = 6
+            output_dim = 12
+
+
+        print('output type', output_type)
         if arch == 'mlp':
             self.backbone = nn.Sequential(
                 nn.Flatten(),
                 nn.Linear(raw_input_dim, hidden),
+                nn.ReLU(),
+                nn.Linear(hidden, hidden),
                 nn.ReLU(),
             )
             self.head_my_dec = nn.Linear(hidden, 6)
@@ -48,7 +53,7 @@ class EndToEndModel(nn.Module):
             self.raw_embed = nn.Linear(in_channels*7*7, hidden)
             #self.pos_embed = nn.Parameter(torch.randn(1, self.T_pad, 32))
             #self.processed_embed = nn.Linear(processed_input_dim//self.T_in, hidden)
-            encoder = nn.TransformerEncoderLayer(d_model=hidden, nhead=2, dropout=0.0, batch_first=True, norm_first=True)
+            encoder = nn.TransformerEncoderLayer(d_model=hidden, nhead=2, dropout=0.05, batch_first=True, norm_first=True)
             self.transformer = torch.compile(nn.TransformerEncoder(encoder, num_layers=2))
             #self.head = nn.Linear(32, output_dim)
             self.head_my_bel   = nn.Linear(hidden, 5*2*6)
@@ -315,15 +320,15 @@ class BaseModule(nn.Module, ABC):
                                hardcoded)'''
 
 class SmallTransformer(nn.Module):
-    def __init__(self, total_in_dim, total_out_dim, T=5, d_model=32, nhead=2, num_layers=1):
+    def __init__(self, total_in_dim, total_out_dim, T=5, d_model=64, nhead=2, num_layers=1):
         super().__init__()
         self.T = T
         self.input_dim = total_in_dim // T
         self.output_dim = total_out_dim // T if total_out_dim % T == 0 else total_out_dim
         self.embed = nn.Linear(self.input_dim, d_model)
         layer = nn.TransformerEncoderLayer(
-            d_model=d_model, nhead=nhead, activation='gelu',
-            batch_first=True, dropout=0.2
+            d_model=d_model, nhead=2,
+            batch_first=True, dropout=0.05
         )
         self.encoder = nn.TransformerEncoder(layer, num_layers=num_layers)
         self.head = nn.Linear(d_model, self.output_dim)
@@ -409,7 +414,7 @@ class TreatPerceptionModule(BaseModule):
 
     def _create_neural_network(self) -> nn.Module:
         if self.archx == "transformer":
-            return SmallTransformer(245 * 5, 5 * 2 * 6, d_model=32)
+            return SmallTransformer(7*7*3 * 5, 5 * 2 * 6, d_model=64)
         return TreatPerceptionNetwork()
 
     def _hardcoded_forward_2x(self, perceptual_field: torch.Tensor) -> torch.Tensor:
@@ -561,7 +566,7 @@ class RNNBeliefNetwork(nn.Module):
         return output
 
 class NormalizedBeliefTransformer(nn.Module):
-    def __init__(self, T=5, d_model=32, nhead=4, num_layers=1):
+    def __init__(self, T=5, d_model=64, nhead=4, num_layers=1):
         super().__init__()
         self.T = T
         self.input_dim = 7   # 6 treats + 1 vision per timestep
@@ -571,9 +576,8 @@ class NormalizedBeliefTransformer(nn.Module):
         layer = nn.TransformerEncoderLayer(
             d_model=d_model,
             nhead=nhead,
-            activation='gelu',
             batch_first=True,
-            dropout=0.1,
+            dropout=0.05,
         )
         self.encoder = nn.TransformerEncoder(layer, num_layers=num_layers)
         self.head = nn.Linear(d_model, self.output_dim)
@@ -1471,7 +1475,7 @@ class SimulationEndToEnd(nn.Module):
         if self.mode == "shared":
             self.end2end_op = self.end2end_self
         elif self.mode == "split":
-            self.end2end_op = EndToEndModel(arch=self.arch, output_type=self.output_type, pad=self.pad, in_channels=3 if self.sim_style not in ("ri", "rp", "ip") else 10)
+            self.end2end_op = EndToEndModel(arch=self.arch, output_type=self.output_type, pad=self.pad, in_channels=3 if self.sim_style not in ("ri", "rp", "ip") else 6)
         elif self.mode == "single":
             self.end2end_op = None
 
@@ -1485,21 +1489,29 @@ class SimulationEndToEnd(nn.Module):
         #self.presence_op = PresencePerceptionModule(use_neural=False, random_prob=0.0, sigmoid_temp=sig)
         self.perception_op = CombinedPerceptionModule(use_neural=False, sigmoid_temp=sig)
 
-        comb_in = 6
+        comb_in = 12
         if self.mode != "single":
-            comb_in += 6
+            comb_in += 12
 
         self.combiner = nn.Sequential(nn.Linear(comb_in, d_model), nn.ReLU(), nn.Linear(d_model, 6))
 
     def augment_treats_continuous(self, raw_field):
-        B = raw_field.shape[0]
-        scale = 0.5 + torch.rand(B, 1, 1, 1, device=raw_field.device)
-        
-        augmented = raw_field.clone()
-        treat_channel = augmented[:, :, 1:2]
-        mask = treat_channel > 0
-        treat_ch[mask] *= scale.expand_as(treat_ch)[mask]
-        return augmented
+        raw_field = raw_field.clone()
+        treats = raw_field[:, :, 1:2]
+
+        B = treats.shape[0]
+        sigma = 0.23
+
+        noise1 = torch.randn(B, 1, 1, 1, 1, device=treats.device) * sigma
+        noise2 = torch.randn(B, 1, 1, 1, 1, device=treats.device) * sigma
+
+        treats[:] = (
+            (treats == 1) * (1.0 + noise1) +
+            (treats == 2) * (2.0 + noise2) +
+            (treats == 0) * 0
+        )
+
+        return raw_field
 
     def forward(self, my_raw: torch.Tensor, additional_input: torch.Tensor):
         #opp_vision = self.vision_op(my_raw, is_p1=0)
@@ -1526,7 +1538,7 @@ class SimulationEndToEnd(nn.Module):
         #print("Raw")
         #print_perception(my_raw)
 
-        if self.training and self.augment_treats:
+        if self.augment_treats:
             my_raw = self.augment_treats_continuous(my_raw)
             sim_field = self.augment_treats_continuous(sim_field) if self.sim_style != "" else None
 

@@ -47,6 +47,7 @@ def last_step_targets(flat_oracle, module_ranges, module_name):
 def evaluate_model_stage(model, test_loader, novel_loader, novel_task_loader, criterion, device, stage_name=""):
     model.eval()
     test_losses, all_preds, all_targets = [], [], []
+    novel_losses, novel_task_losses = [], []
     sim_r_losses, sim_i_losses = [], []
     novel_sim_r_losses, novel_sim_i_losses = [], []
     novel_task_sim_r_losses, novel_task_sim_i_losses = [], []
@@ -73,6 +74,8 @@ def evaluate_model_stage(model, test_loader, novel_loader, novel_task_loader, cr
                 inputs = inputs.to(device)
                 target_labels = target_labels.to(device)
                 outputs = model(inputs, None)
+                loss = criterion(outputs['my_decision'], target_labels)
+                novel_losses.append(loss.item())
 
                 novel_preds.append(outputs['my_decision'].argmax(dim=1))
                 novel_targets.append(target_labels)
@@ -92,6 +95,8 @@ def evaluate_model_stage(model, test_loader, novel_loader, novel_task_loader, cr
                 inputs = inputs.to(device)
                 target_labels = target_labels.to(device)
                 outputs = model(inputs, None)
+                loss = criterion(outputs['my_decision'], target_labels)
+                novel_task_losses.append(loss.item())
 
                 novel_task_preds.append(outputs['my_decision'].argmax(dim=1))
                 novel_task_targets.append(target_labels)
@@ -105,6 +110,8 @@ def evaluate_model_stage(model, test_loader, novel_loader, novel_task_loader, cr
                 novel_task_accuracy = (novel_task_preds == novel_task_targets).float().mean().item()
 
     test_loss = sum(test_losses) / len(test_losses)
+    novel_test_loss = sum(novel_losses) / len(novel_losses)
+    novel_task_test_loss = sum(novel_task_losses) / len(novel_task_losses)
 
     all_preds = torch.cat(all_preds)
     all_targets = torch.cat(all_targets)
@@ -116,6 +123,8 @@ def evaluate_model_stage(model, test_loader, novel_loader, novel_task_loader, cr
         'novel_accuracy': novel_accuracy,
         'novel_task_accuracy': novel_task_accuracy,
         'loss': test_loss,
+        'novel_test_loss': novel_test_loss,
+        'novel_task_test_loss': novel_task_test_loss,
         'stage': stage_name,
     }
     if len(sim_r_losses):
@@ -260,13 +269,13 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
     if output_type == "-bdmb":
         module_labels = {
             'my_decision': ['correct-loc'], #5
-            'op_decision': ['i-target-loc'], #5
+            'op_decision': ['target-loc'], #5
             'my_belief_t': ['loc-large', 'loc-small'], #25, 25
         }
     elif output_type == "-bd":
         module_labels = {
             'my_decision': ['correct-loc'],
-            'op_decision': ['i-target-loc'],
+            'op_decision': ['target-loc'],
         }
     elif output_type == "-mb":
         module_labels = {
@@ -288,7 +297,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
     real_batch = 0
 
     criterion = nn.CrossEntropyLoss()
-    oracle_criterion = nn.CrossEntropyLoss() 
+    oracle_criterion = nn.CrossEntropyLoss()
     
     model.vision_prob = 1.0
 
@@ -301,17 +310,21 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
 
     for stage_config in curriculum_config.curriculum_stages:
         if 'trans' in model.kwargs['module_configs']['arch']:
-            lr = 2e-4
+            lr = 1e-4
             gamma = 0.95
             betas = (0.90, 0.99)
             decay = 0.02
+            print('transformer')
         else:
-            lr = 5e-4
-            gamma = 0.97
-            betas = (0.9, 0.99)
-            decay = 0.02
+            lr = 5e-3
+            gamma = 0.99
+            betas = (0.95, 0.999)
+            decay = 1e-4
+            print('not transformer')
         optimizer = torch.optim.AdamW(model.parameters(), lr=lr, betas=betas, weight_decay=decay)
-        scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=gamma)
+        #scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=gamma)
+        batches = stage_config['batches']
+        scheduler = torch.optim.lr_scheduler.OneCycleLR( optimizer, max_lr=lr, total_steps=batches, anneal_strategy='cos', pct_start=0.2, div_factor=5.0)
         model.kwargs['module_configs']['gamma'] = gamma
         model.kwargs['module_configs']['betas'] = betas
         model.kwargs['module_configs']['lr'] = lr
@@ -324,7 +337,6 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
             if regime in train_sets_dict:
                 stage_train_sets.extend(train_sets_dict[regime])
 
-        batches = stage_config['batches']
         print('training on these sets: ', stage_train_sets)
 
         #trainable = [name for name, module in model.get_module_dict().items() if module is not None and any(p.requires_grad for p in module.parameters())]
@@ -452,7 +464,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
         print(f'Total: {sum(len(d) for d in data)} samples\n')
         
         all_unique_params = list(all_unique_params)
-        n_withheld = max(1, int(0.05 * len(all_unique_params)))
+        n_withheld = max(1, int(0.1 * len(all_unique_params)))
         withheld_params = set(np.random.choice(len(all_unique_params), size=n_withheld, replace=False))
         withheld_params = {all_unique_params[i] for i in withheld_params}
         
@@ -470,7 +482,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
             novel_task_loader = None
 
         if record_loss:
-            train_size = int(0.9 * len(train_dataset))
+            train_size = int(0.95 * len(train_dataset))
             print('epochs:', train_size // batch_size)
             test_size = len(train_dataset) - train_size
             train_dataset, test_dataset = random_split(train_dataset, [train_size, test_size], generator=torch.Generator().manual_seed(42+repetition))
@@ -480,6 +492,8 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
             new_row_data = {
                 'Batch': real_batch,
                 'Loss': baseline_results['loss'],
+                'Novel_Loss': baseline_results['novel_test_loss'],
+                'Novel_Task_Loss': baseline_results['novel_task_test_loss'],
                 'Accuracy': baseline_results['accuracy'],
                 'Novel_Accuracy': baseline_results['novel_accuracy'],
                 'Novel_Task_Accuracy': baseline_results['novel_task_accuracy'],
@@ -521,12 +535,10 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
         first_batch_processed = False
         module_ranges = {}
 
-        if 'trans' in model.kwargs['module_configs']['arch']:
-            print('transformer')
-            #scheduler = torch.optim.lr_scheduler.OneCycleLR( optimizer, max_lr=lr, total_steps=batches, anneal_strategy='cos', div_factor=5.0 )
-        else:
-            print('non transformer!')
-            #scheduler = torch.optim.lr_scheduler.OneCycleLR( optimizer, max_lr=lr, total_steps=batches, anneal_strategy='cos', div_factor=5.0 )
+        best_novel_loss = float('inf')
+        best_checkpoint = None
+        best_batch = 0
+
 
         for batch in range(batches):
             real_batch += 1
@@ -697,12 +709,12 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
             total_loss.backward()
             #torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=2.0)
             optimizer.step()
-            #scheduler.step()
+            scheduler.step()
 
             if (batch+1) % epoch_length == 0:
                 if batch > 1:
                     t.update(epoch_length)
-                    scheduler.step()
+                    #scheduler.step()
 
             if record_loss and (((real_batch) % (epoch_length_val) == 0) or (real_batch == total_batches - 1)):
 
@@ -711,10 +723,12 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
                 new_row_data = {
                     'Batch': real_batch,
                     'Loss': stage_results['loss'],
+                    'Novel_Loss': stage_results['novel_test_loss'],
+                    'Novel_Task_Loss': stage_results['novel_task_test_loss'],
                     'OLoss_total': float(oracle_loss.item()) if oracle_labels else 0,
                     'Accuracy': stage_results['accuracy'],
                     'Novel_Accuracy': stage_results['novel_accuracy'],
-                    'Novel_Task_Accuracy': stage_results['novel_task_accuracy'],
+                    'Novel_Task_Accuracy': stage_results['novel_task_accuracy'], #note novel task accuracy is strangely labeled, it means novel but on-task-distribution accuracy
                     "sim_r_loss": stage_results['sim_r_loss'] if 'sim_r_loss' in stage_results.keys() else 0,
                     "sim_i_loss": stage_results['sim_i_loss'] if 'sim_r_loss' in stage_results.keys() else 0,
                     'novel_sim_r_loss': stage_results['novel_sim_r_loss'] if 'sim_r_loss' in stage_results.keys() else 0,
@@ -725,6 +739,17 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
                 }
                 for k, v in oracle_losses.items():
                     new_row_data[f'OLoss_{k}'] = float(v.item())
+
+                if stage_results['novel_task_test_loss'] < best_novel_loss:
+                    best_novel_loss = stage_results['novel_task_test_loss']
+                    best_batch = real_batch
+                    best_checkpoint = {
+                        'model_state': model.state_dict(),
+                        'batch': real_batch,
+                        'novel_loss': best_novel_loss,
+                        'novel_accuracy': stage_results['novel_accuracy'],
+                        'accuracy': stage_results['accuracy']
+                    }
 
                 new_row = pd.DataFrame([new_row_data])
                 epoch_losses_df = pd.concat([epoch_losses_df, new_row], ignore_index=True)
@@ -742,7 +767,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
                     f"Acc: {stage_results['accuracy']:.3f}, "
                     f"Nacc: {stage_results['novel_accuracy']:.3f}, "
                     f"NTacc: {stage_results['novel_task_accuracy']:.3f}, "
-                    f"L: {stage_results['loss']:.3f}, "
+                    f"L: {stage_results['loss']:.3f}, {stage_results['novel_test_loss']:.3f}, {stage_results['novel_task_test_loss']:.3f}"
                     f"O: {oloss_line}, "
                     f"SR: {stage_results['sim_r_loss'] if 'sim_r_loss' in stage_results.keys() else 0:.3f} {stage_results['novel_sim_r_loss'] if 'sim_r_loss' in stage_results.keys() else 0:.3f}, "
                     f"SI: {stage_results['sim_i_loss'] if 'sim_r_loss' in stage_results.keys() else 0:.3f} {stage_results['novel_sim_i_loss'] if 'sim_r_loss' in stage_results.keys() else 0:.3f}, "
@@ -753,7 +778,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
                 )
                 if save_models and real_batch == total_batches - 1:
                     os.makedirs(save_path, exist_ok=True)
-                    torch.save([model.kwargs, model.state_dict()], os.path.join(save_path, f'{repetition}-checkpoint-{stage_config["stage_name"]}.pt'))
+                    torch.save([model.kwargs, best_checkpoint['model_state']], os.path.join(save_path, f'{repetition}-checkpoint-{stage_config["stage_name"]}.pt'))
 
     if record_loss:
         epoch_losses_df.to_csv(os.path.join(save_path, f'losses-{repetition}.csv'), index=False)

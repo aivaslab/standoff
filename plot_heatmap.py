@@ -58,6 +58,7 @@ def load_and_plot_heatmap(table_path, save_dir, param='test_group', label='accur
         's1': 'Solo',
         's2': 'Informed',
         's21': 'ToM-Simple',
+        'end2end_s21': 'ToM-Simple',
         's3': 'ToM-Complex'
         }
     df['test_group'] = df['test_group'].map(lambda x: test_group_mapping.get(x, x))
@@ -439,8 +440,8 @@ def create_comparison_bar_graph(table_path, save_dir):
     return save_path
 
 if __name__ == "__main__":
-    table_path = "C:\\Users\\Rufus\\Documents\\github\\standoff\\supervised\\exp_2-L\\c\\key_param\\test_group_accuracy_table.csv"
-    save_dir = "C:\\Users\\Rufus\\Documents\\github\\standoff\\supervised\\exp_2-L\\c"
+    table_path = "C:\\Users\\Rufus\\Documents\\github\\standoff\\supervised\\exp_1016\\c\\key_param\\test_group_accuracy_table.csv"
+    save_dir = "C:\\Users\\Rufus\\Documents\\github\\standoff\\supervised\\exp_1016\\c"
     plot_path = load_and_plot_heatmap(table_path, save_dir)
     create_comparison_bar_graph(table_path, save_dir)
     print(f"Heatmap saved to: {plot_path}")

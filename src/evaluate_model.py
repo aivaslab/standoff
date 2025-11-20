@@ -356,12 +356,12 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_load_
                     
                 losses = special_criterion(outputs, max_labels)
                 predicted = outputs.argmax(1)
-                print(predicted, max_labels)
+                #print(predicted, max_labels)
 
                 corrects = predicted.eq(max_labels)
 
                 wrong = ~corrects
-                if wrong.any():
+                if wrong.any() and False:
                     wrong_idx = torch.where(wrong)[0]
                     for k in wrong_idx.tolist():
                         param = params[k]
@@ -534,13 +534,15 @@ def evaluate_model(test_sets, target_label, load_path='supervised/', model_load_
     curtime = time.time()
     print(df.info(memory_usage='deep'))
 
-    print('saving csv...')
+    _path = os.path.join(model_load_path, f'param_losses_{epoch_number}_{repetition}.csv')
+
+    print('saving csv...', _path)
     # print('cols', df.columns)
     if use_prior:
         epoch_number = 'prior'
 
 
-    df.to_csv(os.path.join(model_load_path, f'param_losses_{epoch_number}_{repetition}.csv'), index=False)
+    df.to_csv(_path, index=False)
     print('compressed write time (gzip):', time.time() - curtime)
 
     df_paths.append(os.path.join(model_load_path, f'param_losses_{epoch_number}_{repetition}.csv'))
