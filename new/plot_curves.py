@@ -5,7 +5,7 @@ import re
 import numpy as np
 
 root = Path.cwd()
-num = "1021b"
+num = "6002"
 out_csv = root / f"all_losses{num}.csv"
 
 
@@ -105,7 +105,7 @@ if last_batch_records:
         )
 
     def top3_stats(group):
-        top3 = group.nlargest(3, 'novel_accuracy')
+        top3 = group.nlargest(5, 'novel_accuracy')
         return pd.Series({
             'novel_accuracy_mean': top3['novel_accuracy'].mean(),
             'novel_accuracy_std': top3['novel_accuracy'].std(),
@@ -119,7 +119,7 @@ if last_batch_records:
     summary = last_df.groupby(["exp_id", "model"]).apply(top3_stats)
     
     print("\n" + "="*80)
-    print("LAST BATCH NOVEL_TASK_ACCURACY SUMMARY (TOP 3)")
+    print("LAST BATCH NOVEL_TASK_ACCURACY SUMMARY (TOP 5)")
     for (exp_id, model), row in summary.iterrows():
         print(
             f"{model}, {int(row['count'])}, "

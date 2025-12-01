@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git log --oneline --all -S \"data_at_eval\" -10)",
+      "Bash(git log --all --source --full-history -S \"test_regime\" --oneline)",
+      "Bash(git log --oneline --all -S \"__getitem__\" -20)",
+      "Bash(git log --all --oneline -S \"prior_metrics_data\\[''test_regime''\\]\" -10)",
+      "Bash(git log --all --oneline -S \"''''accuracy'''':\" -- src/evaluate_model.py)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

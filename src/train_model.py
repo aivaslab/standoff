@@ -310,7 +310,7 @@ def train_model(train_sets, target_label, load_path='supervised/', save_path='',
 
     for stage_config in curriculum_config.curriculum_stages:
         if 'trans' in model.kwargs['module_configs']['arch']:
-            lr = 1e-4
+            lr = 0.5e-4
             gamma = 0.95
             betas = (0.90, 0.99)
             decay = 0.02

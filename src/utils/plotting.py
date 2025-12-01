@@ -2071,12 +2071,33 @@ def save_key_param_figures(save_dir, key_param_stats, oracle_stats, key_param, k
                 'a-simv2-single-transformer32-pad-ri-ct-loc-end2end_s21': 'Real + Imaginary',
                 'a-simv2-single-transformer32-pad-ip-ct-loc-end2end_s21': 'Imaginary + Presence',
                 'a-simv2-single-transformer32-pad-r-nsl-ct-loc-end2end_s21': 'Unsupervised',
-                'a-simv2-shared-transformer32-pad-ip-gts-bd-ct-loc-end2end_s21': 'Supervised Sim. + Behavior',
-                'a-simv2-shared-transformer32-pad-ip-gts-mb-ct-loc-end2end_s21': 'Supervised Sim. + Beliefs',
-                'a-simv2-shared-transformer32-pad-ip-gts-bdmb-ct-loc-end2end_s21': 'Supervised Sim. + Behavior and Beliefs',
+
+                'a-simv2-shared-transformer32-pad-ip-gts-bd-ct-loc-end2end_s21': 'GT Sim. + Behavior',
+                'a-simv2-shared-transformer32-pad-ip-gts-mb-ct-loc-end2end_s21': 'GT Sim. + Beliefs',
+                'a-simv2-shared-transformer32-pad-ip-gts-bdmb-ct-loc-end2end_s21': 'GT Sim. + Behavior & Beliefs',
+
+                'a-simv2-shared-transformer32-pad-ip-bd-ct-loc-end2end_s21': 'Supervised Sim. + Behavior',
+                'a-simv2-shared-transformer32-pad-ip-mb-ct-loc-end2end_s21': 'Supervised Sim. + Beliefs',
+                'a-simv2-shared-transformer32-pad-ip-bdmb-ct-loc-end2end_s21': 'Supervised Sim. + Behavior & Beliefs',
+
                 'a-simv2-shared-transformer32-pad-r-nsl-bd-ct-loc-end2end_s21': 'Unsupervised Sim. + Behavior',
                 'a-simv2-shared-transformer32-pad-r-nsl-mb-ct-loc-end2end_s21': 'Unsupervised Sim. + Beliefs',
-                'a-simv2-shared-transformer32-pad-r-nsl-bdmb-ct-loc-end2end_s21': 'Unsupervised Sim. + Behavior and Beliefs',
+                'a-simv2-shared-transformer32-pad-r-nsl-bdmb-ct-loc-end2end_s21': 'Unsupervised Sim. + Behavior & Beliefs',
+                
+
+                'a-simv2-single-transformer32-pad-ip-gts-bd-ct-loc-end2end_s21': 'Single, GT Sim. + Behavior', # these 3 are in 5044
+                'a-simv2-single-transformer32-pad-ip-gts-mb-ct-loc-end2end_s21': 'Single, GT Sim. + Beliefs',
+                'a-simv2-single-transformer32-pad-ip-gts-bdmb-ct-loc-end2end_s21': 'Single, GT Sim. + Behavior & Beliefs',
+                'a-simv2-single-transformer32-pad-ip-bdmb-ct-loc-end2end_s21': 'Single, Sup. Sim. + Behavior & Beliefs',
+
+                'a-simv2-split-transformer32-pad-ip-gts-bd-ct-loc-end2end_s21': 'Split, GT Sim. + Behavior', #these are in 5042, alongside ip-mb
+                'a-simv2-split-transformer32-pad-ip-gts-mb-ct-loc-end2end_s21': 'Split, GT Sim. + Beliefs',
+                'a-simv2-split-transformer32-pad-ip-gts-bdmb-ct-loc-end2end_s21': 'Split, GT Sim. + Behavior & Beliefs',
+                'a-simv2-split-transformer32-pad-ip-bdmb-ct-loc-end2end_s21': 'Split, Sup. Sim. + Behavior & Belief', 
+                
+                'a-simv2-single-transformer32-loc-end2end_s2': 'Single without Additions',
+                'a-simv2-split-transformer32-pad-ip-bdmb-ct-loc-end2end_s2': 'Split with Additions',
+                'a-simv2-shared-transformer32-pad-ip-bdmb-ct-loc-end2end_s2': 'Shared with Additions',
             }
 
             if param == 'test_regime':
@@ -2312,10 +2333,12 @@ def save_key_param_figures(save_dir, key_param_stats, oracle_stats, key_param, k
                         for ending_idx, filter in enumerate(all_filters):
                             ax = plt.subplot(inner_gs[ending_idx])
                             df_filtered = df[df[param].str.contains(filter)]
-                            subset_df = df_filtered[(df_filtered[key_param] == key_param_val)]
+                            subset_df = df_filtered[(df_filtered[key_param] == key_param_val)].copy()
+
                             subset_df['param_char1'] = subset_df[param].str[0]
                             subset_df['param_char2'] = subset_df[param].str[1]
-                            subset_pivot = subset_df.pivot(index='param_char1', columns='param_char2', values='accuracy mean')
+                            subset_pivot = subset_df.groupby(['param_char1', 'param_char2'])['accuracy mean'].mean().unstack()
+                            #subset_pivot = subset_df.pivot(index='param_char1', columns='param_char2', values='accuracy mean').mean().unstack()
 
                             #subset_pivot = subset_pivot / 5
                             subset_pivot = subset_pivot.reindex(custom_row_order)

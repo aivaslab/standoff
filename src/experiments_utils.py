@@ -44,17 +44,37 @@ def plot_gg_vs_ng_scatter(last_epoch_df, save_path, key_param=None):
         'a-simv2-split-transformer32-pad-r-nsl-ct-loc-end2end_s21': 'Split, Unsupervised Sim.',
         'a-simv2-split-transformer32-pad-i-gts-ct-loc-end2end_s21': 'Split, Imaginary Sim',
         'a-simv2-split-transformer32-pad-ip-gts-ct-loc-end2end_s21': 'Split, Imag.+Pres. Sim',
+
         'a-simv2-shared-transformer32-pad-ct-loc-end2end_s21': 'Shared',
         'a-simv2-shared-transformer32-pad-r-nsl-ct-loc-end2end_s21': 'Shared, Unsupervised Sim.',
         'a-simv2-shared-transformer32-pad-i-gts-ct-loc-end2end_s21': 'Shared, Imaginary Sim',
         'a-simv2-shared-transformer32-pad-ip-gts-ct-loc-end2end_s21': 'Shared, Imag.+Pres. Sim',
 
-        'a-simv2-shared-transformer32-pad-ip-gts-bd-ct-loc-end2end_s21': 'Supervised Sim. + Behavior',
-        'a-simv2-shared-transformer32-pad-ip-gts-mb-ct-loc-end2end_s21': 'Supervised Sim. + Beliefs',
-        'a-simv2-shared-transformer32-pad-ip-gts-bdmb-ct-loc-end2end_s21': 'Supervised Sim. + Behavior and Beliefs',
+        'a-simv2-shared-transformer32-pad-ip-gts-bd-ct-loc-end2end_s21': 'GT Sim. + Behavior',
+        'a-simv2-shared-transformer32-pad-ip-gts-mb-ct-loc-end2end_s21': 'GT Sim. + Beliefs',
+        'a-simv2-shared-transformer32-pad-ip-gts-bdmb-ct-loc-end2end_s21': 'GT Sim. + Behavior and Beliefs',
+
+        'a-simv2-shared-transformer32-pad-ip-bd-ct-loc-end2end_s21': 'Supervised Sim. + Behavior',
+        'a-simv2-shared-transformer32-pad-ip-mb-ct-loc-end2end_s21': 'Supervised Sim. + Beliefs',
+        'a-simv2-shared-transformer32-pad-ip-bdmb-ct-loc-end2end_s21': 'Supervised Sim. + Behavior and Beliefs',
+
         'a-simv2-shared-transformer32-pad-r-nsl-bd-ct-loc-end2end_s21': 'Unsupervised Sim. + Behavior',
         'a-simv2-shared-transformer32-pad-r-nsl-mb-ct-loc-end2end_s21': 'Unsupervised Sim. + Beliefs',
         'a-simv2-shared-transformer32-pad-r-nsl-bdmb-ct-loc-end2end_s21': 'Unsupervised Sim. + Behavior and Beliefs',
+
+        'a-simv2-single-transformer32-pad-ip-gts-bd-ct-loc-end2end_s21': 'Single, GT Sim. + Behavior', # these 3 are in 5044
+        'a-simv2-single-transformer32-pad-ip-gts-mb-ct-loc-end2end_s21': 'Single, GT Sim. + Beliefs',
+        'a-simv2-single-transformer32-pad-ip-gts-bdmb-ct-loc-end2end_s21': 'Single, GT Sim. + Behavior & Beliefs',
+        'a-simv2-single-transformer32-pad-ip-bdmb-ct-loc-end2end_s21': 'Single, Sup. Sim. + Behavior & Beliefs',
+
+        'a-simv2-split-transformer32-pad-ip-gts-bd-ct-loc-end2end_s21': 'Split, GT Sim. + Behavior', #these are in 5042, alongside ip-mb
+        'a-simv2-split-transformer32-pad-ip-gts-mb-ct-loc-end2end_s21': 'Split, GT Sim. + Beliefs',
+        'a-simv2-split-transformer32-pad-ip-gts-bdmb-ct-loc-end2end_s21': 'Split, GT Sim. + Behavior & Beliefs',
+        'a-simv2-split-transformer32-pad-ip-bdmb-ct-loc-end2end_s21': 'Split, Sup. Sim. + Behavior & Belief', 
+
+        'a-simv2-single-transformer32-loc-end2end_s2': 'Single without Additions',
+        'a-simv2-split-transformer32-pad-ip-bdmb-ct-loc-end2end_s2': 'Split with Additions',
+        'a-simv2-shared-transformer32-pad-ip-bdmb-ct-loc-end2end_s2': 'Shared with Additions',
     }
 
     

@@ -416,15 +416,63 @@ if __name__ == '__main__':
         'a-simv2-shared-transformer32-pad-ip-gts-bdmb-ct',
         ]
 
-    # Experiment 4: whatever best of those plus op decision, my belief #1040, #1041 with higher lr and dropout,
+    # Experiment 4: whatever best of those plus op decision, my belief #1040, #1041 with higher lr and dropout, #4041 special
     e4model_types = [
         'a-simv2-shared-transformer32-pad-ip-gts-bdmb-ct',
         'a-simv2-shared-transformer32-pad-ip-gts-bd-ct',
         'a-simv2-shared-transformer32-pad-ip-gts-mb-ct',
+
+        'a-simv2-shared-transformer32-pad-ip-bdmb-ct',
+        'a-simv2-shared-transformer32-pad-ip-bd-ct',
+        'a-simv2-shared-transformer32-pad-ip-mb-ct',
+
         'a-simv2-shared-transformer32-pad-r-nsl-bd-ct',
         'a-simv2-shared-transformer32-pad-r-nsl-mb-ct',
         'a-simv2-shared-transformer32-pad-r-nsl-bdmb-ct',
         ]
+
+    e4bmodel_types = [ #supervised, not ground truth #4042 special,
+        ]
+
+    e4cmodel_types = [ # move the shared one to e4b, #5042, need to run e
+        #'a-simv2-shared-transformer32-pad-ip-mb-ct',
+        'a-simv2-split-transformer32-pad-ip-gts-bdmb-ct',
+        'a-simv2-split-transformer32-pad-ip-gts-bd-ct',
+        'a-simv2-split-transformer32-pad-ip-gts-mb-ct', # this one was missing! rerun with it!
+        'a-simv2-split-transformer32-pad-ip-bdmb-ct',
+        'a-simv2-single-transformer32-pad-ip-gts-bdmb-ct',
+        'a-simv2-single-transformer32-pad-ip-gts-bd-ct',
+        'a-simv2-single-transformer32-pad-ip-gts-mb-ct',
+        'a-simv2-single-transformer32-pad-ip-bdmb-ct',
+        ]
+
+    #single bdmb?
+
+    e4dmodel_types = [ #5043
+        'a-simv2-shared-transformer32-pad-i-gts-bdmb-ct',
+        'a-simv2-split-transformer32-pad-ip-bdmb-ct',
+        'a-simv2-shared-transformer32-pad-r-nsl-bdmb-ct',
+    ]
+
+
+    e4fmodel_types = [ ##5044
+        'a-simv2-single-transformer32-pad-ip-gts-bdmb-ct',
+        'a-simv2-single-transformer32-pad-ip-gts-bd-ct',
+        'a-simv2-single-transformer32-pad-ip-gts-mb-ct',
+        ]
+
+    e4g = [ #5055
+        'a-simv2-single-transformer32-pad-ip-bdmb-ct',
+        'a-simv2-split-transformer32-pad-ip-bdmb-ct',
+    ]
+
+    e6 = [ #6001
+        #'a-simv2-single-mlp',
+        'a-simv2-single-transformer32',
+        'a-simv2-split-transformer32-pad-ip-bdmb-ct',
+        'a-simv2-shared-transformer32-pad-ip-bdmb-ct',
+    ]
+
 
     # Experiment 5: modular stuff
     e5model_types = [
@@ -433,7 +481,7 @@ if __name__ == '__main__':
         'a-mix-n-all-op',
         ]
 
-    model_types = e4model_types
+    model_types = ['a-mix-n-all-op']
 
     labels = [('correct-loc', 'loc')]
 
@@ -451,17 +499,15 @@ if __name__ == '__main__':
     early_frozen_curriculum_names = [name + "_then_else_s21" for name in base_names]
     late_frozen_curriculum_names = ["else_then_" + name + "_s21" for name in base_names]
 
-    #curriculum_names = ['end2end_s2', 'end2end_s21', 'end2end_s3']
-    curriculum_names = [ 'end2end_s21'] 
+    curriculum_names = [ 'end2end_s3'] 
 
-    #curriculum_names = ['belief_both_s21']
 
     if (not args.p) and (not args.g):
         experiment_args = [(model_type, label, args, curriculum_name) for model_type, label, curriculum_name in product(model_types, labels, curriculum_names)]
 
         total_tasks = len(experiment_args)
         
-        with multiprocessing.Pool(processes=6) as pool:
+        with multiprocessing.Pool(processes=3) as pool:
             list(tqdm(
                 pool.imap(run_single_experiment, experiment_args),
                 total=total_tasks,

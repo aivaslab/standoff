@@ -316,6 +316,8 @@ def load_model_data_eval_retrain(test_sets, load_path, target_label, last_timest
         params.append(np.load(os.path.join(dir, 'params.npz'), mmap_mode=mmap_mode)['arr_0'])
         for metric in set(prior_metrics):
             metric_data = np.load(os.path.join(dir, 'label-' + metric + '.npz'), mmap_mode=mmap_mode)['arr_0']
+            if len(metric_data.shape) > 1 and last_timestep:
+                metric_data = metric_data[..., -1]
             if metric in prior_metrics_data.keys():
                 prior_metrics_data[metric].append(metric_data)
             else:
@@ -688,7 +690,7 @@ def run_supervised_session(save_path, repetitions=1, epochs=5, train_sets=None, 
     test_names = []
 
     num_random_tests = 1
-    top_n = 5
+    top_n = 50 if skip_eval == False else 55
 
     test = 0
     model_kwargs = {"batch_size": 1024, "oracle_early": oracle_early, "hidden_size": 32, "num_layers": 3, "kernels": 16, "kernel_size1": 3, "kernel_size2": 5, "stride1": 1, "pool_kernel_size": 3, "pool_stride": 1, "padding1": 1, "padding2": 1, "use_pool": False, "use_conv2": False, "kernels2": 16, "lr": 0.0003, "oracle_len": 0, "output_len": 5, "channels": 3}

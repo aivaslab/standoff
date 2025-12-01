@@ -22,6 +22,18 @@ import pandas as pd
 import heapq
 from scipy.stats import sem, t
 
+def extract_last_value_from_list_str(val):
+    if isinstance(val, str):
+        try:
+            parsed = ast.literal_eval(val)
+            if isinstance(parsed, list) and len(parsed) > 0:
+                return parsed[-1]
+        except:
+            pass
+    elif isinstance(val, list) and len(val) > 0:
+        return val[-1]
+    return val
+
 def calculate_statistics(df, last_epoch_df, params, skip_3x=True, skip_2x1=False, key_param=None, skip_1x=True, record_delta_pi=False, used_regimes=None, savepath=None, last_timestep=True):
     '''
     Calculates various statistics from datasets of model outputs detailing model performance.
@@ -33,7 +45,7 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=True, skip_2x1=False
     range_dict = {}
     range_dict3 = {}
 
-    check_labels = ['p-s-0', 'target', 'delay', 'b-loc', 'p-b-0', 'p-b-1', 'p-s-1', 'shouldAvoidSmall', 'shouldGetBig', 'vision', 'loc']
+    check_labels = ['p-s-0', 'target', 'delay', 'b-loc', 'p-b-0', 'p-b-1', 'p-s-1', 'shouldAvoidSmall', 'shouldGetBig', 'vision', 'loc', 'accuracy']
 
     sub_regime_keys = [
         "Nn", "Fn", "Nf", "Tn", "Nt", "Ff", "Tf", "Ft", "Tt"
@@ -92,13 +104,14 @@ def calculate_statistics(df, last_epoch_df, params, skip_3x=True, skip_2x1=False
     variable_columns = last_epoch_df.select_dtypes(include=[np.number]).nunique().index[
         last_epoch_df.select_dtypes(include=[np.number]).nunique() > 1].tolist()
 
-    correlations = last_epoch_df[variable_columns + ['accuracy']].corr()
-    target_correlations = correlations['accuracy'][variable_columns]
-    stats = {
-        'param_correlations': correlations,
-        'accuracy_correlations': target_correlations,
-        'vars': variable_columns
-    }
+    if True:
+        correlations = last_epoch_df[variable_columns + ['accuracy']].corr()
+        target_correlations = correlations['accuracy'][variable_columns]
+        stats = {
+            'param_correlations': correlations,
+            'accuracy_correlations': target_correlations,
+            'vars': variable_columns
+        }
     if used_regimes:
         print('calculating regime size')
         regime_lengths = {}
